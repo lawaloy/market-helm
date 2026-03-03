@@ -21,48 +21,91 @@ jobs:
           BASE_REF="${{ github.event.pull_request.base.ref }}"
           git fetch origin $BASE_REF
 
-          # Get commit messages (summary)
-          COMMITS=$(git log --format="- %s" origin/$BASE_REF..HEAD)
-          [ -z "$COMMITS" ] && COMMITS="- (no new commits)"
+          # Gather changed files and statuses
+          FILE_STATUS=$(git diff --name-status origin/$BASE_REF...HEAD)
+          FILE_LIST=$(echo "$FILE_STATUS" | awk '
+            $1 ~ /^R/ { print $3; next }
+            NF >= 2 { print $2 }
+          ')
 
-          # Get changed files
-          FILES=$(git diff --name-only origin/$BASE_REF...HEAD | sed 's/^/- `/' | sed 's/$/`/')
+          # Files changed (bullet list)
+          FILES=$(echo "$FILE_LIST" | sed '/^$/d' | sed 's/^/- `/' | sed 's/$/`/')
           [ -z "$FILES" ] && FILES="- (no files changed)"
 
+          # Scalable summary: counts by change type and top-level area
+          TOTAL_CHANGED=$(echo "$FILE_LIST" | sed '/^$/d' | wc -l | tr -d ' ')
+          ADDED=$(echo "$FILE_STATUS" | grep -Ec '^A[[:space:]]' || true)
+          MODIFIED=$(echo "$FILE_STATUS" | grep -Ec '^M[[:space:]]' || true)
+          DELETED=$(echo "$FILE_STATUS" | grep -Ec '^D[[:space:]]' || true)
+          RENAMED=$(echo "$FILE_STATUS" | grep -Ec '^R[0-9]*[[:space:]]' || true)
+
+          AREA_COUNTS=$(echo "$FILE_LIST" | sed '/^$/d' | awk -F/ '
+            {
+              area = (NF == 1) ? "root" : $1
+              count[area]++
+            }
+            END {
+              for (a in count) {
+                printf "- %s: %d files\n", a, count[a]
+              }
+            }
+          ' | sort)
+
+          if [ -z "$AREA_COUNTS" ]; then
+            AREA_COUNTS="- none"
+          fi
+
           {
-            echo "## Summary"
+            echo "## Auto"
             echo ""
-            echo "$COMMITS"
+            echo "- ${TOTAL_CHANGED} files changed."
+            echo "- ${ADDED} added, ${MODIFIED} modified, ${RENAMED} renamed, ${DELETED} deleted."
+            echo ""
+            echo "## Areas"
+            echo ""
+            echo "$AREA_COUNTS"
             echo ""
             echo "## Files changed"
             echo ""
             echo "$FILES"
-          } > pr-body.md
+          } > pr-auto.md
 
       - name: Update PR description
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const MAX_LENGTH = 65536;
-            const TRUNCATE_SUFFIX = '\n\n... (truncated)';
+            const MAX_LENGTH = 1000;
+            const TRUNCATE_SUFFIX = '\n\n...';
+            const START = '<!-- AUTO:START -->';
+            const END = '<!-- AUTO:END -->';
 
-            let body = fs.readFileSync('pr-body.md', 'utf8');
+            let autoBody = fs.readFileSync('pr-auto.md', 'utf8');
 
-            if (body.length > MAX_LENGTH) {
-              // Prefer: keep full summary, truncate files section only
-              const filesHeader = '## Files changed';
-              const idx = body.indexOf(filesHeader);
-              if (idx !== -1) {
-                const summaryPart = body.slice(0, idx + filesHeader.length + 2);
-                const maxFilesLen = MAX_LENGTH - summaryPart.length - TRUNCATE_SUFFIX.length;
-                const filesPart = body.slice(idx + filesHeader.length + 2);
-                body = summaryPart + (maxFilesLen > 0 ? filesPart.slice(0, maxFilesLen) : '') + TRUNCATE_SUFFIX;
+            if (autoBody.length > MAX_LENGTH) {
+              // Keep whole lines; never cut file paths mid-line.
+              const lines = autoBody.split('\n');
+              let out = '';
+              for (const line of lines) {
+                const candidate = out ? `${out}\n${line}` : line;
+                if (candidate.length + TRUNCATE_SUFFIX.length > MAX_LENGTH) break;
+                out = candidate;
               }
-              // Fallback: if summary alone exceeds limit, truncate from end
-              if (body.length > MAX_LENGTH) {
-                body = body.slice(0, MAX_LENGTH - TRUNCATE_SUFFIX.length) + TRUNCATE_SUFFIX;
-              }
+              autoBody = out + TRUNCATE_SUFFIX;
+            }
+            const autoSection = `${START}\n${autoBody}\n${END}`;
+
+            const existing = context.payload.pull_request.body || '';
+            let body;
+            const startIdx = existing.indexOf(START);
+            const endIdx = existing.indexOf(END);
+
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              const before = existing.slice(0, startIdx).trimEnd();
+              const after = existing.slice(endIdx + END.length).trimStart();
+              body = `${before}\n\n${autoSection}${after ? `\n\n${after}` : ''}`;
+            } else {
+              body = `## What + Why\n- \n\n## Checks\n- [ ] \`api\`: \`npm run build\`\n- [ ] \`api\`: \`npm run test -- --ci --runInBand\`\n\n${autoSection}`;
             }
 
             const { owner, repo } = context.repo;
