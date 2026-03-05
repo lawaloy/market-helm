@@ -8,8 +8,8 @@ updates:
   - package-ecosystem: "npm" # See documentation for possible values
     directory: "/dashboard/frontend" # Location of package manifests
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "cron"
+      cronjob: "0 13 * * *"
     groups:
       npm-all:
         patterns:
@@ -17,8 +17,8 @@ updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "cron"
+      cronjob: "0 13 * * *"
     groups:
       pip-all:
         patterns:
@@ -26,8 +26,8 @@ updates:
   - package-ecosystem: "pip"
     directory: "/dashboard/backend"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "cron"
+      cronjob: "0 13 * * *"
     groups:
       pip-all:
         patterns:
