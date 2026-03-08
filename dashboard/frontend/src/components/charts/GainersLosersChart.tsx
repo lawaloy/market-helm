@@ -8,6 +8,17 @@ interface GainersLosersChartProps {
   losers: StockMover[];
 }
 
+const toNumericTooltipValue = (
+  value: number | string | ReadonlyArray<number | string> | undefined
+): number | null => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+  return null;
+};
+
 const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers }) => {
   // Take top 5 gainers and top 5 losers
   const topGainers = gainers.slice(0, 5);
@@ -36,9 +47,10 @@ const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers
           <XAxis type="number" />
           <YAxis dataKey="symbol" type="category" width={60} />
           <Tooltip
-            formatter={(value: number | undefined) =>
-              value != null ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : ''
-            }
+            formatter={(value) => {
+              const numericValue = toNumericTooltipValue(value);
+              return numericValue != null ? `${numericValue >= 0 ? '+' : ''}${numericValue.toFixed(2)}%` : '';
+            }}
           />
           <Bar dataKey="change" radius={[0, 4, 4, 0]}>
             {data.map((entry, index) => (

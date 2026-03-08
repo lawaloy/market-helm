@@ -23,6 +23,17 @@ interface HistoricalTrendsProps {
   refreshKey?: number;
 }
 
+const toNumericTooltipValue = (
+  value: number | string | ReadonlyArray<number | string> | undefined
+): number | null => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+  return null;
+};
+
 const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) => {
   const [data, setData] = useState<DailySummaryPoint[]>([]);
   const [dateRange, setDateRange] = useState<{ first: string; last: string } | null>(null);
@@ -192,9 +203,10 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
               <Tooltip
-                formatter={(value: number | undefined) =>
-                  value != null ? [`${value}%`, 'Avg Confidence'] : ['', 'Avg Confidence']
-                }
+                formatter={(value) => {
+                  const numericValue = toNumericTooltipValue(value);
+                  return numericValue != null ? [`${numericValue}%`, 'Avg Confidence'] : ['', 'Avg Confidence'];
+                }}
                 labelFormatter={(label) => `Date: ${label}`}
               />
               <Line
@@ -218,9 +230,10 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
               <Tooltip
-                formatter={(value: number | undefined) =>
-                  value != null ? [formatPercentage(value), 'Expected Move'] : ['', 'Expected Move']
-                }
+                formatter={(value) => {
+                  const numericValue = toNumericTooltipValue(value);
+                  return numericValue != null ? [formatPercentage(numericValue), 'Expected Move'] : ['', 'Expected Move'];
+                }}
                 labelFormatter={(label) => `Date: ${label}`}
               />
               <Line
@@ -337,9 +350,10 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v.toFixed(0)}`} />
                   <Tooltip
-                    formatter={(value: number | undefined, name?: string) =>
-                      value != null ? [formatPrice(value), name ?? ''] : ['', name ?? '']
-                    }
+                    formatter={(value, name) => {
+                      const numericValue = toNumericTooltipValue(value);
+                      return numericValue != null ? [formatPrice(numericValue), name ?? ''] : ['', name ?? ''];
+                    }}
                     labelFormatter={(label) => `Date: ${label}`}
                   />
                   <Legend />
