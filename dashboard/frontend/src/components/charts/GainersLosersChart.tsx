@@ -1,23 +1,13 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import type { StockMover } from '../../types';
+import { coerceTooltipNumber } from '../../utils/formatters';
 import CompanyLogo from '../common/CompanyLogo';
 
 interface GainersLosersChartProps {
   gainers: StockMover[];
   losers: StockMover[];
 }
-
-const toNumericTooltipValue = (
-  value: number | string | ReadonlyArray<number | string> | undefined
-): number | null => {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const parsedValue = Number(value);
-    return Number.isFinite(parsedValue) ? parsedValue : null;
-  }
-  return null;
-};
 
 const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers }) => {
   // Take top 5 gainers and top 5 losers
@@ -48,8 +38,8 @@ const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers
           <YAxis dataKey="symbol" type="category" width={60} />
           <Tooltip
             formatter={(value) => {
-              const numericValue = toNumericTooltipValue(value);
-              return numericValue != null ? `${numericValue >= 0 ? '+' : ''}${numericValue.toFixed(2)}%` : '';
+              const n = coerceTooltipNumber(value);
+              return n != null ? `${n >= 0 ? '+' : ''}${n.toFixed(2)}%` : '';
             }}
           />
           <Bar dataKey="change" radius={[0, 4, 4, 0]}>

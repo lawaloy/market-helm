@@ -14,7 +14,7 @@ import {
   Legend,
 } from 'recharts';
 import { historyApi, stocksApi } from '../services/api';
-import { formatPercentage, formatDate, formatPrice, getCompanyName } from '../utils/formatters';
+import { coerceTooltipNumber, formatPercentage, formatDate, formatPrice, getCompanyName } from '../utils/formatters';
 import type { DailySummaryPoint, HistoricalPoint } from '../types';
 
 const DAY_OPTIONS = [7, 14, 30, 90];
@@ -22,17 +22,6 @@ const DAY_OPTIONS = [7, 14, 30, 90];
 interface HistoricalTrendsProps {
   refreshKey?: number;
 }
-
-const toNumericTooltipValue = (
-  value: number | string | ReadonlyArray<number | string> | undefined
-): number | null => {
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const parsedValue = Number(value);
-    return Number.isFinite(parsedValue) ? parsedValue : null;
-  }
-  return null;
-};
 
 const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) => {
   const [data, setData] = useState<DailySummaryPoint[]>([]);
@@ -204,8 +193,8 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
               <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
               <Tooltip
                 formatter={(value) => {
-                  const numericValue = toNumericTooltipValue(value);
-                  return numericValue != null ? [`${numericValue}%`, 'Avg Confidence'] : ['', 'Avg Confidence'];
+                  const n = coerceTooltipNumber(value);
+                  return n != null ? [`${n}%`, 'Avg Confidence'] : ['', 'Avg Confidence'];
                 }}
                 labelFormatter={(label) => `Date: ${label}`}
               />
@@ -231,8 +220,8 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
               <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
               <Tooltip
                 formatter={(value) => {
-                  const numericValue = toNumericTooltipValue(value);
-                  return numericValue != null ? [formatPercentage(numericValue), 'Expected Move'] : ['', 'Expected Move'];
+                  const n = coerceTooltipNumber(value);
+                  return n != null ? [formatPercentage(n), 'Expected Move'] : ['', 'Expected Move'];
                 }}
                 labelFormatter={(label) => `Date: ${label}`}
               />
@@ -351,8 +340,9 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v.toFixed(0)}`} />
                   <Tooltip
                     formatter={(value, name) => {
-                      const numericValue = toNumericTooltipValue(value);
-                      return numericValue != null ? [formatPrice(numericValue), name ?? ''] : ['', name ?? ''];
+                      const n = coerceTooltipNumber(value);
+                      const label = name != null ? String(name) : '';
+                      return n != null ? [formatPrice(n), label] : ['', label];
                     }}
                     labelFormatter={(label) => `Date: ${label}`}
                   />

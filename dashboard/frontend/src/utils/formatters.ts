@@ -115,3 +115,18 @@ export const getTrendIcon = (trend: string): string => {
 /** Display name from API when valid, else symbol */
 export const getCompanyName = (symbol: string, apiName?: string): string =>
   apiName && apiName !== symbol ? apiName : symbol;
+
+/** Narrow Recharts tooltip values (string | number | …) to a finite number. */
+export function coerceTooltipNumber(value: unknown): number | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return coerceTooltipNumber(first);
+  }
+  return undefined;
+}
