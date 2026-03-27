@@ -3,13 +3,14 @@ Core alert engine.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 import json
 
 from ..core.logger import setup_logger
 from .alert_storage import AlertStorage
 from .alert_rules import evaluate_price_threshold, evaluate_screening_match
+from .notifiers.webhook_notifier import WebhookNotifier
 
 logger = setup_logger("alerts")
 
@@ -60,15 +61,22 @@ class AlertEngine:
             return False
         return datetime.utcnow() - last_triggered < timedelta(minutes=cooldown_minutes)
 
-    def _build_notifiers(self, alert: Dict) -> List[LogNotifier]:
+    def _build_notifiers(self, alert: Dict) -> List[Any]:
         notifier_names = alert.get("notifications") or ["log"]
-        instances = []
+        instances: List[Any] = []
         for name in notifier_names:
-            notifier_cls = NOTIFIERS.get(name)
-            if notifier_cls:
-                instances.append(notifier_cls())
+            if name == "log":
+                instances.append(LogNotifier())
+            elif name == "webhook":
+                webhook = WebhookNotifier.from_alert(alert)
+                if webhook:
+                    instances.append(webhook)
             else:
-                logger.warning(f"Unknown notifier '{name}', skipping")
+                notifier_cls = NOTIFIERS.get(name)
+                if notifier_cls:
+                    instances.append(notifier_cls())
+                else:
+                    logger.warning(f"Unknown notifier '{name}', skipping")
         if not instances:
             instances.append(LogNotifier())
         return instances
