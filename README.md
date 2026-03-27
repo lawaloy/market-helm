@@ -79,6 +79,8 @@ source .venv/bin/activate
   pip install -e .
   ```
 
+**Why isn’t the web dashboard installed from PyPI?** The published package (`stock-exchange-tracker` on PyPI) only includes the **`src/`** library and the **`stock-tracker`** CLI—it does not bundle the dashboard. The dashboard is a **separate stack**: a **FastAPI** backend plus a **React** frontend that must be built with **Node.js** (`npm install` / `npm run build`). Shipping that through `pip` would mean packaging prebuilt static assets and extra dependencies into the wheel (or publishing a separate npm package)—**we haven’t done that yet**. To run the UI, use a **clone** of the repo and follow [dashboard/README.md](dashboard/README.md).
+
 ### Step 2: Add Your API Key
 
 Create a file named `.env` in the folder where you will run the tool (project root if you cloned, or any working directory if you installed from PyPI):

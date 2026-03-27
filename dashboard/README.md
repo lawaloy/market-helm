@@ -2,6 +2,8 @@
 
 Modern, interactive web dashboard for visualizing stock market data, projections, and recommendations.
 
+**Not on PyPI:** The CLI is installable with `pip install stock-exchange-tracker`; the dashboard is **not** part of that wheel. You need this repository (or a copy of `dashboard/`), **Python 3.12+**, and **Node.js 18+** to run backend + frontend—see Quick Start below.
+
 ## Quick Start
 
 ### Prerequisites
