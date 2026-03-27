@@ -61,7 +61,7 @@ Never commit values; use your host’s secret manager or encrypted env.
 
 ## Future: hosting and **automated trading** (not implemented yet)
 
-This repo today is **analysis + dashboard + alerts**. It does **not** place orders. If you later add **automated buy/sell**:
+This repo today is **analysis + dashboard + alerts**. It does **not** place orders. The **product direction** (monitor → suggest → execute, multi-user) is in [PROJECT_STATUS.md](PROJECT_STATUS.md#product-vision). If you later add **automated buy/sell**:
 
 1. **Broker API** — You need a broker that exposes **order placement** (e.g. Alpaca, Interactive Brokers, Tradier). Finnhub is **market data**, not a substitute for execution.
 2. **Secrets** — Trading keys must live only in **host secrets**; rotate and scope to paper vs live.

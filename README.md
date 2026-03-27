@@ -2,6 +2,8 @@
 
 A daily stock market tracking tool that automatically identifies promising stocks, fetches market data, and generates insights. Perfect for traders, analysts, or anyone interested in tracking market trends.
 
+**Direction:** The long-term goal is a product that **monitors** markets, **suggests** buys/sells, and can **eventually execute** via broker APIs—with room to grow from the installable **CLI** toward a **multi-user** app. Read the full picture in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-vision).
+
 ## What Does It Do?
 
 This tool automatically:

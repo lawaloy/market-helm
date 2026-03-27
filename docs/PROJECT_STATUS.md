@@ -1,8 +1,23 @@
 # Project status & roadmap
 
-**Last updated:** 2026-03-26 — added [DEPLOYMENT.md](DEPLOYMENT.md) (hosting, `DATA_DIR`, future trading notes)
+**Last updated:** 2026-03-26 — product vision, [DEPLOYMENT.md](DEPLOYMENT.md), hosting notes
 
 This file is the **single place** for “where we are,” “what’s next,” and **gaps** (skipped or deferred work). Other READMEs link here for details.
+
+---
+
+## Product vision
+
+**What we’re building toward** is a product—not only a CLI—that can:
+
+1. **Monitor** the market on a schedule (screening, data fetch, summaries).
+2. **Suggest** what to buy or sell (projections, recommendations, opportunities, alerts).
+3. **Execute** trades on the user’s behalf **safely** (broker API, limits, audit trail)—**not in the codebase yet**; see [DEPLOYMENT.md](DEPLOYMENT.md).
+4. **Serve more than one person** over time: the **CLI is already installable**; a hosted **app** with accounts would add auth, per-user data, and isolated secrets—likely a **database** instead of only shared files.
+
+**Where we are today:** analysis + file-backed storage + dashboard + partial alerts (log + webhook). That’s the foundation; execution and multi-tenant SaaS are **later phases**, not a single jump.
+
+**Disclaimer:** This is software design, not investment, legal, or tax advice. Automated trading has regulatory and broker rules; validate with professionals and your broker.
 
 ---
 
