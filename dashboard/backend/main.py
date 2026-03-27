@@ -11,18 +11,30 @@ logging.basicConfig(
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.staticfiles import StaticFiles
 from pathlib import Path
 import sys
 import os
 
-# Add parent directory to path to import from src
-project_root = Path(__file__).parent.parent.parent
-sys.path.append(str(project_root))
+# Add repo root to path when running from source (development) so src/ is importable.
+_here = Path(__file__).resolve()
+for _p in _here.parents:
+    if (_p / "main.py").is_file() and (_p / "src").is_dir():
+        if str(_p) not in sys.path:
+            sys.path.insert(0, str(_p))
+        break
 
-# Load .env from project root so FINNHUB_API_KEY is available for name enrichment
+# Load .env from cwd, then repo root (dev), then user config dir (pip install)
 try:
     from dotenv import load_dotenv
-    load_dotenv(project_root / ".env")
+    load_dotenv()
+    for _p in _here.parents:
+        if (_p / "main.py").is_file() and (_p / ".env").is_file():
+            load_dotenv(_p / ".env")
+            break
+    _user_cfg = Path.home() / ".stock-exchange-tracker" / ".env"
+    if _user_cfg.is_file():
+        load_dotenv(_user_cfg)
 except ImportError:
     pass
 
@@ -66,16 +78,6 @@ app.include_router(refresh.router, prefix="/api", tags=["Refresh"])
 app.include_router(history.router, prefix="/api/history", tags=["History"])
 
 
-@app.get("/")
-async def root():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "service": "Stock Exchange Tracker API",
-        "version": "0.3.0"
-    }
-
-
 @app.get("/health")
 async def health():
     """Health check endpoint"""
@@ -103,6 +105,22 @@ async def api_summary():
     return await get_market_summary()
 
 
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+if _STATIC_DIR.is_dir() and (_STATIC_DIR / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="spa")
+else:
+
+    @app.get("/")
+    async def root():
+        """Health check when SPA bundle is not present (e.g. dev without frontend build)."""
+        return {
+            "status": "healthy",
+            "service": "Stock Exchange Tracker API",
+            "version": "0.3.0",
+            "spa": False,
+        }
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("dashboard.backend.main:app", host="0.0.0.0", port=8000, reload=True)

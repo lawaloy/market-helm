@@ -48,16 +48,14 @@ def run_stock_tracker():
         refresh_status["last_status"] = "running"
         _refresh_cancel_event.clear()
         
-        # Get the project root (3 levels up from this file)
+        # Repo checkout: run top-level main.py. Pip install: run same CLI as console_scripts.
         project_root = Path(__file__).parent.parent.parent.parent
         main_script = project_root / "main.py"
-        
-        if not main_script.exists():
-            refresh_status["last_status"] = "error"
-            refresh_status["progress"] = "Unable to start refresh."
-            refresh_status["is_running"] = False
-            return
-        
+        if main_script.is_file():
+            command = [sys.executable, str(main_script)]
+        else:
+            command = [sys.executable, "-m", "src.cli.commands"]
+
         # Run the stock tracker (default to top 10 for faster refresh, minimum 10)
         top_n_value = os.getenv("REFRESH_TOP_N", "10")
         try:
@@ -66,8 +64,6 @@ def run_stock_tracker():
             top_n = 10
         if top_n > 0:
             top_n = max(10, top_n)  # At least 10 stocks when using limit
-
-        command = [sys.executable, str(main_script)]
         if top_n:
             command.extend(["--top-n", str(top_n)])
 

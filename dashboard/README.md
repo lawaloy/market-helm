@@ -2,9 +2,23 @@
 
 Modern, interactive web dashboard for visualizing stock market data, projections, and recommendations.
 
-**Not on PyPI:** The CLI is installable with `pip install stock-exchange-tracker`; the dashboard is **not** part of that wheel. You need this repository (or a copy of `dashboard/`), **Python 3.12+**, and **Node.js 18+** to run backend + frontend—see Quick Start below.
+## Install from PyPI (recommended)
 
-## Quick Start
+After **`pip install stock-exchange-tracker`** (from the [main README](../README.md)), run:
+
+```bash
+stock-tracker-dashboard
+```
+
+Then open **http://localhost:8000** — the API and the built React UI are served together. Data files are read from **`DATA_DIR`** if set, otherwise the repo’s **`data/`** folder when developing from a clone, or **`~/.stock-exchange-tracker/data`** when the package is installed from a wheel.
+
+Optional: **`HOST`**, **`PORT`**, **`CORS_ORIGINS`**, **`UVICORN_RELOAD`** — see [Environment Variables](#environment-variables) below.
+
+---
+
+## Development (clone + hot reload)
+
+Use this when you are changing React/TypeScript and want Vite’s dev server.
 
 ### Prerequisites
 
@@ -12,45 +26,46 @@ Modern, interactive web dashboard for visualizing stock market data, projections
 - Node.js 18+
 - npm or yarn
 
-### 1. Start the Backend
+### 1. Install the repo (editable) and frontend deps
+
+From the repository root:
+
+```bash
+pip install -e .
+cd dashboard/frontend && npm install
+```
+
+### 2. Start the backend
 
 ```bash
 cd dashboard/backend
-
-# Create virtual environment
-python -m venv venv
-
-# Activate it (Windows)
-venv\Scripts\activate
-# Or Mac/Linux
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the server
 python main.py
 ```
 
-Backend will run on `http://localhost:8000`
+Backend runs on **http://localhost:8000** (API only if you have not run `npm run build`; with a built `static/` bundle, `/` serves the SPA).
 
-### 2. Start the Frontend
+### 3. Start the Vite dev server (frontend)
 
 ```bash
 cd dashboard/frontend
-
-# Install dependencies
-npm install
-
-# Start the dev server
 npm run dev
 ```
 
-Frontend will run on `http://localhost:3000`
+Vite defaults to **http://localhost:3000** and proxies `/api` to the backend.
 
-### 3. Open the Dashboard
+### Rebuild the SPA for pip packaging
 
-Navigate to `http://localhost:3000` in your browser.
+From `dashboard/frontend`:
+
+```bash
+npm run build
+```
+
+Output goes to **`dashboard/backend/static/`** and is included in the Python package for **`stock-tracker-dashboard`**.
+
+### 4. Open the app (dev)
+
+Navigate to **http://localhost:3000** in your browser (Vite dev server).
 
 ## Features
 

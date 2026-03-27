@@ -71,7 +71,7 @@ source .venv/bin/activate
   - Package page: [pypi.org/project/stock-exchange-tracker](https://pypi.org/project/stock-exchange-tracker/)
   - Optional OpenAI-powered summaries: `pip install 'stock-exchange-tracker[ai]'`
 
-- **From source** (clone the repo for development, or to run the [web dashboard](dashboard/README.md) from this tree):
+- **From source** (clone the repo for development, or to **rebuild** the dashboard UI from `dashboard/frontend`):
 
   ```bash
   git clone https://github.com/lawaloy/stock-exchange-tracker.git
@@ -79,7 +79,7 @@ source .venv/bin/activate
   pip install -e .
   ```
 
-**Why isn’t the web dashboard installed from PyPI?** The published package (`stock-exchange-tracker` on PyPI) only includes the **`src/`** library and the **`stock-tracker`** CLI—it does not bundle the dashboard. The dashboard is a **separate stack**: a **FastAPI** backend plus a **React** frontend that must be built with **Node.js** (`npm install` / `npm run build`). Shipping that through `pip` would mean packaging prebuilt static assets and extra dependencies into the wheel (or publishing a separate npm package)—**we haven’t done that yet**. To run the UI, use a **clone** of the repo and follow [dashboard/README.md](dashboard/README.md).
+The same package also installs the **web dashboard** (API + pre-built SPA). After install, run **`stock-tracker-dashboard`** and open **http://localhost:8000** (set `DATA_DIR` or use the default data folder; see [dashboard/README.md](dashboard/README.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). To develop the React UI with hot reload, use Node in `dashboard/frontend` as described in the dashboard README.
 
 ### Step 2: Add Your API Key
 
@@ -93,19 +93,21 @@ FINNHUB_API_KEY=your-api-key-here
 
 ### Step 3: Run It
 
-The install adds the **`stock-tracker`** command:
+The install adds:
 
-```bash
-stock-tracker
-```
+- **`stock-tracker`** — run the daily tracker (writes CSV/JSON under `data/` or `DATA_DIR`):
 
-If you cloned the repository, you can also run:
+  ```bash
+  stock-tracker
+  ```
 
-```bash
-python main.py
-```
+- **`stock-tracker-dashboard`** — web UI + API (after `pip install`, open http://localhost:8000):
 
-from the project root (same CLI under the hood).
+  ```bash
+  stock-tracker-dashboard
+  ```
+
+If you cloned the repository, you can also run **`python main.py`** from the project root (same CLI as `stock-tracker`).
 
 That's it! The tool will:
 

@@ -97,13 +97,17 @@ def client(mock_data_loader):
 class TestDashboardHealth:
     """Test health and root endpoints."""
 
-    def test_root_returns_healthy(self, client):
-        """Root endpoint returns service info."""
+    def test_root_returns_spa_or_health_json(self, client):
+        """Root serves bundled SPA (HTML) or JSON when SPA is not built."""
         r = client.get("/")
         assert r.status_code == 200
-        data = r.json()
-        assert data["status"] == "healthy"
-        assert "Stock Exchange Tracker" in data["service"]
+        ct = r.headers.get("content-type", "")
+        if "application/json" in ct:
+            data = r.json()
+            assert data["status"] == "healthy"
+            assert "Stock Exchange Tracker" in data["service"]
+        else:
+            assert "text/html" in ct
 
     def test_health_returns_healthy(self, client):
         """Health endpoint returns healthy."""
