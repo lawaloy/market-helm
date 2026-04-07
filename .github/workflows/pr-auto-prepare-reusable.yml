@@ -110,17 +110,17 @@ jobs:
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         run: npm install --global npm@11.6.2
 
-      - name: Normalize npm lockfiles
+      - name: Sync lockfile with package.json (matches npm ci)
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         env:
           CHANGED_WORKSPACES: ${{ steps.pr.outputs.changed-workspaces }}
         run: |
           node -e "const workspaces = JSON.parse(process.env.CHANGED_WORKSPACES); if (!Array.isArray(workspaces) || workspaces.length === 0) process.exit(0);"
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
-            (cd "$workspace" && npm install --package-lock-only --ignore-scripts)
+            (cd "$workspace" && npm install --ignore-scripts)
           done
 
-      - name: Commit normalized lockfiles
+      - name: Commit lockfile updates
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         env:
           CHANGED_WORKSPACES: ${{ steps.pr.outputs.changed-workspaces }}
@@ -128,15 +128,11 @@ jobs:
           git config user.name "market-helm[bot]"
           git config user.email "market-helm[bot]@users.noreply.github.com"
 
-          changed=false
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
-            if ! git diff --quiet -- "$workspace/package-lock.json"; then
-              git add "$workspace/package-lock.json"
-              changed=true
-            fi
+            git add "$workspace/package-lock.json" "$workspace/package.json"
           done
 
-          if [ "$changed" = false ]; then
+          if git diff --cached --quiet; then
             echo "No lockfile changes to commit."
             exit 0
           fi
