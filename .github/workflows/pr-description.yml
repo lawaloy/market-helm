@@ -105,7 +105,7 @@ jobs:
               const after = existing.slice(endIdx + END.length).trimStart();
               body = `${before}\n\n${autoSection}${after ? `\n\n${after}` : ''}`;
             } else {
-              body = `## What + Why\n- \n\n## Checks\n- [ ] \`api\`: \`npm run build\`\n- [ ] \`api\`: \`npm run test -- --ci --runInBand\`\n\n${autoSection}`;
+              body = `## What + Why\n- \n\n## Checks\n- [ ] \`dashboard/frontend\`: \`npm ci\` and \`npm run build\`\n- [ ] \`pytest tests/\` (repo root)\n\n${autoSection}`;
             }
 
             const { owner, repo } = context.repo;

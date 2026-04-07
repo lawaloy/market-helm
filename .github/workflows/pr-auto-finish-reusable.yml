@@ -1,0 +1,210 @@
+name: PR Auto Finish Reusable
+
+on:
+  workflow_call:
+    inputs:
+      lane:
+        required: true
+        type: string
+      pull_number:
+        required: false
+        type: number
+        default: 0
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Merge PR when ready
+        uses: actions/github-script@v7
+        env:
+          LANE: ${{ inputs.lane }}
+          PULL_NUMBER: ${{ inputs.pull_number }}
+        with:
+          github-token: ${{ steps.app-token.outputs.token }}
+          script: |
+            const lane = process.env.LANE;
+            const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
+            const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
+            const pull_number = eventPullNumber || inputPullNumber;
+            const { owner, repo } = context.repo;
+            const maxAttempts = 10;
+            const delayMs = 15000;
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            if (!pull_number) {
+              core.info('Skipping because no pull request number was available on the workflow_run payload.');
+              return;
+            }
+
+            const ensureComment = async (body) => {
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: pull_number,
+                per_page: 100,
+              });
+
+              if (comments.some((comment) => comment.body === body)) {
+                core.info('Skipping comment because the same comment already exists.');
+                return;
+              }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body,
+              });
+            };
+
+            const addBlockedLabel = async (labels) => {
+              if (labels.includes('automerge-blocked')) {
+                return;
+              }
+
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: pull_number,
+                labels: ['automerge-blocked'],
+              });
+            };
+
+            const isTrustedDependabot = (pr) => {
+              const authorLogin = pr.user?.login || '';
+              const headRef = pr.head?.ref || '';
+              return (
+                ['dependabot[bot]', 'app/dependabot'].includes(authorLogin) &&
+                headRef.startsWith('dependabot/')
+              );
+            };
+
+            const isTrustedMaintenance = (pr, labels) => {
+              const authorLogin = pr.user?.login || '';
+              return (
+                pr.head.repo?.full_name === `${owner}/${repo}` &&
+                pr.base?.ref === 'main' &&
+                pr.head?.ref === 'security/deps-maintenance' &&
+                ['app/github-actions', 'github-actions[bot]', 'market-helm[bot]', 'app/market-helm'].includes(authorLogin) &&
+                labels.includes('dependencies') &&
+                labels.includes('security')
+              );
+            };
+
+            /** Check runs that belong to this auto-finish automation (avoid waiting on ourselves). */
+            const skipPendingCheckNames = new Set([
+              'Dependabot Auto Finish',
+              'Dependency Maintenance Auto Finish',
+              'finish',
+            ]);
+
+            const hasPendingBlockingChecks = async (headSha) => {
+              const checkRuns = [];
+              for await (const response of github.paginate.iterator(github.rest.checks.listForRef, {
+                owner,
+                repo,
+                ref: headSha,
+                per_page: 100,
+              })) {
+                checkRuns.push(...response.data.check_runs);
+              }
+              const pending = checkRuns.filter(
+                (r) =>
+                  !skipPendingCheckNames.has(r.name) &&
+                  (r.status === 'queued' || r.status === 'in_progress'),
+              );
+              if (pending.length > 0) {
+                core.info(
+                  `Waiting for ${pending.length} check run(s) still queued or in progress: ${pending.map((r) => r.name).join(', ')}`,
+                );
+                return true;
+              }
+              return false;
+            };
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const pullRequest = (
+                await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number,
+                })
+              ).data;
+              const labels = pullRequest.labels.map((label) => label.name);
+              const trusted =
+                lane === 'dependabot'
+                  ? isTrustedDependabot(pullRequest)
+                  : isTrustedMaintenance(pullRequest, labels);
+
+              if (!trusted) {
+                core.info(`Skipping because PR does not satisfy trusted ${lane} provenance.`);
+                return;
+              }
+
+              if (labels.includes('automerge-blocked')) {
+                core.info('Skipping because automerge-blocked label is present.');
+                return;
+              }
+
+              core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
+
+              if (pullRequest.mergeable_state === 'clean') {
+                if (await hasPendingBlockingChecks(pullRequest.head.sha)) {
+                  if (attempt === maxAttempts) {
+                    core.info(
+                      'Mergeable is clean but checks are still pending. A later workflow_run completion will retry.',
+                    );
+                    return;
+                  }
+                  await sleep(delayMs);
+                  continue;
+                }
+                await github.rest.pulls.merge({
+                  owner,
+                  repo,
+                  pull_number,
+                  merge_method: 'squash',
+                });
+                core.info(`Merged PR #${pull_number}.`);
+                return;
+              }
+
+              if (pullRequest.mergeable_state === 'behind') {
+                try {
+                  await github.rest.pulls.updateBranch({
+                    owner,
+                    repo,
+                    pull_number,
+                    expected_head_sha: pullRequest.head.sha,
+                  });
+                  core.info(`Queued branch update for PR #${pull_number}.`);
+                } catch (error) {
+                  const body =
+                    'Auto-merge skipped because updating this PR branch from `main` would create a merge conflict or could not be applied cleanly.';
+                  await ensureComment(body);
+                  await addBlockedLabel(labels);
+                  core.info(`Branch update failed for PR #${pull_number}: ${error.message}`);
+                }
+                return;
+              }
+
+              if (attempt === maxAttempts) {
+                core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
+                return;
+              }
+
+              await sleep(delayMs);
+            }

@@ -1,0 +1,75 @@
+name: Dependency Maintenance
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'
+    - cron: '0 10 * * 4'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependency-maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard/frontend/package-lock.json
+
+      - name: Pin npm version
+        run: npm install --global npm@11.6.2
+
+      - name: Install dashboard frontend dependencies
+        working-directory: dashboard/frontend
+        run: npm ci
+
+      - name: Update lockfile and patch vulnerabilities
+        working-directory: dashboard/frontend
+        run: |
+          npm update
+          npm audit fix || true
+
+      - name: Audit report (non-blocking)
+        working-directory: dashboard/frontend
+        run: npm audit --audit-level=moderate || true
+
+      - name: Create or update maintenance PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: security/deps-maintenance
+          delete-branch: true
+          title: 'chore(deps): automated dependency maintenance'
+          commit-message: 'chore(deps): automated dependency maintenance'
+          body: |
+            Automated dependency maintenance run for the dashboard SPA (`dashboard/frontend`):
+            - `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
+
+            This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
+          labels: |
+            dependencies
+            security
+          add-paths: |
+            dashboard/frontend/package.json
+            dashboard/frontend/package-lock.json

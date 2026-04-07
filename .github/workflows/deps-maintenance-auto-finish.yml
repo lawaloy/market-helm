@@ -1,0 +1,25 @@
+name: Dependency Maintenance Auto Finish
+
+on:
+  workflow_run:
+    workflows: ["CI", "PR Description", "CodeQL"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: maintenance-auto-finish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  finish:
+    if: |
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/pr-auto-finish-reusable.yml
+    with:
+      lane: maintenance
+    secrets: inherit

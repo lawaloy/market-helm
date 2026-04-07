@@ -2,8 +2,8 @@
 - 
 
 ## Checks
-- [ ] `api`: `npm run build`
-- [ ] `api`: `npm run test -- --ci --runInBand`
+- [ ] `dashboard/frontend`: `npm ci` and `npm run build`
+- [ ] `pytest tests/` (repo root)
 
 <!-- AUTO:START -->
 ## Auto
