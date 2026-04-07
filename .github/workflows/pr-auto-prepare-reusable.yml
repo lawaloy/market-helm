@@ -1,3 +1,6 @@
+# Call only from workflows that use `pull_request` (not `pull_request_target`) and
+# restrict to same-repo PRs so checkout runs in a standard PR context.
+
 name: PR Auto Prepare Reusable
 
 on:
@@ -87,16 +90,13 @@ jobs:
 
             core.setOutput('trusted', trusted ? 'true' : 'false');
             core.setOutput('blocked', labels.includes('automerge-blocked') ? 'true' : 'false');
-            core.setOutput('head-ref', pr.head.ref);
-            core.setOutput('head-repo', pr.head.repo?.full_name || `${owner}/${repo}`);
             core.setOutput('changed-workspaces', JSON.stringify(changedWorkspaces));
 
       - name: Checkout PR branch
         if: steps.pr.outputs.trusted == 'true' && steps.pr.outputs.changed-workspaces != '[]'
         uses: actions/checkout@v4
         with:
-          repository: ${{ steps.pr.outputs.head-repo }}
-          ref: ${{ steps.pr.outputs.head-ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
