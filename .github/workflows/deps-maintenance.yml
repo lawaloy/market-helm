@@ -18,8 +18,17 @@ jobs:
   maintain:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -48,7 +57,7 @@ jobs:
       - name: Create or update maintenance PR
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ github.token }}
+          token: ${{ steps.app-token.outputs.token }}
           branch: security/deps-maintenance
           delete-branch: true
           title: 'chore(deps): automated dependency maintenance'
