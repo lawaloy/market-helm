@@ -2,7 +2,7 @@ name: Dependabot Auto Finish
 
 on:
   workflow_run:
-    workflows: ["CI", "PR Description"]
+    workflows: ["CI", "PR Description", "CodeQL"]
     types: [completed]
 
 permissions:
