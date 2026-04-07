@@ -112,15 +112,22 @@ jobs:
             ]);
 
             const hasPendingBlockingChecks = async (headSha) => {
-              const checkRuns = [];
-              for await (const response of github.paginate.iterator(github.rest.checks.listForRef, {
-                owner,
-                repo,
-                ref: headSha,
-                per_page: 100,
-              })) {
-                checkRuns.push(...response.data.check_runs);
-              }
+              const checkRunsFromPage = (response) => {
+                const d = response.data;
+                if (Array.isArray(d)) return d;
+                if (d && Array.isArray(d.check_runs)) return d.check_runs;
+                return [];
+              };
+              const checkRuns = await github.paginate(
+                github.rest.checks.listForRef,
+                {
+                  owner,
+                  repo,
+                  ref: headSha,
+                  per_page: 100,
+                },
+                checkRunsFromPage,
+              );
               const pending = checkRuns.filter(
                 (r) =>
                   !skipPendingCheckNames.has(r.name) &&
