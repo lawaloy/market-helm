@@ -1,4 +1,10 @@
-# Alerting System Design (Proposed Feature)
+# Alerting System Design (vision + partial implementation)
+
+## Implementation status (`main`)
+
+**Already in the codebase:** `src/alerts/` — rule-driven **`AlertEngine`**, `config/alerts.json`, cooldowns and alert history storage, **log** notifier, and **HTTP webhook** notifier (`webhook_url` per rule or `ALERT_WEBHOOK_URL`). See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the short roadmap.
+
+**Still design / future work (this document):** SMTP and other cloud notifiers, Slack block payloads, technical-indicator conditions, CLI subcommands, dashboard management UI. Phases and checkboxes below describe the **full** vision, not only what is merged today.
 
 ## Overview
 
@@ -36,7 +42,7 @@ A flexible alerting system to notify users when stocks meet specific conditions,
 
 ```text
 src/
-└── alerts/                          # New module
+└── alerts/                          # Implemented (partial — see status above)
     ├── __init__.py
     ├── alert_engine.py              # Core alert evaluation
     ├── alert_rules.py               # Rule definitions

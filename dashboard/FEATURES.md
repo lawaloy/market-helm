@@ -126,14 +126,19 @@
 - ✅ Enhanced mobile UI (responsive layout, horizontal scroll for tables)
 - ✅ Data loader uses filename date instead of mtime for latest data
 
+### Historical analysis & accuracy
+
+- ✅ **Historical Trends** page (`/historical`) — multi-day market charts, per-symbol series, projection overlay
+- ✅ **`GET /api/history/summary`** — aggregated history for the UI
+- ✅ **`GET /api/history/accuracy`** — projection vs. actual close; rollups and sample rows (see [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md))
+- ✅ Time-series charts for the above (interactive Recharts; not every “zoom” affordance from the design doc)
+
 ## Planned for Phase 2 (Future)
 
-### Historical Analysis
+### Historical analysis (remaining)
 
-- ⏳ Historical trends page (partially implemented)
-- ⏳ Time-series charts with zoom
-- ⏳ Projection accuracy tracking
-- ⏳ Compare multiple stocks
+- ⏳ Chart zoom / deeper time-range UX (polish)
+- ⏳ Compare multiple stocks side-by-side
 
 ### UX Enhancements (Remaining)
 
@@ -146,30 +151,29 @@
 - ⏳ Real-time WebSocket updates
 - ⏳ User authentication
 - ⏳ Multiple portfolios
-- ⏳ Custom alerts
+- ⏳ Alert management UI (rules today: `config/alerts.json` + tracker)
 - ⏳ Sector analysis
 - ⏳ Correlation heatmaps
 
 ## Technology Stack
 
+Pinned versions change in **`dashboard/frontend/package.json`** and **`dashboard/backend/requirements.txt`**. Approximate stack:
+
 **Backend:**
 
-- FastAPI 0.128.0
-- Python 3.12+
-- Pandas 2.0+
-- Pydantic 2.5+
+- FastAPI (see `dashboard/backend/requirements.txt`)
+- Python 3.12+ (3.10+ supported for the core package)
+- Pandas 2.x, Pydantic 2.x
 - Uvicorn (ASGI server)
 
 **Frontend:**
 
-- React 18.2
-- TypeScript 5.3
-- Vite 5.0
-- TailwindCSS 3.4
-- Recharts 2.10
-- Axios 1.6
-- Headless UI 1.7
-- Heroicons 2.1
+- React 19 + TypeScript
+- Vite 8
+- TailwindCSS 4
+- Recharts 3
+- Axios
+- Headless UI, Heroicons
 
 **Development:**
 
@@ -187,7 +191,8 @@ dashboard/
 │   ├── api/                 # API endpoints
 │   │   ├── market.py
 │   │   ├── projections.py
-│   │   └── stocks.py
+│   │   ├── stocks.py
+│   │   └── history.py       # Historical summary + projection accuracy
 │   ├── models/              # Pydantic models
 │   ├── services/            # Data loading
 │   └── requirements.txt
@@ -217,13 +222,15 @@ dashboard/
 
 ## Known Limitations
 
-1. **No historical data yet**: Only shows latest snapshot
-2. **No real-time updates**: Need to refresh page for new data
-3. **Basic mobile UI**: Works but could be optimized further
-4. **No authentication**: Open to anyone who can access it
+1. **Historical views need multiple runs**: Charts and accuracy need several days of saved `data/*.csv` / `projections_*.csv` (see [dashboard/README.md](README.md)).
+2. **No real-time updates**: Refresh or **Fetch New**; not streaming quotes
+3. **Mobile UX**: Usable; further polish possible
+4. **No authentication**: Open to anyone who can reach the server
 5. **Limited error recovery**: Some edge cases may not be handled
 
-## Metrics (Current Data - Jan 11, 2026)
+## Example metrics (illustrative snapshot)
+
+Figures below are from a **sample** daily run (documentation only; your numbers will vary):
 
 - **Total Stocks**: 196
 - **Total Projections**: 177
@@ -256,4 +263,4 @@ dashboard/
 
 ---
 
-**Dashboard Status**: ✅ Phase 1 MVP Complete and Functional
+**Dashboard status:** ✅ Phase 1 MVP **and** core Phase 2 (historical trends, projection accuracy, dark mode, export) are **functional on `main`**. See [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md) for what is still open.

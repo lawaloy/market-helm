@@ -1,6 +1,6 @@
 # Project status & roadmap
 
-**Last updated:** 2026-03-26 — product vision, [DEPLOYMENT.md](DEPLOYMENT.md), hosting notes
+**Last updated:** 2026-04-11 — doc alignment with `main`; product vision, [DEPLOYMENT.md](DEPLOYMENT.md), hosting notes
 
 This file is the **single place** for “where we are,” “what’s next,” and **gaps** (skipped or deferred work). Other READMEs link here for details.
 

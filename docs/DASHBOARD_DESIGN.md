@@ -1,14 +1,16 @@
-# Web Dashboard Design (Priority Feature)
+# Web Dashboard Design (spec — largely implemented)
 
 ## Overview
 
 A modern, responsive web dashboard for visualizing stock market data, projections, and recommendations in real-time. Transforms CSV/JSON data into interactive, actionable insights.
 
-## Priority: CRITICAL
+## Priority: CRITICAL (original plan)
 
-**Status:** Planned for v0.3.0
+**Status:** **Shipped on `main`** — FastAPI + React dashboard, including Historical Trends and projection accuracy (`GET /api/history/accuracy`). Operational docs: [dashboard/README.md](../dashboard/README.md), roadmap: [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
-**Estimated Effort:** 1-2 weeks
+**This file** is the detailed **design spec** (API shapes, UX wireframes, phased ideas). Where it disagrees with the repo, trust the READMEs and `PROJECT_STATUS.md`.
+
+**Estimated Effort (historical):** MVP was on the order of 1–2 weeks.
 
 **Impact:** Very High - Makes data accessible and actionable
 
@@ -1136,12 +1138,12 @@ test('stock detail modal opens', async ({ page }) => {
 
 Want to help build the dashboard? See [CONTRIBUTING.md](../CONTRIBUTING.md)
 
-**Open Issues:**
+**Open work (examples — see [PROJECT_STATUS.md](PROJECT_STATUS.md)):**
 
-- Dashboard: Phase 1 MVP
-- Dashboard: Historical trends
-- Dashboard: Dark mode
-- Dashboard: Mobile optimization
+- Dashboard: lazy-loaded routes / bundle size
+- Dashboard: watchlist and keyboard shortcuts
+- Dashboard: multi-stock compare, chart zoom polish
+- Real-time updates and authentication (later phases)
 
 **Contact:** Open an issue with tag `feature: dashboard` to discuss implementation.
 
@@ -1156,6 +1158,6 @@ Want to help build the dashboard? See [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ---
 
-**Status:** 📋 Design Complete - Ready for Implementation
+**Status:** Design spec — **Phase 1 MVP and much of Phase 2 (historical views, accuracy, dark mode, export)** are implemented in the repository. Remaining Phase 2/3 items (watchlist, lazy routes, WebSockets, auth) are tracked in [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
-**Next Step:** Begin Phase 1 MVP Development
+**Next step for readers:** Use [dashboard/README.md](../dashboard/README.md) to run and develop the app; use this document for deeper UI/API reference.

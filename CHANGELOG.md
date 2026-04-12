@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned for Future Releases
+### Planned (not yet shipped)
 
-- Historical trends page with time-series analysis and projection accuracy tracking
-- Full alert and notification system
-- Real-time WebSocket updates
-- User authentication and watchlists
+- **Alerts:** SMTP email and optional Slack-style webhook payloads; CLI commands such as `alerts list` / `alerts test`; technical / multi-condition rules (see [docs/ALERTING_DESIGN.md](docs/ALERTING_DESIGN.md)).
+- **Dashboard:** Route-level code splitting, watchlist, keyboard shortcuts (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
+- **Real-time:** WebSocket or streaming-style updates (batch/daily today).
+- **Product:** User authentication, multi-user data isolation.
+
+## [0.5.1] - 2026-04-11
+
+### Documentation
+
+- Synced markdown with shipped behavior on `main`: historical trends UI, projection accuracy API (`GET /api/history/accuracy`), partial alerting (log + webhook), and corrected “planned vs shipped” language across `CHANGELOG`, `dashboard/FEATURES.md`, `docs/DASHBOARD_DESIGN.md`, `docs/ALERTING_DESIGN.md`, `docs/STOCK_PROJECTIONS.md`, and `docs/PROJECT_STATUS.md`.
 
 ## [0.5.0] - 2026-03-26
 

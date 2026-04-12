@@ -243,18 +243,22 @@ summary = projector.generate_projection_summary(projections)
 ✅ **Track accuracy over time**
 ✅ **Adjust for market conditions**
 
+## Projection accuracy (shipped)
+
+The dashboard and backend compare past **`target_mid`** values to the first available **closing price** on or after the projection target date. Summary API: **`GET /api/history/accuracy`** (see [PROJECT_STATUS.md](PROJECT_STATUS.md)). This complements the projector: scoring lives in the dashboard data layer, not inside `StockProjector`.
+
 ## Future Enhancements
 
 Potential improvements for future versions:
 
 - [ ] Multi-timeframe projections (1-day, 5-day, 30-day)
-- [ ] Historical accuracy tracking
+- [ ] Richer accuracy analytics (e.g. by confidence band, business-calendar targets — see [PROJECT_STATUS.md](PROJECT_STATUS.md))
 - [ ] Machine learning model integration
 - [ ] Fundamental analysis factors
 - [ ] News sentiment integration
 - [ ] Sector correlation analysis
 - [ ] Backtesting framework
-- [ ] Alert system for high-confidence opportunities
+- [ ] More alert channels and rules for high-confidence opportunities (partial alerting exists; see [ALERTING_DESIGN.md](ALERTING_DESIGN.md))
 
 ## Architecture
 
@@ -325,6 +329,4 @@ For questions or issues with the projection system:
 
 ---
 
-**Version**: 1.0.0  
-**Added**: January 2026  
-**Branch**: `feature/stock-projections`
+**Doc scope:** Describes the core **`StockProjector`** pipeline. For shipping status and related APIs, see [PROJECT_STATUS.md](PROJECT_STATUS.md) and the main [README.md](../README.md).
