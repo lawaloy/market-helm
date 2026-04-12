@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
 - **Product:** User authentication, multi-user data isolation.
 
+## [0.2.14] - 2026-04-12
+
+### Changed
+
+- Repository version metadata aligned with Git tag **`v0.2.14`** / PyPI **`0.2.14`** (automated post-release sync).
+
+
 ## [0.2.9] - 2026-04-12
 
 ### Changed
