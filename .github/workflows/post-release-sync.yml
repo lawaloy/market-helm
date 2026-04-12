@@ -6,12 +6,13 @@ name: Post-release sync to main
 
 on:
   workflow_run:
+    # Use the workflow filename so renames of the human-readable `name:` do not break the trigger.
+    # Do not filter by `branches`: for `release`-triggered runs GitHub often does not associate the
+    # run with `main`, so `branches: [main]` prevents this workflow from ever starting.
     workflows:
-      - Publish to PyPI
+      - publish.yml
     types:
       - completed
-    branches:
-      - main
 
 permissions:
   contents: read
