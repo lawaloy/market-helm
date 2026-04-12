@@ -133,3 +133,99 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+  # After a successful PyPI publish from a GitHub Release, align main with the tag.
+  # Runs only when the publish job succeeds (failed uploads do not open a PR).
+  sync_repo_version:
+    name: Post-release version sync PR
+    needs: publish
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply released version and sync tracked files
+        id: align
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if ! echo "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Unexpected ref name (want vMAJOR.MINOR.PATCH): $TAG"
+            exit 1
+          fi
+          python - <<'PY'
+          import configparser, os, re, sys
+
+          tag = os.environ["TAG"]
+          version = tag.lstrip("v")
+          if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+              print("Invalid version from tag", tag, file=sys.stderr)
+              sys.exit(1)
+
+          cfg = configparser.ConfigParser()
+          cfg.read("setup.cfg", encoding="utf-8")
+          cfg["metadata"]["version"] = version
+          with open("setup.cfg", "w", encoding="utf-8") as f:
+              cfg.write(f)
+          print("Version set to", version, "from tag", tag)
+          PY
+          python scripts/version_sync.py sync
+          python scripts/version_sync.py check
+          VERSION="${TAG#v}"
+          python scripts/post_release_changelog.py \
+            --version "$VERSION" \
+            --date "$(date -u +%Y-%m-%d)"
+          if git diff --quiet HEAD; then
+            echo "Working tree matches $(git rev-parse HEAD); no PR needed."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate GitHub App token
+        if: steps.align.outputs.skip != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Open pull request to main
+        if: steps.align.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          VERSION="${TAG#v}"
+          BRANCH="chore/post-release-sync-${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$BRANCH" 2>/dev/null || true
+          git checkout -B "$BRANCH"
+          git add setup.cfg dashboard/frontend/package.json dashboard/frontend/package-lock.json dashboard/backend/main.py CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No staged changes; exiting."
+            exit 0
+          fi
+          git commit -m "chore: sync repo version and changelog for ${VERSION} (post-release ${TAG})"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push -u origin "$BRANCH" --force-with-lease
+          if [ "$(gh pr list --base main --head "$BRANCH" --state open --json number --jq length)" -eq 0 ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore: sync repo version to ${VERSION} (${TAG})" \
+              --body "Automated PR after **${TAG}** was published to PyPI. Updates \`setup.cfg\` and synced files (\`scripts/version_sync.py\`), and adds a **[\`${VERSION}\`]** entry to \`CHANGELOG.md\` when one is not already present (\`scripts/post_release_changelog.py\`). This job only runs when **Publish to PyPI** succeeds. If you retried with a different tag, merge the PR that matches the version on PyPI; edit the new changelog section for user-facing notes if needed."
+          else
+            echo "Open PR already exists for ${BRANCH}; branch updated."
+          fi
