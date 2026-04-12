@@ -1,6 +1,9 @@
 # Create a GitHub Release (and git tag) from main, which triggers "Publish to PyPI"
 # on release: published.
 #
+# Version: choose patch / minor / major to auto-bump from the latest vMAJOR.MINOR.PATCH
+# tag on origin, or choose manual and type the tag.
+#
 # Important: we use the repository GitHub App token for `gh release create`, not
 # github.token. Events caused by the default GITHUB_TOKEN do not trigger other
 # workflows (see GitHub docs: "triggering a workflow from a workflow").
@@ -14,10 +17,20 @@ name: Create Release
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Release tag (e.g. v0.2.9). Must follow vMAJOR.MINOR.PATCH."
+      version_source:
+        description: "How to pick the version (latest v*.*.* tag on origin is the baseline)"
         required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - manual
+      tag:
+        description: "Only if version_source is manual — full tag (e.g. v0.3.0 or 0.3.0)."
+        required: false
         type: string
+        default: ""
       confirm:
         description: "Confirm: create this release on main and trigger PyPI publish"
         required: true
@@ -47,18 +60,59 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Normalize and validate tag
+      - name: Resolve release tag
         id: tag
         env:
+          VERSION_SOURCE: ${{ inputs.version_source }}
           RAW_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          t="${RAW_TAG#v}"
-          if ! echo "$t" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Tag must look like v0.2.9 or 0.2.9 (semver only)."
-            exit 1
+          bump_semver() {
+            local bump="$1" major="$2" minor="$3" patch="$4"
+            case "$bump" in
+              patch) patch=$((patch + 1)) ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              *) echo "Invalid bump: $bump"; exit 1 ;;
+            esac
+            echo "v${major}.${minor}.${patch}"
+          }
+
+          if [ "$VERSION_SOURCE" = "manual" ]; then
+            t="${RAW_TAG#v}"
+            if [ -z "$t" ]; then
+              echo 'For version_source "manual", set the tag input (e.g. v0.3.0).'
+              exit 1
+            fi
+            if ! echo "$t" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "Tag must look like v0.2.9 or 0.2.9 (semver only)."
+              exit 1
+            fi
+            TAG="v${t}"
+          else
+            git fetch --tags --quiet origin || true
+            # Latest vMAJOR.MINOR.PATCH on origin (plain semver lines for sort -V)
+            latest="$(
+              git ls-remote --tags origin |
+                awk '{print $2}' |
+                sed 's#refs/tags/##' |
+                grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' |
+                sed 's/^v//' |
+                sort -V |
+                tail -n1
+            )"
+            if [ -z "$latest" ]; then
+              echo "No prior vMAJOR.MINOR.PATCH tags found on origin. Use version_source manual once."
+              exit 1
+            fi
+            major="${latest%%.*}"
+            rest="${latest#*.}"
+            minor="${rest%%.*}"
+            patch="${rest#*.}"
+            TAG="$(bump_semver "$VERSION_SOURCE" "$major" "$minor" "$patch")"
+            echo "Latest release tag on origin: v${latest} → next ($VERSION_SOURCE): ${TAG}"
           fi
-          TAG="v${t}"
+
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Will create release ${TAG}"
 
