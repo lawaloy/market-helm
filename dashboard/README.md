@@ -10,7 +10,7 @@ After **`pip install market-helm`** (from the [main README](../README.md)), run:
 market-helm-web
 ```
 
-Then open **http://localhost:8000** — the API and the built React UI are served together. Data files are read from **`DATA_DIR`** if set, otherwise the repo’s **`data/`** folder when developing from a clone, or **`~/.market-helm/data`** when the package is installed from a wheel. On first run, if **`~/.market-helm`** does not exist but **`~/.market-desk`** does, it is **renamed** to **`~/.market-helm`** automatically.
+Then open **<http://localhost:8000>** — the API and the built React UI are served together. Data files are read from **`DATA_DIR`** if set, otherwise the repo’s **`data/`** folder when developing from a clone, or **`~/.market-helm/data`** when the package is installed from a wheel. On first run, if **`~/.market-helm`** does not exist but **`~/.market-desk`** does, it is **renamed** to **`~/.market-helm`** automatically.
 
 Optional: **`HOST`**, **`PORT`**, **`CORS_ORIGINS`**, **`UVICORN_RELOAD`** — see [Environment Variables](#environment-variables) below.
 
@@ -42,7 +42,7 @@ cd dashboard/backend
 python main.py
 ```
 
-Backend runs on **http://localhost:8000** (API only if you have not run `npm run build`; with a built `static/` bundle, `/` serves the SPA).
+Backend runs on **<http://localhost:8000>** (API only if you have not run `npm run build`; with a built `static/` bundle, `/` serves the SPA).
 
 ### 3. Start the Vite dev server (frontend)
 
@@ -51,7 +51,7 @@ cd dashboard/frontend
 npm run dev
 ```
 
-Vite defaults to **http://localhost:3000** and proxies `/api` to the backend.
+Vite defaults to **<http://localhost:3000>** and proxies `/api` to the backend.
 
 ### Rebuild the SPA for pip packaging
 
@@ -65,7 +65,7 @@ Output goes to **`dashboard/backend/static/`** (not committed; release wheels ar
 
 ### 4. Open the app (dev)
 
-Navigate to **http://localhost:3000** in your browser (Vite dev server).
+Navigate to **<http://localhost:3000>** in your browser (Vite dev server).
 
 ## Features
 

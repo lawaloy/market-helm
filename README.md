@@ -27,7 +27,7 @@ This tool automatically:
 market-helm-web
 ```
 
-Open **http://localhost:8000** — API docs are at **/docs**.
+Open **<http://localhost:8000>** — API docs are at **/docs**.
 
 **Develop the React UI** (Vite dev server on port 3000, hot reload): see [dashboard/README.md](dashboard/README.md#development-clone-hot-reload).
 
@@ -74,7 +74,7 @@ source .venv/bin/activate
   pip install -e .
   ```
 
-The same package also installs the **web dashboard** (API + pre-built SPA). After install, run **`market-helm-web`** and open **http://localhost:8000** (set `DATA_DIR` or use the default data folder; see [dashboard/README.md](dashboard/README.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). To develop the React UI with hot reload, use Node in `dashboard/frontend` as described in the dashboard README.
+The same package also installs the **web dashboard** (API + pre-built SPA). After install, run **`market-helm-web`** and open **<http://localhost:8000>** (set `DATA_DIR` or use the default data folder; see [dashboard/README.md](dashboard/README.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). To develop the React UI with hot reload, use Node in `dashboard/frontend` as described in the dashboard README.
 
 ### Step 2: Add Your API Key
 
@@ -96,7 +96,7 @@ The install adds:
   market-helm
   ```
 
-- **`market-helm-web`** — web UI + API (after `pip install`, open http://localhost:8000).
+- **`market-helm-web`** — web UI + API (after `pip install`, open <http://localhost:8000>).
 
   ```bash
   market-helm-web
