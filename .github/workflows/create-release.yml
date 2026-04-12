@@ -25,17 +25,9 @@ on:
   workflow_dispatch:
     inputs:
       bump_type:
-        description: |
-          How the next tag is chosen. The workflow reads the latest **`vMAJOR.MINOR.PATCH`** on **origin** (except **manual**).
-
-          | Value | Effect (if latest tag were **v0.2.9**) |
-          |-------|----------------------------------------|
-          | **patch** | **v0.2.10** (increment PATCH) |
-          | **minor** | **v0.3.0** (increment MINOR, PATCH → 0) |
-          | **major** | **v1.0.0** (increment MAJOR, rest → 0) |
-          | **manual** | Use **Release tag** below (e.g. **v0.10.0**) |
-
-          Routine releases: **patch**.
+        description: >-
+          Next tag from the latest vA.B.C on origin. patch = +0.0.1, minor = +0.1.0, major = +1.0.0,
+          manual = type the tag in Release tag below. Routine releases: patch.
         type: choice
         default: patch
         options:
@@ -43,12 +35,9 @@ on:
           - minor
           - major
           - manual
-      tag:
-        description: |
-          **Use only when bump type is `manual`.** Ignored for patch / minor / major.
-          Format: **`v0.10.0`** or **`0.10.0`** (semver `MAJOR.MINOR.PATCH` only).
-
-          For **patch** / **minor** / **major**, leave this **empty** (whitespace only is OK).
+      release_tag:
+        description: >-
+          Leave blank unless bump type is manual. Then enter v0.10.0 or 0.10.0 (MAJOR.MINOR.PATCH only).
         required: false
         type: string
         default: ""
@@ -69,7 +58,7 @@ jobs:
       - name: Require dispatch from main
         run: |
           if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
-            echo '::error::Set "Use workflow from" to branch **main** before Run workflow.'
+            echo '::error::Set "Use workflow from" to branch main before Run workflow.'
             echo "Current GITHUB_REF=${GITHUB_REF}"
             exit 1
           fi
@@ -77,15 +66,15 @@ jobs:
       - name: Require empty Release tag unless manual bump
         env:
           BUMP: ${{ inputs.bump_type }}
-          RAW_TAG: ${{ inputs.tag }}
+          RAW_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           if [ "$BUMP" = "manual" ]; then
             exit 0
           fi
           if printf '%s' "$RAW_TAG" | grep -q '[[:graph:]]'; then
-            echo '::error::Release tag must be empty when bump type is not **manual**.'
-            echo 'Clear the Release tag field, or set bump type to **manual** to use a custom tag.'
+            echo '::error::Release tag must be empty when bump type is not manual.'
+            echo 'Clear Release tag, or set bump type to manual for a custom tag.'
             exit 1
           fi
 
@@ -98,7 +87,7 @@ jobs:
         id: tag
         env:
           BUMP: ${{ inputs.bump_type }}
-          RAW_TAG: ${{ inputs.tag }}
+          RAW_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           bump_semver() {
