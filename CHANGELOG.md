@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-**Published releases** on GitHub use tags in the **`v0.2.*`** series (for example **`v0.2.7`**). The `setup.cfg` / package version tracks that line (next: **`0.2.8`**). Section headings **`[0.3.0]`** and newer below are dated milestones on `main`; they are not separate `v0.3`+ tags unless noted otherwise.
+**Published releases** on GitHub use tags in the **`v0.2.*`** series (for example **`v0.2.9`**). The `setup.cfg` / package version tracks that line. Section headings **`[0.3.0]`** and newer below are dated milestones on `main`; they are not separate `v0.3`+ tags unless noted otherwise.
 
 ## [Unreleased]
 
@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dashboard:** Route-level code splitting, watchlist, keyboard shortcuts (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
 - **Product:** User authentication, multi-user data isolation.
+
+## [0.2.9] - 2026-04-12
+
+### Changed
+
+- Aligned repository version metadata with Git tag **`v0.2.9`** / PyPI **`0.2.9`**: `setup.cfg`, `dashboard/frontend/package.json`, `package-lock.json` (root), `dashboard/backend/main.py`.
 
 ## [0.2.8] - 2026-04-11
 
