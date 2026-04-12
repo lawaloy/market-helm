@@ -1,0 +1,96 @@
+# Create a GitHub Release (and git tag) from main, which triggers "Publish to PyPI"
+# on release: published.
+#
+# Important: we use the repository GitHub App token for `gh release create`, not
+# github.token. Events caused by the default GITHUB_TOKEN do not trigger other
+# workflows (see GitHub docs: "triggering a workflow from a workflow").
+#
+# Ensure your GitHub App installation has permission to create releases / write
+# contents on this repo (same app as Dependabot auto-merge is fine if it already
+# has contents: write).
+
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.2.9). Must follow vMAJOR.MINOR.PATCH."
+        required: true
+        type: string
+      confirm:
+        description: "Confirm: create this release on main and trigger PyPI publish"
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require confirmation
+        if: ${{ inputs.confirm != true }}
+        run: |
+          echo "Set the Confirm checkbox to true to create this GitHub release and trigger PyPI publish."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Normalize and validate tag
+        id: tag
+        env:
+          RAW_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          t="${RAW_TAG#v}"
+          if ! echo "$t" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Tag must look like v0.2.9 or 0.2.9 (semver only)."
+            exit 1
+          fi
+          TAG="v${t}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Will create release ${TAG}"
+
+      - name: Ensure tag does not already exist
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --quiet origin || true
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists locally."
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            echo "Tag $TAG already exists on origin."
+            exit 1
+          fi
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Create GitHub Release (triggers Publish to PyPI)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --target main \
+            --title "Release $TAG" \
+            --generate-notes
