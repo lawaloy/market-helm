@@ -49,6 +49,12 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Sync to latest origin/main before applying release
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -103,15 +109,19 @@ jobs:
           set -euo pipefail
           VERSION="${TAG#v}"
           BRANCH="chore/post-release-sync-${VERSION}"
+          echo "HEAD before branch ($(git rev-parse --short HEAD)) should match origin/main ($(git rev-parse --short origin/main))."
+          git fetch origin "$BRANCH" 2>/dev/null || true
+          # HEAD is latest origin/main (see "Sync to latest origin/main"); branch carries one commit on top.
+          git checkout -B "$BRANCH"
           git config user.name "market-helm[bot]"
           git config user.email "market-helm[bot]@users.noreply.github.com"
-          git fetch origin "$BRANCH" 2>/dev/null || true
-          git checkout -B "$BRANCH"
           git add setup.cfg dashboard/frontend/package.json dashboard/frontend/package-lock.json dashboard/backend/main.py CHANGELOG.md
           if git diff --cached --quiet; then
             echo "No staged changes; exiting."
             exit 0
           fi
+          echo "Staged changes for post-release sync:"
+          git diff --cached --stat
           git commit -m "chore: sync repo version and changelog for ${VERSION} (post-release ${TAG})"
           git push -u origin "$BRANCH" --force-with-lease
           if [ "$(gh pr list --base main --head "$BRANCH" --state open --json number --jq length)" -eq 0 ]; then
