@@ -55,6 +55,8 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
+          author: "lawaloy <40930161+lawaloy@users.noreply.github.com>"
+          committer: "market-helm[bot] <market-helm[bot]@users.noreply.github.com>"
           branch: security/deps-maintenance
           delete-branch: true
           title: 'chore(deps): automated dependency maintenance'

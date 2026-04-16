@@ -133,7 +133,9 @@ jobs:
             exit 0
           fi
 
-          git commit -m "chore: normalize npm lockfiles"
+          git commit \
+            --author="lawaloy <40930161+lawaloy@users.noreply.github.com>" \
+            -m "chore: normalize npm lockfiles"
           git push
 
       - name: Prepare PR for automation

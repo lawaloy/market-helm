@@ -122,7 +122,9 @@ jobs:
           fi
           echo "Staged changes for post-release sync:"
           git diff --cached --stat
-          git commit -m "chore: sync repo version and changelog for ${VERSION} (post-release ${TAG})"
+          git commit \
+            --author="lawaloy <40930161+lawaloy@users.noreply.github.com>" \
+            -m "chore: sync repo version and changelog for ${VERSION} (post-release ${TAG})"
           git push -u origin "$BRANCH" --force-with-lease
           if [ "$(gh pr list --base main --head "$BRANCH" --state open --json number --jq length)" -eq 0 ]; then
             gh pr create --base main --head "$BRANCH" \
