@@ -5,13 +5,13 @@
   "dependencies": {
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.1.1",
-    "@tailwindcss/postcss": "^4.2.3",
-    "axios": "^1.14.0",
+    "@tailwindcss/postcss": "^4.2.4",
+    "axios": "^1.15.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-router-dom": "^7.14.1",
+    "react-router-dom": "^7.14.2",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
