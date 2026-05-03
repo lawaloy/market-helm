@@ -167,3 +167,88 @@ class TestDataLoader:
         assert out["samples"][0]["absErrorPct"] == 5.0
         assert out["samples"][0]["symbol"] == "AAPL"
         assert "HOLD" in out["summary"]["byRecommendation"]
+
+    def test_compute_projection_accuracy_uses_next_available_close(self, loader, temp_data_dir):
+        """Uses the first available close after the target date when target-day data is absent."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [100.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [108.0],
+                "change_percent": [1.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "target_mid": [100.0],
+                "recommendation": ["BUY"],
+                "projection_date": ["2026-01-15"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        assert out["summary"]["sampleCount"] == 1
+        assert out["summary"]["meanAbsErrorPct"] == 8.0
+        assert out["samples"][0]["targetDate"] == "2026-01-15"
+        assert out["samples"][0]["actualDate"] == "2026-01-16"
+
+    def test_compute_projection_accuracy_skips_unmatured_targets(self, loader, temp_data_dir):
+        """Does not score projections whose target date is later than latest daily data."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [100.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "target_mid": [120.0],
+                "recommendation": ["BUY"],
+                "projection_date": ["2026-01-20"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        assert out["summary"]["sampleCount"] == 0
+        assert out["summary"]["meanAbsErrorPct"] is None
+        assert out["samples"] == []
+
+    def test_compute_projection_accuracy_skips_invalid_and_future_targets(self, loader, temp_data_dir):
+        """Excludes projections that cannot yet be measured or have invalid targets."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [100.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "MSFT", "GOOGL"],
+                "target_mid": [0.0, "not-a-number", 120.0],
+                "recommendation": ["BUY", "HOLD", "SELL"],
+                "projection_date": ["2026-01-10", "2026-01-10", "2026-01-20"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        assert out == {
+            "summary": {
+                "sampleCount": 0,
+                "meanAbsErrorPct": None,
+                "byRecommendation": {},
+            },
+            "samples": [],
+        }
