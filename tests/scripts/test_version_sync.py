@@ -96,12 +96,15 @@ def test_cmd_sync_updates_all_dashboard_version_surfaces(tmp_path: Path) -> None
 def test_sync_main_py_rejects_missing_root_json_marker(tmp_path: Path) -> None:
     _write_repo(tmp_path, setup_version="9.9.9")
     main_py = tmp_path / "dashboard" / "backend" / "main.py"
-    original = main_py.read_text(encoding="utf-8")
-    main_py.write_text(original.replace('"service": "MarketHelm API",', '"service": "Other API",'), encoding="utf-8")
+    before_sync = main_py.read_text(encoding="utf-8").replace(
+        '"service": "MarketHelm API",',
+        '"service": "Other API",',
+    )
+    main_py.write_text(before_sync, encoding="utf-8")
 
     error = version_sync.sync_main_py(main_py, "9.9.9")
 
     assert error is not None
     assert "Could not find the root JSON version" in error
-    assert main_py.read_text(encoding="utf-8") != original
+    assert main_py.read_text(encoding="utf-8") == before_sync
     assert version_sync.read_main_py_versions(main_py) == (None, None)
