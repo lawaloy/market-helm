@@ -1,24 +1,3 @@
-# Create a GitHub Release (and git tag) from main, which triggers "Publish to PyPI"
-# on release: published.
-#
-# Version: defaults to the next PATCH from the latest vMAJOR.MINOR.PATCH on origin.
-# Override bump only when you need minor, major, or a custom tag (manual).
-#
-# Important: we use the repository GitHub App token for `gh release create`, not
-# github.token. Events caused by the default GITHUB_TOKEN do not trigger other
-# workflows (see GitHub docs: "triggering a workflow from a workflow").
-#
-# Ensure your GitHub App installation has permission to create releases / write
-# contents on this repo (same app as Dependabot auto-merge is fine if it already
-# has contents: write).
-#
-# UI notes (GitHub platform — not configurable in this file):
-# - "Use workflow from" always appears for workflow_dispatch; it **must** be **main**:
-#   the job fails immediately otherwise (so you never run a stale copy of this workflow).
-# - All inputs are always visible; there is no conditional "show tag only for manual".
-# - To cancel: close the dialog without clicking **Run workflow** (there is no
-#   per-workflow Cancel button next to Run workflow).
-
 name: Create Release
 
 on:
