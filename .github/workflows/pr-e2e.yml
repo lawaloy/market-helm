@@ -180,7 +180,8 @@ jobs:
         if: always() && github.event.pull_request.head.repo.full_name == github.repository
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          header: e2e-smoke-${{ github.workflow }}
-          recreate: true
+          # Stable id so reruns/Pushes update the same comment (do not tie to workflow display name).
+          header: market-helm-pr-e2e
+          skip_unchanged: true
           path: e2e/pr-comment.md
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
