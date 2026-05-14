@@ -11,7 +11,7 @@ logging.basicConfig(
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pathlib import Path
 import sys
 import os
@@ -109,8 +109,24 @@ async def api_summary():
 
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
-if _STATIC_DIR.is_dir() and (_STATIC_DIR / "index.html").is_file():
-    app.mount("/", StaticFiles(directory=str(_STATIC_DIR), html=True), name="spa")
+_INDEX = _STATIC_DIR / "index.html"
+if _STATIC_DIR.is_dir() and _INDEX.is_file():
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa_or_static(full_path: str):
+        """
+        Serve Vite-built assets; unknown paths return index.html so React Router
+        deep links (e.g. /summary) work when the SPA is served from FastAPI.
+        """
+        base = _STATIC_DIR.resolve()
+        candidate = (base / full_path).resolve()
+        try:
+            candidate.relative_to(base)
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Not found")
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_INDEX)
 else:
 
     @app.get("/")
