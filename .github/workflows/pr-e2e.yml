@@ -142,9 +142,10 @@ jobs:
             echo "| Curl smoke | ${{ steps.curl_smoke.outcome }} |"
             echo "| Playwright | ${{ steps.playwright.outcome }} |"
             echo ""
-            echo "**Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*).
-            echo "E2E test results: **Workflow run → Artifacts → e2e-test-results (unzip → all PNGs).**"
-            echo "Playwright HTML report: **Workflow run → Artifacts → playwright-report.**"
+            echo "**Screenshots & HTML report:** Unzip artifacts **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL})."
+            echo ""
+            echo "- **PNGs:** artifact **e2e-test-results** — unzip to view screenshots."
+            echo "- **HTML report:** artifact **playwright-report**."
             echo ""
             echo "### Inline preview"
             echo ""
@@ -161,8 +162,7 @@ jobs:
                   url=$(host_png "$f")
                   if [ -n "$url" ]; then
                     any_inline=1
-                    echo "![${base}](${url})"
-                    echo ""
+                    printf '![%s](%s)\n\n' "$base" "$url"
                   fi
                 done
                 if [ "$any_inline" -eq 0 ]; then
