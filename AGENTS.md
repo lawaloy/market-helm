@@ -33,5 +33,7 @@ See CI in `.github/workflows/python-app.yml` for the canonical commands. Quick r
 - `flake8` and `pytest` are installed to `~/.local/bin` — make sure `PATH` includes it (`export PATH="$HOME/.local/bin:$PATH"`).
 - The `FINNHUB_API_KEY` env var is required only for live data fetching (CLI `market-helm` or dashboard "Fetch New" button). All tests mock the API and run without it.
 - The `OPENAI_API_KEY` is fully optional; without it, AI summaries fall back to template-based demo text.
-- Dashboard API endpoints return 500 when no data files exist in `data/` — this is expected on a fresh clone before the first fetch.
+- Dashboard API endpoints (e.g. `/api/market/overview`) return 404 `"No data available."` or 500 when no data files exist in `data/` — this is expected on a fresh clone before the first fetch.
 - The frontend build outputs to `dashboard/backend/static/`; FastAPI serves this as a SPA mount if the directory exists.
+- The Vite dev server proxies `/api` requests to the backend on port 8000. When developing frontend, use `http://localhost:3000`; when testing the built SPA, use `http://localhost:8000`.
+- Clicking "Fetch New" in the dashboard UI triggers a live data fetch via the Finnhub API and will fail gracefully without `FINNHUB_API_KEY`, showing an error banner in the UI.
