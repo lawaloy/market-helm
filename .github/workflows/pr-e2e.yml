@@ -142,11 +142,11 @@ jobs:
             echo "| Curl smoke | ${{ steps.curl_smoke.outcome }} |"
             echo "| Playwright | ${{ steps.playwright.outcome }} |"
             echo ""
-            echo "📎 **Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*). workflow run → Artifacts → e2e-test-results (unzip → all PNGs). Playwright HTML report is in playwright-report."
+            echo "**Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*).
+            echo "E2E test results: **Workflow run → Artifacts → e2e-test-results (unzip → all PNGs).**"
+            echo "Playwright HTML report: **Workflow run → Artifacts → playwright-report.**"
             echo ""
-            echo "### Inline preview (best effort)"
-            echo ""
-            echo "_Temporary image hosts often block GitHub Actions; if nothing renders below, the artifact zip still has every PNG._"
+            echo "### Inline preview"
             echo ""
             if [ ! -d e2e/test-results ]; then
               echo "_No PNG files under \`e2e/test-results\` (run may have failed before capture)._"
