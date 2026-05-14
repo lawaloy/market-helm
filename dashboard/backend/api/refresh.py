@@ -77,13 +77,14 @@ def run_daily_tracker():
         env = os.environ.copy()
         env["STOCK_FETCH_MAX_WORKERS"] = os.getenv("REFRESH_MAX_WORKERS", "4")
 
+        # Do not use PIPE for stdout/stderr: the tracker logs heavily to the console.
+        # Unread PIPE buffers deadlock the child once full (parent only drains in communicate()).
         _refresh_process = subprocess.Popen(
             command,
             cwd=str(project_root),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env,
         )
 
         max_seconds = int(os.getenv("REFRESH_TIMEOUT_SECONDS", "600"))
@@ -113,10 +114,10 @@ def run_daily_tracker():
             time.sleep(2)
 
         try:
-            stdout, stderr = _refresh_process.communicate(timeout=10)
+            _refresh_process.wait(timeout=30)
         except subprocess.TimeoutExpired:
             _refresh_process.kill()
-            stdout, stderr = _refresh_process.communicate()
+            _refresh_process.wait(timeout=10)
 
         if _refresh_cancel_event.is_set():
             refresh_status["last_status"] = "cancelled"
@@ -173,6 +174,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
 
     refresh_status["last_status"] = "running"
     refresh_status["progress"] = "Starting market-helm..."
+    refresh_status["is_running"] = True
 
     # Start refresh in background
     thread = threading.Thread(target=run_daily_tracker, daemon=True)

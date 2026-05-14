@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { marketApi, projectionsApi } from '../services/api';
 import KPICard from '../components/cards/KPICard';
 import OpportunityCard from '../components/cards/OpportunityCard';
@@ -13,6 +14,32 @@ import type { MarketOverview, ProjectionsSummary, StockMover, Opportunity } from
 interface DashboardProps {
   onDataLoaded?: (date: string) => void;
   refreshKey?: number;
+}
+
+function dashboardLoadErrorMessage(err: unknown): string {
+  if (axios.isAxiosError(err)) {
+    const status = err.response?.status;
+    if (status === 404) {
+      return (
+        'No market data yet. Use "Fetch New" in the header (needs a Finnhub API key set on the server), ' +
+        'or run the market-helm CLI once to populate the data folder.'
+      );
+    }
+    if (status != null && status >= 500) {
+      return 'Service is temporarily unavailable. Please try again later.';
+    }
+    if (!err.response) {
+      return (
+        'Cannot reach the API. Start the backend (port 8000), or if you use the Vite dev server, ensure it can proxy /api.'
+      );
+    }
+    const data = err.response.data as { detail?: unknown } | undefined;
+    const detail = data?.detail;
+    if (typeof detail === 'string') {
+      return `Could not load dashboard: ${detail}`;
+    }
+  }
+  return 'Service is temporarily unavailable. Please try again later.';
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) => {
@@ -104,7 +131,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
 
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Service is temporarily unavailable. Please try again later.');
+      setError(dashboardLoadErrorMessage(err));
     } finally {
       setLoading(false);
       if (!silent) isInitialMount.current = false;

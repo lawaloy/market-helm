@@ -1,0 +1,187 @@
+# Smoke-test the built SPA + API like production, and leave a PR comment with results.
+#
+# Screenshots: always in workflow Artifacts. Optional best-effort inline images via transfer.sh
+# (ephemeral; may fail). GitHub does not allow embedding private artifact URLs in comments.
+
+name: PR E2E
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-e2e-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Curl + Playwright
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install -r dashboard/backend/requirements.txt
+
+      - name: Verify version sync
+        run: python scripts/version_sync.py check
+
+      - name: Seed E2E data (matches app trading-day logic; avoids auto Finnhub fetch)
+        run: python e2e/scripts/seed_ci_data.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: dashboard/frontend/package-lock.json
+
+      - name: Build dashboard SPA
+        run: |
+          cd dashboard/frontend
+          npm ci
+          npm run build
+
+      - name: Start API (uvicorn, no reload)
+        run: |
+          cd "${{ github.workspace }}"
+          python -m uvicorn dashboard.backend.main:app --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 45); do
+            if curl -fsS "http://127.0.0.1:8000/health" | jq -e '.status == "healthy"' >/dev/null; then
+              echo "API is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Timed out waiting for /health"
+          exit 1
+
+      - id: curl_smoke
+        name: Curl smoke (health, data-info, HTML shell)
+        run: |
+          set -euo pipefail
+          curl -fsS "http://127.0.0.1:8000/health" | jq -e '.status == "healthy"'
+          curl -fsS "http://127.0.0.1:8000/api/data-info" | jq -e '.needs_fetch == false'
+          curl -fsS -o /tmp/spa.html "http://127.0.0.1:8000/"
+          grep -qiE '<!doctype html|<html' /tmp/spa.html
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - id: playwright
+        name: Install Playwright & run tests
+        env:
+          CI: "true"
+          E2E_BASE_URL: http://127.0.0.1:8000
+        run: |
+          cd e2e
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload screenshots & test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: e2e/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Build sticky PR comment (artifacts + optional hosted images)
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          set +e
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          host_png() {
+            local f="$1"
+            local base u
+            base=$(basename "$f")
+            u=$(curl -fsS --connect-timeout 20 --max-time 90 --upload-file "$f" "https://transfer.sh/$base" | tr -d '\r\n')
+            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
+              echo "$u"
+              return 0
+            fi
+            u=$(curl -fsS --connect-timeout 20 --max-time 90 -F "file=@${f}" "https://0x0.st" | tr -d '\r\n')
+            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
+              echo "$u"
+              return 0
+            fi
+            echo ""
+            return 1
+          }
+
+          {
+            echo "## E2E smoke (curl + Playwright)"
+            echo ""
+            echo "| Step | Result |"
+            echo "|------|--------|"
+            echo "| Curl smoke | ${{ steps.curl_smoke.outcome }} |"
+            echo "| Playwright | ${{ steps.playwright.outcome }} |"
+            echo ""
+            echo "**Screenshots & HTML report:** Unzip artifacts **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL})."
+            echo ""
+            echo "_PNGs:_ workflow run → Artifacts → **e2e-test-results** (unzip the archive)."
+            echo "_Playwright HTML report:_ workflow run → Artifacts → **playwright-report**."
+            echo ""
+            echo "### Inline preview"
+            echo ""
+            if [ ! -d e2e/test-results ]; then
+              echo "_No PNG files under \`e2e/test-results\` (run may have failed before capture)._"
+            else
+              mapfile -d '' -t PNGS < <(find e2e/test-results -type f -name '*.png' -print0 | sort -z)
+              if [ "${#PNGS[@]}" -eq 0 ]; then
+                echo "_No PNG files found._"
+              else
+                any_inline=0
+                for f in "${PNGS[@]}"; do
+                  base=$(basename "$f")
+                  url=$(host_png "$f")
+                  if [ -n "$url" ]; then
+                    any_inline=1
+                    printf '![%s](%s)\n\n' "$base" "$url"
+                  fi
+                done
+                if [ "$any_inline" -eq 0 ]; then
+                  echo "**This run could not upload previews.** Open the artifact above — PNGs include:"
+                  echo ""
+                  for abs in "${PNGS[@]}"; do
+                    echo "- \`$(basename "$abs")\`"
+                  done
+                fi
+              fi
+            fi
+          } > e2e/pr-comment.md
+
+      - name: Comment on PR with results
+        if: always() && github.event.pull_request.head.repo.full_name == github.repository
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          # Same header across runs → marocchino updates this comment (PATCH), no delete/repost.
+          header: e2e-smoke-${{ github.workflow }}
+          skip_unchanged: true
+          path: e2e/pr-comment.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

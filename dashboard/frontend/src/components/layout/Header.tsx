@@ -44,9 +44,28 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
       const response = await api.post('/api/refresh');
       updateMessage(response.data.message);
 
+      const pollMs = 2000;
+      const maxWaitMs = 15 * 60 * 1000;
+      const pollStarted = Date.now();
+
+      const finishPolling = () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      };
+
       // Poll for status
       pollIntervalRef.current = setInterval(async () => {
         try {
+          if (Date.now() - pollStarted > maxWaitMs) {
+            finishPolling();
+            setIsRefreshing(false);
+            updateMessage('Refresh is taking too long. Check server logs or try Cancel.');
+            setTimeout(() => updateMessage(''), 8000);
+            return;
+          }
+
           const statusRes = await api.get('/api/refresh/status');
           const status = statusRes.data;
 
@@ -55,10 +74,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
           }
 
           if (!status.is_running) {
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
+            finishPolling();
             setIsRefreshing(false);
 
             if (status.last_status === 'success') {
@@ -77,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
         } catch (err) {
           console.error('Status poll error:', err);
         }
-      }, 2000); // Poll every 2 seconds
+      }, pollMs);
 
     } catch (error) {
       console.error('Refresh error:', error);
