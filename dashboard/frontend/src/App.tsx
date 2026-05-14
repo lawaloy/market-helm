@@ -36,10 +36,20 @@ function App() {
 
         setBackgroundFetching(true);
         await api.post('/api/refresh');
+        const pollIntervalMs = 2000;
+        const maxWaitMs = 15 * 60 * 1000;
+        const started = Date.now();
+
         const poll = async (): Promise<void> => {
-          const { data: status } = await api.get<{ is_running: boolean; last_status: string }>('/api/refresh/status');
+          if (Date.now() - started > maxWaitMs) {
+            setBackgroundFetching(false);
+            return;
+          }
+          const { data: status } = await api.get<{ is_running: boolean; last_status: string }>(
+            '/api/refresh/status',
+          );
           if (status.is_running) {
-            await new Promise((r) => setTimeout(r, 2000));
+            await new Promise((r) => setTimeout(r, pollIntervalMs));
             return poll();
           }
           setBackgroundFetching(false);

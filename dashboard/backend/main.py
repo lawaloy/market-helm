@@ -88,7 +88,10 @@ async def health():
 async def data_info():
     """Data status: path, latest date, and whether we need to fetch for the most recent trading day."""
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
-    loader = get_data_loader()
+    try:
+        loader = get_data_loader()
+    except ValueError:
+        raise HTTPException(status_code=404, detail="No data available.")
     target_trading_day = get_most_recent_trading_day()
     return {
         "data_dir": str(loader.data_dir),

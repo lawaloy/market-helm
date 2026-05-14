@@ -199,6 +199,21 @@ class TestHistoryAccuracyAPI:
 class TestMarketAPIErrors:
     """Test API error handling."""
 
+    def test_data_info_404_when_data_dir_missing(self):
+        """GET /api/data-info returns 404 when DATA_DIR/user data path does not exist (not 500)."""
+        with patch(
+            "dashboard.backend.services.data_loader.get_data_loader",
+            side_effect=ValueError("Data directory not found: /nonexistent"),
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/data-info")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available."
+
     def test_summary_404_when_no_data(self, temp_data_dir):
         """Summary returns 404 when no summary files exist."""
         import dashboard.backend.api.market

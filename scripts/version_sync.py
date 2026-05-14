@@ -30,6 +30,11 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _repo_rel_posix(root: Path, path: Path) -> str:
+    """Path under root using forward slashes (stable check/CI output on Windows and POSIX)."""
+    return path.relative_to(root).as_posix()
+
+
 def read_setup_version(root: Path) -> str:
     cfg_path = root / "setup.cfg"
     if not cfg_path.is_file():
@@ -82,27 +87,29 @@ def check(root: Path) -> list[str]:
     pj = root / "dashboard" / "frontend" / "package.json"
     got = read_package_json_version(pj)
     if got != want:
-        errors.append(f"{pj.relative_to(root)}: version is {got!r}, setup.cfg has {want!r}")
+        errors.append(f"{_repo_rel_posix(root, pj)}: version is {got!r}, setup.cfg has {want!r}")
 
     lock = root / "dashboard" / "frontend" / "package-lock.json"
     top, inner = read_lock_root_versions(lock)
     if top != want:
-        errors.append(f"{lock.relative_to(root)} root version: {top!r} != {want!r}")
+        errors.append(f"{_repo_rel_posix(root, lock)} root version: {top!r} != {want!r}")
     if inner != want:
-        errors.append(f'{lock.relative_to(root)} packages[""] version: {inner!r} != {want!r}')
+        errors.append(
+            f'{_repo_rel_posix(root, lock)} packages[""] version: {inner!r} != {want!r}'
+        )
 
     main_py = root / "dashboard" / "backend" / "main.py"
     fa, rj = read_main_py_versions(main_py)
     if fa is None or rj is None:
         errors.append(
-            f"{main_py.relative_to(root)}: could not read version markers "
+            f"{_repo_rel_posix(root, main_py)}: could not read version markers "
             '(expected FastAPI "MarketHelm API" block and root() JSON). Run sync after fixing the file.'
         )
     else:
         if fa != want:
-            errors.append(f"{main_py.relative_to(root)} FastAPI version: {fa!r} != {want!r}")
+            errors.append(f"{_repo_rel_posix(root, main_py)} FastAPI version: {fa!r} != {want!r}")
         if rj != want:
-            errors.append(f"{main_py.relative_to(root)} root JSON version: {rj!r} != {want!r}")
+            errors.append(f"{_repo_rel_posix(root, main_py)} root JSON version: {rj!r} != {want!r}")
 
     return errors
 
