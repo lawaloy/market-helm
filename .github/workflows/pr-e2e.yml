@@ -142,7 +142,7 @@ jobs:
             echo "| Curl smoke | ${{ steps.curl_smoke.outcome }} |"
             echo "| Playwright | ${{ steps.playwright.outcome }} |"
             echo ""
-            echo "📎 **Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*). GitHub cannot embed those files directly in comments."
+            echo "📎 **Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*). workflow run → Artifacts → e2e-test-results (unzip → all PNGs). Playwright HTML report is in playwright-report."
             echo ""
             echo "### Inline preview (best effort)"
             echo ""
@@ -166,7 +166,7 @@ jobs:
                   fi
                 done
                 if [ "$any_inline" -eq 0 ]; then
-                  echo "**This run could not upload previews** (transfer.sh / 0x0.st). Open the artifact above — PNGs include:"
+                  echo "**This run could not upload previews.** Open the artifact above — PNGs include:"
                   echo ""
                   for abs in "${PNGS[@]}"; do
                     echo "- \`$(basename "$abs")\`"
