@@ -115,6 +115,25 @@ jobs:
         run: |
           set +e
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          host_png() {
+            local f="$1"
+            local base u
+            base=$(basename "$f")
+            u=$(curl -fsS --connect-timeout 20 --max-time 90 --upload-file "$f" "https://transfer.sh/$base" | tr -d '\r\n')
+            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
+              echo "$u"
+              return 0
+            fi
+            u=$(curl -fsS --connect-timeout 20 --max-time 90 -F "file=@${f}" "https://0x0.st" | tr -d '\r\n')
+            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
+              echo "$u"
+              return 0
+            fi
+            echo ""
+            return 1
+          }
+
           {
             echo "## E2E smoke (curl + Playwright)"
             echo ""
@@ -123,23 +142,37 @@ jobs:
             echo "| Curl smoke | ${{ steps.curl_smoke.outcome }} |"
             echo "| Playwright | ${{ steps.playwright.outcome }} |"
             echo ""
-            echo "📎 **Artifacts (HTML report + PNGs):** [open this workflow run](${RUN_URL}) → section *Artifacts* → download **playwright-report** or **e2e-test-results**."
+            echo "📎 **Screenshots & HTML report:** Unzip artifact **e2e-test-results** or **playwright-report** from [this workflow run](${RUN_URL}) (section *Artifacts*). GitHub cannot embed those files directly in comments."
             echo ""
-            echo "### Screenshots (preview — temporary host; may be empty if upload failed)"
+            echo "### Inline preview (best effort)"
+            echo ""
+            echo "_Temporary image hosts often block GitHub Actions; if nothing renders below, the artifact zip still has every PNG._"
             echo ""
             if [ ! -d e2e/test-results ]; then
-              echo "_No PNG files (tests may have failed before capture)._"
+              echo "_No PNG files under \`e2e/test-results\` (run may have failed before capture)._"
             else
-              find e2e/test-results -type f -name '*.png' | sort | while read -r f; do
-                base=$(basename "$f")
-                url=$(curl -fsS --connect-timeout 20 --max-time 120 --upload-file "$f" "https://transfer.sh/$base" | tr -d '\r\n')
-                if [ -n "$url" ]; then
-                  echo "![$base]($url)"
+              mapfile -d '' -t PNGS < <(find e2e/test-results -type f -name '*.png' -print0 | sort -z)
+              if [ "${#PNGS[@]}" -eq 0 ]; then
+                echo "_No PNG files found._"
+              else
+                any_inline=0
+                for f in "${PNGS[@]}"; do
+                  base=$(basename "$f")
+                  url=$(host_png "$f")
+                  if [ -n "$url" ]; then
+                    any_inline=1
+                    echo "![${base}](${url})"
+                    echo ""
+                  fi
+                done
+                if [ "$any_inline" -eq 0 ]; then
+                  echo "**This run could not upload previews** (transfer.sh / 0x0.st). Open the artifact above — PNGs include:"
                   echo ""
-                else
-                  echo "- \`$base\` _(hosted preview unavailable; see artifact)_"
+                  for abs in "${PNGS[@]}"; do
+                    echo "- \`$(basename "$abs")\`"
+                  done
                 fi
-              done
+              fi
             fi
           } > e2e/pr-comment.md
 
