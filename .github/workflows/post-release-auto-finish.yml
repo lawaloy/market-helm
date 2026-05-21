@@ -9,6 +9,12 @@ on:
   workflow_run:
     workflows: ["CI", "PR Description", "PR E2E"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Open post-release sync PR number to merge
+        required: true
+        type: number
 
 permissions:
   contents: write
@@ -16,12 +22,13 @@ permissions:
   issues: write
 
 concurrency:
-  group: post-release-auto-finish-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
+  group: post-release-auto-finish-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pull_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   finish:
     if: |
+      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'pull_request' &&
         startsWith(github.event.pull_request.head.ref, 'chore/post-release-sync-')) ||
       (github.event_name == 'workflow_run' &&
@@ -31,5 +38,5 @@ jobs:
     uses: ./.github/workflows/pr-auto-finish-reusable.yml
     with:
       lane: post-release
-      pull_number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || 0 }}
+      pull_number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || inputs.pull_number || 0 }}
     secrets: inherit

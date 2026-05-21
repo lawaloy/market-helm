@@ -197,11 +197,14 @@ jobs:
 
               core.info(`Mergeable state on attempt ${attempt}: ${pullRequest.mergeable_state}`);
 
-              if (pullRequest.mergeable_state === 'clean') {
+              // GitHub often reports "unstable" while optional/neutral checks exist even when required checks passed.
+              const canTryMerge = ['clean', 'unstable'].includes(pullRequest.mergeable_state);
+
+              if (canTryMerge) {
                 if (await hasPendingBlockingChecks(pullRequest.head.sha)) {
                   if (attempt === maxAttempts) {
                     core.info(
-                      'Mergeable is clean but checks are still pending. A later workflow_run completion will retry.',
+                      'Mergeable but checks are still pending. A later workflow_run completion will retry.',
                     );
                     return;
                   }
