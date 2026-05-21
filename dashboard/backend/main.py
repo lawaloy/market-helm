@@ -44,7 +44,7 @@ from dashboard.backend.api.market import get_market_summary
 app = FastAPI(
     title="MarketHelm API",
     description="API for stock market data, projections, and recommendations",
-    version="0.2.14"
+    version="0.2.15"
 )
 
 # CORS configuration for local development
@@ -135,7 +135,7 @@ else:
         return {
             "status": "healthy",
             "service": "MarketHelm API",
-            "version": "0.2.14",
+            "version": "0.2.15",
             "spa": False,
         }
 
