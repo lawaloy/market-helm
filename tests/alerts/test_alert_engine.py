@@ -67,3 +67,31 @@ def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     log_notifier_cls.assert_called_once_with()
     log_notifier.send.assert_called_once_with(events[0])
 
+
+def test_evaluate_dispatches_email_notifier_for_triggered_alert():
+    """Triggered email alerts are persisted and delivered with the engine event payload."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    email = MagicMock()
+    alert = {
+        "id": "price-drop",
+        "name": "Price Drop",
+        "enabled": True,
+        "notifications": ["email"],
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch("src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email) as from_alert:
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    event = events[0]
+    from_alert.assert_called_once_with(alert)
+    email.send.assert_called_once_with(event)
+

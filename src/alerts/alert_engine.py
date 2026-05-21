@@ -8,8 +8,10 @@ from datetime import datetime, timedelta
 import json
 
 from ..core.logger import setup_logger
+from .alert_paths import resolve_alerts_config_path
 from .alert_storage import AlertStorage
 from .alert_rules import evaluate_price_threshold, evaluate_screening_match
+from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
 
 logger = setup_logger("alerts")
@@ -35,8 +37,7 @@ class AlertEngine:
 
     @staticmethod
     def from_config(config_path: Optional[Path] = None) -> Optional["AlertEngine"]:
-        if config_path is None:
-            config_path = Path(__file__).parent.parent.parent / "config" / "alerts.json"
+        config_path = resolve_alerts_config_path(config_path)
         if not config_path.exists():
             return None
         try:
@@ -71,6 +72,10 @@ class AlertEngine:
                 webhook = WebhookNotifier.from_alert(alert)
                 if webhook:
                     instances.append(webhook)
+            elif name == "email":
+                email = EmailNotifier.from_alert(alert)
+                if email:
+                    instances.append(email)
             else:
                 notifier_cls = NOTIFIERS.get(name)
                 if notifier_cls:

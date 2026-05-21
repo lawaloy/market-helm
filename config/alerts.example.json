@@ -1,0 +1,63 @@
+{
+  "alerts": [
+    {
+      "id": "alert_aapl_drop",
+      "name": "AAPL Price Drop",
+      "enabled": false,
+      "condition": {
+        "type": "price_threshold",
+        "symbol": "AAPL",
+        "operator": "less_than",
+        "value": 150.0
+      },
+      "notifications": ["log", "email"],
+      "email_to": "you@example.com",
+      "cooldown_minutes": 60
+    },
+    {
+      "id": "alert_high_volume_gainers",
+      "name": "High Volume Gainers",
+      "enabled": false,
+      "condition": {
+        "type": "screening_match",
+        "filters": {
+          "volume_threshold": 5000000,
+          "min_daily_change_pct": 5.0
+        }
+      },
+      "notifications": ["log", "webhook"],
+      "webhook_url": "https://hooks.example.com/your/incoming/webhook",
+      "webhook_format": "slack",
+      "cooldown_minutes": 1440
+    },
+    {
+      "id": "alert_multi_channel",
+      "name": "Example: log + email + webhook",
+      "enabled": false,
+      "condition": {
+        "type": "price_threshold",
+        "symbol": "MSFT",
+        "operator": "greater_than",
+        "value": 400.0
+      },
+      "notifications": ["log", "email", "webhook"],
+      "email_to": "alerts@example.com,backup@example.com",
+      "cooldown_minutes": 120
+    },
+    {
+      "id": "alert_discord_example",
+      "name": "Example: Discord webhook",
+      "enabled": false,
+      "condition": {
+        "type": "price_threshold",
+        "symbol": "TSLA",
+        "operator": "greater_than",
+        "value": 200.0
+      },
+      "notifications": ["webhook"],
+      "webhook_url": "https://discord.com/api/webhooks/YOUR/WEBHOOK/URL",
+      "webhook_format": "discord",
+      "cooldown_minutes": 60
+    }
+  ]
+}

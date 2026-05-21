@@ -143,7 +143,13 @@ def display_results(result: dict):
 def main():
     """CLI entry point for MarketHelm (see also console script `market-helm`)."""
     import argparse
-    
+
+    if len(sys.argv) > 1 and sys.argv[1] == "alerts":
+        from .alerts_commands import main as alerts_main
+
+        alerts_main(sys.argv[2:])
+        return
+
     parser = argparse.ArgumentParser(description='MarketHelm — daily market run (day-trading oriented)')
     parser.add_argument('--top-n', type=int, default=None, 
                        help='Limit to top N stocks by volume (e.g. --top-n 50 for day trading)')

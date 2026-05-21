@@ -213,7 +213,8 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 ### Current Gaps & Opportunities
 
-- **Alerts:** Engine + `config/alerts.json` + **log** + **webhook** are in place; **email/SNS**, rich **Slack payloads**, **CLI** subcommands, and **dashboard** management UI are not.
+- **Alerts (product):** Backend engine exists; **end-user Settings UI** (email subscribe, no JSON) is the next milestone — see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-requirements--alerts-non‑negotiable-direction). JSON/env config is interim only, not the shipped UX.
+- **Alerts (in flight):** SMTP email, Slack webhook format, CLI `alerts init|list|test` on branch `feat/alerts-smtp-email` — validate before merge.
 - **Historical / accuracy:** Multi-day trends and **projection accuracy** (API + Historical Trends UI) are in place; deeper **metrics by confidence**, **risk-adjusted** views, and **business-calendar** target dates are still open.
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
 - **Screening:** Advanced technical filters (RSI/MACD, etc.) remain future work.
@@ -225,23 +226,25 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 ### Priority Features (ranked by impact)
 
-#### Priority #1: Alert & notification system (extend what exists)
+#### Priority #1: Alert & notification system
 
-**Status:** Partially implemented — see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+**Status:** Backend partial; **product UI next** — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
-**Done / in repo:**
+**On `main`:**
 
 - [x] Alert engine (price threshold, screening match), storage, cooldowns
-- [x] JSON rules in `config/alerts.json`
-- [x] Log notifier
-- [x] **Webhook** notifier (`webhook_url` or `ALERT_WEBHOOK_URL`)
+- [x] Log + **webhook** notifiers
 
-**Still to build:**
+**In flight (validate before merge):**
 
-- [ ] Email (SMTP) and optional cloud notifiers (SNS, etc.)
-- [ ] Optional Slack/Discord-specific payload shaping
-- [ ] CLI: `alerts list`, `alerts test`, …
-- [ ] Technical / multi-condition rules per [Alerting Design](docs/ALERTING_DESIGN.md)
+- [ ] SMTP email notifier
+- [ ] Slack webhook payload format
+- [ ] CLI: `alerts init`, `alerts list`, `alerts test`
+
+**Next product milestone (after above merges):**
+
+- [ ] **Dashboard Settings → Alerts** — users enter email, manage rules, test notifications (no raw JSON)
+- [ ] Later: accounts, DB, always-on worker, SMS/push
 
 ---
 

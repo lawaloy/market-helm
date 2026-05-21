@@ -44,6 +44,17 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 | `CORS_ORIGINS` | Dashboard backend | Comma-separated origins allowed in browser (e.g. `https://app.example.com`) |
 | `VITE_API_URL` | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`) |
 | `ALERT_WEBHOOK_URL` | Tracker (alerts) | Default webhook when rules use `webhook` without per-rule `url` |
+| `ALERT_WEBHOOK_FORMAT` | Tracker (alerts) | `json`, `slack`, or `discord` webhook body format |
+| `DISCORD_WEBHOOK_URL` | Tracker (alerts) | Default Discord incoming webhook URL when a rule has no `webhook_url` |
+| `MARKET_HELM_ALERTS_CONFIG` | Tracker (alerts) | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`) |
+| `SMTP_HOST` | Tracker (alerts) | SMTP server for `email` notifications |
+| `SMTP_PORT` | Tracker (alerts) | SMTP port (default `587`) |
+| `SMTP_USER` | Tracker (alerts) | SMTP username |
+| `SMTP_PASSWORD` | Tracker (alerts) | SMTP password or app password |
+| `ALERT_EMAIL_TO` | Tracker (alerts) | Default recipients for `email` notifications |
+| `ALERT_EMAIL_FROM` | Tracker (alerts) | Optional From header (defaults to `SMTP_USER`) |
+
+**Dev vs product email:** these variables are for **self-host / operator** SMTP (e.g. personal Gmail). Hosted product delivery (platform `From`, user `To` in Settings) is described in [PROJECT_STATUS.md — Production alert delivery (target)](PROJECT_STATUS.md#production-alert-delivery-target). Provider runbooks (SendGrid, SES, etc.) go in DEPLOYMENT when implemented.
 
 Never commit values; use your host’s secret manager or encrypted env.
 
