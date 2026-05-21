@@ -1,0 +1,40 @@
+# Auto-merge chore/post-release-sync-* PRs after required checks complete.
+# Runs from main via workflow_run (not pull_request) so merge is attempted after CI/E2E,
+# not in parallel with them. Use workflow_dispatch to retry a specific open PR manually.
+
+name: Post-release Auto Finish
+
+on:
+  workflow_run:
+    workflows: ["CI", "PR Description", "PR E2E"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pull_number:
+        description: Open post-release sync PR number to merge
+        required: true
+        type: number
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: post-release-auto-finish-${{ github.event.workflow_run.pull_requests[0].number || inputs.pull_number || github.event.workflow_run.head_branch || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  finish:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        startsWith(github.event.workflow_run.head_branch, 'chore/post-release-sync-'))
+    uses: ./.github/workflows/pr-auto-finish-reusable.yml
+    with:
+      lane: post-release
+      pull_number: ${{ github.event.workflow_run.pull_requests[0].number || inputs.pull_number || 0 }}
+      poll_profile: after_checks
+    secrets: inherit
