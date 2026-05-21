@@ -1,6 +1,11 @@
 name: Post-release Auto Finish
 
 on:
+  # pull_request: runs from the PR branch (works before this file is on main).
+  # workflow_run: takes over after merge to main (runs after CI / E2E complete).
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ["CI", "PR Description", "PR E2E"]
     types: [completed]
@@ -11,15 +16,20 @@ permissions:
   issues: write
 
 concurrency:
-  group: post-release-auto-finish-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+  group: post-release-auto-finish-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   finish:
     if: |
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'pull_request' &&
+        startsWith(github.event.pull_request.head.ref, 'chore/post-release-sync-')) ||
+      (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        startsWith(github.event.workflow_run.head_branch, 'chore/post-release-sync-'))
     uses: ./.github/workflows/pr-auto-finish-reusable.yml
     with:
       lane: post-release
+      pull_number: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || 0 }}
     secrets: inherit

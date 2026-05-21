@@ -38,11 +38,26 @@ jobs:
             const lane = process.env.LANE;
             const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
             const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
-            const pull_number = eventPullNumber || inputPullNumber;
+            let pull_number = eventPullNumber || inputPullNumber;
             const { owner, repo } = context.repo;
-            const maxAttempts = 10;
+            const maxAttempts = 24;
             const delayMs = 15000;
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            if (!pull_number && context.payload.workflow_run?.head_branch) {
+              const branch = context.payload.workflow_run.head_branch;
+              const { data: prs } = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                head: `${owner}:${branch}`,
+                per_page: 1,
+              });
+              if (prs.length > 0) {
+                pull_number = prs[0].number;
+                core.info(`Resolved PR #${pull_number} from head branch ${branch}.`);
+              }
+            }
 
             if (!pull_number) {
               core.info('Skipping because no pull request number was available on the workflow_run payload.');
