@@ -1,21 +1,30 @@
-# Advanced CodeQL (disable default setup under Settings → Security → Code scanning).
-# https://docs.github.com/en/code-security/code-scanning
+# Advanced CodeQL (custom workflow). Requires GitHub **default** CodeQL setup to stay OFF:
+#   Repo → Settings → Code security → Code scanning → disable "Default" / use this workflow only.
+# If both default and this workflow upload SARIF, analysis fails with:
+#   "CodeQL analyses from advanced configurations cannot be processed when the default setup is enabled"
+#
+# https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning
 
-name: "CodeQL"
+name: CodeQL Advanced
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
   schedule:
     - cron: "35 5 * * 1"
+  workflow_dispatch:
 
 permissions:
   security-events: write
   packages: read
   actions: read
   contents: read
+
+concurrency:
+  group: codeql-advanced-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
