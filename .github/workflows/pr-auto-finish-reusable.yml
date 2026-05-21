@@ -10,6 +10,10 @@ on:
         required: false
         type: number
         default: 0
+      poll_profile:
+        required: false
+        type: string
+        default: default
 
 permissions:
   contents: write
@@ -32,6 +36,7 @@ jobs:
         env:
           LANE: ${{ inputs.lane }}
           PULL_NUMBER: ${{ inputs.pull_number }}
+          POLL_PROFILE: ${{ inputs.poll_profile }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -40,8 +45,13 @@ jobs:
             const inputPullNumber = Number(process.env.PULL_NUMBER || 0);
             let pull_number = eventPullNumber || inputPullNumber;
             const { owner, repo } = context.repo;
-            const maxAttempts = 24;
-            const delayMs = 15000;
+            const pollProfiles = {
+              default: { maxAttempts: 10, delayMs: 15000 },
+              // workflow_run fires after a check workflow completes; short poll for mergeable lag only.
+              after_checks: { maxAttempts: 6, delayMs: 5000 },
+            };
+            const { maxAttempts, delayMs } =
+              pollProfiles[process.env.POLL_PROFILE] || pollProfiles.default;
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
             if (!pull_number && context.payload.workflow_run?.head_branch) {

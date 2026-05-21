@@ -22,4 +22,5 @@ jobs:
     uses: ./.github/workflows/pr-auto-finish-reusable.yml
     with:
       lane: maintenance
+      poll_profile: after_checks
     secrets: inherit
