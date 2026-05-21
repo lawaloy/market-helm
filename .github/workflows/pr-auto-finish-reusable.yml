@@ -140,13 +140,18 @@ jobs:
               );
             };
 
-            /** Check runs that belong to this auto-finish automation (avoid waiting on ourselves). */
-            const skipPendingCheckNames = new Set([
-              'Dependabot Auto Finish',
-              'Dependency Maintenance Auto Finish',
-              'Post-release Auto Finish',
-              'finish',
-            ]);
+            /** Check runs from this automation (avoid waiting on ourselves). */
+            const isOwnAutoFinishCheck = (name) => {
+              if (!name) return false;
+              if (name === 'finish' || name.startsWith('finish /')) {
+                return true;
+              }
+              return [
+                'Dependabot Auto Finish',
+                'Dependency Maintenance Auto Finish',
+                'Post-release Auto Finish',
+              ].includes(name);
+            };
 
             const hasPendingBlockingChecks = async (headSha) => {
               const checkRunsFromPage = (response) => {
@@ -167,7 +172,7 @@ jobs:
               );
               const pending = checkRuns.filter(
                 (r) =>
-                  !skipPendingCheckNames.has(r.name) &&
+                  !isOwnAutoFinishCheck(r.name) &&
                   (r.status === 'queued' || r.status === 'in_progress'),
               );
               if (pending.length > 0) {
