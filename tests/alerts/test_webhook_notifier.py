@@ -36,6 +36,82 @@ def test_send_posts_json(mock_post: MagicMock) -> None:
     assert kwargs["timeout"] == 10.0
 
 
+def test_build_payload_slack_format() -> None:
+    notifier = WebhookNotifier("https://example.com/hook", payload_format="slack")
+    payload = notifier.build_payload(
+        {
+            "alert_id": "x",
+            "alert_name": "Drop",
+            "symbols": ["AAPL"],
+            "condition_type": "price_threshold",
+            "timestamp": "2026-05-21T12:00:00",
+        }
+    )
+    assert "text" in payload
+    assert "blocks" in payload
+    assert "Drop" in payload["text"]
+    assert "AAPL" in payload["text"]
+
+
+@patch.dict("os.environ", {"ALERT_WEBHOOK_FORMAT": "slack"}, clear=False)
+def test_from_alert_uses_env_payload_format() -> None:
+    notifier = WebhookNotifier.from_alert(
+        {"id": "a1", "webhook_url": "https://example.com/hook", "notifications": ["webhook"]}
+    )
+    assert notifier is not None
+    assert notifier._payload_format == "slack"
+
+
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_posts_slack_payload(mock_post: MagicMock) -> None:
+    mock_post.return_value.status_code = 200
+    notifier = WebhookNotifier("https://example.com/hook", payload_format="slack")
+    notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]})
+    payload = mock_post.call_args[1]["json"]
+    assert "text" in payload
+    assert "blocks" in payload
+
+
+def test_build_payload_discord_format() -> None:
+    notifier = WebhookNotifier("https://example.com/hook", payload_format="discord")
+    payload = notifier.build_payload(
+        {
+            "alert_id": "x",
+            "alert_name": "Drop",
+            "symbols": ["AAPL"],
+            "condition_type": "price_threshold",
+            "timestamp": "2026-05-21T12:00:00",
+            "test": True,
+        }
+    )
+    assert payload == {
+        "content": (
+            "**MarketHelm alert (test):** Drop\n"
+            "**Symbols:** AAPL\n"
+            "**Condition:** price_threshold\n"
+            "**Time (UTC):** 2026-05-21T12:00:00"
+        )
+    }
+
+
+@patch.dict("os.environ", {"DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/x/y"}, clear=False)
+def test_from_alert_falls_back_to_discord_env_url() -> None:
+    n = WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]})
+    assert n is not None
+    assert n._url == "https://discord.com/api/webhooks/x/y"
+
+
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_posts_discord_payload(mock_post: MagicMock) -> None:
+    mock_post.return_value.status_code = 204
+    notifier = WebhookNotifier("https://discord.com/api/webhooks/x/y", payload_format="discord")
+    notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]})
+    payload = mock_post.call_args[1]["json"]
+    assert "content" in payload
+    assert "Test" in payload["content"]
+    assert "AAPL" in payload["content"]
+
+
 @patch("src.alerts.notifiers.webhook_notifier.requests.post")
 def test_send_logs_on_http_error(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 500

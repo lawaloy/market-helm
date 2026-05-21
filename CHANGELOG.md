@@ -11,9 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Alerts:** SMTP **email** notifier (`"notifications": ["email"]`) with env-based defaults (`SMTP_*`, `ALERT_EMAIL_TO`) and per-rule `email_to`; see `config/alerts.example.json` and [dashboard/README.md](dashboard/README.md).
+- **Alerts CLI:** `market-helm alerts init|list|test` with user config at `~/.market-helm/alerts.json`.
+- **Alerts:** Slack- and Discord-formatted webhook payloads via `webhook_format: slack|discord` or `ALERT_WEBHOOK_FORMAT`.
+
 ### Planned (not yet shipped)
 
-- **Alerts:** SMTP email and optional Slack-style webhook payloads; CLI commands such as `alerts list` / `alerts test`; technical / multi-condition rules (see [docs/ALERTING_DESIGN.md](docs/ALERTING_DESIGN.md)).
+- **Alerts:** dashboard settings UI for rules and notification channels; technical / multi-condition rules (see [docs/ALERTING_DESIGN.md](docs/ALERTING_DESIGN.md)).
 - **Dashboard:** Route-level code splitting, watchlist, keyboard shortcuts (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
 - **Product:** User authentication, multi-user data isolation.

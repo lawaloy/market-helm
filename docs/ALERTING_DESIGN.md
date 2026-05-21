@@ -2,9 +2,9 @@
 
 ## Implementation status (`main`)
 
-**Already in the codebase:** `src/alerts/` — rule-driven **`AlertEngine`**, `config/alerts.json`, cooldowns and alert history storage, **log** notifier, and **HTTP webhook** notifier (`webhook_url` per rule or `ALERT_WEBHOOK_URL`). See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the short roadmap.
+**Already in the codebase:** `src/alerts/` — rule-driven **`AlertEngine`**, cooldowns, history, **log**, **webhook** (JSON + Slack format), **SMTP email**, CLI `alerts init|list|test`, user config at `~/.market-helm/alerts.json`. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for roadmap and **[Production alert delivery (target)](PROJECT_STATUS.md#production-alert-delivery-target)** (platform From vs user To — not personal Gmail as the product sender).
 
-**Still design / future work (this document):** SMTP and other cloud notifiers, Slack block payloads, technical-indicator conditions, CLI subcommands, dashboard management UI. Phases and checkboxes below describe the **full** vision, not only what is merged today.
+**Still design / future work (this document):** hosted transactional email (SendGrid/Mailgun/SES), accounts + DB per user, always-on worker, technical-indicator rules, full dashboard Settings UI. Phases and checkboxes below describe the **full** vision, not only what is merged today.
 
 ## Overview
 
