@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
