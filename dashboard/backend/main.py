@@ -147,13 +147,14 @@ class SpaFallbackMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
-        if (
-            response.status_code == 404
-            and request.method == "GET"
-            and not request.url.path.startswith("/api/")
-            and _INDEX.is_file()
-            and "text/html" in request.headers.get("accept", "text/html")
-        ):
+        if response.status_code != 404 or request.method != "GET" or not _INDEX.is_file():
+            return response
+        path = request.url.path
+        if path.startswith("/api/") or path.startswith("/assets/"):
+            return response
+        accept = request.headers.get("accept", "*/*")
+        wants_html = path == "/" or "text/html" in accept or "*/*" in accept
+        if wants_html:
             return FileResponse(_INDEX)
         return response
 
@@ -161,6 +162,11 @@ class SpaFallbackMiddleware(BaseHTTPMiddleware):
 if _STATIC_DIR.is_dir() and _INDEX.is_file():
     if _ASSETS_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="spa-assets")
+
+    @app.get("/", include_in_schema=False)
+    async def spa_index():
+        return FileResponse(_INDEX)
+
     app.add_middleware(SpaFallbackMiddleware)
 else:
 
