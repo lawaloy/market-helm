@@ -12,6 +12,7 @@ logging.basicConfig(
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import sys
 import os
@@ -134,34 +135,20 @@ async def api_summary():
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _INDEX = _STATIC_DIR / "index.html"
-
-
-def _safe_static_file(full_path: str) -> Path | None:
-    """Return a file under the SPA static root, or None if the path is invalid."""
-    normalized = os.path.normpath(full_path.replace("\\", "/")).lstrip("/")
-    if not normalized or normalized.startswith("..") or os.path.isabs(normalized):
-        return None
-    base = os.path.realpath(_STATIC_DIR)
-    candidate = os.path.realpath(os.path.join(base, normalized))
-    if os.path.commonpath([base, candidate]) != base:
-        return None
-    path = Path(candidate)
-    return path if path.is_file() else None
-
+_ASSETS_DIR = _STATIC_DIR / "assets"
 
 if _STATIC_DIR.is_dir() and _INDEX.is_file():
+    if _ASSETS_DIR.is_dir():
+        app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="spa-assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_or_static(full_path: str):
         """
-        Serve Vite-built assets; unknown paths return index.html so React Router
-        deep links (e.g. /summary) work when the SPA is served from FastAPI.
+        React Router fallback: serve index.html for client routes.
+        Built JS/CSS are served from /assets via StaticFiles above.
         """
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
-        static_file = _safe_static_file(full_path)
-        if static_file is not None:
-            return FileResponse(static_file)
         return FileResponse(_INDEX)
 else:
 
