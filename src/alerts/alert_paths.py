@@ -6,7 +6,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
@@ -59,7 +59,10 @@ _PLACEHOLDER_EMAILS = frozenset(
 
 def _is_placeholder_webhook(url: str) -> bool:
     lowered = url.lower()
-    return "example.com" in lowered or "your/webhook" in lowered
+    if "your/webhook" in lowered:
+        return True
+    host = (urlparse(url.strip()).hostname or "").lower()
+    return host == "example.com" or host.endswith(".example.com")
 
 
 def polish_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
