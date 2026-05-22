@@ -134,6 +134,21 @@ async def api_summary():
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _INDEX = _STATIC_DIR / "index.html"
+
+
+def _safe_static_file(full_path: str) -> Path | None:
+    """Return a file under the SPA static root, or None if the path is invalid."""
+    normalized = os.path.normpath(full_path.replace("\\", "/")).lstrip("/")
+    if not normalized or normalized.startswith("..") or os.path.isabs(normalized):
+        return None
+    base = os.path.realpath(_STATIC_DIR)
+    candidate = os.path.realpath(os.path.join(base, normalized))
+    if os.path.commonpath([base, candidate]) != base:
+        return None
+    path = Path(candidate)
+    return path if path.is_file() else None
+
+
 if _STATIC_DIR.is_dir() and _INDEX.is_file():
 
     @app.get("/{full_path:path}", include_in_schema=False)
@@ -144,17 +159,9 @@ if _STATIC_DIR.is_dir() and _INDEX.is_file():
         """
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
-        base = _STATIC_DIR.resolve()
-        relative = Path(full_path.replace("\\", "/").lstrip("/"))
-        if relative.is_absolute() or ".." in relative.parts:
-            raise HTTPException(status_code=404, detail="Not found")
-        candidate = (base / relative).resolve()
-        try:
-            candidate.relative_to(base)
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Not found")
-        if candidate.is_file():
-            return FileResponse(candidate)
+        static_file = _safe_static_file(full_path)
+        if static_file is not None:
+            return FileResponse(static_file)
         return FileResponse(_INDEX)
 else:
 
