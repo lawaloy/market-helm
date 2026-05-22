@@ -49,4 +49,77 @@
   .badge {
     @apply px-2 py-1 rounded-full text-xs font-medium;
   }
+
+  .alerts-page {
+    @apply relative isolate;
+  }
+
+  .alerts-page-glow {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgb(20 184 166 / 0.18), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(99 102 241 / 0.12), transparent),
+      radial-gradient(ellipse 50% 30% at 0% 10%, rgb(245 158 11 / 0.08), transparent);
+  }
+
+  .dark .alerts-page-glow {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgb(20 184 166 / 0.14), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(99 102 241 / 0.1), transparent);
+  }
+
+  .alerts-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white/90 shadow-[0_8px_30px_rgb(15_23_42/0.06)] backdrop-blur-sm dark:border-slate-700/80 dark:bg-slate-800/90 dark:shadow-[0_8px_30px_rgb(0_0_0/0.25)];
+  }
+
+  .alerts-composer {
+    @apply rounded-2xl border border-teal-200/60 bg-gradient-to-br from-white via-white to-teal-50/40 p-6 shadow-[0_12px_40px_rgb(20_184_166/0.08)] dark:border-teal-900/40 dark:from-slate-800 dark:via-slate-800 dark:to-teal-950/20;
+  }
+
+  .alerts-inline-input {
+    @apply rounded-lg border border-slate-200/80 bg-white px-2.5 py-1 text-center text-base font-semibold tabular-nums text-slate-900 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100;
+  }
+
+  .alerts-inline-select {
+    @apply rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 shadow-sm transition focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200;
+  }
+
+  .alerts-cta {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 transition hover:from-teal-500 hover:to-emerald-500 hover:shadow-teal-500/30 active:scale-[0.98] disabled:opacity-50 disabled:shadow-none;
+  }
+
+  .alerts-channel {
+    @apply rounded-xl border border-slate-200/70 bg-slate-50/50 p-4 transition dark:border-slate-700/70 dark:bg-slate-900/40;
+  }
+
+  .alerts-channel-active {
+    @apply border-teal-300/80 bg-teal-50/50 ring-1 ring-teal-500/20 dark:border-teal-800/60 dark:bg-teal-950/20 dark:ring-teal-500/10;
+  }
+
+  .alerts-rule-card {
+    @apply rounded-xl border border-slate-200/70 bg-white p-4 transition dark:border-slate-700/70 dark:bg-slate-900/50;
+  }
+
+  .alerts-rule-card-active {
+    @apply border-teal-200/80 shadow-[0_4px_20px_rgb(20_184_166/0.08)] dark:border-teal-900/50;
+  }
+
+  .alerts-rule-card-paused {
+    @apply opacity-75;
+  }
+
+  .alerts-toggle-on {
+    @apply bg-gradient-to-r from-teal-500 to-emerald-500 shadow-inner shadow-teal-600/20;
+  }
+
+  .alerts-toast {
+    @apply fixed left-1/2 top-20 z-40 flex max-w-md -translate-x-1/2 items-start gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-xl backdrop-blur-md;
+  }
+
+  .alerts-save-bar {
+    @apply fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/80 bg-white/80 shadow-[0_-12px_40px_rgb(15_23_42/0.08)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-900/85;
+  }
+
+  .alerts-onboard {
+    @apply relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-b from-white to-slate-50 p-10 text-center shadow-[0_20px_60px_rgb(15_23_42/0.08)] dark:border-slate-700 dark:from-slate-800 dark:to-slate-900;
+  }
 }

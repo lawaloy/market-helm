@@ -6,7 +6,8 @@ from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 
 def test_from_alert_returns_none_without_url() -> None:
-    assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None
+    with patch.dict("os.environ", {}, clear=True):
+        assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None
 
 
 def test_from_alert_uses_webhook_url_field() -> None:

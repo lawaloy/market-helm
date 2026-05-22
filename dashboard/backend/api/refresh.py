@@ -10,6 +10,9 @@ from pathlib import Path
 from datetime import datetime
 import threading
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -128,6 +131,14 @@ def run_daily_tracker():
             refresh_status["last_status"] = "success"
             refresh_status["last_refresh"] = datetime.now().isoformat()
             refresh_status["progress"] = "Data refresh completed successfully!"
+            try:
+                from src.alerts.alert_runner import evaluate_alerts_from_latest_data
+
+                result = evaluate_alerts_from_latest_data()
+                if result.get("triggered", 0) > 0:
+                    logger.info("Alerts triggered after refresh: %s", result["triggered"])
+            except Exception as exc:
+                logger.warning("Post-refresh alert check failed: %s", exc)
         else:
             refresh_status["last_status"] = "error"
             refresh_status["progress"] = "Refresh failed. Please try again."

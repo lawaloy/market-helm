@@ -1,0 +1,170 @@
+"""Tests for dashboard alerts settings API."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+
+@pytest.fixture
+def alerts_config_dir(tmp_path: Path, monkeypatch):
+    """Isolated alerts config directory."""
+    config_dir = tmp_path / "market-helm"
+    config_dir.mkdir()
+    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
+    return config_dir
+
+
+@pytest.fixture
+def client():
+    from fastapi.testclient import TestClient
+    from dashboard.backend.main import app
+
+    return TestClient(app)
+
+
+class TestAlertsConfigAPI:
+    def test_get_config_when_missing_returns_empty(self, client, alerts_config_dir):
+        r = client.get("/api/alerts/config")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["exists"] is False
+        assert data["config"]["alerts"] == []
+
+    def test_get_config_never_returns_webhook_url(self, client, alerts_config_dir, monkeypatch):
+        config_path = alerts_config_dir / "alerts.json"
+        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/secret/token")
+        config_path.write_text(
+            json.dumps(
+                {
+                    "defaults": {"webhook_url": "https://discord.com/api/webhooks/leaked/token"},
+                    "alerts": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        r = client.get("/api/alerts/config")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["config"]["defaults"].get("webhook_url") is None
+        assert data["channels"]["webhook_url"] is True
+        assert "secret" not in json.dumps(data)
+
+    def test_init_creates_config(self, client, alerts_config_dir):
+        r = client.post("/api/alerts/init")
+        assert r.status_code == 200
+        assert (alerts_config_dir / "alerts.json").exists()
+
+        r2 = client.get("/api/alerts/config")
+        assert r2.status_code == 200
+        assert r2.json()["exists"] is True
+        assert r2.json()["config"]["alerts"] == []
+
+    def test_init_conflict_without_force(self, client, alerts_config_dir):
+        path = alerts_config_dir / "alerts.json"
+        path.write_text('{"alerts": []}', encoding="utf-8")
+        r = client.post("/api/alerts/init")
+        assert r.status_code == 409
+
+    def test_put_and_get_config(self, client, alerts_config_dir):
+        payload = {
+            "defaults": {"email_to": "user@example.com"},
+            "alerts": [
+                {
+                    "id": "aapl_drop",
+                    "name": "AAPL drop",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                    "notifications": ["log", "email"],
+                    "cooldown_minutes": 60,
+                }
+            ],
+        }
+        r = client.put("/api/alerts/config", json=payload)
+        assert r.status_code == 200
+        data = r.json()
+        assert data["exists"] is True
+        assert data["config"]["defaults"]["email_to"] == "user@example.com"
+        assert data["config"]["alerts"][0]["id"] == "aapl_drop"
+
+        saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
+        assert saved["alerts"][0]["enabled"] is True
+
+    def test_test_alert_dry_run(self, client, alerts_config_dir):
+        payload = {
+            "defaults": {"email_to": "user@example.com"},
+            "alerts": [
+                {
+                    "id": "test_rule",
+                    "name": "Test rule",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 1,
+                    },
+                    "notifications": ["log"],
+                }
+            ],
+        }
+        client.put("/api/alerts/config", json=payload)
+        r = client.post("/api/alerts/test", json={"id": "test_rule", "dry_run": True})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["status"] == "dry_run"
+        assert data["notifiers"] == []
+
+    def test_test_alert_not_found(self, client, alerts_config_dir):
+        r = client.post("/api/alerts/test", json={"id": "missing", "dry_run": True})
+        assert r.status_code == 404
+
+    def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.build_symbol_catalog",
+            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+        )
+        r = client.get("/api/alerts/symbols")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["count"] == 3
+        assert "AAPL" in data["symbols"]
+        assert data["names"]["AAPL"] == "Apple Inc."
+        assert "prices" in data
+
+    def test_post_quotes(self, client, monkeypatch):
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            lambda symbols, fetch_missing=True: {"AAPL": 180.0},
+        )
+        r = client.post("/api/alerts/quotes", json={"symbols": ["AAPL", "MSFT"]})
+        assert r.status_code == 200
+        assert r.json()["prices"]["AAPL"] == 180.0
+
+    def test_get_quotes(self, client, monkeypatch):
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            lambda symbols, fetch_missing=True: {"AON": 412.5, "APH": 88.0},
+        )
+        r = client.get("/api/alerts/quotes", params={"symbols": "AON,APH"})
+        assert r.status_code == 200
+        assert r.json()["prices"]["AON"] == 412.5
+
+    def test_get_status(self, client, alerts_config_dir):
+        r = client.get("/api/alerts/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["checks_on_fetch"] is True
+        assert "tracked_symbols" in data
+        assert "active_watches" in data
+
+    def test_run_without_config(self, client, alerts_config_dir):
+        r = client.post("/api/alerts/run")
+        assert r.status_code == 200
+        assert r.json()["triggered"] == 0

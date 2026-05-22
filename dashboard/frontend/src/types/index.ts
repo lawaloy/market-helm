@@ -165,3 +165,75 @@ export interface MarketSummaryResponse {
   summary: string;
   source: 'ai' | 'demo';
 }
+
+export type AlertNotification = 'log' | 'email' | 'webhook';
+export type AlertOperator = 'less_than' | 'greater_than';
+export type WebhookFormat = 'json' | 'slack' | 'discord';
+
+export interface AlertCondition {
+  type: 'price_threshold' | 'screening_match';
+  symbol?: string;
+  operator?: AlertOperator;
+  value?: number;
+  filters?: Record<string, number>;
+}
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  condition: AlertCondition;
+  notifications: AlertNotification[];
+  email_to?: string;
+  webhook_url?: string;
+  webhook_format?: WebhookFormat;
+  cooldown_minutes?: number;
+}
+
+export interface AlertDefaults {
+  email_to?: string;
+  /** Write-only from the UI — never returned by the API after save. */
+  webhook_url?: string;
+  webhook_format?: WebhookFormat;
+  notify_email?: boolean;
+  notify_webhook?: boolean;
+}
+
+export interface AlertsConfig {
+  defaults?: AlertDefaults;
+  alerts: AlertRule[];
+}
+
+export interface ChannelStatus {
+  email_smtp: boolean;
+  email_recipients: boolean;
+  webhook_url: boolean;
+}
+
+export interface AlertsConfigResponse {
+  exists: boolean;
+  config: AlertsConfig;
+  channels: ChannelStatus;
+}
+
+export interface AlertTestResponse {
+  alert_id: string;
+  status: string;
+  notifiers: string[];
+  previews?: Array<{ notifier: string; payload: unknown }>;
+}
+
+export interface AlertsStatus {
+  checks_on_fetch: boolean;
+  last_data_date: string | null;
+  tracked_symbols: string[];
+  active_watches: number;
+  last_triggered_at: string | null;
+}
+
+export interface AlertsRunResponse {
+  triggered: number;
+  last_data_date: string | null;
+  events: Array<{ alert_id: string; alert_name: string; symbols: string[] }>;
+  message: string | null;
+}

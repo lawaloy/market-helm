@@ -45,3 +45,10 @@ class AlertStorage:
         history.setdefault("events", []).append(event)
         history.setdefault("last_triggered", {})[event["alert_id"]] = event["timestamp"]
         self._save(history)
+
+    def latest_event_timestamp(self) -> Optional[str]:
+        history = self._load()
+        events = history.get("events") or []
+        if not events:
+            return None
+        return events[-1].get("timestamp")

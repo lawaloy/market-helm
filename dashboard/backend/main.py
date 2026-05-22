@@ -38,13 +38,36 @@ try:
 except ImportError:
     pass
 
-from dashboard.backend.api import market, projections, stocks, refresh, history
+from contextlib import asynccontextmanager
+import threading
+
+from dashboard.backend.api import market, projections, stocks, refresh, history, alerts
 from dashboard.backend.api.market import get_market_summary
+
+
+def _startup_alert_check() -> None:
+    try:
+        from src.alerts.alert_runner import evaluate_alerts_from_latest_data
+
+        result = evaluate_alerts_from_latest_data()
+        triggered = result.get("triggered", 0)
+        if triggered:
+            logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Startup alert check failed: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    threading.Thread(target=_startup_alert_check, daemon=True).start()
+    yield
+
 
 app = FastAPI(
     title="MarketHelm API",
     description="API for stock market data, projections, and recommendations",
-    version="0.2.16"
+    version="0.2.16",
+    lifespan=lifespan,
 )
 
 # CORS configuration for local development
@@ -76,6 +99,7 @@ app.include_router(projections.router, prefix="/api/projections", tags=["Project
 app.include_router(stocks.router, prefix="/api/stocks", tags=["Stocks"])
 app.include_router(refresh.router, prefix="/api", tags=["Refresh"])
 app.include_router(history.router, prefix="/api/history", tags=["History"])
+app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 
 
 @app.get("/health")
@@ -118,6 +142,8 @@ if _STATIC_DIR.is_dir() and _INDEX.is_file():
         Serve Vite-built assets; unknown paths return index.html so React Router
         deep links (e.g. /summary) work when the SPA is served from FastAPI.
         """
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
         base = _STATIC_DIR.resolve()
         candidate = (base / full_path).resolve()
         try:
@@ -142,4 +168,5 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("dashboard.backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    reload = os.getenv("UVICORN_RELOAD", "").lower() in {"1", "true", "yes"}
+    uvicorn.run("dashboard.backend.main:app", host="0.0.0.0", port=8000, reload=reload)

@@ -5,7 +5,8 @@ import Header from './components/layout/Header';
 import Dashboard from './pages/Dashboard';
 import HistoricalTrends from './pages/HistoricalTrends';
 import Summary from './pages/Summary';
-import api from './services/api';
+import AlertsSettings from './pages/AlertsSettings';
+import api, { alertsApi } from './services/api';
 
 function App() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -13,8 +14,17 @@ function App() {
   const [backgroundFetching, setBackgroundFetching] = useState(false);
   const hasAutoFetched = useRef(false);
 
+  const runBackgroundAlertCheck = async () => {
+    try {
+      await alertsApi.runCheck();
+    } catch {
+      // No watches, no saved data, or alerts not configured yet.
+    }
+  };
+
   const handleRefreshComplete = () => {
     setRefreshKey((prev) => prev + 1);
+    void runBackgroundAlertCheck();
   };
 
   const handleQuickRefresh = () => {
@@ -24,12 +34,15 @@ function App() {
   const refreshCompleteRef = useRef(handleRefreshComplete);
   refreshCompleteRef.current = handleRefreshComplete;
 
-  // On first load: fetch latest trading day data if missing (runs behind the scenes, no button click)
+  // On first load: fetch latest trading day data if missing, then check watches.
   useEffect(() => {
     if (hasAutoFetched.current) return;
     hasAutoFetched.current = true;
 
+    void runBackgroundAlertCheck();
+
     const fetchIfNeeded = async () => {
+      let refreshSucceeded = false;
       try {
         const { data } = await api.get<{ needs_fetch: boolean }>('/api/data-info');
         if (!data.needs_fetch) return;
@@ -54,12 +67,17 @@ function App() {
           }
           setBackgroundFetching(false);
           if (status.last_status === 'success') {
+            refreshSucceeded = true;
             refreshCompleteRef.current();
           }
         };
         await poll();
       } catch {
         setBackgroundFetching(false);
+      } finally {
+        if (!refreshSucceeded) {
+          await runBackgroundAlertCheck();
+        }
       }
     };
     fetchIfNeeded();
@@ -115,6 +133,18 @@ function App() {
               >
                 Summary
               </NavLink>
+              <NavLink
+                to="/alerts"
+                className={({ isActive }) =>
+                  `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+                  }`
+                }
+              >
+                Helmtower
+              </NavLink>
             </nav>
           </div>
         </div>
@@ -122,6 +152,7 @@ function App() {
           <Route path="/" element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />} />
           <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
           <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
+          <Route path="/alerts" element={<AlertsSettings />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import json
 
 from ..core.logger import setup_logger
-from .alert_paths import resolve_alerts_config_path
+from .alert_paths import apply_alert_defaults, resolve_alerts_config_path
 from .alert_storage import AlertStorage
 from .alert_rules import evaluate_price_threshold, evaluate_screening_match
 from .notifiers.email_notifier import EmailNotifier
@@ -31,9 +31,15 @@ NOTIFIERS = {
 
 
 class AlertEngine:
-    def __init__(self, alerts: List[Dict], storage: Optional[AlertStorage] = None):
+    def __init__(
+        self,
+        alerts: List[Dict],
+        storage: Optional[AlertStorage] = None,
+        defaults: Optional[Dict[str, Any]] = None,
+    ):
         self.alerts = alerts
         self.storage = storage or AlertStorage()
+        self.defaults = defaults or {}
 
     @staticmethod
     def from_config(config_path: Optional[Path] = None) -> Optional["AlertEngine"]:
@@ -47,11 +53,12 @@ class AlertEngine:
             logger.warning(f"Failed to load alerts config: {e}")
             return None
 
+        defaults = config.get("defaults") or {}
         alerts = config.get("alerts", [])
         enabled = [alert for alert in alerts if alert.get("enabled", False)]
         if not enabled:
             return None
-        return AlertEngine(enabled)
+        return AlertEngine(enabled, defaults=defaults)
 
     def _within_cooldown(self, alert: Dict) -> bool:
         cooldown_minutes = int(alert.get("cooldown_minutes", 0))
@@ -63,6 +70,7 @@ class AlertEngine:
         return datetime.utcnow() - last_triggered < timedelta(minutes=cooldown_minutes)
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
+        alert = apply_alert_defaults(alert, self.defaults)
         notifier_names = alert.get("notifications") or ["log"]
         instances: List[Any] = []
         for name in notifier_names:
@@ -97,10 +105,13 @@ class AlertEngine:
             triggered_symbols: List[str] = []
 
             if condition_type == "price_threshold":
-                symbol = condition.get("symbol")
+                symbol = str(condition.get("symbol") or "").upper()
                 if not symbol:
                     continue
-                stock = next((s for s in stocks if s.get("symbol") == symbol), None)
+                stock = next(
+                    (s for s in stocks if str(s.get("symbol", "")).upper() == symbol),
+                    None,
+                )
                 if stock and evaluate_price_threshold(condition, stock):
                     triggered_symbols = [symbol]
             elif condition_type == "screening_match":
