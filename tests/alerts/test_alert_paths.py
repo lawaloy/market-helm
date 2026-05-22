@@ -2,7 +2,16 @@
 
 from pathlib import Path
 
-from src.alerts.alert_paths import init_user_alerts_config, resolve_alerts_config_path
+from src.alerts.alert_paths import (
+    apply_alert_defaults,
+    init_user_alerts_config,
+    load_alerts_config,
+    polish_alerts_config,
+    resolve_alerts_config_path,
+    save_alerts_config,
+    dedupe_alerts_config,
+    strip_webhook_secrets_from_config,
+)
 
 
 def test_resolve_prefers_explicit_path(tmp_path: Path) -> None:
@@ -21,3 +30,75 @@ def test_init_user_alerts_config_creates_file(monkeypatch, tmp_path: Path) -> No
     dest = init_user_alerts_config()
     assert dest == user_dir / "alerts.json"
     assert dest.exists()
+
+
+def test_save_and_load_alerts_config(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "alerts.json"
+    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
+    monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+    payload = {"defaults": {"email_to": "a@example.com"}, "alerts": []}
+    save_alerts_config(payload)
+    path, loaded = load_alerts_config()
+    assert path == config_path
+    assert loaded == payload
+
+
+def test_polish_alerts_config_strips_placeholders(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_EMAIL_TO", "real@example.org")
+    config = {
+        "alerts": [
+            {
+                "id": "a1",
+                "email_to": "you@example.com",
+                "webhook_url": "https://hooks.example.com/x",
+                "notifications": ["email", "webhook"],
+            }
+        ]
+    }
+    polished = polish_alerts_config(config)
+    assert polished["defaults"]["email_to"] == "real@example.org"
+    assert "email_to" not in polished["alerts"][0]
+    assert "webhook_url" not in polished["alerts"][0]
+
+
+def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
+    config = {
+        "alerts": [
+            {
+                "id": "aapl_drop",
+                "condition": {"type": "price_threshold", "symbol": "AAPL", "operator": "less_than", "value": 150},
+            },
+            {
+                "id": "aapl_drop_copy",
+                "condition": {"type": "price_threshold", "symbol": "AAPL", "operator": "less_than", "value": 150},
+            },
+            {
+                "id": "msft_high",
+                "condition": {"type": "price_threshold", "symbol": "MSFT", "operator": "greater_than", "value": 400},
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert len(deduped["alerts"]) == 2
+    assert deduped["alerts"][0]["id"] == "aapl_drop"
+
+
+def test_strip_webhook_secrets_from_config() -> None:
+    config = {
+        "defaults": {"webhook_url": "https://discord.com/secret", "email_to": "a@example.com"},
+        "alerts": [{"id": "x", "webhook_url": "https://discord.com/secret"}],
+    }
+    stripped = strip_webhook_secrets_from_config(config)
+    assert "webhook_url" not in stripped["defaults"]
+    assert "webhook_url" not in stripped["alerts"][0]
+    assert stripped["defaults"]["email_to"] == "a@example.com"
+
+
+def test_apply_alert_defaults_merges_email_and_webhook() -> None:
+    alert = {"notifications": ["email", "webhook"]}
+    defaults = {"email_to": "a@example.com", "webhook_url": "https://example.com/hook"}
+    merged = apply_alert_defaults(alert, defaults)
+    assert merged["email_to"] == "a@example.com"
+    assert merged["webhook_url"] == "https://example.com/hook"

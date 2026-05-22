@@ -13,12 +13,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _resolve_company_names(symbols: list) -> dict:
+def load_index_symbol_names() -> dict:
     """
-    Resolve symbol->company name via pytickersymbols (S&P 500, NASDAQ 100, Dow Jones).
+    Symbol -> company name for major US indices (S&P 500, NASDAQ 100, Dow Jones).
     """
-    if not symbols:
-        return {}
     result = {}
     try:
         from pytickersymbols import PyTickerSymbols
@@ -26,17 +24,53 @@ def _resolve_company_names(symbols: list) -> dict:
         data = PyTickerSymbols()
         for index_name in ["S&P 500", "NASDAQ 100", "Dow Jones"]:
             try:
-                for s in data.get_stocks_by_index(index_name):
-                    sym = s.get("symbol")
-                    name = s.get("name")
+                for stock in data.get_stocks_by_index(index_name):
+                    sym = stock.get("symbol")
+                    name = stock.get("name")
                     if sym and name:
-                        result[sym] = name
+                        result[str(sym).upper()] = name
             except Exception:
                 continue
     except Exception:
         pass
+    return result
 
-    return {sym: result.get(sym, sym) for sym in symbols}
+
+def _resolve_company_names(symbols: list) -> dict:
+    """
+    Resolve symbol->company name via pytickersymbols (S&P 500, NASDAQ 100, Dow Jones).
+    """
+    if not symbols:
+        return {}
+    catalog = load_index_symbol_names()
+    return {sym: catalog.get(str(sym).upper(), sym) for sym in symbols}
+
+
+def build_symbol_catalog() -> tuple:
+    """
+    Full picker catalog: major US index constituents plus any symbols in latest projections.
+    Returns (sorted_symbols, symbol_names).
+    """
+    names = load_index_symbol_names()
+    symbols = set(names.keys())
+    try:
+        loader = get_data_loader()
+        df = loader.load_projections()
+        if not df.empty and "symbol" in df.columns:
+            name_col = "name" if "name" in df.columns else None
+            for sym in df["symbol"].unique():
+                sym_key = str(sym).upper()
+                symbols.add(sym_key)
+                if name_col:
+                    stored = df.loc[df["symbol"] == sym, name_col].iloc[0]
+                    if stored and str(stored).strip() and str(stored) != sym_key:
+                        names[sym_key] = str(stored).strip()
+                elif sym_key not in names:
+                    names[sym_key] = sym_key
+    except (ValueError, Exception):
+        pass
+    sorted_symbols = sorted(symbols)
+    return sorted_symbols, {sym: names.get(sym, sym) for sym in sorted_symbols}
 
 
 class DailySummaryPoint(BaseModel):
@@ -114,11 +148,13 @@ async def get_tracked_symbols():
             raise HTTPException(status_code=404, detail="No data available")
 
         df = loader.load_projections()
-        symbols = df['symbol'].unique().tolist() if 'symbol' in df.columns else []
-        symbol_names = _resolve_company_names(symbols)
+        symbols, symbol_names = build_symbol_catalog()
+        if not symbols:
+            symbols = df['symbol'].unique().tolist() if 'symbol' in df.columns else []
+            symbol_names = _resolve_company_names(symbols)
 
         return {
-            "symbols": sorted(symbols),
+            "symbols": symbols,
             "names": symbol_names,
             "date": date,
         }

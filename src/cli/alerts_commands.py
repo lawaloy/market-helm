@@ -10,10 +10,25 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..alerts.alert_engine import AlertEngine
-from ..alerts.alert_paths import init_user_alerts_config, resolve_alerts_config_path
+from ..alerts.alert_paths import (
+    apply_alert_defaults,
+    init_user_alerts_config,
+    load_alerts_config,
+    polish_alerts_config,
+    resolve_alerts_config_path,
+)
 from ..core.logger import setup_logger
 
 logger = setup_logger()
+
+
+def _notifier_label(class_name: str) -> Optional[str]:
+    labels = {
+        "LogNotifier": None,
+        "EmailNotifier": "email",
+        "WebhookNotifier": "webhook",
+    }
+    return labels.get(class_name, class_name.replace("Notifier", "").lower())
 
 
 def _load_config(path: Path) -> Dict[str, Any]:
@@ -64,7 +79,7 @@ def cmd_list(config_path: Optional[Path] = None) -> int:
         )
         return 1
 
-    config = _load_config(path)
+    config = polish_alerts_config(_load_config(path))
     alerts = config.get("alerts", [])
     if not alerts:
         logger.info("No alert rules in %s", path)
@@ -115,17 +130,20 @@ def cmd_init(force: bool = False) -> int:
     return 0
 
 
-def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] = None) -> int:
+def run_alert_test(
+    alert_id: str,
+    dry_run: bool = False,
+    config_path: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Send or preview a test notification; returns a structured result for API/CLI."""
     path = resolve_alerts_config_path(config_path)
     if not path.exists():
-        logger.error("No alerts config at %s. Run: market-helm alerts init", path)
-        return 1
+        raise FileNotFoundError(f"No alerts config at {path}")
 
-    config = _load_config(path)
+    config = polish_alerts_config(_load_config(path))
     alert = _find_alert(config.get("alerts", []), alert_id)
     if alert is None:
-        logger.error("No alert with id %r in %s", alert_id, path)
-        return 1
+        raise ValueError(f"No alert with id {alert_id!r}")
 
     event = {
         "alert_id": alert["id"],
@@ -136,22 +154,63 @@ def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] =
         "test": True,
     }
 
-    engine = AlertEngine([alert])
-    notifiers = engine._build_notifiers(alert)
+    defaults = config.get("defaults") or {}
+    effective = apply_alert_defaults(alert, defaults)
+    engine = AlertEngine([alert], defaults=defaults)
+    notifiers = engine._build_notifiers(effective)
     if not notifiers:
-        logger.error("No notifiers configured for alert %r", alert_id)
-        return 1
+        raise RuntimeError(f"No notifiers configured for alert {alert_id!r}")
 
-    logger.info("Testing alert %r (%s)", alert_id, "dry-run" if dry_run else "live")
+    delivered: List[str] = []
+    previews: List[Dict[str, Any]] = []
     for notifier in notifiers:
         name = notifier.__class__.__name__
         if dry_run:
-            payload = event
+            payload: Any = event
             if hasattr(notifier, "build_payload"):
                 payload = notifier.build_payload(event)
-            logger.info("[%s] would send: %s", name, json.dumps(payload, indent=2))
+            previews.append({"notifier": name, "payload": payload})
         else:
             notifier.send(event)
+            label = _notifier_label(name)
+            if label:
+                delivered.append(label)
+
+    return {
+        "alert_id": alert_id,
+        "dry_run": dry_run,
+        "notifiers": delivered if not dry_run else [
+            label
+            for item in previews
+            if (label := _notifier_label(item["notifier"]))
+        ],
+        "previews": previews if dry_run else None,
+        "status": "dry_run" if dry_run else "sent",
+    }
+
+
+def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] = None) -> int:
+    path = resolve_alerts_config_path(config_path)
+    if not path.exists():
+        logger.error("No alerts config at %s. Run: market-helm alerts init", path)
+        return 1
+
+    try:
+        result = run_alert_test(alert_id, dry_run=dry_run, config_path=config_path)
+    except (FileNotFoundError, ValueError, RuntimeError) as exc:
+        logger.error("%s", exc)
+        return 1
+
+    logger.info("Testing alert %r (%s)", alert_id, "dry-run" if dry_run else "live")
+    if dry_run and result.get("previews"):
+        for preview in result["previews"]:
+            logger.info(
+                "[%s] would send: %s",
+                preview["notifier"],
+                json.dumps(preview["payload"], indent=2),
+            )
+    else:
+        for name in result.get("notifiers") or []:
             logger.info("[%s] sent test notification", name)
     return 0
 

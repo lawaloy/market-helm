@@ -185,6 +185,20 @@ class StockTrackerWorkflow:
                 # Log top 5 stocks by volume
                 top_5_symbols = [f"{s['symbol']} ({s.get('volume', 0):,})" for s in all_data[:5]]
                 logger.debug(f"Top 5 by volume: {top_5_symbols}")
+
+            from ..alerts.alert_paths import get_enabled_watch_symbols
+
+            watch_symbols = get_enabled_watch_symbols()
+            if watch_symbols:
+                existing = {str(stock.get("symbol", "")).upper() for stock in all_data}
+                for symbol in watch_symbols:
+                    if symbol in existing:
+                        continue
+                    fetched = self.fetcher.fetch_symbol_data(symbol)
+                    if fetched:
+                        all_data.append(fetched)
+                        existing.add(symbol)
+                        logger.info(f"Included watch symbol {symbol} in fetch")
             
             if not all_data:
                 logger.warning("No data was fetched")

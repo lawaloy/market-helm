@@ -9,6 +9,11 @@ import type {
   HistoricalSummaryResponse,
   MarketSummaryResponse,
   ProjectionAccuracyResponse,
+  AlertsConfigResponse,
+  AlertsConfig,
+  AlertTestResponse,
+  AlertsStatus,
+  AlertsRunResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
@@ -68,6 +73,36 @@ export const stocksApi = {
     api.get<HistoricalData>(`/api/stocks/${symbol}/historical`, {
       params: { days },
     }),
+};
+
+export const alertsApi = {
+  getConfig: () => api.get<AlertsConfigResponse>('/api/alerts/config'),
+  saveConfig: (config: AlertsConfig) => api.put<AlertsConfigResponse>('/api/alerts/config', config),
+  initConfig: (force = false) =>
+    api.post<{ message: string }>('/api/alerts/init', null, {
+      params: force ? { force: true } : undefined,
+    }),
+  testAlert: (id: string, dryRun = false) =>
+    api.post<AlertTestResponse>(
+      '/api/alerts/test',
+      { id, dry_run: dryRun },
+      { timeout: 30000 },
+    ),
+  getSymbols: () =>
+    api.get<{
+      symbols: string[];
+      names: Record<string, string>;
+      count: number;
+      tracked_symbols?: string[];
+      prices?: Record<string, number>;
+    }>('/api/alerts/symbols'),
+  getQuotes: (symbols: string[]) =>
+    api.get<{ prices: Record<string, number> }>('/api/alerts/quotes', {
+      params: { symbols: symbols.join(',') },
+      timeout: 45000,
+    }),
+  getStatus: () => api.get<AlertsStatus>('/api/alerts/status'),
+  runCheck: () => api.post<AlertsRunResponse>('/api/alerts/run'),
 };
 
 export default api;
