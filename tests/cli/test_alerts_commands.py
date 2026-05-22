@@ -48,7 +48,7 @@ def test_cmd_test_dry_run(caplog, tmp_path: Path) -> None:
                         "name": "Hook",
                         "enabled": True,
                         "notifications": ["webhook"],
-                        "webhook_url": "https://example.com/hook",
+                        "webhook_url": "https://hooks.slack.com/services/T000/B000/XXXXXXXX",
                         "webhook_format": "slack",
                         "condition": {"type": "price_threshold", "symbol": "AAPL"},
                     }

@@ -145,7 +145,10 @@ if _STATIC_DIR.is_dir() and _INDEX.is_file():
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
         base = _STATIC_DIR.resolve()
-        candidate = (base / full_path).resolve()
+        relative = Path(full_path.replace("\\", "/").lstrip("/"))
+        if relative.is_absolute() or ".." in relative.parts:
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = (base / relative).resolve()
         try:
             candidate.relative_to(base)
         except ValueError:
