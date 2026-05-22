@@ -42,6 +42,10 @@ except ImportError:
 from contextlib import asynccontextmanager
 import threading
 
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
 from dashboard.backend.api import market, projections, stocks, refresh, history, alerts
 from dashboard.backend.api.market import get_market_summary
 
@@ -137,19 +141,27 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _INDEX = _STATIC_DIR / "index.html"
 _ASSETS_DIR = _STATIC_DIR / "assets"
 
+
+class SpaFallbackMiddleware(BaseHTTPMiddleware):
+    """Return index.html for unknown GET routes so React Router deep links work."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        if (
+            response.status_code == 404
+            and request.method == "GET"
+            and not request.url.path.startswith("/api/")
+            and _INDEX.is_file()
+            and "text/html" in request.headers.get("accept", "text/html")
+        ):
+            return FileResponse(_INDEX)
+        return response
+
+
 if _STATIC_DIR.is_dir() and _INDEX.is_file():
     if _ASSETS_DIR.is_dir():
         app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="spa-assets")
-
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def spa_or_static(full_path: str):
-        """
-        React Router fallback: serve index.html for client routes.
-        Built JS/CSS are served from /assets via StaticFiles above.
-        """
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Not found")
-        return FileResponse(_INDEX)
+    app.add_middleware(SpaFallbackMiddleware)
 else:
 
     @app.get("/")
