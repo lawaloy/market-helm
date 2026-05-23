@@ -68,3 +68,16 @@ def test_cmd_test_missing_id(tmp_path: Path) -> None:
     config = tmp_path / "alerts.json"
     config.write_text(json.dumps({"alerts": []}), encoding="utf-8")
     assert alerts_commands.cmd_test("missing", config_path=config) == 1
+
+
+@patch("src.alerts.alert_worker.run_worker_once")
+def test_cmd_run_once(mock_once) -> None:
+    mock_once.return_value = {"triggered": 0, "last_data_date": "2026-05-20"}
+    assert alerts_commands.cmd_run(loop=False) == 0
+    mock_once.assert_called_once()
+
+
+@patch("src.alerts.alert_worker.run_worker_loop")
+def test_cmd_run_loop(mock_loop) -> None:
+    assert alerts_commands.cmd_run(loop=True, interval=120) == 0
+    mock_loop.assert_called_once_with(120)
