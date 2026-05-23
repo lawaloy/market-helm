@@ -1,4 +1,4 @@
-"""CLI: market-helm alerts list|test|init"""
+"""CLI: market-helm alerts list|test|init|run"""
 
 from __future__ import annotations
 
@@ -189,6 +189,18 @@ def run_alert_test(
     }
 
 
+def cmd_run(*, loop: bool = False, interval: Optional[int] = None) -> int:
+    """Evaluate enabled watches once, or run on a schedule until interrupted."""
+    from ..alerts.alert_worker import run_worker_loop, run_worker_once
+
+    if loop:
+        run_worker_loop(interval)
+        return 0
+
+    run_worker_once()
+    return 0
+
+
 def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] = None) -> int:
     path = resolve_alerts_config_path(config_path)
     if not path.exists():
@@ -245,6 +257,23 @@ def main(argv: Optional[List[str]] = None) -> None:
         help="Print payloads instead of delivering notifications",
     )
 
+    run_parser = sub.add_parser(
+        "run",
+        help="Evaluate enabled watches against latest market data",
+    )
+    run_parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Run until interrupted (scheduled worker)",
+    )
+    run_parser.add_argument(
+        "--interval",
+        type=int,
+        default=None,
+        metavar="SECONDS",
+        help="Seconds between checks when --loop (min 60; default 300 or ALERT_CHECK_INTERVAL_SECONDS)",
+    )
+
     args = parser.parse_args(argv)
     _load_env()
 
@@ -254,3 +283,5 @@ def main(argv: Optional[List[str]] = None) -> None:
         sys.exit(cmd_init(force=args.force))
     if args.command == "test":
         sys.exit(cmd_test(args.id, dry_run=args.dry_run, config_path=args.config))
+    if args.command == "run":
+        sys.exit(cmd_run(loop=args.loop, interval=args.interval))
