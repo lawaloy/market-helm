@@ -71,7 +71,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     title="MarketHelm API",
     description="API for stock market data, projections, and recommendations",
-    version="0.2.16",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -176,7 +176,7 @@ else:
         return {
             "status": "healthy",
             "service": "MarketHelm API",
-            "version": "0.2.16",
+            "version": "0.3.0",
             "spa": False,
         }
 
