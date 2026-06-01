@@ -112,6 +112,22 @@ module.exports = async ({ github, context, core }) => {
     ].includes(name);
   };
 
+  /** GitHub default CodeQL duplicates CodeQL Advanced when both are enabled. */
+  const hasSuccessfulCodeQlAdvanced = (checkRuns) =>
+    checkRuns.some(
+      (r) =>
+        r.name?.startsWith('Analyze (') &&
+        r.status === 'completed' &&
+        r.conclusion === 'success',
+    );
+
+  const isDuplicateDefaultCodeQl = (checkRun, checkRuns) => {
+    if (checkRun.name !== 'CodeQL') {
+      return false;
+    }
+    return hasSuccessfulCodeQlAdvanced(checkRuns);
+  };
+
   const hasPendingBlockingChecks = async (headSha) => {
     const checkRunsFromPage = (response) => {
       const d = response.data;
@@ -132,6 +148,7 @@ module.exports = async ({ github, context, core }) => {
     const pending = checkRuns.filter(
       (r) =>
         !isOwnAutoFinishCheck(r.name) &&
+        !isDuplicateDefaultCodeQl(r, checkRuns) &&
         (r.status === 'queued' || r.status === 'in_progress'),
     );
     if (pending.length > 0) {

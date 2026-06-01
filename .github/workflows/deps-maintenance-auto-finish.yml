@@ -2,7 +2,8 @@ name: Dependency Maintenance Auto Finish
 
 on:
   workflow_run:
-    workflows: ["CI", "PR Description", "CodeQL Advanced"]
+    # PR E2E is the last required check; retry merge when it completes (see post-release-auto-finish.yml).
+    workflows: ["CI", "PR Description", "CodeQL Advanced", "PR E2E"]
     types: [completed]
 
 permissions:
