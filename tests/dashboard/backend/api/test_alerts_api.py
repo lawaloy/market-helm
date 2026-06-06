@@ -96,6 +96,58 @@ class TestAlertsConfigAPI:
         saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
         assert saved["alerts"][0]["enabled"] is True
 
+    def test_put_config_persists_webhook_secret_only_to_env(
+        self, client, alerts_config_dir, monkeypatch, tmp_path
+    ):
+        home_dir = tmp_path / "home"
+        monkeypatch.setenv("HOME", str(home_dir))
+        monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+        monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
+
+        payload = {
+            "defaults": {
+                "webhook_url": " https://discord.com/api/webhooks/secret/token ",
+                "webhook_format": "DISCORD",
+            },
+            "alerts": [
+                {
+                    "id": "aapl_drop",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                    "notifications": ["webhook"],
+                    "webhook_url": "https://discord.com/api/webhooks/rule/secret",
+                }
+            ],
+        }
+
+        response = client.put("/api/alerts/config", json=payload)
+
+        assert response.status_code == 200
+        data = response.json()
+        serialized_response = json.dumps(data)
+        assert "secret/token" not in serialized_response
+        assert "rule/secret" not in serialized_response
+        assert data["channels"]["webhook_url"] is True
+        assert data["config"]["defaults"]["webhook_format"] == "discord"
+        assert data["config"]["defaults"].get("webhook_url") is None
+        assert "webhook_url" not in data["config"]["alerts"][0]
+
+        saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
+        assert saved["defaults"]["webhook_format"] == "discord"
+        assert "webhook_url" not in saved["defaults"]
+        assert "webhook_url" not in saved["alerts"][0]
+
+        env_file = home_dir / ".market-helm" / ".env"
+        assert env_file.read_text(encoding="utf-8").splitlines() == [
+            "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token",
+            "ALERT_WEBHOOK_FORMAT=discord",
+        ]
+
     def test_test_alert_dry_run(self, client, alerts_config_dir):
         payload = {
             "defaults": {"email_to": "user@example.com"},
