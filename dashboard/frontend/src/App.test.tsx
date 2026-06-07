@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -117,9 +117,13 @@ describe('App routing', () => {
 
     render(<App />);
 
-    await waitFor(() => {
-      expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh');
     expect(screen.getByTestId('background-fetching').textContent).toBe('fetching');
     expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('0');
     expect(apiMocks.get).toHaveBeenCalledWith('/api/refresh/status');
@@ -128,9 +132,7 @@ describe('App routing', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('1');
-    });
+    expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('1');
     expect(screen.getByTestId('background-fetching').textContent).toBe('idle');
     expect(apiMocks.runCheck).toHaveBeenCalledTimes(2);
   });
