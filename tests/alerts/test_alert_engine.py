@@ -52,6 +52,37 @@ def test_evaluate_dispatches_webhook_notifier_for_triggered_alert():
     webhook.send.assert_called_once_with(event)
 
 
+def test_evaluate_does_not_record_failed_delivery_so_retry_can_fire():
+    """Failed notification delivery must not start cooldown or suppress a retry."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    webhook = MagicMock()
+    webhook.send.side_effect = [False, True]
+    alert = {
+        "id": "price-drop",
+        "name": "Price Drop",
+        "enabled": True,
+        "notifications": ["webhook"],
+        "cooldown_minutes": 60,
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch("src.alerts.alert_engine.WebhookNotifier.from_alert", return_value=webhook):
+        failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+        retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert failed_events == []
+    assert len(retried_events) == 1
+    assert webhook.send.call_count == 2
+    storage.record_event.assert_called_once_with(retried_events[0])
+
+
 def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     """Webhook-only alerts still emit via log fallback when URL resolution fails."""
     storage = MagicMock()

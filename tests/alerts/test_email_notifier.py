@@ -1,5 +1,6 @@
 """Tests for SMTP email alert delivery."""
 
+import smtplib
 from unittest.mock import MagicMock, patch
 
 from src.alerts.notifiers.email_notifier import EmailNotifier, _parse_recipients
@@ -69,7 +70,7 @@ def test_send_uses_starttls_on_port_587(mock_smtp_cls: MagicMock) -> None:
         "condition_type": "price_threshold",
         "timestamp": "2026-05-21T12:00:00",
     }
-    notifier.send(event)
+    assert notifier.send(event) is True
     mock_smtp_cls.assert_called_once_with("smtp.example.com", 587, timeout=15.0)
     smtp.starttls.assert_called_once()
     smtp.login.assert_called_once_with("bot@example.com", "secret")
@@ -89,7 +90,23 @@ def test_send_uses_ssl_on_port_465(mock_smtp_cls: MagicMock) -> None:
         use_ssl=True,
         use_tls=False,
     )
-    notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]})
+    assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is True
     mock_smtp_cls.assert_called_once_with("smtp.example.com", 465, timeout=15.0)
     smtp.starttls.assert_not_called()
     smtp.login.assert_called_once()
+
+
+@patch("src.alerts.notifiers.email_notifier.smtplib.SMTP")
+def test_send_returns_false_on_smtp_error(mock_smtp_cls: MagicMock) -> None:
+    smtp = MagicMock()
+    smtp.login.side_effect = smtplib.SMTPException("auth failed")
+    mock_smtp_cls.return_value.__enter__.return_value = smtp
+    notifier = EmailNotifier(
+        host="smtp.example.com",
+        port=587,
+        username="bot@example.com",
+        password="secret",
+        to_addrs=["you@example.com"],
+    )
+
+    assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is False

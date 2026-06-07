@@ -102,7 +102,10 @@ def _normalize_config(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     alerts = raw.get("alerts")
     if not isinstance(alerts, list):
         raise HTTPException(status_code=400, detail="Config must include an 'alerts' array.")
-    defaults = raw.get("defaults") or {}
+    defaults = dict(raw.get("defaults") or {})
+    webhook_format = defaults.get("webhook_format")
+    if isinstance(webhook_format, str):
+        defaults["webhook_format"] = webhook_format.strip().lower()
     return {"defaults": defaults, "alerts": alerts}
 
 

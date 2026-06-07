@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call, patch
 import pandas as pd
 
 from src.alerts.alert_paths import get_enabled_watch_symbols
-from src.alerts.alert_runner import evaluate_alerts_from_latest_data, _fetch_missing_watch_quotes
+from src.alerts.alert_runner import _fetch_missing_watch_quotes, evaluate_alerts_from_latest_data
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
@@ -107,6 +107,32 @@ def test_fetch_missing_watch_quotes_does_not_initialize_fetcher_when_all_symbols
 
     assert enriched is stocks
     mock_fetcher_cls.assert_not_called()
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_skips_invalid_live_prices(mock_fetcher_cls, caplog):
+    fetcher = MagicMock()
+
+    def fetch_symbol(symbol):
+        if symbol == "NVDA":
+            return {"symbol": symbol, "close": "not-a-price"}
+        return {"symbol": symbol, "price": "410.25"}
+
+    fetcher.fetch_symbol_data.side_effect = fetch_symbol
+    mock_fetcher_cls.return_value = fetcher
+
+    with caplog.at_level("WARNING"):
+        enriched = _fetch_missing_watch_quotes(
+            [{"symbol": "AAPL", "close": 180.0}],
+            ["NVDA", "MSFT"],
+        )
+
+    assert enriched == [
+        {"symbol": "AAPL", "close": 180.0},
+        {"symbol": "MSFT", "close": 410.25},
+    ]
+    assert "Skipping invalid quote for watch symbol NVDA" in caplog.text
+    assert fetcher.fetch_symbol_data.call_count == 2
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
