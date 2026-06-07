@@ -125,7 +125,7 @@ class EmailNotifier:
         message.set_content(body)
         return message
 
-    def send(self, event: Dict[str, Any]) -> None:
+    def send(self, event: Dict[str, Any]) -> bool:
         message = self._format_message(event)
         try:
             if self._use_ssl:
@@ -140,9 +140,11 @@ class EmailNotifier:
                         smtp.starttls()
                     smtp.login(self._username, self._password)
                     smtp.send_message(message)
-        except smtplib.SMTPException as exc:
+            return True
+        except (smtplib.SMTPException, OSError) as exc:
             logger.warning(
                 "Email delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
+            return False
