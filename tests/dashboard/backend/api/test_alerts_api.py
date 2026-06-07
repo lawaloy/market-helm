@@ -96,6 +96,51 @@ class TestAlertsConfigAPI:
         saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
         assert saved["alerts"][0]["enabled"] is True
 
+    def test_put_config_persists_webhook_secret_only_to_user_env(
+        self, client, alerts_config_dir, tmp_path, monkeypatch
+    ):
+        user_config_dir = tmp_path / "user-config"
+        monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
+        monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+        monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
+        payload = {
+            "defaults": {
+                "webhook_url": "https://discord.com/api/webhooks/secret/token",
+                "webhook_format": "Discord",
+            },
+            "alerts": [
+                {
+                    "id": "aapl_drop",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                    "notifications": ["webhook"],
+                }
+            ],
+        }
+
+        r = client.put("/api/alerts/config", json=payload)
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["config"]["defaults"].get("webhook_url") is None
+        assert data["config"]["defaults"]["webhook_format"].lower() == "discord"
+        assert "secret/token" not in json.dumps(data)
+
+        saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
+        assert saved["defaults"].get("webhook_url") is None
+        assert saved["defaults"]["webhook_format"].lower() == "discord"
+        assert "webhook_url" not in saved["alerts"][0]
+
+        env_file = user_config_dir / ".env"
+        env_text = env_file.read_text(encoding="utf-8")
+        assert "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token" in env_text
+        assert "ALERT_WEBHOOK_FORMAT=discord" in env_text
+
     def test_test_alert_dry_run(self, client, alerts_config_dir):
         payload = {
             "defaults": {"email_to": "user@example.com"},
@@ -146,6 +191,28 @@ class TestAlertsConfigAPI:
         r = client.post("/api/alerts/quotes", json={"symbols": ["AAPL", "MSFT"]})
         assert r.status_code == 200
         assert r.json()["prices"]["AAPL"] == 180.0
+
+    def test_post_quotes_caps_symbols_before_resolving(self, client, monkeypatch):
+        captured = {}
+
+        def fake_resolve(symbols, fetch_missing=True):
+            captured["symbols"] = symbols
+            captured["fetch_missing"] = fetch_missing
+            return {}
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            fake_resolve,
+        )
+
+        r = client.post(
+            "/api/alerts/quotes",
+            json={"symbols": [f"SYM{i}" for i in range(20)]},
+        )
+
+        assert r.status_code == 200
+        assert captured["symbols"] == [f"SYM{i}" for i in range(15)]
+        assert captured["fetch_missing"] is True
 
     def test_get_quotes(self, client, monkeypatch):
         monkeypatch.setattr(
