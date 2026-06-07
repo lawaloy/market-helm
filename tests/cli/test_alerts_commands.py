@@ -64,6 +64,36 @@ def test_cmd_test_dry_run(caplog, tmp_path: Path) -> None:
     assert "MarketHelm alert" in text
 
 
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_cmd_test_returns_error_when_live_delivery_fails(
+    mock_post: MagicMock,
+    tmp_path: Path,
+) -> None:
+    mock_post.return_value.status_code = 500
+    mock_post.return_value.text = "err"
+    config = tmp_path / "alerts.json"
+    config.write_text(
+        json.dumps(
+            {
+                "alerts": [
+                    {
+                        "id": "a1",
+                        "name": "Hook",
+                        "enabled": True,
+                        "notifications": ["webhook"],
+                        "webhook_url": "https://hooks.slack.com/services/T000/B000/XXXXXXXX",
+                        "webhook_format": "slack",
+                        "condition": {"type": "price_threshold", "symbol": "AAPL"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert alerts_commands.cmd_test("a1", config_path=config) == 1
+
+
 def test_cmd_test_missing_id(tmp_path: Path) -> None:
     config = tmp_path / "alerts.json"
     config.write_text(json.dumps({"alerts": []}), encoding="utf-8")

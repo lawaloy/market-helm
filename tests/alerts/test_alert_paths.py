@@ -4,6 +4,7 @@ from pathlib import Path
 
 from src.alerts.alert_paths import (
     apply_alert_defaults,
+    update_user_env_vars,
     init_user_alerts_config,
     load_alerts_config,
     polish_alerts_config,
@@ -94,6 +95,40 @@ def test_strip_webhook_secrets_from_config() -> None:
     assert "webhook_url" not in stripped["defaults"]
     assert "webhook_url" not in stripped["alerts"][0]
     assert stripped["defaults"]["email_to"] == "a@example.com"
+
+
+def test_update_user_env_vars_replaces_webhook_values_without_dropping_other_settings(
+    tmp_path: Path, monkeypatch
+) -> None:
+    user_dir = tmp_path / ".market-helm"
+    env_file = user_dir / ".env"
+    user_dir.mkdir()
+    env_file.write_text(
+        "\n".join(
+            [
+                "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/old/token",
+                "ALERT_EMAIL_TO=alerts@example.com",
+                "ALERT_WEBHOOK_FORMAT=slack",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+
+    update_user_env_vars(
+        {
+            "DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/new/token",
+            "ALERT_WEBHOOK_FORMAT": "discord",
+        }
+    )
+
+    lines = env_file.read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/new/token",
+        "ALERT_EMAIL_TO=alerts@example.com",
+        "ALERT_WEBHOOK_FORMAT=discord",
+    ]
 
 
 def test_apply_alert_defaults_merges_email_and_webhook() -> None:
