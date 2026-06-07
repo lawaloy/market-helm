@@ -96,14 +96,13 @@ class TestAlertsConfigAPI:
         saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
         assert saved["alerts"][0]["enabled"] is True
 
-    def test_put_config_persists_webhook_secret_only_to_env(
-        self, client, alerts_config_dir, monkeypatch, tmp_path
+    def test_put_config_persists_webhook_secret_only_to_user_env(
+        self, client, alerts_config_dir, tmp_path, monkeypatch
     ):
-        home_dir = tmp_path / "home"
-        monkeypatch.setenv("HOME", str(home_dir))
+        user_config_dir = tmp_path / "user-config"
+        monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
         monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
         monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
-
         payload = {
             "defaults": {
                 "webhook_url": " https://discord.com/api/webhooks/secret/token ",
@@ -125,10 +124,10 @@ class TestAlertsConfigAPI:
             ],
         }
 
-        response = client.put("/api/alerts/config", json=payload)
+        r = client.put("/api/alerts/config", json=payload)
 
-        assert response.status_code == 200
-        data = response.json()
+        assert r.status_code == 200
+        data = r.json()
         serialized_response = json.dumps(data)
         assert "secret/token" not in serialized_response
         assert "rule/secret" not in serialized_response
@@ -142,7 +141,7 @@ class TestAlertsConfigAPI:
         assert "webhook_url" not in saved["defaults"]
         assert "webhook_url" not in saved["alerts"][0]
 
-        env_file = home_dir / ".market-helm" / ".env"
+        env_file = user_config_dir / ".env"
         assert env_file.read_text(encoding="utf-8").splitlines() == [
             "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token",
             "ALERT_WEBHOOK_FORMAT=discord",
@@ -198,6 +197,28 @@ class TestAlertsConfigAPI:
         r = client.post("/api/alerts/quotes", json={"symbols": ["AAPL", "MSFT"]})
         assert r.status_code == 200
         assert r.json()["prices"]["AAPL"] == 180.0
+
+    def test_post_quotes_caps_symbols_before_resolving(self, client, monkeypatch):
+        captured = {}
+
+        def fake_resolve(symbols, fetch_missing=True):
+            captured["symbols"] = symbols
+            captured["fetch_missing"] = fetch_missing
+            return {}
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            fake_resolve,
+        )
+
+        r = client.post(
+            "/api/alerts/quotes",
+            json={"symbols": [f"SYM{i}" for i in range(20)]},
+        )
+
+        assert r.status_code == 200
+        assert captured["symbols"] == [f"SYM{i}" for i in range(15)]
+        assert captured["fetch_missing"] is True
 
     def test_get_quotes(self, client, monkeypatch):
         monkeypatch.setattr(
