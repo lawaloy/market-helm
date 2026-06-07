@@ -105,8 +105,8 @@ class TestAlertsConfigAPI:
         monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
         payload = {
             "defaults": {
-                "webhook_url": "https://discord.com/api/webhooks/secret/token",
-                "webhook_format": "Discord",
+                "webhook_url": " https://discord.com/api/webhooks/secret/token ",
+                "webhook_format": "DISCORD",
             },
             "alerts": [
                 {
@@ -119,6 +119,7 @@ class TestAlertsConfigAPI:
                         "value": 150,
                     },
                     "notifications": ["webhook"],
+                    "webhook_url": "https://discord.com/api/webhooks/rule/secret",
                 }
             ],
         }
@@ -127,19 +128,24 @@ class TestAlertsConfigAPI:
 
         assert r.status_code == 200
         data = r.json()
+        serialized_response = json.dumps(data)
+        assert "secret/token" not in serialized_response
+        assert "rule/secret" not in serialized_response
+        assert data["channels"]["webhook_url"] is True
+        assert data["config"]["defaults"]["webhook_format"] == "discord"
         assert data["config"]["defaults"].get("webhook_url") is None
-        assert data["config"]["defaults"]["webhook_format"].lower() == "discord"
-        assert "secret/token" not in json.dumps(data)
+        assert "webhook_url" not in data["config"]["alerts"][0]
 
         saved = json.loads((alerts_config_dir / "alerts.json").read_text(encoding="utf-8"))
-        assert saved["defaults"].get("webhook_url") is None
-        assert saved["defaults"]["webhook_format"].lower() == "discord"
+        assert saved["defaults"]["webhook_format"] == "discord"
+        assert "webhook_url" not in saved["defaults"]
         assert "webhook_url" not in saved["alerts"][0]
 
         env_file = user_config_dir / ".env"
-        env_text = env_file.read_text(encoding="utf-8")
-        assert "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token" in env_text
-        assert "ALERT_WEBHOOK_FORMAT=discord" in env_text
+        assert env_file.read_text(encoding="utf-8").splitlines() == [
+            "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token",
+            "ALERT_WEBHOOK_FORMAT=discord",
+        ]
 
     def test_test_alert_dry_run(self, client, alerts_config_dir):
         payload = {
