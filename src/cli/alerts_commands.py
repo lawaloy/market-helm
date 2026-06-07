@@ -162,19 +162,24 @@ def run_alert_test(
         raise RuntimeError(f"No notifiers configured for alert {alert_id!r}")
 
     delivered: List[str] = []
+    attempted: List[str] = []
     previews: List[Dict[str, Any]] = []
     for notifier in notifiers:
         name = notifier.__class__.__name__
+        label = _notifier_label(name)
+        if label:
+            attempted.append(label)
         if dry_run:
             payload: Any = event
             if hasattr(notifier, "build_payload"):
                 payload = notifier.build_payload(event)
             previews.append({"notifier": name, "payload": payload})
         else:
-            notifier.send(event)
-            label = _notifier_label(name)
-            if label:
+            if notifier.send(event) is not False and label:
                 delivered.append(label)
+
+    if not dry_run and attempted and not delivered:
+        raise RuntimeError(f"No test notifications were delivered for alert {alert_id!r}")
 
     return {
         "alert_id": alert_id,

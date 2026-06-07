@@ -85,7 +85,7 @@ class WebhookNotifier:
             return {"content": self._alert_text(event, markdown="discord")}
         return dict(event)
 
-    def send(self, event: Dict[str, Any]) -> None:
+    def send(self, event: Dict[str, Any]) -> bool:
         payload = self.build_payload(event)
         try:
             response = requests.post(
@@ -101,9 +101,12 @@ class WebhookNotifier:
                     event.get("alert_id"),
                     response.text[:500],
                 )
+                return False
+            return True
         except requests.RequestException as exc:
             logger.warning(
                 "Webhook delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
+            return False
