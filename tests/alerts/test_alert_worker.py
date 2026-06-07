@@ -57,3 +57,20 @@ def test_run_worker_loop_stops_via_callback(mock_once, _mock_sleep, caplog) -> N
         alert_worker.run_worker_loop(60, should_stop=lambda: True)
     assert mock_once.call_count == 1
     assert "Alert worker stopped" in caplog.text
+
+
+@patch("src.alerts.alert_worker.signal.signal")
+@patch("src.alerts.alert_worker.time.sleep")
+@patch("src.alerts.alert_worker.time.monotonic")
+@patch("src.alerts.alert_worker.run_worker_once")
+def test_run_worker_loop_repeats_until_stop_callback(
+    mock_once, mock_monotonic, _mock_sleep, mock_signal
+) -> None:
+    """The daemon path should continue evaluating after an interval until asked to stop."""
+    mock_monotonic.side_effect = [0, 0, 61, 61, 61]
+    stop_checks = iter([False, True])
+
+    alert_worker.run_worker_loop(60, should_stop=lambda: next(stop_checks))
+
+    assert mock_once.call_count == 2
+    assert mock_signal.call_count == 2

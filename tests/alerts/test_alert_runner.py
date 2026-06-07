@@ -1,11 +1,11 @@
 """Tests for alert evaluation against saved daily data."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pandas as pd
 
 from src.alerts.alert_paths import get_enabled_watch_symbols
-from src.alerts.alert_runner import evaluate_alerts_from_latest_data
+from src.alerts.alert_runner import evaluate_alerts_from_latest_data, _fetch_missing_watch_quotes
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
@@ -56,6 +56,57 @@ def test_evaluate_alerts_fetches_missing_watch_symbols(
     mock_fetch_missing.assert_called_once()
     stocks = engine.evaluate.call_args[0][0]
     assert stocks[-1] == {"symbol": "NVDA", "close": 900.0}
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_skips_present_symbols_and_recovers_from_failures(
+    mock_fetcher_cls, caplog
+):
+    """Live backfill should enrich only missing symbols and tolerate partial API failures."""
+    fetcher = MagicMock()
+
+    def fetch_symbol(symbol):
+        if symbol == "NVDA":
+            return {"symbol": "NVDA", "price": 900.0}
+        if symbol == "MSFT":
+            raise RuntimeError("api timeout")
+        if symbol == "TSLA":
+            return {}
+        if symbol == "AMD":
+            return {"symbol": "AMD", "close": None}
+        raise AssertionError(f"unexpected fetch for {symbol}")
+
+    fetcher.fetch_symbol_data.side_effect = fetch_symbol
+    mock_fetcher_cls.return_value = fetcher
+    stocks = [{"symbol": "AAPL", "close": 180.0}]
+
+    with caplog.at_level("WARNING"):
+        enriched = _fetch_missing_watch_quotes(stocks, ["AAPL", "NVDA", "MSFT", "TSLA", "AMD"])
+
+    assert enriched == [
+        {"symbol": "AAPL", "close": 180.0},
+        {"symbol": "NVDA", "close": 900.0},
+    ]
+    mock_fetcher_cls.assert_called_once_with(include_profile=False)
+    assert fetcher.fetch_symbol_data.call_args_list == [
+        call("NVDA"),
+        call("MSFT"),
+        call("TSLA"),
+        call("AMD"),
+    ]
+    assert "Failed to fetch quote for watch symbol MSFT" in caplog.text
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_does_not_initialize_fetcher_when_all_symbols_present(
+    mock_fetcher_cls,
+):
+    stocks = [{"symbol": "aapl", "close": 180.0}]
+
+    enriched = _fetch_missing_watch_quotes(stocks, ["AAPL"])
+
+    assert enriched is stocks
+    mock_fetcher_cls.assert_not_called()
 
 
 @patch("src.alerts.alert_runner.AlertEngine")

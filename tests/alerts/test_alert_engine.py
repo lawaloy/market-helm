@@ -1,8 +1,22 @@
 """Tests for alert engine notification dispatch."""
 
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from src.alerts.alert_engine import AlertEngine
+
+
+class InMemoryCooldownStorage:
+    def __init__(self):
+        self.events = []
+        self.last_triggered = None
+
+    def get_last_triggered(self, _alert_id):
+        return self.last_triggered
+
+    def record_event(self, event):
+        self.events.append(event)
+        self.last_triggered = datetime.fromisoformat(event["timestamp"])
 
 
 def test_evaluate_dispatches_webhook_notifier_for_triggered_alert():
@@ -94,4 +108,44 @@ def test_evaluate_dispatches_email_notifier_for_triggered_alert():
     event = events[0]
     from_alert.assert_called_once_with(alert)
     email.send.assert_called_once_with(event)
+
+
+def test_evaluate_suppresses_duplicate_notifications_during_cooldown():
+    """Repeated worker checks must not resend the same alert inside its cooldown window."""
+    storage = InMemoryCooldownStorage()
+    notifier = MagicMock()
+    alert = {
+        "id": "aapl-drop",
+        "name": "AAPL Drop",
+        "cooldown_minutes": 5,
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+    stocks = [{"symbol": "AAPL", "close": 149.5}]
+    first_check = datetime(2026, 5, 20, 12, 0, 0)
+    second_check = datetime(2026, 5, 20, 12, 1, 0)
+    third_check = datetime(2026, 5, 20, 12, 6, 0)
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        with patch("src.alerts.alert_engine.datetime") as mock_datetime:
+            mock_datetime.utcnow.side_effect = [
+                first_check,
+                second_check,
+                third_check,
+                third_check,
+            ]
+            first_events = engine.evaluate(stocks)
+            second_events = engine.evaluate(stocks)
+            third_events = engine.evaluate(stocks)
+
+    assert len(first_events) == 1
+    assert second_events == []
+    assert len(third_events) == 1
+    assert len(storage.events) == 2
+    assert notifier.send.call_count == 2
 

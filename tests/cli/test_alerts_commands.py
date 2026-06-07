@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.cli import alerts_commands
 
 
@@ -80,4 +82,14 @@ def test_cmd_run_once(mock_once) -> None:
 @patch("src.alerts.alert_worker.run_worker_loop")
 def test_cmd_run_loop(mock_loop) -> None:
     assert alerts_commands.cmd_run(loop=True, interval=120) == 0
+    mock_loop.assert_called_once_with(120)
+
+
+@patch("src.cli.alerts_commands._load_env")
+@patch("src.alerts.alert_worker.run_worker_loop")
+def test_main_run_loop_parses_interval(mock_loop, _mock_load_env) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        alerts_commands.main(["run", "--loop", "--interval", "120"])
+
+    assert exc_info.value.code == 0
     mock_loop.assert_called_once_with(120)
