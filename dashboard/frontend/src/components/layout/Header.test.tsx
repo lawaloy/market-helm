@@ -87,4 +87,39 @@ describe('Header refresh controls', () => {
 
     expect(onRefreshComplete).toHaveBeenCalledTimes(1);
   });
+
+  it('does not notify the app when manual refresh polling fails', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValueOnce({
+      data: { is_running: false, last_status: 'failed', progress: 'Provider error' },
+    });
+    const onQuickRefresh = vi.fn();
+    const onRefreshComplete = vi.fn();
+
+    render(
+      <Header
+        dataDate="2026-06-07"
+        onQuickRefresh={onQuickRefresh}
+        onRefreshComplete={onRefreshComplete}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh');
+    expect(screen.getByRole('button', { name: 'Fetching...' })).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+    expect(screen.getByText('Refresh failed. Please try again.')).toBeTruthy();
+    expect(onQuickRefresh).toHaveBeenCalledTimes(1);
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+  });
 });
