@@ -18,11 +18,12 @@ logger = setup_logger("alerts")
 
 
 class LogNotifier:
-    def send(self, event: Dict) -> None:
+    def send(self, event: Dict) -> bool:
         logger.info(
             f"Alert triggered: {event['alert_name']} ({event['alert_id']}) "
             f"symbols={event.get('symbols', [])}"
         )
+        return True
 
 
 NOTIFIERS = {
@@ -133,9 +134,30 @@ class AlertEngine:
                 "condition_type": condition_type,
             }
 
-            self.storage.record_event(event)
+            delivered = False
             for notifier in self._build_notifiers(alert):
-                notifier.send(event)
+                try:
+                    result = notifier.send(event)
+                except Exception as exc:
+                    logger.warning(
+                        "Notifier %s failed for alert %s: %s",
+                        notifier.__class__.__name__,
+                        alert["id"],
+                        exc,
+                    )
+                    continue
+                if result is not False:
+                    delivered = True
+
+            if not delivered:
+                logger.warning(
+                    "Alert %s matched but no notifications were delivered; "
+                    "leaving it eligible for retry.",
+                    alert["id"],
+                )
+                continue
+
+            self.storage.record_event(event)
 
             events.append(event)
 

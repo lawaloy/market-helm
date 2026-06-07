@@ -63,7 +63,11 @@ def _fetch_missing_watch_quotes(
         close = row.get("close", row.get("price"))
         if close is None:
             continue
-        enriched.append({"symbol": symbol.upper(), "close": float(close)})
+        try:
+            enriched.append({"symbol": symbol.upper(), "close": float(close)})
+        except (TypeError, ValueError):
+            logger.warning("Skipping invalid quote for watch symbol %s: %r", symbol, close)
+            continue
         logger.info("Fetched live quote for watch symbol %s", symbol)
 
     return enriched

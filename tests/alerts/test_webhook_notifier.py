@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 
@@ -30,7 +32,7 @@ def test_send_posts_json(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 200
     notifier = WebhookNotifier("https://example.com/hook")
     event = {"alert_id": "x", "symbols": ["AAPL"]}
-    notifier.send(event)
+    assert notifier.send(event) is True
     mock_post.assert_called_once()
     kwargs = mock_post.call_args[1]
     assert kwargs["json"] == event
@@ -67,7 +69,7 @@ def test_from_alert_uses_env_payload_format() -> None:
 def test_send_posts_slack_payload(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 200
     notifier = WebhookNotifier("https://example.com/hook", payload_format="slack")
-    notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]})
+    assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is True
     payload = mock_post.call_args[1]["json"]
     assert "text" in payload
     assert "blocks" in payload
@@ -106,7 +108,7 @@ def test_from_alert_falls_back_to_discord_env_url() -> None:
 def test_send_posts_discord_payload(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 204
     notifier = WebhookNotifier("https://discord.com/api/webhooks/x/y", payload_format="discord")
-    notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]})
+    assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is True
     payload = mock_post.call_args[1]["json"]
     assert "content" in payload
     assert "Test" in payload["content"]
@@ -118,4 +120,11 @@ def test_send_logs_on_http_error(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 500
     mock_post.return_value.text = "err"
     notifier = WebhookNotifier("https://example.com/hook")
-    notifier.send({"alert_id": "x"})
+    assert notifier.send({"alert_id": "x"}) is False
+
+
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_returns_false_on_request_error(mock_post: MagicMock) -> None:
+    mock_post.side_effect = requests.RequestException("timeout")
+    notifier = WebhookNotifier("https://example.com/hook")
+    assert notifier.send({"alert_id": "x"}) is False
