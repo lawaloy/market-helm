@@ -147,6 +147,28 @@ class TestAlertsConfigAPI:
         assert r.status_code == 200
         assert r.json()["prices"]["AAPL"] == 180.0
 
+    def test_post_quotes_caps_symbols_before_resolving(self, client, monkeypatch):
+        captured = {}
+
+        def fake_resolve(symbols, fetch_missing=True):
+            captured["symbols"] = symbols
+            captured["fetch_missing"] = fetch_missing
+            return {}
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            fake_resolve,
+        )
+
+        r = client.post(
+            "/api/alerts/quotes",
+            json={"symbols": [f"SYM{i}" for i in range(20)]},
+        )
+
+        assert r.status_code == 200
+        assert captured["symbols"] == [f"SYM{i}" for i in range(15)]
+        assert captured["fetch_missing"] is True
+
     def test_get_quotes(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.resolve_symbol_prices",
