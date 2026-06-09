@@ -83,8 +83,92 @@ This is **not legal or financial advice**; follow your broker’s terms and appl
 
 ---
 
+## Docker (CLI tracker)
+
+Build and run the daily tracker in a container:
+
+```bash
+docker build -t market-helm:latest .
+docker run --rm -e FINNHUB_API_KEY=your-key market-helm:latest
+# Or: docker run --rm --env-file .env market-helm:latest
+```
+
+Mount persistent data:
+
+```bash
+docker run --rm --env-file .env \
+  -v /var/lib/market-helm/data:/app/data \
+  -v /var/lib/market-helm/logs:/app/logs \
+  market-helm:latest
+```
+
+### Docker Compose
+
+```yaml
+services:
+  market-helm:
+    build: .
+    environment:
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+```
+
+---
+
+## Scheduled runs
+
+Use cron (Linux/Mac), Task Scheduler (Windows), or systemd to run once per day.
+
+**Cron example:**
+
+```bash
+0 9 * * * docker run --rm -e FINNHUB_API_KEY=$(cat /path/to/key) market-helm:latest >> /var/log/market-helm.log 2>&1
+```
+
+For alert evaluation on a schedule (independent of dashboard access), use `market-helm alerts run --loop` — see [ALERTING_DESIGN.md](ALERTING_DESIGN.md).
+
+---
+
+## Kubernetes
+
+Use `k8s/market-helm-cronjob.yaml` as a CronJob. Create secrets first:
+
+```bash
+kubectl create secret generic market-helm-secrets \
+  --from-literal=FINNHUB_API_KEY=your-key \
+  --from-literal=OPENAI_API_KEY=your-key
+```
+
+Mount a persistent volume for `DATA_DIR` so history survives pod restarts.
+
+---
+
+## Cloud platforms
+
+Common patterns:
+
+- **AWS** — ECS task + EventBridge schedule; secrets in Secrets Manager.
+- **GCP** — Cloud Run job + Cloud Scheduler; secrets in Secret Manager.
+- **Azure** — Container Instances + Logic Apps; secrets in Key Vault.
+
+Store API keys in the platform secret manager; never bake them into images.
+
+---
+
+## Security
+
+- Never commit keys; `.env` is gitignored.
+- Use secret stores in production (AWS Secrets Manager, GCP Secret Manager, Azure Key Vault).
+- Rotate keys periodically; audit Finnhub usage at <https://finnhub.io/dashboard>.
+
+---
+
 ## Related
 
 - [PROJECT_STATUS.md](PROJECT_STATUS.md) — roadmap and future execution notes  
 - [Dashboard README](../dashboard/README.md) — local dev, env vars  
+- [USAGE.md](USAGE.md) — CLI entry points and output files  
 - [Contributing](../CONTRIBUTING.md) — development workflow

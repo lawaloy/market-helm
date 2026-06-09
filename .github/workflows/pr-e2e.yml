@@ -166,7 +166,7 @@ jobs:
                   fi
                 done
                 if [ "$any_inline" -eq 0 ]; then
-                  echo "**This run could not upload previews.** Open the artifact above — PNGs include:"
+                  echo "Open the artifact above to review screenshots — PNGs include:"
                   echo ""
                   for abs in "${PNGS[@]}"; do
                     echo "- \`$(basename "$abs")\`"
