@@ -80,13 +80,30 @@ jobs:
             const START = '<!-- AUTO:START -->';
             const END = '<!-- AUTO:END -->';
 
-            const defaultHumanSection = `## What + Why
-            - 
+            const defaultHumanSection = [
+              '## What + Why',
+              '',
+              '- ',
+              '',
+              '## Checks',
+              '- [ ] `dashboard/frontend`: `npm ci` and `npm run build` (required: **Dashboard frontend**)',
+              '- [ ] `pytest tests/` (required: **Python**)',
+              '- [ ] PR E2E smoke (required: **Curl + Playwright**)',
+            ].join('\n');
 
-            ## Checks
-            - [ ] \`dashboard/frontend\`: \`npm ci\` and \`npm run build\` (required: **Dashboard frontend**)
-            - [ ] \`pytest tests/\` (required: **Python**)
-            - [ ] PR E2E smoke (required: **Curl + Playwright**)`;
+            const whatWhyHasContent = (humanSection) => {
+              const match = humanSection.match(/^## What \+ Why\s*\n([\s\S]*?)(?=\n## |\n<!--|$)/im);
+              if (!match) {
+                return humanSection.trim().length > 0;
+              }
+              const body = match[1].trim();
+              if (!body) {
+                return false;
+              }
+              return body
+                .split('\n')
+                .some((line) => line.replace(/^-\s*/, '').replace(/<!--[\s\S]*?-->/g, '').trim().length > 0);
+            };
 
             let autoBody = fs.readFileSync('pr-auto.md', 'utf8');
 
@@ -119,6 +136,22 @@ jobs:
               body = `${existing.trimEnd()}\n\n${autoSection}`;
             } else {
               body = `${defaultHumanSection}\n\n${autoSection}`;
+            }
+
+            const humanSection =
+              startIdx !== -1 && endIdx !== -1 && endIdx > startIdx
+                ? existing.slice(0, startIdx).trim()
+                : existing.trim();
+
+            if (
+              context.payload.action === 'synchronize' &&
+              humanSection &&
+              !whatWhyHasContent(humanSection)
+            ) {
+              core.info(
+                'Skipping PR description sync until What + Why has at least one filled bullet.',
+              );
+              return;
             }
 
             const { owner, repo } = context.repo;
