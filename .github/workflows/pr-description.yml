@@ -80,7 +80,15 @@ jobs:
             const START = '<!-- AUTO:START -->';
             const END = '<!-- AUTO:END -->';
 
-            const defaultHumanSection = ['## What + Why', '', '- '].join('\n');
+            const defaultHumanSection = [
+              '## What + Why',
+              '',
+              '- ',
+              '',
+              '## Checks',
+              '- [ ] `dashboard/frontend`: `npm ci` and `npm run build`',
+              '- [ ] `pytest tests/` (repo root)',
+            ].join('\n');
 
             const whatWhyHasContent = (humanSection) => {
               const match = humanSection.match(/^## What \+ Why\s*\n([\s\S]*?)(?=\n## |\n<!--|$)/im);

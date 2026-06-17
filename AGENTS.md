@@ -22,7 +22,7 @@ Start the backend **before** the Vite dev server. Use `python3` (not `python`) �
 
 ### Lint, test, build
 
-See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`. **Required to merge into `main`** (GitHub ruleset *Merging*): **Python**, **Dashboard frontend**, **Curl + Playwright** (PR E2E).
+See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 
 - **Lint**: `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
 - **Tests**: `pytest tests/ -v` (110 tests, all pure unit/integration — no API key needed)
@@ -33,9 +33,8 @@ See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
+- **`## Checks`** for local verification before push
 - **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
-
-Merge is gated by CI (ruleset *Merging*); no need to duplicate required checks as template checkboxes.
 
 ```bash
 gh pr create --title "..." --body-file .github/pull_request_template.md
