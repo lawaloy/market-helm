@@ -2,7 +2,7 @@ name: Dependency Maintenance Auto Finish
 
 on:
   workflow_run:
-    # PR E2E is the last required check; retry merge when it completes (see post-release-auto-finish.yml).
+    # PR E2E (Curl + Playwright) is a required merge check on main — see GitHub ruleset "Merging".
     workflows: ["CI", "PR Description", "CodeQL Advanced", "PR E2E"]
     types: [completed]
 

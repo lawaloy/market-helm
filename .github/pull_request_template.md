@@ -2,8 +2,9 @@
 - 
 
 ## Checks
-- [ ] `dashboard/frontend`: `npm ci` and `npm run build`
-- [ ] `pytest tests/` (repo root)
+- [ ] `dashboard/frontend`: `npm ci` and `npm run build` (required: **Dashboard frontend**)
+- [ ] `pytest tests/` (required: **Python**)
+- [ ] PR E2E smoke (required: **Curl + Playwright**)
 
 <!-- AUTO:START -->
 ## Auto

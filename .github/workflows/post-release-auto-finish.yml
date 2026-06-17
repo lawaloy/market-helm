@@ -1,5 +1,5 @@
 # Auto-merge chore/post-release-sync-* PRs after required checks complete.
-# Runs from main via workflow_run after PR E2E (last required check) succeeds.
+# Required on main (ruleset "Merging"): Python, Dashboard frontend, Curl + Playwright.
 # Use workflow_dispatch to retry a specific open PR manually.
 
 name: Post-release Auto Finish

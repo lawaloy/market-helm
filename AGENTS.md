@@ -22,7 +22,9 @@ Start the backend **before** the Vite dev server. Use `python3` (not `python`) â
 
 ### Lint, test, build
 
-See CI in `.github/workflows/python-app.yml` for the canonical commands. Quick reference:
+See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml` for the canonical commands. **Required to merge into `main`** (GitHub ruleset *Merging*): **Python**, **Dashboard frontend**, **Curl + Playwright** (PR E2E).
+
+Quick reference:
 
 - **Lint**: `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
 - **Tests**: `pytest tests/ -v` (110 tests, all pure unit/integration â€” no API key needed)
