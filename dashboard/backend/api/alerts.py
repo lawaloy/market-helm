@@ -18,6 +18,7 @@ from src.alerts.alert_paths import (
     user_alerts_config_path,
     user_config_dir,
 )
+from src.alerts.notifiers.email_delivery import email_delivery_configured
 from src.cli.alerts_commands import _load_env, run_alert_test
 
 from dashboard.backend.api.history import build_symbol_catalog
@@ -117,11 +118,7 @@ def _channel_status(config: Dict[str, Any]) -> ChannelStatus:
         os.environ.get("ALERT_WEBHOOK_URL") or os.environ.get("DISCORD_WEBHOOK_URL")
     )
     return ChannelStatus(
-        email_smtp=bool(
-            os.environ.get("SMTP_HOST")
-            and os.environ.get("SMTP_USER")
-            and os.environ.get("SMTP_PASSWORD")
-        ),
+        email_smtp=email_delivery_configured(),
         email_recipients=has_default_email or has_rule_email,
         webhook_url=has_env_webhook,
     )
@@ -262,7 +259,7 @@ async def post_symbol_quotes(body: SymbolQuotesRequest) -> SymbolQuotesResponse:
 
 @router.get("/status", response_model=AlertsStatusResponse)
 async def get_alerts_status() -> AlertsStatusResponse:
-    """How alerts run today: evaluated when MarketHelm loads fresh market data."""
+    """Alert status: active watches, last data date, and last trigger time."""
     _load_env()
     tracked: List[str] = []
     last_date: Optional[str] = None

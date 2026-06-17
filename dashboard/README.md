@@ -190,25 +190,27 @@ npm run build
 market-helm alerts init          # creates ~/.market-helm/alerts.json
 market-helm alerts list          # show rules
 market-helm alerts test --id alert_aapl_drop --dry-run
+market-helm alerts run --loop    # evaluate watches on a schedule (production)
 ```
 
-Put secrets in `~/.market-helm/.env` (SMTP password, webhook URL). Edit `~/.market-helm/alerts.json` to enable rules.
+Put secrets in `~/.market-helm/.env` (SMTP password, webhook URL, SendGrid key). Configure watches in **Helmtower** (`/alerts`) or edit `~/.market-helm/alerts.json`.
 
 **Developers (git clone):** may use `config/alerts.json` in the repo instead; user config takes precedence when present.
 
-**Dashboard UI for alerts:** not built yet — see [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md) (*Alerts — operational UX*). Today alerts are configured via the file above + env vars; a future settings page would write the same config.
-
 | Variable | Purpose |
 |----------|---------|
+| `ALERT_EMAIL_PROVIDER` | `smtp` (default), `sendgrid`, or `mailgun` — see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#transactional-alert-email) |
 | `ALERT_WEBHOOK_URL` | Default webhook URL when a rule uses `"notifications": ["webhook"]` without per-rule `webhook_url` |
 | `ALERT_WEBHOOK_FORMAT` | `json` (default), `slack`, or `discord` for incoming-webhook payload shape |
 | `DISCORD_WEBHOOK_URL` | Optional default Discord webhook URL |
-| `SMTP_HOST` | SMTP server hostname (e.g. `smtp.gmail.com`) |
+| `SMTP_HOST` | SMTP server hostname (e.g. `smtp.gmail.com`) — dev/self-host or SES SMTP |
 | `SMTP_PORT` | SMTP port (default `587`; use `465` for implicit SSL) |
 | `SMTP_USER` | SMTP login username |
 | `SMTP_PASSWORD` | SMTP login password or app password |
+| `SENDGRID_API_KEY` | SendGrid API key when using SendGrid |
+| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Mailgun credentials when using Mailgun |
 | `ALERT_EMAIL_TO` | Default comma-separated recipients when a rule uses `"email"` without `email_to` |
-| `ALERT_EMAIL_FROM` | Optional From address (defaults to `SMTP_USER`) |
+| `ALERT_EMAIL_FROM` | Platform **From** address; required for SendGrid/Mailgun |
 
 Per-rule overrides in alerts config: `webhook_url`, `webhook_format` (`json`, `slack`, or `discord`), `email_to`, optional SMTP fields.
 

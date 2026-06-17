@@ -3,11 +3,18 @@
 import smtplib
 from unittest.mock import MagicMock, patch
 
-from src.alerts.notifiers.email_notifier import EmailNotifier, _parse_recipients
+from src.alerts.notifiers.email_delivery import (
+    SmtpEmailBackend,
+    build_email_backend,
+    email_delivery_configured,
+    parse_recipients,
+    resolve_email_provider,
+)
+from src.alerts.notifiers.email_notifier import EmailNotifier
 
 
 def test_parse_recipients_accepts_comma_separated_string() -> None:
-    assert _parse_recipients("a@example.com, b@example.com") == [
+    assert parse_recipients("a@example.com, b@example.com") == [
         "a@example.com",
         "b@example.com",
     ]
@@ -32,8 +39,9 @@ def test_from_alert_returns_none_without_host() -> None:
 def test_from_alert_builds_from_environment() -> None:
     notifier = EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]})
     assert notifier is not None
-    assert notifier._host == "smtp.example.com"
-    assert notifier._port == 587
+    assert isinstance(notifier._backend, SmtpEmailBackend)
+    assert notifier._backend._host == "smtp.example.com"
+    assert notifier._backend._port == 587
     assert notifier._to_addrs == ["you@example.com"]
 
 
@@ -52,16 +60,20 @@ def test_from_alert_uses_email_to_field() -> None:
     assert notifier._to_addrs == ["ops@example.com", "backup@example.com"]
 
 
-@patch("src.alerts.notifiers.email_notifier.smtplib.SMTP")
+@patch("src.alerts.notifiers.email_delivery.smtplib.SMTP")
 def test_send_uses_starttls_on_port_587(mock_smtp_cls: MagicMock) -> None:
     smtp = MagicMock()
     mock_smtp_cls.return_value.__enter__.return_value = smtp
-    notifier = EmailNotifier(
+    backend = SmtpEmailBackend(
         host="smtp.example.com",
         port=587,
         username="bot@example.com",
         password="secret",
+    )
+    notifier = EmailNotifier(
+        backend=backend,
         to_addrs=["you@example.com"],
+        from_addr="bot@example.com",
     )
     event = {
         "alert_id": "x",
@@ -77,18 +89,22 @@ def test_send_uses_starttls_on_port_587(mock_smtp_cls: MagicMock) -> None:
     smtp.send_message.assert_called_once()
 
 
-@patch("src.alerts.notifiers.email_notifier.smtplib.SMTP_SSL")
+@patch("src.alerts.notifiers.email_delivery.smtplib.SMTP_SSL")
 def test_send_uses_ssl_on_port_465(mock_smtp_cls: MagicMock) -> None:
     smtp = MagicMock()
     mock_smtp_cls.return_value.__enter__.return_value = smtp
-    notifier = EmailNotifier(
+    backend = SmtpEmailBackend(
         host="smtp.example.com",
         port=465,
         username="bot@example.com",
         password="secret",
-        to_addrs=["you@example.com"],
         use_ssl=True,
         use_tls=False,
+    )
+    notifier = EmailNotifier(
+        backend=backend,
+        to_addrs=["you@example.com"],
+        from_addr="bot@example.com",
     )
     assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is True
     mock_smtp_cls.assert_called_once_with("smtp.example.com", 465, timeout=15.0)
@@ -96,17 +112,64 @@ def test_send_uses_ssl_on_port_465(mock_smtp_cls: MagicMock) -> None:
     smtp.login.assert_called_once()
 
 
-@patch("src.alerts.notifiers.email_notifier.smtplib.SMTP")
+@patch("src.alerts.notifiers.email_delivery.smtplib.SMTP")
 def test_send_returns_false_on_smtp_error(mock_smtp_cls: MagicMock) -> None:
     smtp = MagicMock()
     smtp.login.side_effect = smtplib.SMTPException("auth failed")
     mock_smtp_cls.return_value.__enter__.return_value = smtp
-    notifier = EmailNotifier(
+    backend = SmtpEmailBackend(
         host="smtp.example.com",
         port=587,
         username="bot@example.com",
         password="secret",
+    )
+    notifier = EmailNotifier(
+        backend=backend,
         to_addrs=["you@example.com"],
+        from_addr="bot@example.com",
     )
 
     assert notifier.send({"alert_id": "x", "alert_name": "Test", "symbols": ["AAPL"]}) is False
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "SENDGRID_API_KEY": "sg-key",
+        "ALERT_EMAIL_FROM": "alerts@example.com",
+        "ALERT_EMAIL_TO": "you@example.com",
+    },
+    clear=True,
+)
+def test_resolve_email_provider_explicit_sendgrid() -> None:
+    assert resolve_email_provider() == "sendgrid"
+    assert email_delivery_configured() is True
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "SENDGRID_API_KEY": "sg-key",
+        "ALERT_EMAIL_FROM": "alerts@example.com",
+    },
+    clear=True,
+)
+def test_resolve_email_provider_auto_detects_sendgrid() -> None:
+    assert resolve_email_provider() == "sendgrid"
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "mailgun",
+        "MAILGUN_API_KEY": "mg-key",
+        "MAILGUN_DOMAIN": "mg.example.com",
+        "ALERT_EMAIL_FROM": "alerts@example.com",
+    },
+    clear=True,
+)
+def test_build_email_backend_mailgun() -> None:
+    backend = build_email_backend({"notifications": ["email"]})
+    assert backend is not None
+    assert backend.__class__.__name__ == "MailgunEmailBackend"

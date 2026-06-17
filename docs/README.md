@@ -10,7 +10,7 @@ Start with the [main README](../README.md) for install and quick start. Use this
 | **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md) — project layout, workflow, rate limiting, API client |
 | **Troubleshooting & FAQ** | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common errors and answers |
 | **Advanced** | [ADVANCED.md](ADVANCED.md) — OpenAI summaries, custom data providers |
-| **Roadmap & status** | [PROJECT_STATUS.md](PROJECT_STATUS.md) — what shipped, what's next, product vision |
+| **Roadmap & status** | [PROJECT_STATUS.md](PROJECT_STATUS.md) — what shipped, what's next, go-live → [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) |
 | **Alerts design** | [ALERTING_DESIGN.md](ALERTING_DESIGN.md) — Helmtower / price alerts |
 | **Projections** | [STOCK_PROJECTIONS.md](STOCK_PROJECTIONS.md) — 5-day projection logic |
 | **Dashboard design** | [DASHBOARD_DESIGN.md](DASHBOARD_DESIGN.md) — UI/API reference |
