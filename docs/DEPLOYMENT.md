@@ -52,11 +52,78 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 | `SMTP_USER` | Tracker (alerts) | SMTP username |
 | `SMTP_PASSWORD` | Tracker (alerts) | SMTP password or app password |
 | `ALERT_EMAIL_TO` | Tracker (alerts) | Default recipients for `email` notifications |
-| `ALERT_EMAIL_FROM` | Tracker (alerts) | Optional From header (defaults to `SMTP_USER`) |
+| `ALERT_EMAIL_FROM` | Tracker (alerts) | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun |
+| `ALERT_EMAIL_PROVIDER` | Tracker (alerts) | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set |
+| `SENDGRID_API_KEY` | Tracker (alerts) | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid` |
+| `MAILGUN_API_KEY` | Tracker (alerts) | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun` |
+| `MAILGUN_DOMAIN` | Tracker (alerts) | Mailgun sending domain (e.g. `mg.yourdomain.com`) |
+| `MAILGUN_API_BASE` | Tracker (alerts) | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`) |
 
-**Dev vs product email:** these variables are for **self-host / operator** SMTP (e.g. personal Gmail). Hosted product delivery (platform `From`, user `To` in Settings) is described in [PROJECT_STATUS.md — Production alert delivery (target)](PROJECT_STATUS.md#production-alert-delivery-target). Provider runbooks (SendGrid, SES, etc.) go in DEPLOYMENT when implemented.
+**Dev vs product email:** SMTP env vars suit **self-host / operator** mail (e.g. personal Gmail). For production, use a transactional provider with a verified domain — see [Transactional alert email](#transactional-alert-email) below.
 
 Never commit values; use your host’s secret manager or encrypted env.
+
+---
+
+## Transactional alert email
+
+Helmtower users only enter their **To** address. The platform operator configures **how** email is sent via environment variables (never in git).
+
+### Provider selection
+
+Set `ALERT_EMAIL_PROVIDER` explicitly, or omit it and let MarketHelm auto-detect from API keys:
+
+| Provider | When to use | Required env |
+|----------|-------------|--------------|
+| **SMTP** (default) | Dev, self-host, or **AWS SES SMTP relay** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM` or `SMTP_USER` |
+| **SendGrid** | Hosted product with verified sender domain | `SENDGRID_API_KEY`, `ALERT_EMAIL_FROM` |
+| **Mailgun** | Hosted product with Mailgun domain | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `ALERT_EMAIL_FROM` |
+
+Users still set `email_to` in Helmtower (or `ALERT_EMAIL_TO` as a default). Secrets stay in the host environment only.
+
+### SendGrid example
+
+```bash
+export ALERT_EMAIL_PROVIDER=sendgrid
+export SENDGRID_API_KEY=SG.xxxx
+export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
+```
+
+Verify the sender domain in SendGrid (SPF/DKIM) before going live.
+
+### Mailgun example
+
+```bash
+export ALERT_EMAIL_PROVIDER=mailgun
+export MAILGUN_API_KEY=key-xxxx
+export MAILGUN_DOMAIN=mg.yourdomain.com
+export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
+# EU region:
+# export MAILGUN_API_BASE=https://api.eu.mailgun.net
+```
+
+### AWS SES (SMTP relay)
+
+SES works with the **SMTP** provider — no separate integration required:
+
+```bash
+export ALERT_EMAIL_PROVIDER=smtp
+export SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+export SMTP_PORT=587
+export SMTP_USER=your-ses-smtp-username
+export SMTP_PASSWORD=your-ses-smtp-password
+export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
+```
+
+Generate SMTP credentials in the AWS SES console and verify your domain first.
+
+### Test delivery
+
+```bash
+market-helm alerts test <alert-id>
+```
+
+Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider as production alerts.
 
 ---
 
@@ -67,6 +134,22 @@ Never commit values; use your host’s secret manager or encrypted env.
 3. **Scheduler** — Run the daily tracker on a schedule (cron, GitHub Actions with self-hosted runner, or the platform’s scheduler) **or** use the dashboard “Fetch New” flow if you only trigger manually.
 
 **CORS:** set `CORS_ORIGINS` to your frontend origin so the browser can call the API.
+
+---
+
+## When you go live
+
+Use this when moving from **local dev** to a **public host**. For day-to-day development, Gmail SMTP in `.env` is enough — skip this section until you deploy.
+
+1. **Host** — VPS (Hetzner, DigitalOcean) or PaaS (Fly.io, Railway) with a **persistent volume** for `DATA_DIR`.
+2. **Deploy app** — `market-helm-web` (Docker or `pip install` + process manager); set `FINNHUB_API_KEY` and `CORS_ORIGINS`.
+3. **Daily tracker** — cron or scheduler once per day (`market-helm`).
+4. **Alert worker** — run `market-helm alerts run --loop` (systemd, Docker sidecar, or `scripts/run-alert-worker.ps1` on Windows) so alerts fire without opening the dashboard.
+5. **Email (production)** — register a domain, verify it with SendGrid (or use Mailgun / SES SMTP), set `ALERT_EMAIL_PROVIDER` and provider secrets on the host — see [Transactional alert email](#transactional-alert-email). Users only enter their **To** address in Helmtower.
+6. **Secrets** — all API keys in host env or secret manager; never commit `.env`.
+7. **Smoke test** — Helmtower **Send test**, then confirm an alert delivers with the dashboard stopped and the worker running.
+
+Roadmap context: [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ---
 

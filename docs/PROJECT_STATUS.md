@@ -1,8 +1,8 @@
 # Project status & roadmap
 
-**Last updated:** 2026-05-22 — Helmtower (Alerts Settings UI) shipped on `main`; alerts production gaps are next
+**Last updated:** 2026-06-17 — transactional email providers + alert worker on `main`; reliability/UI delivery status next
 
-This file is the **single place** for “where we are,” “what’s next,” and **gaps** (skipped or deferred work). Other READMEs link here for details.
+This file is the **single place** for “where we are,” “what’s next,” and **gaps** (skipped or deferred work). Other READMEs link here for details. **Hosting and go-live steps:** [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live).
 
 ---
 
@@ -19,7 +19,7 @@ Users should be able to **sign up, enter email (and later phone/push), pick what
 3. **Execute** trades on the user’s behalf **safely** (broker API, limits, audit trail)—**not in the codebase yet**; see [DEPLOYMENT.md](DEPLOYMENT.md).
 4. **Serve many users** — accounts, per-user preferences, isolated secrets, likely a **database** (not only shared flat files).
 
-**Where we are today:** analysis + file-backed storage + dashboard for **viewing** data + **Helmtower** (price-alert UI) + alert engine with email/webhook delivery. JSON under `~/.market-helm/` remains **interim storage** behind the API—not the user-facing workflow.
+**Where we are today:** analysis + file-backed storage + dashboard for **viewing** data + **Helmtower** (price-alert UI) + alert engine with email/webhook delivery + scheduled worker CLI. JSON under `~/.market-helm/` remains **interim storage** behind the API—not the user-facing workflow.
 
 **Disclaimer:** This is software design, not investment, legal, or tax advice. Automated trading has regulatory and broker rules; validate with professionals and your broker.
 
@@ -33,7 +33,7 @@ These define what “done” looks like for alerts as a **product feature**. Loc
 |-------------|--------|--------|
 | **Subscribe without config files** | User enters email (and later phone) in **Helmtower** | ✅ Dashboard UI (`/alerts`) |
 | **No repo clone for end users** | Pip install or hosted app; preferences via UI → `~/.market-helm` | ✅ Onboarding + save via API |
-| **Always-on delivery** | Background job checks rules on a schedule (not “user opened dashboard today”) | ⚠️ Runs on tracker fetch, dashboard load, and set-watch — **no dedicated worker yet** |
+| **Always-on delivery** | Background job checks rules on a schedule (not “user opened dashboard today”) | ✅ `market-helm alerts run --loop` — operator schedules on host (see [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live)) |
 | **Per-user isolation** | Each user’s rules and contact info are private | ❌ Single shared config file |
 | **Test from UI** | “Send test notification” button | ✅ Per-rule test in Helmtower |
 | **Accounts (later)** | Sign-in, saved preferences across devices | ❌ Planned |
@@ -44,24 +44,27 @@ These define what “done” looks like for alerts as a **product feature**. Loc
 
 ## Production alert delivery (target)
 
-How email (and later SMS/push) should work in a **hosted product** vs what we use **today** for dev/self-host. Provider-specific setup (SPF, DKIM, API keys) belongs in [DEPLOYMENT.md](DEPLOYMENT.md) when we implement hosted sending—not here.
+How email (and later SMS/push) should work in a **hosted product** vs what we use **today** for dev/self-host. Provider setup (SPF, DKIM, API keys): [DEPLOYMENT.md — Transactional alert email](DEPLOYMENT.md#transactional-alert-email).
 
 | | **Today (dev / self-host)** | **Target (hosted product)** |
 |--|-----------------------------|-----------------------------|
-| **Who configures SMTP** | Operator in `.env` or `~/.market-helm/.env` | **Platform** ops — one provider account for the whole app |
-| **From** | Often same as `SMTP_USER` (e.g. your Gmail) | **MarketHelm** &lt;`alerts@yourdomain.com`&gt; via transactional email (SendGrid, Mailgun, AWS SES, etc.) |
+| **Who configures delivery** | Operator in `.env` or `~/.market-helm/.env` | **Platform** ops — one provider account for the whole app |
+| **From** | Often same as `SMTP_USER` (e.g. your Gmail) | **MarketHelm** `<alerts@yourdomain.com>` via SendGrid, Mailgun, or SES SMTP |
 | **To** | Email saved in Helmtower (single-tenant) | **Each user’s email** from DB (multi-tenant) |
 | **Secrets** | Operator’s Gmail app password in env; webhooks in `~/.market-helm/.env` | Provider API key / SMTP creds in **host secret manager only** |
 | **User action** | Helmtower: email, Discord/Slack webhook, set watch, test | Same UX; platform-owned **From** and per-user **To** |
+
+**Code today:** `ALERT_EMAIL_PROVIDER` supports **smtp** (default), **sendgrid**, and **mailgun**; users set **To** in Helmtower only.
 
 **Why tests look like “email yourself”:** dev mode uses *your* mailbox to authenticate and *your* address as recipient. That proves delivery; it is not the end-user UX for a hosted product.
 
 **Phased path:**
 
 1. ~~**Foundation** — SMTP + webhook notifiers, CLI, alerts API.~~ **Shipped** (PR #142).
-2. ~~**Helmtower v1** — dashboard UI; user enters **To** and rules; server SMTP from env.~~ **Shipped** (PR #143).
-3. **Production gaps (next)** — always-on worker, transactional **From** domain, reliability — see **What’s next §1**.
-4. **Hosted product** — user accounts, DB-backed rules, SMS/push.
+2. ~~**Helmtower v1** — dashboard UI; user enters **To** and rules; server delivery from env.~~ **Shipped** (PR #143).
+3. ~~**Production delivery plumbing** — always-on worker CLI, transactional providers (SendGrid/Mailgun), deploy docs.~~ **Shipped** on `main` / `feat/transactional-email`.
+4. **Production gaps (remaining)** — retry/backoff, optional delivery status in UI; then hosted multi-user.
+5. **Hosted product** — user accounts, DB-backed rules, SMS/push.
 
 We do **not** require each end user to create a Gmail app password or supply SMTP credentials.
 
@@ -73,36 +76,33 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 |------|--------|--------|
 | CLI / daily tracker | **Stable** | Core workflows, CSV/JSON output; evaluates watch symbols on fetch |
 | Web dashboard | **Active** | FastAPI + React; market views, Historical Trends, projection accuracy, **Helmtower** |
-| Alerts (backend) | **Stable (v1)** | Engine, log/webhook/email, CLI, `/api/alerts/*`, startup + fetch-time evaluation |
+| Alerts (backend) | **Stable (v1+)** | Engine, log/webhook/email (SMTP + SendGrid/Mailgun), CLI, `/api/alerts/*`, worker |
 | Alerts (product UI) | **Shipped (v1)** | Helmtower: watches, channels, live picker prices, E2E in CI |
 | Historical / accuracy | **Partial** | Multi-day charts + `GET /api/history/accuracy` + UI |
 | Tests | **Good coverage** | Core, dashboard, alerts API, Helmtower picker E2E |
-| Hosting / deploy | **Documented** | [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Hosting / deploy | **Documented** | [DEPLOYMENT.md](DEPLOYMENT.md) incl. [go-live steps](DEPLOYMENT.md#when-you-go-live) |
 
 ---
 
 ## Work in flight
 
-**Branch:** `feat/alerts-production-gaps` (next)
+**Branch:** `feat/transactional-email` (merge pending)
 
 | Item | Status |
 |------|--------|
-| Dedicated alert worker (schedule / decouple from dashboard) | Not started |
-| Transactional email provider abstraction (SendGrid/SES) | Not started |
-| Production deployment docs for alert delivery | Not started |
+| Transactional email (SendGrid/Mailgun + SMTP) | Done — pending merge |
+| DEPLOYMENT.md go-live + provider docs | Done — pending merge |
 
 ---
 
 ## What’s next (recommended order)
 
-### 1. **Alerts — production gaps** ← current milestone
+### 1. **Alerts — production gaps (remaining)**
 
-Close the gap between Helmtower v1 and a **hosted-ready** alert system:
-
-- [ ] **Always-on worker** — scheduled evaluation (cron/systemd/GitHub Action/hosted worker), not only dashboard load or “Fetch New”
-- [ ] **Transactional email** — platform **From** via SendGrid/Mailgun/SES; secrets in host env only
+- [x] **Always-on worker** — `market-helm alerts run --loop` (+ `scripts/run-alert-worker.ps1`)
+- [x] **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER`
+- [x] **Deploy docs** — [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) and [transactional email](DEPLOYMENT.md#transactional-alert-email)
 - [ ] **Reliability** — retry/backoff for webhook/email failures; visible delivery status in UI (optional v1)
-- [ ] **Deploy docs** — update [DEPLOYMENT.md](DEPLOYMENT.md) for production alert delivery
 
 **Later (same epic):** user accounts, DB-backed subscriptions, SMS/push.
 
@@ -126,11 +126,14 @@ Close the gap between Helmtower v1 and a **hosted-ready** alert system:
 
 ## Recently shipped (on `main`)
 
-1. **Helmtower (Alerts Settings UI)** — `/alerts`: watches, email + Discord/Slack, company picker with live quotes, auto check on fetch (PR #143).
-2. **Alerts foundation** — SMTP email, Discord/Slack webhooks, CLI `alerts init|list|test`, user config at `~/.market-helm/` (PR #142).
-3. **Webhook notifier** — JSON POST to `webhook_url` or env.
-4. **Projection accuracy** — API + Historical Trends UI.
-5. **CI / release automation** — E2E smoke (incl. Helmtower picker), post-release auto-finish (see [CHANGELOG.md](../CHANGELOG.md)).
+1. **Scheduled alert worker** — `market-helm alerts run` / `--loop`, interval via env or flag.
+2. **Helmtower (Alerts Settings UI)** — `/alerts`: watches, email + Discord/Slack, company picker with live quotes (PR #143).
+3. **Alerts foundation** — SMTP email, Discord/Slack webhooks, CLI `alerts init|list|test`, user config at `~/.market-helm/` (PR #142).
+4. **Docs split** — README slimmed; guides under `docs/` (PR #177).
+5. **Projection accuracy** — API + Historical Trends UI.
+6. **CI / release automation** — E2E smoke (incl. Helmtower picker), post-release auto-finish.
+
+**Pending merge:** transactional email providers (SendGrid/Mailgun) on `feat/transactional-email`.
 
 ---
 
@@ -138,8 +141,8 @@ Close the gap between Helmtower v1 and a **hosted-ready** alert system:
 
 | Item | Why deferred | How we address it |
 |------|----------------|-------------------|
-| **Always-on alert worker** | Helmtower v1 tied to fetch/dashboard | **§1 above** — scheduled worker |
-| **Transactional platform email** | Dev SMTP (Gmail) sufficient for v1 | **§1 above** — provider + fixed From |
+| **Operator must schedule worker on host** | CLI exists; no managed SaaS yet | [DEPLOYMENT.md — When you go live](DEPLOYMENT.md#when-you-go-live) |
+| **Email retry / delivery status in UI** | v1 proves delivery path | **§1 above** — reliability |
 | **User accounts + DB** | Large scope | After production gaps; per-user rules/contacts |
 | **Phone / SMS / push** | Email + webhook first | After hosted email works |
 | **Technical rules (RSI, AND/OR)** | Scope | [ALERTING_DESIGN.md](ALERTING_DESIGN.md); after production gaps |

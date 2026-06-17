@@ -213,38 +213,34 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 ### Current Gaps & Opportunities
 
-- **Alerts (product):** Backend engine exists; **end-user Settings UI** (email subscribe, no JSON) is the next milestone — see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-requirements--alerts-non‑negotiable-direction). JSON/env config is interim only, not the shipped UX.
-- **Alerts (in flight):** SMTP email, Slack webhook format, CLI `alerts init|list|test` on branch `feat/alerts-smtp-email` — validate before merge.
+- **Alerts (product):** Helmtower v1 shipped; remaining gaps are **reliability** (retry/backoff, delivery status UI) and **multi-user** (accounts, DB) — see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-requirements--alerts-non‑negotiable-direction).
 - **Historical / accuracy:** Multi-day trends and **projection accuracy** (API + Historical Trends UI) are in place; deeper **metrics by confidence**, **risk-adjusted** views, and **business-calendar** target dates are still open.
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
 - **Screening:** Advanced technical filters (RSI/MACD, etc.) remain future work.
 
 ### Completed Milestones
 
-- ✅ **Web Dashboard (v0.3+)** — Market overview, projections, Historical Trends, **projection accuracy** section.
-- ✅ **Alerts (partial)** — `AlertEngine`, price/screening rules, cooldowns, **webhook** + **log** notifiers.
+- ✅ **Web Dashboard (v0.3+)** — Market overview, projections, Historical Trends, **projection accuracy**, **Helmtower** (`/alerts`).
+- ✅ **Alerts** — `AlertEngine`, price/screening rules, cooldowns, **webhook** (JSON/Slack/Discord), **email** (SMTP + SendGrid/Mailgun), CLI, scheduled worker (`alerts run --loop`).
 
 ### Priority Features (ranked by impact)
 
 #### Priority #1: Alert & notification system
 
-**Status:** Backend partial; **product UI next** — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+**Status:** v1 shipped; **reliability + multi-user** next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 **On `main`:**
 
 - [x] Alert engine (price threshold, screening match), storage, cooldowns
-- [x] Log + **webhook** notifiers
+- [x] Log + **webhook** notifiers (JSON, Slack, Discord)
+- [x] **SMTP email** + transactional providers (SendGrid, Mailgun)
+- [x] CLI: `alerts init`, `alerts list`, `alerts test`, `alerts run --loop`
+- [x] **Helmtower** — dashboard Settings UI for watches, email, webhooks, test send
 
-**In flight (validate before merge):**
+**Next:**
 
-- [ ] SMTP email notifier
-- [ ] Slack webhook payload format
-- [ ] CLI: `alerts init`, `alerts list`, `alerts test`
-
-**Next product milestone (after above merges):**
-
-- [ ] **Dashboard Settings → Alerts** — users enter email, manage rules, test notifications (no raw JSON)
-- [ ] Later: accounts, DB, always-on worker, SMS/push
+- [ ] Email/webhook **retry/backoff**; optional delivery status in UI
+- [ ] Later: accounts, DB, SMS/push
 
 ---
 
