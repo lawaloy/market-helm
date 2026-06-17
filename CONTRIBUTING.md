@@ -126,9 +126,8 @@ Create a Pull Request on GitHub (or with `gh pr create`) using the repo template
 - Why this change exists (at least one bullet)
 
 ## Checks
-- [ ] `dashboard/frontend`: `npm ci` and `npm run build` (required: **Dashboard frontend**)
-- [ ] `pytest tests/` (required: **Python**)
-- [ ] PR E2E smoke (required: **Curl + Playwright**)
+- [ ] `dashboard/frontend`: `npm ci` and `npm run build`
+- [ ] `pytest tests/` (repo root)
 
 <!-- AUTO:START -->
 <!-- AUTO:END -->
@@ -139,7 +138,6 @@ Create a Pull Request on GitHub (or with `gh pr create`) using the repo template
 - Use **`## What + Why`**, not `## Summary` — matches [`.github/pull_request_template.md`](.github/pull_request_template.md).
 - Include the **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
 - Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
-- **Required merge checks:** **Python**, **Dashboard frontend**, **Curl + Playwright** (PR E2E).
 
 Example with `gh`:
 
