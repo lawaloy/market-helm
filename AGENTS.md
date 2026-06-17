@@ -33,8 +33,9 @@ See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
-- **`## Checks`** checklist
 - **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
+
+Merge is gated by CI (ruleset *Merging*); no need to duplicate required checks as template checkboxes.
 
 ```bash
 gh pr create --title "..." --body-file .github/pull_request_template.md
