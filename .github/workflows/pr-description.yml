@@ -80,6 +80,14 @@ jobs:
             const START = '<!-- AUTO:START -->';
             const END = '<!-- AUTO:END -->';
 
+            const defaultHumanSection = `## What + Why
+            - 
+
+            ## Checks
+            - [ ] \`dashboard/frontend\`: \`npm ci\` and \`npm run build\` (required: **Dashboard frontend**)
+            - [ ] \`pytest tests/\` (required: **Python**)
+            - [ ] PR E2E smoke (required: **Curl + Playwright**)`;
+
             let autoBody = fs.readFileSync('pr-auto.md', 'utf8');
 
             if (autoBody.length > MAX_LENGTH) {
@@ -101,11 +109,16 @@ jobs:
             const endIdx = existing.indexOf(END);
 
             if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+              // Refresh only the auto-generated block; keep author content above/below.
               const before = existing.slice(0, startIdx).trimEnd();
               const after = existing.slice(endIdx + END.length).trimStart();
               body = `${before}\n\n${autoSection}${after ? `\n\n${after}` : ''}`;
+            } else if (existing.trim()) {
+              // gh pr create / other tools may omit AUTO markers (e.g. ## Summary).
+              // Preserve the human-written body and append the auto section once.
+              body = `${existing.trimEnd()}\n\n${autoSection}`;
             } else {
-              body = `## What + Why\n- \n\n## Checks\n- [ ] \`dashboard/frontend\`: \`npm ci\` and \`npm run build\` (required: **Dashboard frontend**)\n- [ ] \`pytest tests/\` (required: **Python**)\n- [ ] PR E2E smoke (required: **Curl + Playwright**)\n\n${autoSection}`;
+              body = `${defaultHumanSection}\n\n${autoSection}`;
             }
 
             const { owner, repo } = context.repo;
