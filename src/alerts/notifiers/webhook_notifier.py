@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from ...core.logger import setup_logger
+from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_http_status
 
 logger = setup_logger("alerts.webhook")
 
@@ -85,7 +86,7 @@ class WebhookNotifier:
             return {"content": self._alert_text(event, markdown="discord")}
         return dict(event)
 
-    def send(self, event: Dict[str, Any]) -> bool:
+    def _post_once(self, event: Dict[str, Any]) -> DeliveryAttempt:
         payload = self.build_payload(event)
         try:
             response = requests.post(
@@ -94,19 +95,29 @@ class WebhookNotifier:
                 headers={"Content-Type": "application/json"},
                 timeout=self._timeout,
             )
-            if response.status_code >= 400:
-                logger.warning(
-                    "Webhook returned %s for alert %s: %s",
-                    response.status_code,
-                    event.get("alert_id"),
-                    response.text[:500],
-                )
-                return False
-            return True
+            if response.status_code < 400:
+                return DeliveryAttempt(ok=True)
+            logger.warning(
+                "Webhook returned %s for alert %s: %s",
+                response.status_code,
+                event.get("alert_id"),
+                response.text[:500],
+            )
+            return DeliveryAttempt(
+                ok=False,
+                retriable=is_retriable_http_status(response.status_code),
+            )
         except requests.RequestException as exc:
             logger.warning(
                 "Webhook delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
-            return False
+            return DeliveryAttempt(ok=False, retriable=True)
+
+    def send(self, event: Dict[str, Any]) -> bool:
+        return deliver_with_retry(
+            operation="Webhook",
+            alert_id=event.get("alert_id"),
+            attempt=lambda: self._post_once(event),
+        )

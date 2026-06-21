@@ -56,6 +56,9 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 | `ALERT_EMAIL_PROVIDER` | Tracker (alerts) | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set |
 | `SENDGRID_API_KEY` | Tracker (alerts) | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid` |
 | `MAILGUN_API_KEY` | Tracker (alerts) | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun` |
+| `ALERT_DELIVERY_MAX_ATTEMPTS` | Tracker (alerts) | Total send attempts per notification (default `3`) |
+| `ALERT_DELIVERY_RETRY_BASE_SECONDS` | Tracker (alerts) | Initial backoff delay between retries (default `1`) |
+| `ALERT_DELIVERY_RETRY_MAX_SECONDS` | Tracker (alerts) | Max backoff delay cap (default `8`) |
 | `MAILGUN_DOMAIN` | Tracker (alerts) | Mailgun sending domain (e.g. `mg.yourdomain.com`) |
 | `MAILGUN_API_BASE` | Tracker (alerts) | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`) |
 

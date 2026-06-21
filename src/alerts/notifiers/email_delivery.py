@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Union
 import requests
 
 from ...core.logger import setup_logger
+from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_http_status
 
 logger = setup_logger("alerts.email.delivery")
 
@@ -149,7 +150,7 @@ class SmtpEmailBackend(EmailDeliveryBackend):
         self._use_ssl = use_ssl
         self._timeout = timeout
 
-    def send(
+    def _send_once(
         self,
         *,
         subject: str,
@@ -157,7 +158,7 @@ class SmtpEmailBackend(EmailDeliveryBackend):
         from_addr: str,
         to_addrs: List[str],
         event: Dict[str, Any],
-    ) -> bool:
+    ) -> DeliveryAttempt:
         message = EmailMessage()
         message["Subject"] = subject
         message["From"] = from_addr
@@ -176,20 +177,14 @@ class SmtpEmailBackend(EmailDeliveryBackend):
                         smtp.starttls()
                     smtp.login(self._username, self._password)
                     smtp.send_message(message)
-            return True
+            return DeliveryAttempt(ok=True)
         except (smtplib.SMTPException, OSError) as exc:
             logger.warning(
                 "SMTP email delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
-            return False
-
-
-class SendGridEmailBackend(EmailDeliveryBackend):
-    def __init__(self, api_key: str, timeout: float = 15.0) -> None:
-        self._api_key = api_key
-        self._timeout = timeout
+            return DeliveryAttempt(ok=False, retriable=True)
 
     def send(
         self,
@@ -200,6 +195,33 @@ class SendGridEmailBackend(EmailDeliveryBackend):
         to_addrs: List[str],
         event: Dict[str, Any],
     ) -> bool:
+        return deliver_with_retry(
+            operation="SMTP email",
+            alert_id=event.get("alert_id"),
+            attempt=lambda: self._send_once(
+                subject=subject,
+                body=body,
+                from_addr=from_addr,
+                to_addrs=to_addrs,
+                event=event,
+            ),
+        )
+
+
+class SendGridEmailBackend(EmailDeliveryBackend):
+    def __init__(self, api_key: str, timeout: float = 15.0) -> None:
+        self._api_key = api_key
+        self._timeout = timeout
+
+    def _send_once(
+        self,
+        *,
+        subject: str,
+        body: str,
+        from_addr: str,
+        to_addrs: List[str],
+        event: Dict[str, Any],
+    ) -> DeliveryAttempt:
         payload = {
             "personalizations": [{"to": [{"email": addr} for addr in to_addrs]}],
             "from": {"email": from_addr},
@@ -217,21 +239,45 @@ class SendGridEmailBackend(EmailDeliveryBackend):
                 timeout=self._timeout,
             )
             if response.status_code in (200, 202):
-                return True
+                return DeliveryAttempt(ok=True)
             logger.warning(
                 "SendGrid email delivery failed for alert %s: HTTP %s %s",
                 event.get("alert_id"),
                 response.status_code,
                 response.text[:500],
             )
-            return False
+            return DeliveryAttempt(
+                ok=False,
+                retriable=is_retriable_http_status(response.status_code),
+            )
         except requests.RequestException as exc:
             logger.warning(
                 "SendGrid email delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
-            return False
+            return DeliveryAttempt(ok=False, retriable=True)
+
+    def send(
+        self,
+        *,
+        subject: str,
+        body: str,
+        from_addr: str,
+        to_addrs: List[str],
+        event: Dict[str, Any],
+    ) -> bool:
+        return deliver_with_retry(
+            operation="SendGrid email",
+            alert_id=event.get("alert_id"),
+            attempt=lambda: self._send_once(
+                subject=subject,
+                body=body,
+                from_addr=from_addr,
+                to_addrs=to_addrs,
+                event=event,
+            ),
+        )
 
 
 class MailgunEmailBackend(EmailDeliveryBackend):
@@ -247,7 +293,7 @@ class MailgunEmailBackend(EmailDeliveryBackend):
         self._api_base = api_base.rstrip("/")
         self._timeout = timeout
 
-    def send(
+    def _send_once(
         self,
         *,
         subject: str,
@@ -255,7 +301,7 @@ class MailgunEmailBackend(EmailDeliveryBackend):
         from_addr: str,
         to_addrs: List[str],
         event: Dict[str, Any],
-    ) -> bool:
+    ) -> DeliveryAttempt:
         url = f"{self._api_base}/v3/{self._domain}/messages"
         data = {
             "from": from_addr,
@@ -271,21 +317,45 @@ class MailgunEmailBackend(EmailDeliveryBackend):
                 timeout=self._timeout,
             )
             if response.status_code in (200, 202):
-                return True
+                return DeliveryAttempt(ok=True)
             logger.warning(
                 "Mailgun email delivery failed for alert %s: HTTP %s %s",
                 event.get("alert_id"),
                 response.status_code,
                 response.text[:500],
             )
-            return False
+            return DeliveryAttempt(
+                ok=False,
+                retriable=is_retriable_http_status(response.status_code),
+            )
         except requests.RequestException as exc:
             logger.warning(
                 "Mailgun email delivery failed for alert %s: %s",
                 event.get("alert_id"),
                 exc,
             )
-            return False
+            return DeliveryAttempt(ok=False, retriable=True)
+
+    def send(
+        self,
+        *,
+        subject: str,
+        body: str,
+        from_addr: str,
+        to_addrs: List[str],
+        event: Dict[str, Any],
+    ) -> bool:
+        return deliver_with_retry(
+            operation="Mailgun email",
+            alert_id=event.get("alert_id"),
+            attempt=lambda: self._send_once(
+                subject=subject,
+                body=body,
+                from_addr=from_addr,
+                to_addrs=to_addrs,
+                event=event,
+            ),
+        )
 
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:

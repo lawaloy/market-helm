@@ -63,6 +63,30 @@ def test_sendgrid_delivery_failure(mock_post: MagicMock) -> None:
     notifier = EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]})
     assert notifier is not None
     assert notifier.send({"alert_id": "a1", "alert_name": "Test", "symbols": []}) is False
+    mock_post.assert_called_once()
+
+
+@patch("src.alerts.notifiers.email_delivery.requests.post")
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "SENDGRID_API_KEY": "sg-test-key",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_sendgrid_retries_transient_failure(mock_post: MagicMock) -> None:
+    mock_post.side_effect = [
+        MagicMock(status_code=503, text="unavailable"),
+        MagicMock(status_code=202, text=""),
+    ]
+    notifier = EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]})
+    assert notifier is not None
+    with patch("src.alerts.notifiers.delivery_retry.time.sleep"):
+        assert notifier.send({"alert_id": "a1", "alert_name": "Test", "symbols": []}) is True
+    assert mock_post.call_count == 2
 
 
 @patch("src.alerts.notifiers.email_delivery.requests.post")
