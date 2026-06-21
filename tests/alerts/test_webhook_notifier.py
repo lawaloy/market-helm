@@ -120,11 +120,35 @@ def test_send_logs_on_http_error(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 500
     mock_post.return_value.text = "err"
     notifier = WebhookNotifier("https://example.com/hook")
+    with patch("src.alerts.notifiers.delivery_retry.time.sleep"):
+        assert notifier.send({"alert_id": "x"}) is False
+    assert mock_post.call_count == 3
+
+
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_retries_then_succeeds(mock_post: MagicMock) -> None:
+    failing = MagicMock(status_code=503, text="busy")
+    success = MagicMock(status_code=200, text="")
+    mock_post.side_effect = [failing, success]
+    notifier = WebhookNotifier("https://example.com/hook")
+    with patch("src.alerts.notifiers.delivery_retry.time.sleep"):
+        assert notifier.send({"alert_id": "x"}) is True
+    assert mock_post.call_count == 2
+
+
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_does_not_retry_client_error(mock_post: MagicMock) -> None:
+    mock_post.return_value.status_code = 403
+    mock_post.return_value.text = "forbidden"
+    notifier = WebhookNotifier("https://example.com/hook")
     assert notifier.send({"alert_id": "x"}) is False
+    mock_post.assert_called_once()
 
 
 @patch("src.alerts.notifiers.webhook_notifier.requests.post")
 def test_send_returns_false_on_request_error(mock_post: MagicMock) -> None:
     mock_post.side_effect = requests.RequestException("timeout")
     notifier = WebhookNotifier("https://example.com/hook")
-    assert notifier.send({"alert_id": "x"}) is False
+    with patch("src.alerts.notifiers.delivery_retry.time.sleep"):
+        assert notifier.send({"alert_id": "x"}) is False
+    assert mock_post.call_count == 3

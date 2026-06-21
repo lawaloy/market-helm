@@ -63,7 +63,7 @@ How email (and later SMS/push) should work in a **hosted product** vs what we us
 1. ~~**Foundation** — SMTP + webhook notifiers, CLI, alerts API.~~ **Shipped** (PR #142).
 2. ~~**Helmtower v1** — dashboard UI; user enters **To** and rules; server delivery from env.~~ **Shipped** (PR #143).
 3. ~~**Production delivery plumbing** — always-on worker CLI, transactional providers (SendGrid/Mailgun), deploy docs.~~ **Shipped** on `main` / `feat/transactional-email`.
-4. **Production gaps (remaining)** — retry/backoff, optional delivery status in UI; then hosted multi-user.
+4. ~~**Production gaps (remaining)** — retry/backoff~~ **Shipped** (retry/backoff); delivery status UI optional next.
 5. **Hosted product** — user accounts, DB-backed rules, SMS/push.
 
 We do **not** require each end user to create a Gmail app password or supply SMTP credentials.
@@ -86,12 +86,12 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 
 ## Work in flight
 
-**Branch:** `feat/transactional-email` (merge pending)
+**Branch:** `feat/alert-delivery-retry` — delivery retry/backoff for email and webhooks.
 
 | Item | Status |
 |------|--------|
-| Transactional email (SendGrid/Mailgun + SMTP) | Done — pending merge |
-| DEPLOYMENT.md go-live + provider docs | Done — pending merge |
+| Retry/backoff (`ALERT_DELIVERY_*`) | In progress |
+| Delivery status in Helmtower UI | Not started |
 
 ---
 
@@ -102,7 +102,8 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 - [x] **Always-on worker** — `market-helm alerts run --loop` (+ `scripts/run-alert-worker.ps1`)
 - [x] **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER`
 - [x] **Deploy docs** — [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) and [transactional email](DEPLOYMENT.md#transactional-alert-email)
-- [ ] **Reliability** — retry/backoff for webhook/email failures; visible delivery status in UI (optional v1)
+- [x] **Reliability** — retry/backoff for webhook/email failures (`ALERT_DELIVERY_*` env)
+- [ ] **Delivery status in UI** (optional v1)
 
 **Later (same epic):** user accounts, DB-backed subscriptions, SMS/push.
 
@@ -133,7 +134,10 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 5. **Projection accuracy** — API + Historical Trends UI.
 6. **CI / release automation** — E2E smoke (incl. Helmtower picker), post-release auto-finish.
 
-**Pending merge:** transactional email providers (SendGrid/Mailgun) on `feat/transactional-email`.
+6. **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER` (PR #188).
+7. **Delivery retry/backoff** — transient email/webhook failures (in flight on `feat/alert-delivery-retry`).
+
+**Pending merge:** delivery retry/backoff on `feat/alert-delivery-retry`.
 
 ---
 
