@@ -86,18 +86,34 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 
 ## Work in flight
 
-**Branch:** `feat/alert-delivery-status` — delivery status in Helmtower UI.
+**Branch:** `feat/hosted-multi-user` — SQLite storage, auth API, per-user alerts API.
 
 | Item | Status |
 |------|--------|
-| Delivery log + `/api/alerts/status` | In progress |
-| Helmtower delivery status display | In progress |
+| SQLite schema + user accounts | Done |
+| Auth API (`/api/auth/register`, `/login`, `/me`) | Done |
+| Per-user alerts API when `MARKET_HELM_DATABASE_URL` set | Done |
+| Helmtower sign-in / sign-up UI | Planned |
+| Multi-user alert worker | Planned |
+
+See [MULTI_USER.md](MULTI_USER.md).
 
 ---
 
 ## What’s next (recommended order)
 
-### 1. **Alerts — production gaps (remaining)**
+### 1. **Hosted multi-user — follow-ups** (after this PR merges)
+
+Foundation (storage, auth API, per-user alerts API) ships in PR on `feat/hosted-multi-user`. Remaining work:
+
+- [ ] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
+- [ ] **Multi-user alert worker** — evaluate all users' enabled watches on schedule (not just one file config)
+- [ ] **Per-user delivery history** — move delivery log from shared file storage to DB when multi-user mode is on
+- [ ] **Production hardening** — PostgreSQL, password reset, rate limits, update [AGENTS.md](../AGENTS.md) (database optional today)
+
+See [MULTI_USER.md](MULTI_USER.md).
+
+### 2. **Alerts — production gaps** (complete on `main`)
 
 - [x] **Always-on worker** — `market-helm alerts run --loop` (+ `scripts/run-alert-worker.ps1`)
 - [x] **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER`
@@ -105,21 +121,21 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 - [x] **Reliability** — retry/backoff for webhook/email failures (`ALERT_DELIVERY_*` env)
 - [x] **Delivery status in UI** — latest per-channel outcomes on `/alerts`
 
-**Later (same epic):** user accounts, DB-backed subscriptions, SMS/push.
+**Later (same epic):** SMS/push after hosted email works.
 
-### 2. Projection accuracy — deeper analytics
+### 3. Projection accuracy — deeper analytics
 
 - Buckets by **confidence** band; business-day targets if needed.
 
-### 3. Dashboard UX (general)
+### 4. Dashboard UX (general)
 
 - Code splitting, watchlist, saved views.
 
-### 4. Tests & services coverage
+### 5. Tests & services coverage
 
 - `data_fetcher.py`, `stock_screener.py`, `index_fetcher.py`; optional full tracker integration test.
 
-### 5. Future: execution & multi-tenant SaaS
+### 6. Future: execution & multi-tenant SaaS
 
 - Broker API, order DB, auth — see [DEPLOYMENT.md](DEPLOYMENT.md) and product vision above.
 
@@ -146,7 +162,7 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 |------|----------------|-------------------|
 | **Operator must schedule worker on host** | CLI exists; no managed SaaS yet | [DEPLOYMENT.md — When you go live](DEPLOYMENT.md#when-you-go-live) |
 | **Email retry / delivery status in UI** | v1 proves delivery path | **§1 above** — reliability |
-| **User accounts + DB** | Large scope | After production gaps; per-user rules/contacts |
+| **User accounts + DB** | Large scope | **§1 above** — foundation in this PR; UI + worker next |
 | **Phone / SMS / push** | Email + webhook first | After hosted email works |
 | **Technical rules (RSI, AND/OR)** | Scope | [ALERTING_DESIGN.md](ALERTING_DESIGN.md); after production gaps |
 | **Automated trading** | Out of scope | Broker + DB + compliance; later phase |

@@ -136,14 +136,18 @@ def run_alert_test(
     alert_id: str,
     dry_run: bool = False,
     config_path: Optional[Path] = None,
+    config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Send or preview a test notification; returns a structured result for API/CLI."""
-    path = resolve_alerts_config_path(config_path)
-    if not path.exists():
-        raise FileNotFoundError(f"No alerts config at {path}")
+    if config is not None:
+        polished = polish_alerts_config(config)
+    else:
+        path = resolve_alerts_config_path(config_path)
+        if not path.exists():
+            raise FileNotFoundError(f"No alerts config at {path}")
+        polished = polish_alerts_config(_load_config(path))
 
-    config = polish_alerts_config(_load_config(path))
-    alert = _find_alert(config.get("alerts", []), alert_id)
+    alert = _find_alert(polished.get("alerts", []), alert_id)
     if alert is None:
         raise ValueError(f"No alert with id {alert_id!r}")
 
@@ -156,7 +160,7 @@ def run_alert_test(
         "test": True,
     }
 
-    defaults = config.get("defaults") or {}
+    defaults = polished.get("defaults") or {}
     effective = apply_alert_defaults(alert, defaults)
     engine = AlertEngine([alert], defaults=defaults)
     notifiers = engine._build_notifiers(effective)
