@@ -46,7 +46,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from dashboard.backend.api import market, projections, stocks, refresh, history, alerts
+from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
 from dashboard.backend.api.market import get_market_summary
 
 
@@ -64,6 +64,12 @@ def _startup_alert_check() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    try:
+        from src.storage.database import init_database
+
+        init_database()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Database init skipped: %s", exc)
     threading.Thread(target=_startup_alert_check, daemon=True).start()
     yield
 
@@ -105,6 +111,7 @@ app.include_router(stocks.router, prefix="/api/stocks", tags=["Stocks"])
 app.include_router(refresh.router, prefix="/api", tags=["Refresh"])
 app.include_router(history.router, prefix="/api/history", tags=["History"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/health")

@@ -5,8 +5,16 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+
+from dashboard.backend.auth import require_user_id
+from src.storage.database import database_enabled
+from src.storage.user_alerts import (
+    init_user_alerts_config,
+    load_user_alerts_config,
+    save_user_alerts_config,
+)
 
 from src.alerts.alert_paths import (
     init_minimal_user_alerts_config,
@@ -142,21 +150,41 @@ def _persist_webhook_secret(defaults: Optional[AlertDefaults]) -> None:
         update_user_env_vars(updates)
 
 
+def _load_raw_config(user_id: Optional[str]) -> tuple[bool, Optional[Dict[str, Any]]]:
+    if database_enabled():
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required.")
+        return load_user_alerts_config(user_id)
+    path = user_alerts_config_path()
+    if not path.exists():
+        return False, None
+    _, raw = load_alerts_config(path)
+    return raw is not None, raw
+
+
+def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
+    if database_enabled():
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required.")
+        save_user_alerts_config(user_id, config)
+        return
+    save_alerts_config(config)
+
+
 @router.get("/config", response_model=AlertsConfigResponse)
-async def get_alerts_config() -> AlertsConfigResponse:
+async def get_alerts_config(
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertsConfigResponse:
     """Return the user alerts config and channel readiness (no secrets)."""
     _load_env()
-    path = user_alerts_config_path()
-    raw = None
-    if path.exists():
-        _, raw = load_alerts_config(path)
-        if raw is not None:
-            raw = polish_alerts_config(raw)
+    exists, raw = _load_raw_config(user_id)
+    if raw is not None:
+        raw = polish_alerts_config(raw)
+        if not database_enabled():
             scrubbed = strip_webhook_secrets_from_config(raw)
             if scrubbed != raw:
                 save_alerts_config(scrubbed)
                 raw = scrubbed
-    exists = raw is not None
     config = _public_config(_normalize_config(raw))
     defaults = dict(config.get("defaults") or {})
     if not defaults.get("webhook_format"):
@@ -174,7 +202,10 @@ async def get_alerts_config() -> AlertsConfigResponse:
 
 
 @router.put("/config", response_model=AlertsConfigResponse)
-async def put_alerts_config(body: AlertsConfigBody) -> AlertsConfigResponse:
+async def put_alerts_config(
+    body: AlertsConfigBody,
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertsConfigResponse:
     """Save alerts config to the user config path."""
     _load_env()
     _persist_webhook_secret(body.defaults)
@@ -183,7 +214,7 @@ async def put_alerts_config(body: AlertsConfigBody) -> AlertsConfigResponse:
     for alert in config["alerts"]:
         if not alert.get("id"):
             raise HTTPException(status_code=400, detail="Each alert must have an id.")
-    save_alerts_config(config)
+    _save_raw_config(user_id, config)
     public = _public_config(polish_alerts_config(config))
     return AlertsConfigResponse(
         exists=True,
@@ -193,9 +224,25 @@ async def put_alerts_config(body: AlertsConfigBody) -> AlertsConfigResponse:
 
 
 @router.post("/init", response_model=AlertInitResponse)
-async def post_alerts_init(force: bool = False) -> AlertInitResponse:
-    """Create an empty ~/.market-helm/alerts.json for dashboard onboarding."""
+async def post_alerts_init(
+    force: bool = False,
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertInitResponse:
+    """Create an empty alerts config for onboarding."""
     _load_env()
+    if database_enabled():
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required.")
+        try:
+            init_user_alerts_config(user_id, force=force)
+        except FileExistsError:
+            raise HTTPException(
+                status_code=409,
+                detail="Alerts config already exists for this user. Pass ?force=true to overwrite.",
+            )
+        return AlertInitResponse(
+            message="Alerts config created. Edit rules in Settings and send a test notification.",
+        )
     try:
         init_minimal_user_alerts_config(force=force)
     except FileExistsError:
@@ -259,7 +306,9 @@ async def post_symbol_quotes(body: SymbolQuotesRequest) -> SymbolQuotesResponse:
 
 
 @router.get("/status", response_model=AlertsStatusResponse)
-async def get_alerts_status() -> AlertsStatusResponse:
+async def get_alerts_status(
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertsStatusResponse:
     """Alert status: active watches, last data date, and last trigger time."""
     _load_env()
     tracked: List[str] = []
@@ -278,7 +327,13 @@ async def get_alerts_status() -> AlertsStatusResponse:
         pass
 
     path = user_alerts_config_path()
-    if path.exists():
+    if database_enabled():
+        if user_id:
+            _, raw = load_user_alerts_config(user_id)
+            if raw:
+                alerts = raw.get("alerts") or []
+                active_watches = sum(1 for alert in alerts if alert.get("enabled"))
+    elif path.exists():
         _, raw = load_alerts_config(path)
         if raw:
             alerts = raw.get("alerts") or []
@@ -325,11 +380,26 @@ async def run_alerts_now() -> AlertsRunResponse:
 
 
 @router.post("/test", response_model=AlertTestResponse)
-async def post_alert_test(body: AlertTestRequest) -> AlertTestResponse:
+async def post_alert_test(
+    body: AlertTestRequest,
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertTestResponse:
     """Send a test notification for one alert rule."""
     _load_env()
+    config_payload: Optional[Dict[str, Any]] = None
+    if database_enabled():
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required.")
+        exists, raw = load_user_alerts_config(user_id)
+        if not exists or raw is None:
+            raise HTTPException(status_code=404, detail="No alerts config for this user.")
+        config_payload = raw
     try:
-        result = run_alert_test(body.id, dry_run=body.dry_run)
+        result = run_alert_test(
+            body.id,
+            dry_run=body.dry_run,
+            config=config_payload,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
