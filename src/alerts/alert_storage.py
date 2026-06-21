@@ -3,9 +3,11 @@ Alert history storage.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 import json
+
+MAX_DELIVERY_LOG = 100
 
 
 class AlertStorage:
@@ -19,12 +21,14 @@ class AlertStorage:
 
     def _load(self) -> Dict:
         if not self.history_path.exists():
-            return {"last_triggered": {}, "events": []}
+            return {"last_triggered": {}, "events": [], "delivery_log": []}
         try:
             with open(self.history_path, "r") as f:
-                return json.load(f)
+                data = json.load(f)
         except Exception:
-            return {"last_triggered": {}, "events": []}
+            return {"last_triggered": {}, "events": [], "delivery_log": []}
+        data.setdefault("delivery_log", [])
+        return data
 
     def _save(self, history: Dict) -> None:
         with open(self.history_path, "w") as f:
@@ -39,6 +43,44 @@ class AlertStorage:
             return datetime.fromisoformat(last_ts)
         except Exception:
             return None
+
+    def record_delivery(
+        self,
+        *,
+        alert_id: str,
+        channel: str,
+        success: bool,
+        test: bool = False,
+        error: Optional[str] = None,
+        timestamp: Optional[str] = None,
+    ) -> None:
+        history = self._load()
+        entry: Dict[str, Any] = {
+            "alert_id": alert_id,
+            "channel": channel,
+            "success": success,
+            "test": test,
+            "timestamp": timestamp or datetime.utcnow().isoformat(),
+        }
+        if error:
+            entry["error"] = error[:500]
+        delivery_log = history.setdefault("delivery_log", [])
+        delivery_log.append(entry)
+        if len(delivery_log) > MAX_DELIVERY_LOG:
+            history["delivery_log"] = delivery_log[-MAX_DELIVERY_LOG:]
+        self._save(history)
+
+    def latest_delivery_by_channel(self) -> List[Dict[str, Any]]:
+        """Most recent delivery attempt per channel (email, webhook)."""
+        history = self._load()
+        delivery_log = history.get("delivery_log") or []
+        latest: Dict[str, Dict[str, Any]] = {}
+        for entry in reversed(delivery_log):
+            channel = entry.get("channel")
+            if not channel or channel in latest:
+                continue
+            latest[channel] = entry
+        return [latest[key] for key in sorted(latest.keys())]
 
     def record_event(self, event: Dict) -> None:
         history = self._load()

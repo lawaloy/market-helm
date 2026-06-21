@@ -73,6 +73,29 @@ def main() -> None:
     with open(data_dir / f"summary_{day}.json", "w", encoding="utf-8") as f:
         json.dump(summary, f)
 
+    history = {
+        "last_triggered": {},
+        "events": [],
+        "delivery_log": [
+            {
+                "alert_id": "e2e_watch",
+                "channel": "email",
+                "success": True,
+                "test": True,
+                "timestamp": "2026-06-21T12:00:00",
+            },
+            {
+                "alert_id": "e2e_watch",
+                "channel": "webhook",
+                "success": False,
+                "test": False,
+                "timestamp": "2026-06-20T08:30:00",
+            },
+        ],
+    }
+    with open(data_dir / "alerts_history.json", "w", encoding="utf-8") as f:
+        json.dump(history, f)
+
     print(f"Seeded data for trading day {day} under {data_dir}")
 
 

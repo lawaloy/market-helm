@@ -11,6 +11,7 @@ from ..core.logger import setup_logger
 from .alert_paths import apply_alert_defaults, resolve_alerts_config_path
 from .alert_storage import AlertStorage
 from .alert_rules import evaluate_price_threshold, evaluate_screening_match
+from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
 
@@ -136,6 +137,7 @@ class AlertEngine:
 
             delivered = False
             for notifier in self._build_notifiers(alert):
+                is_test = bool(event.get("test"))
                 try:
                     result = notifier.send(event)
                 except Exception as exc:
@@ -145,8 +147,24 @@ class AlertEngine:
                         alert["id"],
                         exc,
                     )
+                    record_notifier_delivery(
+                        self.storage,
+                        alert_id=alert["id"],
+                        notifier=notifier,
+                        success=False,
+                        test=is_test,
+                        error=str(exc),
+                    )
                     continue
-                if result is not False:
+                success = result is not False
+                record_notifier_delivery(
+                    self.storage,
+                    alert_id=alert["id"],
+                    notifier=notifier,
+                    success=success,
+                    test=is_test,
+                )
+                if success:
                     delivered = True
 
             if not delivered:

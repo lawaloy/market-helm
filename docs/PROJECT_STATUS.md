@@ -63,7 +63,7 @@ How email (and later SMS/push) should work in a **hosted product** vs what we us
 1. ~~**Foundation** — SMTP + webhook notifiers, CLI, alerts API.~~ **Shipped** (PR #142).
 2. ~~**Helmtower v1** — dashboard UI; user enters **To** and rules; server delivery from env.~~ **Shipped** (PR #143).
 3. ~~**Production delivery plumbing** — always-on worker CLI, transactional providers (SendGrid/Mailgun), deploy docs.~~ **Shipped** on `main` / `feat/transactional-email`.
-4. ~~**Production gaps (remaining)** — retry/backoff~~ **Shipped** (retry/backoff); delivery status UI optional next.
+4. ~~**Production gaps (remaining)**~~ **Shipped** — retry/backoff + delivery status in Helmtower.
 5. **Hosted product** — user accounts, DB-backed rules, SMS/push.
 
 We do **not** require each end user to create a Gmail app password or supply SMTP credentials.
@@ -86,12 +86,12 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 
 ## Work in flight
 
-**Branch:** `feat/alert-delivery-retry` — delivery retry/backoff for email and webhooks.
+**Branch:** `feat/alert-delivery-status` — delivery status in Helmtower UI.
 
 | Item | Status |
 |------|--------|
-| Retry/backoff (`ALERT_DELIVERY_*`) | In progress |
-| Delivery status in Helmtower UI | Not started |
+| Delivery log + `/api/alerts/status` | In progress |
+| Helmtower delivery status display | In progress |
 
 ---
 
@@ -103,7 +103,7 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 - [x] **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER`
 - [x] **Deploy docs** — [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) and [transactional email](DEPLOYMENT.md#transactional-alert-email)
 - [x] **Reliability** — retry/backoff for webhook/email failures (`ALERT_DELIVERY_*` env)
-- [ ] **Delivery status in UI** (optional v1)
+- [x] **Delivery status in UI** — latest per-channel outcomes on `/alerts`
 
 **Later (same epic):** user accounts, DB-backed subscriptions, SMS/push.
 
@@ -127,7 +127,8 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 
 ## Recently shipped (on `main`)
 
-1. **Scheduled alert worker** — `market-helm alerts run` / `--loop`, interval via env or flag.
+1. **Delivery retry/backoff** — transient email/webhook failures with `ALERT_DELIVERY_*` env (PR #196).
+2. **Scheduled alert worker** — `market-helm alerts run` / `--loop`, interval via env or flag.
 2. **Helmtower (Alerts Settings UI)** — `/alerts`: watches, email + Discord/Slack, company picker with live quotes (PR #143).
 3. **Alerts foundation** — SMTP email, Discord/Slack webhooks, CLI `alerts init|list|test`, user config at `~/.market-helm/` (PR #142).
 4. **Docs split** — README slimmed; guides under `docs/` (PR #177).
@@ -135,9 +136,7 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 6. **CI / release automation** — E2E smoke (incl. Helmtower picker), post-release auto-finish.
 
 6. **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER` (PR #188).
-7. **Delivery retry/backoff** — transient email/webhook failures (in flight on `feat/alert-delivery-retry`).
-
-**Pending merge:** delivery retry/backoff on `feat/alert-delivery-retry`.
+7. **Delivery retry/backoff** — PR #196.
 
 ---
 

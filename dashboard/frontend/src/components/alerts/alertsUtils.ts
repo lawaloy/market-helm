@@ -133,6 +133,28 @@ export function formatTestSuccess(notifiers: string[]): string {
   return `Test sent via ${notifiers.slice(0, -1).join(', ')} and ${last}.`;
 }
 
+const DELIVERY_CHANNEL_LABELS: Record<string, string> = {
+  email: 'Email',
+  webhook: 'Discord/Slack',
+};
+
+export function formatDeliveryChannel(channel: string): string {
+  return DELIVERY_CHANNEL_LABELS[channel] ?? channel;
+}
+
+export function formatDeliveryStatusLine(entry: {
+  channel: string;
+  success: boolean;
+  test: boolean;
+  timestamp: string;
+}): string {
+  const label = formatDeliveryChannel(entry.channel);
+  const when = new Date(entry.timestamp).toLocaleString();
+  const outcome = entry.success ? 'Delivered' : 'Failed';
+  const kind = entry.test ? 'test' : 'live';
+  return `${label}: ${outcome} (${kind}) · ${when}`;
+}
+
 export function formSnapshot(config: AlertsConfig, webhookDraft: string): string {
   return JSON.stringify({
     defaults: config.defaults ?? {},
