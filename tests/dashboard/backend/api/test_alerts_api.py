@@ -229,13 +229,31 @@ class TestAlertsConfigAPI:
         assert r.status_code == 200
         assert r.json()["prices"]["AON"] == 412.5
 
-    def test_get_status(self, client, alerts_config_dir):
+    def test_get_status(self, client, alerts_config_dir, tmp_path, monkeypatch):
+        from src.alerts.alert_storage import AlertStorage
+
+        storage = AlertStorage(data_dir=tmp_path)
+        storage.record_delivery(
+            alert_id="rule1",
+            channel="email",
+            success=True,
+            test=True,
+            timestamp="2026-06-21T12:00:00",
+        )
+        monkeypatch.setattr(
+            "src.alerts.alert_storage.AlertStorage",
+            lambda data_dir=None: storage,
+        )
+
         r = client.get("/api/alerts/status")
         assert r.status_code == 200
         data = r.json()
         assert data["checks_on_fetch"] is True
         assert "tracked_symbols" in data
         assert "active_watches" in data
+        assert data["latest_deliveries"]
+        assert data["latest_deliveries"][0]["channel"] == "email"
+        assert data["latest_deliveries"][0]["success"] is True
 
     def test_run_without_config(self, client, alerts_config_dir):
         r = client.post("/api/alerts/run")

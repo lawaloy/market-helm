@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..alerts.alert_engine import AlertEngine
+from ..alerts.alert_storage import AlertStorage
+from ..alerts.delivery_status import record_notifier_delivery
 from ..alerts.alert_paths import (
     apply_alert_defaults,
     init_user_alerts_config,
@@ -161,6 +163,7 @@ def run_alert_test(
     if not notifiers:
         raise RuntimeError(f"No notifiers configured for alert {alert_id!r}")
 
+    storage = AlertStorage()
     delivered: List[str] = []
     attempted: List[str] = []
     previews: List[Dict[str, Any]] = []
@@ -175,7 +178,27 @@ def run_alert_test(
                 payload = notifier.build_payload(event)
             previews.append({"notifier": name, "payload": payload})
         else:
-            if notifier.send(event) is not False and label:
+            try:
+                ok = notifier.send(event) is not False
+            except Exception as exc:
+                record_notifier_delivery(
+                    storage,
+                    alert_id=alert_id,
+                    notifier=notifier,
+                    success=False,
+                    test=True,
+                    error=str(exc),
+                )
+                ok = False
+            else:
+                record_notifier_delivery(
+                    storage,
+                    alert_id=alert_id,
+                    notifier=notifier,
+                    success=ok,
+                    test=True,
+                )
+            if ok and label:
                 delivered.append(label)
 
     if not dry_run and attempted and not delivered:

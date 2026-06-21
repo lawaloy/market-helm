@@ -35,6 +35,7 @@ class AlertsStatusResponse(BaseModel):
     tracked_symbols: List[str] = Field(default_factory=list)
     active_watches: int = 0
     last_triggered_at: Optional[str] = None
+    latest_deliveries: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class AlertsRunResponse(BaseModel):
@@ -265,6 +266,7 @@ async def get_alerts_status() -> AlertsStatusResponse:
     last_date: Optional[str] = None
     active_watches = 0
     last_triggered: Optional[str] = None
+    latest_deliveries: List[Dict[str, Any]] = []
 
     try:
         loader = get_data_loader()
@@ -281,12 +283,16 @@ async def get_alerts_status() -> AlertsStatusResponse:
         if raw:
             alerts = raw.get("alerts") or []
             active_watches = sum(1 for alert in alerts if alert.get("enabled"))
-            try:
-                from src.alerts.alert_storage import AlertStorage
 
-                last_triggered = AlertStorage().latest_event_timestamp()
-            except Exception:
-                pass
+    try:
+        from src.alerts.alert_storage import AlertStorage
+        from src.alerts.delivery_status import latest_deliveries_by_channel
+
+        storage = AlertStorage()
+        last_triggered = storage.latest_event_timestamp()
+        latest_deliveries = latest_deliveries_by_channel(storage)
+    except Exception:
+        pass
 
     return AlertsStatusResponse(
         checks_on_fetch=True,
@@ -294,6 +300,7 @@ async def get_alerts_status() -> AlertsStatusResponse:
         tracked_symbols=tracked,
         active_watches=active_watches,
         last_triggered_at=last_triggered,
+        latest_deliveries=latest_deliveries,
     )
 
 

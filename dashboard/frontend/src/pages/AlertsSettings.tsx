@@ -18,6 +18,7 @@ import {
   fieldClass,
   findDuplicatePriceRule,
   formatCondition,
+  formatDeliveryStatusLine,
   formatTestSuccess,
   formSnapshot,
   isSampleRule,
@@ -296,6 +297,7 @@ const AlertsSettings: React.FC = () => {
     try {
       const { data } = await alertsApi.testAlert(alertId, false);
       setSuccess(formatTestSuccess(data.notifiers));
+      await refreshStatus();
     } catch (err) {
       setError(
         axios.isAxiosError(err)
@@ -497,6 +499,22 @@ const AlertsSettings: React.FC = () => {
             <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
               Last alert: {new Date(alertStatus.last_triggered_at).toLocaleString()}.
             </p>
+          )}
+          {exists && (alertStatus?.latest_deliveries?.length ?? 0) > 0 && (
+            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              {alertStatus!.latest_deliveries.map((entry) => (
+                <li
+                  key={`${entry.channel}-${entry.timestamp}`}
+                  className={
+                    entry.success
+                      ? 'text-slate-500 dark:text-slate-400'
+                      : 'text-amber-700 dark:text-amber-300'
+                  }
+                >
+                  {formatDeliveryStatusLine(entry)}
+                </li>
+              ))}
+            </ul>
           )}
           {quotesUnavailable && (
             <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">

@@ -17,3 +17,17 @@ def test_latest_event_timestamp_returns_last(tmp_path):
         {"alert_id": "b", "alert_name": "B", "symbols": ["MSFT"], "timestamp": "2026-05-02T15:30:00"}
     )
     assert storage.latest_event_timestamp() == "2026-05-02T15:30:00"
+
+
+def test_record_delivery_trims_log(tmp_path):
+    storage = AlertStorage(data_dir=tmp_path)
+    for index in range(105):
+        storage.record_delivery(
+            alert_id=f"a{index}",
+            channel="email",
+            success=True,
+            timestamp=f"2026-05-01T12:00:{index:02d}",
+        )
+    history = storage._load()
+    assert len(history["delivery_log"]) == 100
+    assert history["delivery_log"][0]["alert_id"] == "a5"

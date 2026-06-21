@@ -223,12 +223,22 @@ export interface AlertTestResponse {
   previews?: Array<{ notifier: string; payload: unknown }>;
 }
 
+export interface AlertDeliveryStatus {
+  alert_id: string;
+  channel: string;
+  success: boolean;
+  test: boolean;
+  timestamp: string;
+  error?: string | null;
+}
+
 export interface AlertsStatus {
   checks_on_fetch: boolean;
   last_data_date: string | null;
   tracked_symbols: string[];
   active_watches: number;
   last_triggered_at: string | null;
+  latest_deliveries: AlertDeliveryStatus[];
 }
 
 export interface AlertsRunResponse {
