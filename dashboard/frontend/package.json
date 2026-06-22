@@ -30,6 +30,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "dev:3001": "vite --mode development3001 --port 3001",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run"

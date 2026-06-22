@@ -25,6 +25,13 @@ function dashboardLoadErrorMessage(err: unknown): string {
         'or run the market-helm CLI once to populate the data folder.'
       );
     }
+    if (status === 502 || status === 503) {
+      return (
+        'Cannot reach the MarketHelm API (proxy bad gateway). ' +
+        'Port 3000 is often used by another app on this machine — use http://localhost:3001 with the backend on port 8001, ' +
+        'or run scripts/restart-dashboard-backend.ps1 and npm run dev on the default ports.'
+      );
+    }
     if (status != null && status >= 500) {
       return 'Service is temporarily unavailable. Please try again later.';
     }
