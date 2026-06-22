@@ -93,7 +93,7 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 | SQLite schema + user accounts | Done |
 | Auth API (`/api/auth/register`, `/login`, `/me`) | Done |
 | Per-user alerts API when `MARKET_HELM_DATABASE_URL` set | Done |
-| Helmtower sign-in / sign-up UI | Planned |
+| Helmtower sign-in / sign-up UI | Done (PR pending) |
 | Multi-user alert worker | Planned |
 
 See [MULTI_USER.md](MULTI_USER.md).
@@ -106,7 +106,7 @@ See [MULTI_USER.md](MULTI_USER.md).
 
 Foundation (storage, auth API, per-user alerts API) ships in PR on `feat/hosted-multi-user`. Remaining work:
 
-- [ ] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
+- [x] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
 - [ ] **Multi-user alert worker** — evaluate all users' enabled watches on schedule (not just one file config)
 - [ ] **Per-user delivery history** — move delivery log from shared file storage to DB when multi-user mode is on
 - [ ] **Production hardening** — PostgreSQL, password reset, rate limits, update [AGENTS.md](../AGENTS.md) (database optional today)

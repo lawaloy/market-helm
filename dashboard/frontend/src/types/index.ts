@@ -247,3 +247,15 @@ export interface AlertsRunResponse {
   events: Array<{ alert_id: string; alert_name: string; symbols: string[] }>;
   message: string | null;
 }
+
+export interface User {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}

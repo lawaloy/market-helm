@@ -15,6 +15,17 @@ vi.mock('../../contexts/ThemeContext', () => ({
   }),
 }));
 
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    multiUserEnabled: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 vi.mock('../../services/api', () => ({
   default: {
     get: apiMocks.get,

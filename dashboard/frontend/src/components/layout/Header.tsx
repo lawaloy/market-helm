@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowPathIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 interface HeaderProps {
@@ -13,6 +15,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRefresh, backgroundFetching }) => {
   const { theme, toggleTheme } = useTheme();
+  const { user, multiUserEnabled, logout } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -186,6 +189,32 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
                 <MoonIcon className="h-5 w-5" />
               )}
             </button>
+            {multiUserEnabled && (
+              user ? (
+                <div className="flex items-center gap-2">
+                  <span
+                    className="hidden max-w-[10rem] truncate text-sm text-slate-600 dark:text-slate-400 sm:inline"
+                    title={user.email}
+                  >
+                    {user.email}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  to="/sign-in?return=%2Falerts"
+                  className="rounded-md px-3 py-2 text-sm font-medium text-teal-700 transition hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-slate-700"
+                >
+                  Sign in
+                </Link>
+              )
+            )}
           </div>
         </div>
       </div>

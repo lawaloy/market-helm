@@ -105,7 +105,11 @@ const AlertsSettings: React.FC = () => {
       setChannels(data.channels);
       if (data.exists) applyServerConfig(data.config, data.channels);
     } catch (err) {
-      setError(axios.isAxiosError(err) ? err.message : 'Failed to load alerts.');
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setError('Sign in required to access your Helmtower settings.');
+      } else {
+        setError(axios.isAxiosError(err) ? err.message : 'Failed to load alerts.');
+      }
     } finally {
       setLoading(false);
     }

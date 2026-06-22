@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/layout/Header';
+import RequireAuth from './components/auth/RequireAuth';
 import Dashboard from './pages/Dashboard';
 import HistoricalTrends from './pages/HistoricalTrends';
 import Summary from './pages/Summary';
 import AlertsSettings from './pages/AlertsSettings';
+import SignIn from './pages/SignIn';
 import api, { alertsApi } from './services/api';
 
 function App() {
@@ -85,6 +88,7 @@ function App() {
 
   return (
     <ThemeProvider>
+    <AuthProvider>
     <BrowserRouter>
       <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
         <Header
@@ -152,10 +156,19 @@ function App() {
           <Route path="/" element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />} />
           <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
           <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
-          <Route path="/alerts" element={<AlertsSettings />} />
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route
+            path="/alerts"
+            element={
+              <RequireAuth>
+                <AlertsSettings />
+              </RequireAuth>
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>
+    </AuthProvider>
     </ThemeProvider>
   );
 }
