@@ -14,13 +14,38 @@ import type {
   AlertTestResponse,
   AlertsStatus,
   AlertsRunResponse,
+  AuthResponse,
+  User,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
+export const AUTH_TOKEN_KEY = 'market-helm-token';
+
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): void {
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+}
+
+export function clearAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+});
+
+api.interceptors.request.use((config) => {
+  const token = getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Log API failures in development only
@@ -103,6 +128,14 @@ export const alertsApi = {
     }),
   getStatus: () => api.get<AlertsStatus>('/api/alerts/status'),
   runCheck: () => api.post<AlertsRunResponse>('/api/alerts/run'),
+};
+
+export const authApi = {
+  register: (body: { email: string; password: string }) =>
+    api.post<AuthResponse>('/api/auth/register', body),
+  login: (body: { email: string; password: string }) =>
+    api.post<AuthResponse>('/api/auth/login', body),
+  me: () => api.get<User>('/api/auth/me'),
 };
 
 export default api;

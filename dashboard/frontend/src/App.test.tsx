@@ -13,6 +13,18 @@ vi.mock('./contexts/ThemeContext', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock('./contexts/AuthContext', () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    multiUserEnabled: false,
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+  }),
+}));
+
 vi.mock('./components/layout/Header', () => ({
   default: ({ backgroundFetching }: { backgroundFetching: boolean }) => (
     <header>

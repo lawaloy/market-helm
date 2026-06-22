@@ -13,7 +13,7 @@
 | **1 — Storage** | SQLite (dev) / PostgreSQL (prod later); `users` + per-user alert config JSON | Done |
 | **2 — Auth API** | Register, login, session token; `GET /api/auth/me` | Done |
 | **3 — Alerts API** | When multi-user enabled, `/api/alerts/*` scoped to authenticated user | Done |
-| **4 — Helmtower UI** | Sign-in / sign-up screens; attach token to API calls | Planned |
+| **4 — Helmtower UI** | Sign-in / sign-up screens; attach token to API calls | Done (PR pending) |
 | **5 — Worker** | Evaluate all users' enabled watches on schedule | Planned |
 | **6 — Production** | Postgres, password reset, rate limits, SMS/push | Planned |
 
@@ -63,7 +63,6 @@ curl http://localhost:8000/api/alerts/config \
 
 | Priority | Work |
 |----------|------|
-| 1 | **Helmtower auth UI** — sign-in / sign-up; store token; send `Authorization: Bearer …` on `/api/alerts/*` |
-| 2 | **Multi-user worker** — loop over all users with enabled watches; evaluate + deliver per user |
-| 3 | **Per-user delivery log** — scope delivery status to authenticated user in DB mode |
-| 4 | **Production** — Postgres driver, password reset, rate limits, hosted deploy docs |
+| 1 | **Multi-user worker** — loop over all users with enabled watches; evaluate + deliver per user |
+| 2 | **Per-user delivery log** — scope delivery status to authenticated user in DB mode |
+| 3 | **Production** — Postgres driver, password reset, rate limits, hosted deploy docs |
