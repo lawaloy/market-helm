@@ -44,6 +44,18 @@ class AlertEngine:
         self.defaults = defaults or {}
 
     @staticmethod
+    def from_config_dict(
+        config: Dict[str, Any],
+        storage: Optional[AlertStorage] = None,
+    ) -> Optional["AlertEngine"]:
+        defaults = config.get("defaults") or {}
+        alerts = config.get("alerts", [])
+        enabled = [alert for alert in alerts if alert.get("enabled", False)]
+        if not enabled:
+            return None
+        return AlertEngine(enabled, storage=storage, defaults=defaults)
+
+    @staticmethod
     def from_config(config_path: Optional[Path] = None) -> Optional["AlertEngine"]:
         config_path = resolve_alerts_config_path(config_path)
         if not config_path.exists():
@@ -54,13 +66,47 @@ class AlertEngine:
         except Exception as e:
             logger.warning(f"Failed to load alerts config: {e}")
             return None
+        return AlertEngine.from_config_dict(config)
 
-        defaults = config.get("defaults") or {}
-        alerts = config.get("alerts", [])
-        enabled = [alert for alert in alerts if alert.get("enabled", False)]
-        if not enabled:
-            return None
-        return AlertEngine(enabled, defaults=defaults)
+    def deliver_event(self, alert: Dict, event: Dict) -> bool:
+        """Send notifications for a matched watch (used by the delivery job worker)."""
+        delivered = False
+        is_test = bool(event.get("test"))
+        for notifier in self._build_notifiers(alert):
+            try:
+                result = notifier.send(event)
+            except Exception as exc:
+                logger.warning(
+                    "Notifier %s failed for alert %s: %s",
+                    notifier.__class__.__name__,
+                    alert["id"],
+                    exc,
+                )
+                record_notifier_delivery(
+                    self.storage,
+                    alert_id=alert["id"],
+                    notifier=notifier,
+                    success=False,
+                    test=is_test,
+                    error=str(exc),
+                )
+                continue
+            success = result is not False
+            record_notifier_delivery(
+                self.storage,
+                alert_id=alert["id"],
+                notifier=notifier,
+                success=success,
+                test=is_test,
+            )
+            if success:
+                delivered = True
+
+        if not delivered:
+            return False
+
+        self.storage.record_event(event)
+        return True
 
     def _within_cooldown(self, alert: Dict) -> bool:
         cooldown_minutes = int(alert.get("cooldown_minutes", 0))
@@ -135,47 +181,13 @@ class AlertEngine:
                 "condition_type": condition_type,
             }
 
-            delivered = False
-            for notifier in self._build_notifiers(alert):
-                is_test = bool(event.get("test"))
-                try:
-                    result = notifier.send(event)
-                except Exception as exc:
-                    logger.warning(
-                        "Notifier %s failed for alert %s: %s",
-                        notifier.__class__.__name__,
-                        alert["id"],
-                        exc,
-                    )
-                    record_notifier_delivery(
-                        self.storage,
-                        alert_id=alert["id"],
-                        notifier=notifier,
-                        success=False,
-                        test=is_test,
-                        error=str(exc),
-                    )
-                    continue
-                success = result is not False
-                record_notifier_delivery(
-                    self.storage,
-                    alert_id=alert["id"],
-                    notifier=notifier,
-                    success=success,
-                    test=is_test,
-                )
-                if success:
-                    delivered = True
-
-            if not delivered:
+            if not self.deliver_event(alert, event):
                 logger.warning(
                     "Alert %s matched but no notifications were delivered; "
                     "leaving it eligible for retry.",
                     alert["id"],
                 )
                 continue
-
-            self.storage.record_event(event)
 
             events.append(event)
 

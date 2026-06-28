@@ -40,6 +40,9 @@ def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
             """,
             (user_id, blob, updated_at),
         )
+    from .alert_watches import sync_watches_from_config
+
+    sync_watches_from_config(user_id, payload)
 
 
 def init_user_alerts_config(user_id: str, *, force: bool = False) -> None:
