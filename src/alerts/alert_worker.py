@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import time
+import uuid
 from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -32,15 +33,49 @@ def resolve_interval_seconds(explicit: Optional[int] = None) -> int:
 
 
 def run_check_once() -> Dict[str, Any]:
+    from src.storage.database import database_enabled
+
+    if database_enabled():
+        return run_db_worker_cycle()
+
     from src.alerts.alert_runner import evaluate_alerts_from_latest_data
 
     return evaluate_alerts_from_latest_data()
+
+
+def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
+    """Orchestrator tick + job queue processing for hosted multi-user mode."""
+    from src.alerts.alert_orchestrator import run_orchestrator_tick
+    from src.alerts.job_processor import process_job_queue
+
+    wid = worker_id or f"worker-{uuid.uuid4().hex[:12]}"
+    tick = run_orchestrator_tick()
+    stats = process_job_queue(wid)
+    return {
+        "triggered": stats.get("delivered", 0),
+        "events": [],
+        "last_data_date": tick.get("last_data_date"),
+        "message": tick.get("message"),
+        "enqueued": tick.get("enqueued", 0),
+        "jobs": stats,
+    }
 
 
 def log_check_result(result: Dict[str, Any]) -> None:
     triggered = int(result.get("triggered") or 0)
     last_date = result.get("last_data_date")
     message = result.get("message")
+    jobs = result.get("jobs")
+    if jobs:
+        logger.info(
+            "DB worker: enqueued=%s evaluated=%s delivered=%s failed=%s (data %s)",
+            result.get("enqueued", 0),
+            jobs.get("evaluated", 0),
+            jobs.get("delivered", 0),
+            jobs.get("failed", 0),
+            last_date,
+        )
+        return
     if triggered:
         logger.info("Alert check triggered %s watch(es) (data %s)", triggered, last_date)
         for event in result.get("events") or []:
@@ -77,7 +112,10 @@ def run_worker_loop(
     signal.signal(signal.SIGINT, _request_stop)
     signal.signal(signal.SIGTERM, _request_stop)
 
-    logger.info("Alert worker started (interval %ss); Ctrl+C to stop", interval)
+    from src.storage.database import database_enabled
+
+    mode = "multi-user job queue" if database_enabled() else "file-backed"
+    logger.info("Alert worker started (%s, interval %ss); Ctrl+C to stop", mode, interval)
     while not stop:
         run_worker_once()
         if stop:

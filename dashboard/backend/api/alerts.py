@@ -340,12 +340,19 @@ async def get_alerts_status(
             active_watches = sum(1 for alert in alerts if alert.get("enabled"))
 
     try:
-        from src.alerts.alert_storage import AlertStorage
-        from src.alerts.delivery_status import latest_deliveries_by_channel
+        if database_enabled() and user_id:
+            from src.alerts.user_alert_storage import UserAlertStorage
 
-        storage = AlertStorage()
-        last_triggered = storage.latest_event_timestamp()
-        latest_deliveries = latest_deliveries_by_channel(storage)
+            storage = UserAlertStorage(user_id)
+            last_triggered = storage.latest_event_timestamp()
+            latest_deliveries = storage.latest_delivery_by_channel()
+        else:
+            from src.alerts.alert_storage import AlertStorage
+            from src.alerts.delivery_status import latest_deliveries_by_channel
+
+            storage = AlertStorage()
+            last_triggered = storage.latest_event_timestamp()
+            latest_deliveries = latest_deliveries_by_channel(storage)
     except Exception:
         pass
 

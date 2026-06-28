@@ -25,6 +25,20 @@ def test_resolve_interval_seconds_default_without_env(monkeypatch) -> None:
     assert alert_worker.resolve_interval_seconds() == alert_worker.DEFAULT_INTERVAL_SECONDS
 
 
+@patch("src.alerts.alert_worker.run_db_worker_cycle")
+def test_run_check_once_uses_db_cycle(mock_db_cycle, monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///tmp/test.db")
+    mock_db_cycle.return_value = {
+        "triggered": 2,
+        "enqueued": 3,
+        "jobs": {"evaluated": 3, "delivered": 2, "failed": 0},
+        "last_data_date": "2026-06-09",
+    }
+    result = alert_worker.run_check_once()
+    assert result["triggered"] == 2
+    mock_db_cycle.assert_called_once()
+
+
 @patch("src.alerts.alert_worker.run_check_once")
 def test_run_worker_once_logs_trigger(mock_run, caplog) -> None:
     mock_run.return_value = {

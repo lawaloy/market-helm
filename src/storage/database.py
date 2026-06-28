@@ -24,6 +24,65 @@ CREATE TABLE IF NOT EXISTS user_alert_configs (
     config_json TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS alert_watches (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    alert_id TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    condition_type TEXT NOT NULL,
+    symbol TEXT,
+    operator TEXT,
+    threshold REAL,
+    alert_json TEXT NOT NULL,
+    defaults_json TEXT NOT NULL DEFAULT '{}',
+    cooldown_minutes INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, alert_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_watches_symbol_enabled
+    ON alert_watches(symbol, enabled);
+
+CREATE TABLE IF NOT EXISTS alert_trigger_state (
+    user_id TEXT NOT NULL,
+    alert_id TEXT NOT NULL,
+    last_triggered_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, alert_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS alert_delivery_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    alert_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    test INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_delivery_log_user_ts
+    ON alert_delivery_log(user_id, timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS alert_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_type TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    run_after TEXT NOT NULL,
+    locked_at TEXT,
+    locked_by TEXT,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_alert_jobs_poll
+    ON alert_jobs(status, run_after, id);
 """
 
 
@@ -70,6 +129,24 @@ def init_database() -> None:
         return
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
+    _backfill_watches_from_configs()
+
+
+def _backfill_watches_from_configs() -> None:
+    import json
+
+    from .alert_watches import sync_watches_from_config
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT user_id, config_json FROM user_alert_configs",
+        ).fetchall()
+    for row in rows:
+        try:
+            config = json.loads(row["config_json"])
+        except json.JSONDecodeError:
+            continue
+        sync_watches_from_config(row["user_id"], config)
 
 
 def default_database_path() -> Path:
