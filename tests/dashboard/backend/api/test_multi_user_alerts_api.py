@@ -96,7 +96,7 @@ class TestMultiUserAlertsAPI:
         self, client, multi_user_env, tmp_path, monkeypatch
     ):
         from src.storage.user_alerts import load_user_alerts_config
-        from src.storage.users import get_user_by_email
+        from src.storage.users import authenticate_user
 
         user_config_dir = tmp_path / "user-config"
         monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
@@ -147,7 +147,7 @@ class TestMultiUserAlertsAPI:
         assert "user/token" not in json.dumps(second.json())
         assert second.json()["config"]["alerts"][0]["id"] == "aapl_drop"
 
-        saved_user = get_user_by_email("webhook@example.com")
+        saved_user = authenticate_user("webhook@example.com", "password123")
         assert saved_user is not None
         _, raw = load_user_alerts_config(saved_user["id"])
         assert raw is not None
