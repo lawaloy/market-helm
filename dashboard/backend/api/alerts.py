@@ -394,6 +394,7 @@ async def post_alert_test(
     """Send a test notification for one alert rule."""
     _load_env()
     config_payload: Optional[Dict[str, Any]] = None
+    storage = None
     if database_enabled():
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
@@ -401,11 +402,15 @@ async def post_alert_test(
         if not exists or raw is None:
             raise HTTPException(status_code=404, detail="No alerts config for this user.")
         config_payload = raw
+        from src.alerts.user_alert_storage import UserAlertStorage
+
+        storage = UserAlertStorage(user_id)
     try:
         result = run_alert_test(
             body.id,
             dry_run=body.dry_run,
             config=config_payload,
+            storage=storage,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

@@ -137,6 +137,7 @@ def run_alert_test(
     dry_run: bool = False,
     config_path: Optional[Path] = None,
     config: Optional[Dict[str, Any]] = None,
+    storage: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Send or preview a test notification; returns a structured result for API/CLI."""
     if config is not None:
@@ -167,7 +168,7 @@ def run_alert_test(
     if not notifiers:
         raise RuntimeError(f"No notifiers configured for alert {alert_id!r}")
 
-    storage = AlertStorage()
+    storage = storage or AlertStorage()
     delivered: List[str] = []
     attempted: List[str] = []
     previews: List[Dict[str, Any]] = []
