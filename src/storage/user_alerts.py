@@ -6,11 +6,55 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
-from src.alerts.alert_paths import polish_alerts_config, strip_webhook_secrets_from_config
+from src.alerts.alert_paths import polish_alerts_config
 
 from .database import get_connection
 
 _EMPTY_CONFIG: Dict[str, Any] = {"defaults": {}, "alerts": []}
+
+
+def _copy_webhook_secret_if_missing(
+    target: Dict[str, Any],
+    existing: Dict[str, Any],
+) -> None:
+    if str(target.get("webhook_url") or "").strip():
+        target["webhook_url"] = str(target["webhook_url"]).strip()
+        return
+    existing_url = str(existing.get("webhook_url") or "").strip()
+    if existing_url:
+        target["webhook_url"] = existing_url
+
+
+def _merge_existing_webhook_secrets(
+    user_id: str,
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    _, existing = load_user_alerts_config(user_id)
+    if not existing:
+        return config
+
+    merged = dict(config)
+    defaults = dict(merged.get("defaults") or {})
+    _copy_webhook_secret_if_missing(defaults, existing.get("defaults") or {})
+    merged["defaults"] = defaults
+
+    existing_alerts = {
+        str(alert.get("id")): alert
+        for alert in existing.get("alerts") or []
+        if isinstance(alert, dict) and alert.get("id")
+    }
+    alerts = []
+    for alert in merged.get("alerts") or []:
+        if not isinstance(alert, dict):
+            alerts.append(alert)
+            continue
+        copied = dict(alert)
+        existing_alert = existing_alerts.get(str(copied.get("id")))
+        if existing_alert:
+            _copy_webhook_secret_if_missing(copied, existing_alert)
+        alerts.append(copied)
+    merged["alerts"] = alerts
+    return merged
 
 
 def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
@@ -26,7 +70,9 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
 
 
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
-    payload = strip_webhook_secrets_from_config(polish_alerts_config(config))
+    # In hosted DB mode webhook URLs are per-user secrets. They are stripped only
+    # from API responses, not from persisted user records used for delivery.
+    payload = polish_alerts_config(_merge_existing_webhook_secrets(user_id, config))
     updated_at = datetime.now(timezone.utc).isoformat()
     blob = json.dumps(payload, indent=2)
     with get_connection() as conn:

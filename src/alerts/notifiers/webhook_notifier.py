@@ -30,10 +30,13 @@ class WebhookNotifier:
 
     @classmethod
     def from_alert(cls, alert: Dict[str, Any]) -> Optional["WebhookNotifier"]:
+        from src.storage.database import database_enabled
+
+        allow_env_webhook = alert.get("_allow_env_webhook", not database_enabled()) is not False
         url = (
             alert.get("webhook_url")
-            or os.environ.get("ALERT_WEBHOOK_URL")
-            or os.environ.get("DISCORD_WEBHOOK_URL")
+            or (os.environ.get("ALERT_WEBHOOK_URL") if allow_env_webhook else None)
+            or (os.environ.get("DISCORD_WEBHOOK_URL") if allow_env_webhook else None)
         )
         if not url or not str(url).strip():
             logger.warning(

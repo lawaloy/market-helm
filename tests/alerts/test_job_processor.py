@@ -13,6 +13,7 @@ from src.storage.alert_jobs import (
 )
 from src.storage.alert_watches import record_trigger, sync_watches_from_config
 from src.storage.database import get_connection, init_database
+from src.storage.user_alerts import save_user_alerts_config
 from src.storage.users import create_user
 
 
@@ -95,3 +96,34 @@ class TestJobProcessor:
         stats = process_job_queue("test-worker")
         assert stats["evaluated"] == 1
         assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_deliver_uses_user_webhooks_not_global_env(self, db_user, monkeypatch):
+        user_b = create_user("proc-b@example.com", "password123")
+        monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://hooks.example/global")
+
+        config_a = _watch_config()
+        config_a["defaults"] = {
+            "webhook_url": "https://hooks.example/user-a",
+            "webhook_format": "json",
+        }
+        config_a["alerts"][0]["notifications"] = ["webhook"]
+        save_user_alerts_config(db_user, config_a)
+
+        config_b = _watch_config()
+        config_b["defaults"] = {
+            "webhook_url": "https://hooks.example/user-b",
+            "webhook_format": "json",
+        }
+        config_b["alerts"][0]["notifications"] = ["webhook"]
+        save_user_alerts_config(user_b["id"], config_b)
+
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"})
+
+        with patch("src.alerts.notifiers.webhook_notifier.requests.post") as mock_post:
+            mock_post.return_value.status_code = 200
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 2
+        urls = {call.args[0] for call in mock_post.call_args_list}
+        assert urls == {"https://hooks.example/user-a", "https://hooks.example/user-b"}
