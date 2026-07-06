@@ -59,6 +59,34 @@ class TestJobProcessor:
         assert stats["failed"] == 0
         assert pending_job_count([JOB_DELIVER]) == 0
 
+    def test_evaluate_symbol_fans_out_to_all_matching_users(self, db_user):
+        second_user = create_user("second-proc@example.com", "password123")["id"]
+        sync_watches_from_config(db_user, _watch_config())
+        sync_watches_from_config(second_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 2
+        assert stats["failed"] == 0
+        assert send.call_count == 2
+        assert pending_job_count([JOB_DELIVER]) == 0
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT user_id, alert_id
+                FROM alert_trigger_state
+                WHERE alert_id = ?
+                """,
+                ("aapl-low",),
+            ).fetchall()
+        assert {(row["user_id"], row["alert_id"]) for row in rows} == {
+            (db_user, "aapl-low"),
+            (second_user, "aapl-low"),
+        }
+
     def test_deliver_records_trigger(self, db_user):
         sync_watches_from_config(db_user, _watch_config())
         event = {

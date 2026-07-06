@@ -72,3 +72,30 @@ class TestAlertJobs:
                 (job_id,),
             ).fetchone()
         assert row["status"] == STATUS_FAILED
+
+    def test_fail_job_retry_delay_defers_reclaim(self, db):
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": "u1", "alert_id": "a1"},
+            max_attempts=2,
+        )
+        claim_jobs([JOB_DELIVER], "worker-a")
+
+        fail_job(job_id, "transient error", retry_delay_seconds=60)
+
+        with get_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT status, attempts, locked_by, locked_at, last_error
+                FROM alert_jobs
+                WHERE id = ?
+                """,
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_PENDING
+        assert row["attempts"] == 1
+        assert row["locked_by"] is None
+        assert row["locked_at"] is None
+        assert row["last_error"] == "transient error"
+        assert pending_job_count([JOB_DELIVER]) == 0
+        assert claim_jobs([JOB_DELIVER], "worker-b") == []
