@@ -95,3 +95,19 @@ class TestJobProcessor:
         stats = process_job_queue("test-worker")
         assert stats["evaluated"] == 1
         assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_invalid_watch_does_not_block_symbol_for_other_users(self, db_user):
+        bad_user = create_user("bad-watch@example.com", "password123")["id"]
+        bad_config = _watch_config()
+        bad_config["alerts"][0]["id"] = "bad-aapl"
+        bad_config["alerts"][0]["condition"]["operator"] = "below"
+        sync_watches_from_config(bad_user, bad_config)
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 0

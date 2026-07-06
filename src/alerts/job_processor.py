@@ -53,7 +53,18 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
         condition = alert.get("condition") or {}
         if watch["condition_type"] != "price_threshold":
             continue
-        if not evaluate_price_threshold(condition, stock):
+        try:
+            matched = evaluate_price_threshold(condition, stock)
+        except (TypeError, ValueError) as exc:
+            logger.warning(
+                "Skipping invalid price alert %s for user %s on %s: %s",
+                alert_id,
+                user_id,
+                symbol,
+                exc,
+            )
+            continue
+        if not matched:
             continue
 
         event = {
