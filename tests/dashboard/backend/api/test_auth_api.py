@@ -1,6 +1,7 @@
 """Tests for multi-user auth API."""
 
 import pytest
+from src.storage.session import create_access_token
 
 
 @pytest.fixture
@@ -62,3 +63,67 @@ class TestAuthAPI:
             json={"email": "user@example.com", "password": "wrongpassword"},
         )
         assert r.status_code == 401
+
+    def test_register_duplicate_email_returns_400(self, client, multi_user_env):
+        payload = {"email": "User@Example.com", "password": "password123"}
+        first = client.post("/api/auth/register", json=payload)
+        assert first.status_code == 200
+
+        duplicate = client.post(
+            "/api/auth/register",
+            json={"email": " user@example.com ", "password": "password123"},
+        )
+
+        assert duplicate.status_code == 400
+        assert "already exists" in duplicate.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "authorization",
+        [
+            None,
+            "Token abc",
+            "Bearer",
+            "Bearer not-a-valid-token",
+        ],
+    )
+    def test_me_rejects_missing_or_invalid_bearer_token(
+        self,
+        client,
+        multi_user_env,
+        authorization,
+    ):
+        headers = {}
+        if authorization is not None:
+            headers["Authorization"] = authorization
+
+        r = client.get("/api/auth/me", headers=headers)
+
+        assert r.status_code == 401
+        assert r.json()["detail"] == "Authentication required."
+
+    def test_me_rejects_expired_token(self, client, multi_user_env):
+        token = create_access_token("missing-user", ttl_seconds=-1)
+
+        r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+        assert r.status_code == 401
+        assert r.json()["detail"] == "Authentication required."
+
+    def test_me_rejects_token_for_deleted_user(self, client, multi_user_env):
+        registered = client.post(
+            "/api/auth/register",
+            json={"email": "deleted@example.com", "password": "password123"},
+        )
+        assert registered.status_code == 200
+        user_id = registered.json()["user"]["id"]
+        token = registered.json()["access_token"]
+
+        from src.storage.database import get_connection
+
+        with get_connection() as conn:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+        r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+        assert r.status_code == 401
+        assert r.json()["detail"] == "User not found."
