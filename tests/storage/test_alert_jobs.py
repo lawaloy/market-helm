@@ -1,5 +1,7 @@
 """Unit tests for alert job queue."""
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from src.storage.alert_jobs import (
@@ -8,6 +10,7 @@ from src.storage.alert_jobs import (
     STATUS_COMPLETED,
     STATUS_FAILED,
     STATUS_PENDING,
+    STATUS_PROCESSING,
     claim_jobs,
     complete_job,
     enqueue_job,
@@ -72,3 +75,60 @@ class TestAlertJobs:
                 (job_id,),
             ).fetchone()
         assert row["status"] == STATUS_FAILED
+
+    def test_claim_recovers_stale_processing_job(self, db):
+        job_id = enqueue_job(JOB_DELIVER, {"user_id": "u1", "alert_id": "a1"})
+        claim_jobs([JOB_DELIVER], "worker-a")
+        stale_locked_at = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET locked_at = ? WHERE id = ?",
+                (stale_locked_at, job_id),
+            )
+
+        claimed = claim_jobs(
+            [JOB_DELIVER],
+            "worker-b",
+            stale_after_seconds=60,
+        )
+
+        assert [job["id"] for job in claimed] == [job_id]
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT status, attempts, locked_by FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_PROCESSING
+        assert row["attempts"] == 2
+        assert row["locked_by"] == "worker-b"
+
+    def test_stale_processing_job_fails_after_max_attempts(self, db):
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": "u1", "alert_id": "a1"},
+            max_attempts=1,
+        )
+        claim_jobs([JOB_DELIVER], "worker-a")
+        stale_locked_at = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET locked_at = ? WHERE id = ?",
+                (stale_locked_at, job_id),
+            )
+
+        claimed = claim_jobs(
+            [JOB_DELIVER],
+            "worker-b",
+            stale_after_seconds=60,
+        )
+
+        assert claimed == []
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT status, locked_at, locked_by, last_error FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_FAILED
+        assert row["locked_at"] is None
+        assert row["locked_by"] is None
+        assert row["last_error"] == "Processing lock expired after max attempts"
