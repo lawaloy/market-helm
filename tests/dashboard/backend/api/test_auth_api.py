@@ -1,7 +1,6 @@
 """Tests for multi-user auth API."""
 
 import pytest
-from src.storage.session import create_access_token
 
 
 @pytest.fixture
@@ -102,6 +101,8 @@ class TestAuthAPI:
         assert r.json()["detail"] == "Authentication required."
 
     def test_me_rejects_expired_token(self, client, multi_user_env):
+        from src.storage.session import create_access_token
+
         token = create_access_token("missing-user", ttl_seconds=-1)
 
         r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
