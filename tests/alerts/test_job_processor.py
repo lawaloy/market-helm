@@ -25,13 +25,13 @@ def db_user(tmp_path, monkeypatch):
     return user["id"]
 
 
-def _watch_config():
+def _watch_config(alert_id="aapl-low", name="AAPL low"):
     return {
         "defaults": {},
         "alerts": [
             {
-                "id": "aapl-low",
-                "name": "AAPL low",
+                "id": alert_id,
+                "name": name,
                 "enabled": True,
                 "cooldown_minutes": 0,
                 "condition": {
@@ -58,6 +58,48 @@ class TestJobProcessor:
         assert stats["delivered"] == 1
         assert stats["failed"] == 0
         assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_evaluate_symbol_fans_out_to_matching_watches_for_each_user(self, db_user):
+        second_user = create_user("proc2@example.com", "password123")["id"]
+        sync_watches_from_config(
+            db_user,
+            _watch_config(alert_id="aapl-user-a", name="AAPL user A"),
+        )
+        sync_watches_from_config(
+            second_user,
+            _watch_config(alert_id="aapl-user-b", name="AAPL user B"),
+        )
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 2
+        assert stats["failed"] == 0
+        assert pending_job_count([JOB_DELIVER]) == 0
+
+        delivered_events = [call.args[0] for call in send.call_args_list]
+        assert {
+            (event["user_id"], event["alert_id"], event["symbols"][0])
+            for event in delivered_events
+        } == {
+            (db_user, "aapl-user-a", "AAPL"),
+            (second_user, "aapl-user-b", "AAPL"),
+        }
+
+        with get_connection() as conn:
+            rows = conn.execute(
+                """
+                SELECT user_id, alert_id
+                FROM alert_trigger_state
+                ORDER BY user_id, alert_id
+                """
+            ).fetchall()
+        assert {(row["user_id"], row["alert_id"]) for row in rows} == {
+            (db_user, "aapl-user-a"),
+            (second_user, "aapl-user-b"),
+        }
 
     def test_deliver_records_trigger(self, db_user):
         sync_watches_from_config(db_user, _watch_config())
