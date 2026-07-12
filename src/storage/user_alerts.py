@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 from src.alerts.alert_paths import polish_alerts_config, strip_webhook_secrets_from_config
 
 from .database import get_connection
+from .alert_watches import validate_watches_config
 
 _EMPTY_CONFIG: Dict[str, Any] = {"defaults": {}, "alerts": []}
 
@@ -27,6 +28,7 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
 
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
     payload = strip_webhook_secrets_from_config(polish_alerts_config(config))
+    validate_watches_config(user_id, payload)
     updated_at = datetime.now(timezone.utc).isoformat()
     blob = json.dumps(payload, indent=2)
     with get_connection() as conn:

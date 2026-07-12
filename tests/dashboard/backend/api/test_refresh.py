@@ -5,6 +5,7 @@ import subprocess
 from unittest.mock import MagicMock
 
 from fastapi import BackgroundTasks
+from fastapi.testclient import TestClient
 
 from dashboard.backend.api import refresh
 
@@ -96,3 +97,19 @@ def test_trigger_refresh_marks_running_before_worker_thread_starts(monkeypatch) 
     assert len(created_threads) == 1
     assert created_threads[0].daemon is True
     assert created_threads[0].started is True
+
+
+def test_refresh_mutations_require_auth_in_database_mode(tmp_path, monkeypatch) -> None:
+    reset_refresh_state()
+    db_path = tmp_path / "refresh-auth.db"
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+
+    from dashboard.backend.main import app
+    from src.storage.database import init_database
+
+    init_database()
+    client = TestClient(app)
+
+    assert client.post("/api/refresh").status_code == 401
+    assert client.post("/api/refresh/cancel").status_code == 401

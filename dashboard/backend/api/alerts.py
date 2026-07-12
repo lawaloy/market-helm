@@ -33,6 +33,7 @@ from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.alert_runner import evaluate_alerts_from_latest_data
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.storage.alert_watches import InvalidAlertWatchConfig
 
 router = APIRouter()
 
@@ -166,7 +167,10 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
     if database_enabled():
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
-        save_user_alerts_config(user_id, config)
+        try:
+            save_user_alerts_config(user_id, config)
+        except InvalidAlertWatchConfig as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
     save_alerts_config(config)
 
