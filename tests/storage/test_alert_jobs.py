@@ -132,3 +132,23 @@ class TestAlertJobs:
         assert row["locked_at"] is None
         assert row["locked_by"] is None
         assert row["last_error"] == "Processing lock expired after max attempts"
+
+    def test_claim_jobs_skips_jobs_until_run_after(self, db):
+        job_id = enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "MSFT"},
+            max_attempts=2,
+        )
+        assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c") != []
+
+        fail_job(job_id, "transient error", retry_delay_seconds=3600)
+
+        assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
+        assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-d") == []
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT status, attempts FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_PENDING
+        assert row["attempts"] == 1
