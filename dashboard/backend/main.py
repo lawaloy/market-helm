@@ -52,9 +52,9 @@ from dashboard.backend.api.market import get_market_summary
 
 def _startup_alert_check() -> None:
     try:
-        from src.alerts.alert_runner import evaluate_alerts_from_latest_data
+        from src.alerts.alert_worker import run_check_once
 
-        result = evaluate_alerts_from_latest_data()
+        result = run_check_once()
         triggered = result.get("triggered", 0)
         if triggered:
             logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
