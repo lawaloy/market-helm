@@ -52,10 +52,7 @@ def test_run_daily_tracker_discards_child_output_to_prevent_deadlock(monkeypatch
 
     monkeypatch.setattr(refresh.subprocess, "Popen", popen)
     monkeypatch.setenv("REFRESH_TOP_N", "0")
-    monkeypatch.setattr(
-        "src.alerts.alert_runner.evaluate_alerts_from_latest_data",
-        lambda: {"triggered": 0},
-    )
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
 
     refresh.run_daily_tracker()
 

@@ -1,6 +1,7 @@
 """Tests for per-user alerts API when MARKET_HELM_DATABASE_URL is set."""
 
 import json
+from unittest.mock import patch
 
 import pytest
 
@@ -91,6 +92,31 @@ class TestMultiUserAlertsAPI:
         cfg_b = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token_b}"}).json()
         assert cfg_a["config"]["defaults"]["email_to"] == "a@example.com"
         assert cfg_b["config"]["defaults"]["email_to"] == "b@example.com"
+
+    def test_run_requires_auth(self, client, multi_user_env):
+        r = client.post("/api/alerts/run")
+
+        assert r.status_code == 401
+
+    def test_run_uses_db_worker_cycle(self, client, multi_user_env):
+        token = _register(client, "runner@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
+            mock_cycle.return_value = {
+                "triggered": 2,
+                "last_data_date": "2026-06-09",
+                "events": [],
+                "message": None,
+                "enqueued": 2,
+                "jobs": {"evaluated": 2, "delivered": 2, "failed": 0},
+            }
+            r = client.post("/api/alerts/run", headers=headers)
+
+        assert r.status_code == 200
+        assert r.json()["triggered"] == 2
+        assert r.json()["last_data_date"] == "2026-06-09"
+        mock_cycle.assert_called_once()
 
     def test_webhook_secret_is_user_scoped_and_write_only(
         self, client, multi_user_env, tmp_path, monkeypatch
