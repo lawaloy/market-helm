@@ -31,8 +31,8 @@ from src.cli.alerts_commands import _load_env, run_alert_test
 
 from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
-from src.alerts.alert_runner import evaluate_alerts_from_latest_data
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.storage.alert_watches import InvalidAlertWatchConfig
 
 router = APIRouter()
 
@@ -119,17 +119,36 @@ def _normalize_config(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return {"defaults": defaults, "alerts": alerts}
 
 
-def _channel_status(config: Dict[str, Any]) -> ChannelStatus:
+def _has_webhook_secret(config: Dict[str, Any]) -> bool:
+    defaults = config.get("defaults") or {}
+    if str(defaults.get("webhook_url") or "").strip():
+        return True
+    return any(
+        isinstance(alert, dict) and str(alert.get("webhook_url") or "").strip()
+        for alert in config.get("alerts") or []
+    )
+
+
+def _channel_status(
+    config: Dict[str, Any],
+    *,
+    has_webhook_secret: Optional[bool] = None,
+) -> ChannelStatus:
     defaults = config.get("defaults") or {}
     has_rule_email = any(alert.get("email_to") for alert in config.get("alerts", []))
     has_default_email = bool(defaults.get("email_to") or os.environ.get("ALERT_EMAIL_TO"))
-    has_env_webhook = bool(
-        os.environ.get("ALERT_WEBHOOK_URL") or os.environ.get("DISCORD_WEBHOOK_URL")
-    )
+    if database_enabled():
+        webhook_ready = bool(has_webhook_secret)
+    else:
+        webhook_ready = bool(
+            has_webhook_secret
+            if has_webhook_secret is not None
+            else _has_webhook_secret(config)
+        ) or bool(os.environ.get("ALERT_WEBHOOK_URL") or os.environ.get("DISCORD_WEBHOOK_URL"))
     return ChannelStatus(
         email_smtp=email_delivery_configured(),
         email_recipients=has_default_email or has_rule_email,
-        webhook_url=has_env_webhook,
+        webhook_url=webhook_ready,
     )
 
 
@@ -166,7 +185,10 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
     if database_enabled():
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
-        save_user_alerts_config(user_id, config)
+        try:
+            save_user_alerts_config(user_id, config)
+        except InvalidAlertWatchConfig as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
     save_alerts_config(config)
 
@@ -185,6 +207,7 @@ async def get_alerts_config(
             if scrubbed != raw:
                 save_alerts_config(scrubbed)
                 raw = scrubbed
+    has_webhook_secret = _has_webhook_secret(raw or {})
     config = _public_config(_normalize_config(raw))
     defaults = dict(config.get("defaults") or {})
     if not defaults.get("webhook_format"):
@@ -197,7 +220,7 @@ async def get_alerts_config(
     return AlertsConfigResponse(
         exists=exists,
         config=AlertsConfigBody(**config),
-        channels=_channel_status(config),
+        channels=_channel_status(config, has_webhook_secret=has_webhook_secret),
     )
 
 
@@ -208,18 +231,26 @@ async def put_alerts_config(
 ) -> AlertsConfigResponse:
     """Save alerts config to the user config path."""
     _load_env()
-    _persist_webhook_secret(body.defaults)
+    if not database_enabled():
+        _persist_webhook_secret(body.defaults)
     _load_env()
     config = _normalize_config(body.model_dump())
     for alert in config["alerts"]:
         if not alert.get("id"):
             raise HTTPException(status_code=400, detail="Each alert must have an id.")
     _save_raw_config(user_id, config)
-    public = _public_config(polish_alerts_config(config))
+    status_source = config
+    if database_enabled() and user_id:
+        _, saved = load_user_alerts_config(user_id)
+        if saved is not None:
+            status_source = saved
+    status_source = polish_alerts_config(status_source)
+    has_webhook_secret = _has_webhook_secret(status_source)
+    public = _public_config(status_source)
     return AlertsConfigResponse(
         exists=True,
         config=AlertsConfigBody(**public),
-        channels=_channel_status(public),
+        channels=_channel_status(public, has_webhook_secret=has_webhook_secret),
     )
 
 
@@ -367,10 +398,16 @@ async def get_alerts_status(
 
 
 @router.post("/run", response_model=AlertsRunResponse)
-async def run_alerts_now() -> AlertsRunResponse:
+async def run_alerts_now(
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertsRunResponse:
     """Evaluate active alerts against saved data and live quotes for watch symbols."""
+    # The dependency authenticates multi-user requests; file-backed mode returns None.
+    _ = user_id
     try:
-        raw = evaluate_alerts_from_latest_data()
+        from src.alerts.alert_worker import run_check_once
+
+        raw = run_check_once()
     except Exception:
         raise HTTPException(status_code=500, detail="Alert check failed.")
     if raw.get("message") == "No market data available.":
