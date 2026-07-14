@@ -1,5 +1,8 @@
 """Tests for per-user alerts API when MARKET_HELM_DATABASE_URL is set."""
 
+import json
+from unittest.mock import patch
+
 import pytest
 
 
@@ -89,3 +92,89 @@ class TestMultiUserAlertsAPI:
         cfg_b = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token_b}"}).json()
         assert cfg_a["config"]["defaults"]["email_to"] == "a@example.com"
         assert cfg_b["config"]["defaults"]["email_to"] == "b@example.com"
+
+    def test_run_requires_auth(self, client, multi_user_env):
+        r = client.post("/api/alerts/run")
+
+        assert r.status_code == 401
+
+    def test_run_uses_db_worker_cycle(self, client, multi_user_env):
+        token = _register(client, "runner@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
+            mock_cycle.return_value = {
+                "triggered": 2,
+                "last_data_date": "2026-06-09",
+                "events": [],
+                "message": None,
+                "enqueued": 2,
+                "jobs": {"evaluated": 2, "delivered": 2, "failed": 0},
+            }
+            r = client.post("/api/alerts/run", headers=headers)
+
+        assert r.status_code == 200
+        assert r.json()["triggered"] == 2
+        assert r.json()["last_data_date"] == "2026-06-09"
+        mock_cycle.assert_called_once()
+
+    def test_webhook_secret_is_user_scoped_and_write_only(
+        self, client, multi_user_env, tmp_path, monkeypatch
+    ):
+        from src.storage.user_alerts import load_user_alerts_config
+        from src.storage.users import authenticate_user
+
+        user_config_dir = tmp_path / "user-config"
+        monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
+        monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
+
+        token = _register(client, "webhook@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        client.post("/api/alerts/init", headers=headers)
+
+        payload = {
+            "defaults": {
+                "webhook_url": "https://discord.com/api/webhooks/user/token",
+                "webhook_format": "discord",
+                "notify_webhook": True,
+            },
+            "alerts": [
+                {
+                    "id": "aapl_drop",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                    "notifications": ["webhook"],
+                }
+            ],
+        }
+
+        first = client.put("/api/alerts/config", json=payload, headers=headers)
+
+        assert first.status_code == 200
+        assert first.json()["channels"]["webhook_url"] is True
+        serialized = json.dumps(first.json())
+        assert "user/token" not in serialized
+        assert "global/token" not in serialized
+        assert not (user_config_dir / ".env").exists()
+
+        # The frontend sends later edits without the write-only URL; keep the
+        # saved per-user secret instead of falling back to the global env var.
+        payload["defaults"].pop("webhook_url")
+        payload["defaults"]["email_to"] = "webhook@example.com"
+        second = client.put("/api/alerts/config", json=payload, headers=headers)
+
+        assert second.status_code == 200
+        assert second.json()["channels"]["webhook_url"] is True
+        assert "user/token" not in json.dumps(second.json())
+        assert second.json()["config"]["alerts"][0]["id"] == "aapl_drop"
+
+        saved_user = authenticate_user("webhook@example.com", "password123")
+        assert saved_user is not None
+        _, raw = load_user_alerts_config(saved_user["id"])
+        assert raw is not None
+        assert raw["defaults"]["webhook_url"].endswith("/user/token")
