@@ -31,7 +31,6 @@ from src.cli.alerts_commands import _load_env, run_alert_test
 
 from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
-from src.alerts.alert_runner import evaluate_alerts_from_latest_data
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
 from src.storage.alert_watches import InvalidAlertWatchConfig
 
@@ -399,10 +398,16 @@ async def get_alerts_status(
 
 
 @router.post("/run", response_model=AlertsRunResponse)
-async def run_alerts_now() -> AlertsRunResponse:
+async def run_alerts_now(
+    user_id: Optional[str] = Depends(require_user_id),
+) -> AlertsRunResponse:
     """Evaluate active alerts against saved data and live quotes for watch symbols."""
+    # The dependency authenticates multi-user requests; file-backed mode returns None.
+    _ = user_id
     try:
-        raw = evaluate_alerts_from_latest_data()
+        from src.alerts.alert_worker import run_check_once
+
+        raw = run_check_once()
     except Exception:
         raise HTTPException(status_code=500, detail="Alert check failed.")
     if raw.get("message") == "No market data available.":

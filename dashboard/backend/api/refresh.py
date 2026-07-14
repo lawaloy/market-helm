@@ -134,9 +134,9 @@ def run_daily_tracker():
             refresh_status["last_refresh"] = datetime.now().isoformat()
             refresh_status["progress"] = "Data refresh completed successfully!"
             try:
-                from src.alerts.alert_runner import evaluate_alerts_from_latest_data
+                from src.alerts.alert_worker import run_check_once
 
-                result = evaluate_alerts_from_latest_data()
+                result = run_check_once()
                 if result.get("triggered", 0) > 0:
                     logger.info("Alerts triggered after refresh: %s", result["triggered"])
             except Exception as exc:
