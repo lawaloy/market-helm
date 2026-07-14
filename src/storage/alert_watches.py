@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -11,15 +12,44 @@ from .database import get_connection
 MAX_DELIVERY_LOG = 100
 
 
+class InvalidAlertWatchConfig(ValueError):
+    """Raised when a user alert config cannot be normalized into watch rows."""
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
-    """Replace user's watch rows from a Helmtower alerts config payload."""
+def _coerce_threshold(raw_value: Any, alert_id: str) -> Optional[float]:
+    if raw_value is None:
+        return None
+    try:
+        threshold = float(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid price threshold value."
+        ) from exc
+    if not math.isfinite(threshold):
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid price threshold value."
+        )
+    return threshold
+
+
+def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
+    try:
+        return int(raw_value or 0)
+    except (TypeError, ValueError) as exc:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        ) from exc
+
+
+def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> List[tuple]:
+    if not isinstance(config, dict):
+        raise InvalidAlertWatchConfig("Alerts config must be an object.")
     defaults = config.get("defaults") or {}
     alerts = config.get("alerts") or []
-    updated_at = _utc_now()
     rows: List[tuple] = []
 
     for alert in alerts:
@@ -29,6 +59,8 @@ def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
         if not alert_id:
             continue
         condition = alert.get("condition") or {}
+        if not isinstance(condition, dict):
+            condition = {}
         condition_type = str(condition.get("type") or "unknown")
         symbol = None
         operator = None
@@ -36,8 +68,8 @@ def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
         if condition_type == "price_threshold":
             symbol = str(condition.get("symbol") or "").upper() or None
             operator = condition.get("operator")
-            raw_value = condition.get("value")
-            threshold = float(raw_value) if raw_value is not None else None
+            threshold = _coerce_threshold(condition.get("value"), alert_id)
+        cooldown_minutes = _coerce_cooldown(alert.get("cooldown_minutes"), alert_id)
         rows.append(
             (
                 user_id,
@@ -49,10 +81,21 @@ def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
                 threshold,
                 json.dumps(alert),
                 json.dumps(defaults),
-                int(alert.get("cooldown_minutes") or 0),
+                cooldown_minutes,
                 updated_at,
             )
         )
+    return rows
+
+
+def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
+    """Validate that a config can be normalized without mutating watch rows."""
+    _rows_from_config(user_id, config, _utc_now())
+
+
+def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
+    """Replace user's watch rows from a Helmtower alerts config payload."""
+    rows = _rows_from_config(user_id, config, _utc_now())
 
     with get_connection() as conn:
         conn.execute("DELETE FROM alert_watches WHERE user_id = ?", (user_id,))

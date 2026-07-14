@@ -32,6 +32,7 @@ from src.cli.alerts_commands import _load_env, run_alert_test
 from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.storage.alert_watches import InvalidAlertWatchConfig
 
 router = APIRouter()
 
@@ -184,7 +185,10 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
     if database_enabled():
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
-        save_user_alerts_config(user_id, config)
+        try:
+            save_user_alerts_config(user_id, config)
+        except InvalidAlertWatchConfig as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
     save_alerts_config(config)
 
@@ -427,6 +431,7 @@ async def post_alert_test(
     """Send a test notification for one alert rule."""
     _load_env()
     config_payload: Optional[Dict[str, Any]] = None
+    storage = None
     if database_enabled():
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required.")
@@ -434,11 +439,15 @@ async def post_alert_test(
         if not exists or raw is None:
             raise HTTPException(status_code=404, detail="No alerts config for this user.")
         config_payload = raw
+        from src.alerts.user_alert_storage import UserAlertStorage
+
+        storage = UserAlertStorage(user_id)
     try:
         result = run_alert_test(
             body.id,
             dry_run=body.dry_run,
             config=config_payload,
+            storage=storage,
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
