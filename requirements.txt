@@ -1,7 +1,7 @@
-pandas>=3.0.4
+pandas>=3.0.3
 requests>=2.34.2
 urllib3>=2.7.0
 python-dotenv>=1.2.2
-openai>=2.44.0
+openai>=2.45.0
 pytickersymbols>=1.17.10
 
