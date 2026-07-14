@@ -1,5 +1,7 @@
 """Unit tests for normalized alert watches."""
 
+import json
+
 import pytest
 
 from src.storage.alert_watches import (
@@ -118,3 +120,32 @@ class TestAlertWatches:
         db_path = tmp_path / "watches.db"
         init_database()
         assert list_enabled_symbols() == ["AAPL"]
+
+    def test_backfill_skips_invalid_config_rows(self, db_user):
+        bad_config = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "bad-price",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "below",
+                        "value": "not-a-number",
+                    },
+                }
+            ],
+        }
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_alert_configs (user_id, config_json, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (db_user, json.dumps(bad_config), "2026-07-12T00:00:00+00:00"),
+            )
+
+        init_database()
+
+        assert list_enabled_symbols() == []
