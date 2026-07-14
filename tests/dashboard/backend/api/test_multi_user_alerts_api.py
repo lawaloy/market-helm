@@ -98,6 +98,52 @@ class TestMultiUserAlertsAPI:
         assert saved.json()["exists"] is False
         assert saved.json()["config"]["alerts"] == []
 
+    def test_invalid_update_preserves_existing_config_and_watch_index(
+        self, client, multi_user_env
+    ):
+        from src.storage.alert_watches import (
+            list_enabled_symbols,
+            list_watches_for_symbol,
+        )
+
+        token = _register(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        valid_payload = {
+            "defaults": {"email_to": "user@example.com"},
+            "alerts": [
+                {
+                    "id": "watch_aapl",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 100,
+                    },
+                }
+            ],
+        }
+        saved = client.put(
+            "/api/alerts/config", json=valid_payload, headers=headers
+        )
+        assert saved.status_code == 200
+        assert list_enabled_symbols() == ["AAPL"]
+
+        invalid_payload = json.loads(json.dumps(valid_payload))
+        invalid_payload["alerts"][0]["condition"]["value"] = "not-a-number"
+        rejected = client.put(
+            "/api/alerts/config", json=invalid_payload, headers=headers
+        )
+
+        assert rejected.status_code == 400
+        current = client.get("/api/alerts/config", headers=headers).json()
+        assert current["config"]["alerts"][0]["condition"]["value"] == 100
+        assert list_enabled_symbols() == ["AAPL"]
+        indexed = list_watches_for_symbol("AAPL")
+        assert len(indexed) == 1
+        assert indexed[0]["alert_id"] == "watch_aapl"
+        assert indexed[0]["threshold"] == 100
+
     def test_users_have_isolated_configs(self, client, multi_user_env):
         token_a = _register(client, "a@example.com")
         token_b = _register(client, "b@example.com")
