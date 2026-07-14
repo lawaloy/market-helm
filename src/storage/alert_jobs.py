@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from .database import get_connection
@@ -16,6 +16,8 @@ STATUS_PENDING = "pending"
 STATUS_PROCESSING = "processing"
 STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
+
+DEFAULT_STALE_JOB_TIMEOUT_SECONDS = 30 * 60
 
 
 def _utc_now() -> str:
@@ -77,15 +79,47 @@ def claim_jobs(
     worker_id: str,
     *,
     limit: int = 10,
+    stale_after_seconds: int = DEFAULT_STALE_JOB_TIMEOUT_SECONDS,
 ) -> List[Dict[str, Any]]:
     if not job_types:
         return []
-    now = _utc_now()
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
     placeholders = ",".join("?" for _ in job_types)
     claimed: List[Dict[str, Any]] = []
 
     with get_connection() as conn:
         conn.execute("BEGIN IMMEDIATE")
+        if stale_after_seconds >= 0:
+            stale_before = (now_dt - timedelta(seconds=stale_after_seconds)).isoformat()
+            conn.execute(
+                f"""
+                UPDATE alert_jobs
+                SET status = ?, updated_at = ?, locked_at = NULL, locked_by = NULL
+                WHERE status = ? AND job_type IN ({placeholders})
+                  AND locked_at IS NOT NULL AND locked_at <= ?
+                  AND attempts < max_attempts
+                """,
+                (STATUS_PENDING, now, STATUS_PROCESSING, *job_types, stale_before),
+            )
+            conn.execute(
+                f"""
+                UPDATE alert_jobs
+                SET status = ?, updated_at = ?, locked_at = NULL, locked_by = NULL,
+                    last_error = ?
+                WHERE status = ? AND job_type IN ({placeholders})
+                  AND locked_at IS NOT NULL AND locked_at <= ?
+                  AND attempts >= max_attempts
+                """,
+                (
+                    STATUS_FAILED,
+                    now,
+                    "Processing lock expired after max attempts",
+                    STATUS_PROCESSING,
+                    *job_types,
+                    stale_before,
+                ),
+            )
         rows = conn.execute(
             f"""
             SELECT id FROM alert_jobs
