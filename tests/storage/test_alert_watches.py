@@ -63,6 +63,47 @@ class TestAlertWatches:
         assert watches[0]["user_id"] == db_user
         assert watches[0]["alert_id"] == "aapl-drop"
 
+    def test_symbol_index_dedupes_symbols_but_keeps_each_user_watch(self, db_user):
+        other_user = create_user("other-watches@example.com", "password123")["id"]
+        save_user_alerts_config(db_user, _sample_config())
+        save_user_alerts_config(
+            other_user,
+            {
+                "defaults": {"email_to": "other@example.com"},
+                "alerts": [
+                    {
+                        "id": "aapl-rise",
+                        "enabled": True,
+                        "cooldown_minutes": 5,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": "aapl",
+                            "operator": "greater_than",
+                            "value": 150,
+                        },
+                    },
+                    {
+                        "id": "goog-disabled",
+                        "enabled": False,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": "GOOG",
+                            "operator": "greater_than",
+                            "value": 100,
+                        },
+                    },
+                ],
+            },
+        )
+
+        assert list_enabled_symbols() == ["AAPL"]
+
+        watches = list_watches_for_symbol("aapl")
+        assert {(watch["user_id"], watch["alert_id"]) for watch in watches} == {
+            (db_user, "aapl-drop"),
+            (other_user, "aapl-rise"),
+        }
+
     def test_sync_replaces_rows(self, db_user):
         save_user_alerts_config(db_user, _sample_config())
         save_user_alerts_config(db_user, {"defaults": {}, "alerts": []})
