@@ -114,31 +114,38 @@ def process_job_queue(
     worker_id: str | None = None,
     *,
     limit: int = 50,
+    max_batches: int = 100,
 ) -> Dict[str, int]:
     init_database()
     wid = worker_id or new_worker_id()
     stats = {"evaluated": 0, "delivered": 0, "failed": 0}
 
-    eval_jobs = claim_jobs([JOB_EVALUATE_SYMBOL], wid, limit=limit)
-    for job in eval_jobs:
-        try:
-            _process_evaluate_symbol(job)
-            complete_job(job["id"])
-            stats["evaluated"] += 1
-        except Exception as exc:
-            logger.exception("evaluate_symbol job %s failed", job["id"])
-            fail_job(job["id"], str(exc))
-            stats["failed"] += 1
+    for batch in range(max_batches):
+        eval_jobs = claim_jobs([JOB_EVALUATE_SYMBOL], wid, limit=limit)
+        for job in eval_jobs:
+            try:
+                _process_evaluate_symbol(job)
+                complete_job(job["id"])
+                stats["evaluated"] += 1
+            except Exception as exc:
+                logger.exception("evaluate_symbol job %s failed", job["id"])
+                fail_job(job["id"], str(exc))
+                stats["failed"] += 1
 
-    deliver_jobs = claim_jobs([JOB_DELIVER], wid, limit=limit)
-    for job in deliver_jobs:
-        try:
-            _process_deliver(job)
-            complete_job(job["id"])
-            stats["delivered"] += 1
-        except Exception as exc:
-            logger.exception("deliver job %s failed", job["id"])
-            fail_job(job["id"], str(exc))
-            stats["failed"] += 1
+        deliver_jobs = claim_jobs([JOB_DELIVER], wid, limit=limit)
+        for job in deliver_jobs:
+            try:
+                _process_deliver(job)
+                complete_job(job["id"])
+                stats["delivered"] += 1
+            except Exception as exc:
+                logger.exception("deliver job %s failed", job["id"])
+                fail_job(job["id"], str(exc))
+                stats["failed"] += 1
+
+        if not eval_jobs and not deliver_jobs:
+            break
+    else:
+        logger.warning("Stopped processing alert jobs after %s batches", max_batches)
 
     return stats
