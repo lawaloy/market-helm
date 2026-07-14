@@ -2,7 +2,45 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from src.alerts import alert_worker
+from src.storage.alert_jobs import JOB_DELIVER, JOB_EVALUATE_SYMBOL, pending_job_count
+from src.storage.alert_watches import sync_watches_from_config
+from src.storage.database import get_connection, init_database
+from src.storage.users import create_user
+
+
+@pytest.fixture
+def db_users(tmp_path, monkeypatch):
+    db_path = tmp_path / "worker.db"
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    init_database()
+    return (
+        create_user("worker-a@example.com", "password123")["id"],
+        create_user("worker-b@example.com", "password123")["id"],
+    )
+
+
+def _price_watch(alert_id: str, threshold: float = 200.0):
+    return {
+        "defaults": {},
+        "alerts": [
+            {
+                "id": alert_id,
+                "name": f"{alert_id} watch",
+                "enabled": True,
+                "cooldown_minutes": 0,
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "less_than",
+                    "value": threshold,
+                },
+                "notifiers": [{"type": "console"}],
+            }
+        ],
+    }
 
 
 def test_resolve_interval_seconds_explicit_minimum() -> None:
@@ -37,6 +75,41 @@ def test_run_check_once_uses_db_cycle(mock_db_cycle, monkeypatch) -> None:
     result = alert_worker.run_check_once()
     assert result["triggered"] == 2
     mock_db_cycle.assert_called_once()
+
+
+def test_run_db_worker_cycle_evaluates_snapshot_and_delivers_per_user(db_users) -> None:
+    """Hosted worker cycle should wire orchestrator, queue processing, and user storage."""
+    user_a, user_b = db_users
+    sync_watches_from_config(user_a, _price_watch("aapl-low-a"))
+    sync_watches_from_config(user_b, _price_watch("aapl-low-b"))
+
+    with patch(
+        "src.alerts.alert_orchestrator.load_market_snapshot",
+        return_value=("2026-06-09", {"AAPL": 150.0}, []),
+    ) as load_snapshot:
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+            result = alert_worker.run_db_worker_cycle("test-worker")
+
+    assert result["enqueued"] == 1
+    assert result["triggered"] == 2
+    assert result["last_data_date"] == "2026-06-09"
+    assert result["jobs"] == {"evaluated": 1, "delivered": 2, "failed": 0}
+    assert pending_job_count([JOB_EVALUATE_SYMBOL, JOB_DELIVER]) == 0
+    load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
+    assert send.call_count == 2
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT user_id, alert_id FROM alert_trigger_state
+            ORDER BY alert_id
+            """
+        ).fetchall()
+
+    assert [(row["user_id"], row["alert_id"]) for row in rows] == [
+        (user_a, "aapl-low-a"),
+        (user_b, "aapl-low-b"),
+    ]
 
 
 @patch("src.alerts.alert_worker.run_check_once")
