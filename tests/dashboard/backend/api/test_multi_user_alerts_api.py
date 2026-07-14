@@ -70,6 +70,34 @@ class TestMultiUserAlertsAPI:
         assert r3.status_code == 200
         assert len(r3.json()["config"]["alerts"]) == 1
 
+    def test_invalid_price_rule_is_rejected_without_persisting(self, client, multi_user_env):
+        token = _register(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        payload = {
+            "defaults": {"email_to": "user@example.com"},
+            "alerts": [
+                {
+                    "id": "bad-price",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "below",
+                        "value": "not-a-number",
+                    },
+                }
+            ],
+        }
+
+        response = client.put("/api/alerts/config", json=payload, headers=headers)
+
+        assert response.status_code == 400
+        assert "invalid price threshold" in response.json()["detail"]
+        saved = client.get("/api/alerts/config", headers=headers)
+        assert saved.status_code == 200
+        assert saved.json()["exists"] is False
+        assert saved.json()["config"]["alerts"] == []
+
     def test_users_have_isolated_configs(self, client, multi_user_env):
         token_a = _register(client, "a@example.com")
         token_b = _register(client, "b@example.com")
@@ -178,3 +206,63 @@ class TestMultiUserAlertsAPI:
         _, raw = load_user_alerts_config(saved_user["id"])
         assert raw is not None
         assert raw["defaults"]["webhook_url"].endswith("/user/token")
+
+    def test_test_send_records_status_for_authenticated_user_only(
+        self, client, multi_user_env
+    ):
+        token_a = _register(client, "status-a@example.com")
+        token_b = _register(client, "status-b@example.com")
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+        payload = {
+            "defaults": {"email_to": "a@example.com", "notify_email": True},
+            "alerts": [
+                {
+                    "id": "price_watch",
+                    "name": "Price watch",
+                    "enabled": True,
+                    "notifications": ["email"],
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                }
+            ],
+        }
+
+        assert client.post("/api/alerts/init", headers=headers_a).status_code == 200
+        assert client.put("/api/alerts/config", json=payload, headers=headers_a).status_code == 200
+        assert client.post("/api/alerts/init", headers=headers_b).status_code == 200
+
+        class EmailNotifier:
+            def send(self, _event):
+                return True
+
+        with patch(
+            "src.cli.alerts_commands.AlertEngine._build_notifiers",
+            return_value=[EmailNotifier()],
+        ):
+            sent = client.post(
+                "/api/alerts/test",
+                json={"id": "price_watch", "dry_run": False},
+                headers=headers_a,
+            )
+
+        assert sent.status_code == 200
+        assert sent.json()["status"] == "sent"
+
+        status_a = client.get("/api/alerts/status", headers=headers_a)
+        status_b = client.get("/api/alerts/status", headers=headers_b)
+
+        assert status_a.status_code == 200
+        assert status_b.status_code == 200
+        deliveries_a = status_a.json()["latest_deliveries"]
+        assert len(deliveries_a) == 1
+        assert deliveries_a[0]["alert_id"] == "price_watch"
+        assert deliveries_a[0]["channel"] == "email"
+        assert deliveries_a[0]["success"] is True
+        assert deliveries_a[0]["test"] is True
+        assert deliveries_a[0]["error"] is None
+        assert status_b.json()["latest_deliveries"] == []

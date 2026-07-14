@@ -9,6 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 from src.alerts.alert_paths import polish_alerts_config
 
 from .database import get_connection
+from .alert_watches import validate_watches_config
 
 _EMPTY_CONFIG: Dict[str, Any] = {"defaults": {}, "alerts": []}
 
@@ -73,6 +74,7 @@ def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
     # In hosted DB mode webhook URLs are per-user secrets. They are stripped only
     # from API responses, not from persisted user records used for delivery.
     payload = polish_alerts_config(_merge_existing_webhook_secrets(user_id, config))
+    validate_watches_config(user_id, payload)
     updated_at = datetime.now(timezone.utc).isoformat()
     blob = json.dumps(payload, indent=2)
     with get_connection() as conn:
