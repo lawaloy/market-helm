@@ -1,7 +1,7 @@
 """
 Refresh API endpoints — trigger the daily MarketHelm run to fetch new data.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 import subprocess
 import sys
@@ -11,6 +11,8 @@ from datetime import datetime
 import threading
 import time
 import logging
+
+from dashboard.backend.auth import require_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +152,11 @@ def run_daily_tracker():
         refresh_status["is_running"] = False
 
 
-@router.post("/refresh", response_model=RefreshResponse)
+@router.post(
+    "/refresh",
+    response_model=RefreshResponse,
+    dependencies=[Depends(require_user_id)],
+)
 async def trigger_refresh(background_tasks: BackgroundTasks):
     """
     Trigger a data refresh (daily run) to fetch fresh data.
@@ -213,7 +219,11 @@ async def get_refresh_status():
     )
 
 
-@router.post("/refresh/cancel", response_model=RefreshStatusResponse)
+@router.post(
+    "/refresh/cancel",
+    response_model=RefreshStatusResponse,
+    dependencies=[Depends(require_user_id)],
+)
 async def cancel_refresh():
     """Cancel the current refresh job if running."""
     if not refresh_status["is_running"]:

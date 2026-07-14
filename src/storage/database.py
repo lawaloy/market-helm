@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -10,6 +11,8 @@ from typing import Iterator, Optional
 from urllib.parse import urlparse
 
 from src.alerts.alert_paths import user_config_dir
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -135,6 +138,7 @@ def init_database() -> None:
 def _backfill_watches_from_configs() -> None:
     import json
 
+    from .alert_watches import InvalidAlertWatchConfig
     from .alert_watches import sync_watches_from_config
 
     with get_connection() as conn:
@@ -144,9 +148,14 @@ def _backfill_watches_from_configs() -> None:
     for row in rows:
         try:
             config = json.loads(row["config_json"])
-        except json.JSONDecodeError:
+            sync_watches_from_config(row["user_id"], config)
+        except (json.JSONDecodeError, InvalidAlertWatchConfig) as exc:
+            logger.warning(
+                "Skipping invalid alert config during watch backfill for user %s: %s",
+                row["user_id"],
+                exc,
+            )
             continue
-        sync_watches_from_config(row["user_id"], config)
 
 
 def default_database_path() -> Path:

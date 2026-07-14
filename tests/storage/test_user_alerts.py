@@ -2,6 +2,7 @@
 
 import pytest
 
+from src.storage.alert_watches import InvalidAlertWatchConfig
 from src.storage.database import init_database
 from src.storage.user_alerts import (
     init_user_alerts_config,
@@ -42,6 +43,26 @@ class TestUserAlerts:
         exists, raw = load_user_alerts_config(db_user)
         assert raw["defaults"]["email_to"] == "user@example.com"
         assert len(raw["alerts"]) == 1
+
+    def test_invalid_watch_config_is_not_persisted(self, db_user):
+        with pytest.raises(InvalidAlertWatchConfig):
+            save_user_alerts_config(
+                db_user,
+                {
+                    "defaults": {},
+                    "alerts": [
+                        {
+                            "id": "bad-cooldown",
+                            "enabled": True,
+                            "cooldown_minutes": "later",
+                        }
+                    ],
+                },
+            )
+
+        exists, raw = load_user_alerts_config(db_user)
+        assert exists is False
+        assert raw is None
 
     def test_init_conflict_without_force(self, db_user):
         init_user_alerts_config(db_user)

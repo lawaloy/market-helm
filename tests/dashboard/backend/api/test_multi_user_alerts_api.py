@@ -70,6 +70,34 @@ class TestMultiUserAlertsAPI:
         assert r3.status_code == 200
         assert len(r3.json()["config"]["alerts"]) == 1
 
+    def test_invalid_price_rule_is_rejected_without_persisting(self, client, multi_user_env):
+        token = _register(client)
+        headers = {"Authorization": f"Bearer {token}"}
+        payload = {
+            "defaults": {"email_to": "user@example.com"},
+            "alerts": [
+                {
+                    "id": "bad-price",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "below",
+                        "value": "not-a-number",
+                    },
+                }
+            ],
+        }
+
+        response = client.put("/api/alerts/config", json=payload, headers=headers)
+
+        assert response.status_code == 400
+        assert "invalid price threshold" in response.json()["detail"]
+        saved = client.get("/api/alerts/config", headers=headers)
+        assert saved.status_code == 200
+        assert saved.json()["exists"] is False
+        assert saved.json()["config"]["alerts"] == []
+
     def test_users_have_isolated_configs(self, client, multi_user_env):
         token_a = _register(client, "a@example.com")
         token_b = _register(client, "b@example.com")
