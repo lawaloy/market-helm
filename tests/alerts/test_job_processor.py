@@ -61,6 +61,23 @@ class TestJobProcessor:
         assert stats["failed"] == 0
         assert pending_job_count([JOB_DELIVER]) == 0
 
+    def test_process_job_queue_drains_ready_jobs_beyond_limit(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        for index in range(3):
+            enqueue_job(
+                JOB_EVALUATE_SYMBOL,
+                {"symbol": "AAPL", "price": 150.0, "tick_id": f"t{index}"},
+            )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker", limit=2)
+
+        assert stats["evaluated"] == 3
+        assert stats["delivered"] == 3
+        assert stats["failed"] == 0
+        assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
+        assert pending_job_count([JOB_DELIVER]) == 0
+
     def test_evaluate_fans_out_deliveries_for_all_users_watching_symbol(self, db_user):
         other_user = create_user("other-proc@example.com", "password123")["id"]
         sync_watches_from_config(db_user, _watch_config())
