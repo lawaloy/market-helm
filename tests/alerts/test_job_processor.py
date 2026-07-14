@@ -8,7 +8,9 @@ from src.alerts.job_processor import process_job_queue
 from src.storage.alert_jobs import (
     JOB_DELIVER,
     JOB_EVALUATE_SYMBOL,
+    STATUS_COMPLETED,
     STATUS_FAILED,
+    claim_jobs,
     enqueue_job,
     pending_job_count,
 )
@@ -143,6 +145,47 @@ class TestJobProcessor:
                 (db_user, "aapl-low"),
             ).fetchone()
         assert row is not None
+
+    def test_process_job_queue_recovers_and_delivers_stale_job(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        event = {
+            "alert_id": "aapl-low",
+            "alert_name": "AAPL low",
+            "symbols": ["AAPL"],
+            "timestamp": "2026-06-09T12:00:00+00:00",
+            "condition_type": "price_threshold",
+            "user_id": db_user,
+        }
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": db_user, "alert_id": "aapl-low", "event": event},
+        )
+        claimed = claim_jobs([JOB_DELIVER], "crashed-worker")
+        assert [job["id"] for job in claimed] == [job_id]
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET locked_at = ? WHERE id = ?",
+                ("2000-01-01T00:00:00+00:00", job_id),
+            )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("recovery-worker")
+
+        assert stats == {"evaluated": 0, "delivered": 1, "failed": 0}
+        with get_connection() as conn:
+            job = conn.execute(
+                "SELECT status, attempts, locked_at, locked_by FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+            trigger = conn.execute(
+                "SELECT 1 FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                (db_user, "aapl-low"),
+            ).fetchone()
+        assert job["status"] == STATUS_COMPLETED
+        assert job["attempts"] == 2
+        assert job["locked_at"] is None
+        assert job["locked_by"] is None
+        assert trigger is not None
 
     def test_failed_delivery_does_not_record_trigger(self, db_user):
         sync_watches_from_config(db_user, _watch_config())
