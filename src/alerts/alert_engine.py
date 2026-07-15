@@ -118,7 +118,7 @@ class AlertEngine:
         now = (
             datetime.now(last_triggered.tzinfo)
             if last_triggered.tzinfo
-            else datetime.now()
+            else datetime.utcnow()
         )
         return now - last_triggered < timedelta(minutes=cooldown_minutes)
 
