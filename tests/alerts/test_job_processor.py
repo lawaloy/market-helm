@@ -221,6 +221,40 @@ class TestJobProcessor:
         assert job["status"] == STATUS_FAILED
         assert "Delivery failed" in job["last_error"]
 
+    def test_removed_watch_fails_queued_delivery_without_recording_trigger(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        event = {
+            "alert_id": "aapl-low",
+            "alert_name": "AAPL low",
+            "symbols": ["AAPL"],
+            "timestamp": "2026-06-09T12:00:00+00:00",
+            "condition_type": "price_threshold",
+            "user_id": db_user,
+        }
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": db_user, "alert_id": "aapl-low", "event": event},
+            max_attempts=1,
+        )
+        save_user_alerts_config(db_user, {"defaults": {}, "alerts": []})
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 0, "delivered": 0, "failed": 1}
+        with get_connection() as conn:
+            trigger = conn.execute(
+                "SELECT 1 FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                (db_user, "aapl-low"),
+            ).fetchone()
+            job = conn.execute(
+                "SELECT status, last_error FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert trigger is None
+        assert job["status"] == STATUS_FAILED
+        assert "not found" in job["last_error"]
+        assert pending_job_count([JOB_DELIVER]) == 0
+
     def test_deliver_failure_retries_without_recording_trigger(self, db_user):
         sync_watches_from_config(db_user, _watch_config())
         event = {
