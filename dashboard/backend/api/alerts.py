@@ -402,12 +402,10 @@ async def run_alerts_now(
     user_id: Optional[str] = Depends(require_user_id),
 ) -> AlertsRunResponse:
     """Evaluate active alerts against saved data and live quotes for watch symbols."""
-    # The dependency authenticates multi-user requests; file-backed mode returns None.
-    _ = user_id
     try:
-        from src.alerts.alert_worker import run_check_once
+        from src.alerts.alert_worker import run_check_once, run_user_check
 
-        raw = run_check_once()
+        raw = run_user_check(user_id) if user_id else run_check_once()
     except Exception:
         raise HTTPException(status_code=500, detail="Alert check failed.")
     if raw.get("message") == "No market data available.":

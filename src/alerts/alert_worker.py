@@ -7,7 +7,7 @@ import os
 import signal
 import time
 import uuid
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,68 @@ def run_check_once() -> Dict[str, Any]:
     from src.alerts.alert_runner import evaluate_alerts_from_latest_data
 
     return evaluate_alerts_from_latest_data()
+
+
+def run_user_check(user_id: str) -> Dict[str, Any]:
+    """Evaluate and deliver only one hosted user's configured alerts."""
+    from src.alerts.alert_engine import AlertEngine
+    from src.alerts.market_snapshot import load_market_snapshot
+    from src.alerts.user_alert_storage import UserAlertStorage
+    from src.storage.database import database_enabled
+    from src.storage.user_alerts import load_user_alerts_config
+
+    if not database_enabled():
+        raise RuntimeError("User-scoped alert checks require MARKET_HELM_DATABASE_URL")
+
+    exists, config = load_user_alerts_config(user_id)
+    if not exists or not config:
+        return {
+            "triggered": 0,
+            "events": [],
+            "last_data_date": None,
+            "message": "No active watches configured.",
+        }
+
+    engine = AlertEngine.from_config_dict(
+        config,
+        storage=UserAlertStorage(user_id),
+    )
+    if not engine:
+        return {
+            "triggered": 0,
+            "events": [],
+            "last_data_date": None,
+            "message": "No active watches configured.",
+        }
+
+    watch_symbols: List[str] = []
+    for alert in engine.alerts:
+        condition = alert.get("condition") or {}
+        if condition.get("type") != "price_threshold":
+            continue
+        symbol = str(condition.get("symbol") or "").strip().upper()
+        if symbol and symbol not in watch_symbols:
+            watch_symbols.append(symbol)
+
+    last_date, _prices, stocks = load_market_snapshot(
+        watch_symbols,
+        fetch_missing_quotes=True,
+    )
+    if not stocks:
+        return {
+            "triggered": 0,
+            "events": [],
+            "last_data_date": last_date,
+            "message": "No market data available.",
+        }
+
+    events = engine.evaluate(stocks)
+    return {
+        "triggered": len(events),
+        "events": events,
+        "last_data_date": last_date,
+        "message": None if events else "No alerts triggered on latest data.",
+    }
 
 
 def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:

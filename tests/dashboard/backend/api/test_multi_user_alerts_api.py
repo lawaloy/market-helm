@@ -172,25 +172,91 @@ class TestMultiUserAlertsAPI:
 
         assert r.status_code == 401
 
-    def test_run_uses_db_worker_cycle(self, client, multi_user_env):
+    def test_run_uses_user_scoped_check(self, client, multi_user_env):
         token = _register(client, "runner@example.com")
         headers = {"Authorization": f"Bearer {token}"}
 
-        with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
-            mock_cycle.return_value = {
+        with patch("src.alerts.alert_worker.run_user_check") as mock_check:
+            mock_check.return_value = {
                 "triggered": 2,
                 "last_data_date": "2026-06-09",
                 "events": [],
                 "message": None,
-                "enqueued": 2,
-                "jobs": {"evaluated": 2, "delivered": 2, "failed": 0},
             }
             r = client.post("/api/alerts/run", headers=headers)
 
         assert r.status_code == 200
         assert r.json()["triggered"] == 2
         assert r.json()["last_data_date"] == "2026-06-09"
-        mock_cycle.assert_called_once()
+        mock_check.assert_called_once()
+        assert mock_check.call_args.args[0]
+
+    def test_run_only_evaluates_authenticated_users_watches(
+        self, client, multi_user_env
+    ):
+        from src.storage.database import get_connection
+
+        token_a = _register(client, "runner-a@example.com")
+        token_b = _register(client, "runner-b@example.com")
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+        payload = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "aapl-low",
+                    "name": "AAPL low",
+                    "enabled": True,
+                    "cooldown_minutes": 60,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                    "notifications": ["log"],
+                }
+            ],
+        }
+        saved_a = client.put("/api/alerts/config", json=payload, headers=headers_a)
+        saved_b = client.put("/api/alerts/config", json=payload, headers=headers_b)
+        assert saved_a.status_code == 200
+        assert saved_b.status_code == 200
+
+        with patch(
+            "src.alerts.market_snapshot.load_market_snapshot",
+            return_value=(
+                "2026-06-09",
+                {"AAPL": 150.0},
+                [{"symbol": "AAPL", "close": 150.0}],
+            ),
+        ):
+            with patch(
+                "src.alerts.alert_engine.LogNotifier.send", return_value=True
+            ) as send:
+                first = client.post("/api/alerts/run", headers=headers_a)
+                second = client.post("/api/alerts/run", headers=headers_a)
+
+        assert first.status_code == 200
+        assert first.json()["triggered"] == 1
+        assert second.status_code == 200
+        assert second.json()["triggered"] == 0
+        assert send.call_count == 1
+        with get_connection() as conn:
+            triggered_users = conn.execute(
+                "SELECT user_id FROM alert_trigger_state ORDER BY user_id"
+            ).fetchall()
+            user_b = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                ("runner-b@example.com",),
+            ).fetchone()
+            user_a = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                ("runner-a@example.com",),
+            ).fetchone()
+        assert len(triggered_users) == 1
+        assert triggered_users[0]["user_id"] == user_a["id"]
+        assert triggered_users[0]["user_id"] != user_b["id"]
 
     def test_webhook_secret_is_user_scoped_and_write_only(
         self, client, multi_user_env, tmp_path, monkeypatch

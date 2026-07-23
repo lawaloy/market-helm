@@ -115,7 +115,12 @@ class AlertEngine:
         last_triggered = self.storage.get_last_triggered(alert["id"])
         if not last_triggered:
             return False
-        return datetime.utcnow() - last_triggered < timedelta(minutes=cooldown_minutes)
+        now = (
+            datetime.now(last_triggered.tzinfo)
+            if last_triggered.tzinfo
+            else datetime.utcnow()
+        )
+        return now - last_triggered < timedelta(minutes=cooldown_minutes)
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
         alert = apply_alert_defaults(alert, self.defaults)
