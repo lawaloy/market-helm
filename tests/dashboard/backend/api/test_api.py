@@ -412,6 +412,30 @@ class TestStocksAPI:
         assert r.status_code == 404
         assert r.json()["detail"] == "Stock not found."
 
+    def test_stock_detail_omits_projection_when_target_is_nan(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """Finite daily prices with NaN projection fields soft-fail projection to null."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "target_mid": [float("nan")],
+                "expected_change_percent": [2.5],
+                "confidence": [80],
+                "recommendation": ["BUY"],
+                "risk_level": ["Low"],
+                "trend": ["Bullish"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["currentData"]["price"] == 150.0
+        assert data["projection"] is None
+        assert data["technical"] is None
+
     def test_stock_historical_skips_nan_days(self, client, mock_data_loader, temp_data_dir):
         """One corrupt day is omitted; valid siblings still return 200."""
         from datetime import datetime, timedelta
