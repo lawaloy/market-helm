@@ -7,9 +7,47 @@ import shutil
 from pathlib import Path
 import pandas as pd
 import json
-from datetime import date
+from datetime import date, datetime
+from unittest.mock import patch
 
-from src.storage.data_storage import DataStorage
+from src.storage.data_storage import DataStorage, _data_date_for_filename
+
+
+class TestDataDateForFilename:
+    """Write-path trading-day stamp used when save callers omit an explicit date."""
+
+    def test_weekday_uses_today(self):
+        # 2026-07-22 is a Wednesday.
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 22, 12, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 22)
+
+    def test_saturday_rolls_back_to_friday(self):
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 25, 9, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 24)
+
+    def test_sunday_rolls_back_to_friday(self):
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 26, 9, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 24)
+
+    def test_save_daily_data_uses_trading_day_filename(self, tmp_path):
+        storage = DataStorage(data_dir=str(tmp_path))
+        with patch(
+            "src.storage.data_storage._data_date_for_filename",
+            return_value=date(2026, 7, 24),
+        ):
+            path = storage.save_daily_data(
+                [{"symbol": "AAPL", "name": "Apple", "close": 150.0}]
+            )
+        assert path is not None
+        assert Path(path).name == "daily_data_2026-07-24.csv"
+
+    def test_save_daily_data_empty_returns_none(self, tmp_path):
+        storage = DataStorage(data_dir=str(tmp_path))
+        assert storage.save_daily_data([]) is None
+        assert list(tmp_path.glob("daily_data_*.csv")) == []
 
 
 class TestDataStorage(unittest.TestCase):
@@ -151,6 +189,18 @@ class TestDataStorage(unittest.TestCase):
 
     def test_save_projections_empty_returns_none(self):
         self.assertIsNone(self.storage.save_projections({}))
+
+    def test_load_daily_data_missing_file_returns_none(self):
+        """Absent daily CSV soft-fails to None instead of raising."""
+        self.assertIsNone(self.storage.load_daily_data(date=date(2099, 1, 1)))
+
+    def test_load_daily_data_corrupt_csv_returns_none(self):
+        """Unreadable daily CSV soft-fails to None so callers can skip the day."""
+        bad_path = Path(self.test_data_dir) / "daily_data_2099-01-02.csv"
+        bad_path.write_bytes(b"\xff\xfe not,valid,csv\n\x00\x01")
+        with unittest.mock.patch("builtins.print"):
+            loaded = self.storage.load_daily_data(date=date(2099, 1, 2))
+        self.assertIsNone(loaded)
 
 
 if __name__ == '__main__':

@@ -103,7 +103,7 @@ async def get_projections_summary():
             trends=trends,
             riskProfile=risk_profile
         )
-
+    
     except HTTPException:
         raise
     except ValueError:
@@ -137,7 +137,7 @@ async def get_opportunities(
             or "confidence" not in proj_df.columns
         ):
             return OpportunitiesResponse(type=type, count=0, opportunities=[])
-        
+
         # Map type to recommendation string
         rec_map = {
             "STRONG_BUY": "STRONG BUY",
@@ -182,7 +182,7 @@ async def get_opportunities(
             count=len(filtered_df),
             opportunities=opportunities
         )
-
+    
     except HTTPException:
         raise
     except ValueError:

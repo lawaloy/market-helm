@@ -25,6 +25,13 @@ class TestSession:
         with pytest.raises(AuthError, match="expired"):
             decode_access_token(token)
 
+    def test_exact_expiry_boundary_rejected(self, auth_secret, monkeypatch):
+        """Tokens with exp == now must be treated as expired (zero TTL)."""
+        monkeypatch.setattr(time, "time", lambda: 1_000_000)
+        token = create_access_token("user-123", ttl_seconds=0)
+        with pytest.raises(AuthError, match="expired"):
+            decode_access_token(token)
+
     def test_invalid_signature_rejected(self, auth_secret):
         token = create_access_token("user-123")
         tampered = token[:-4] + "xxxx"

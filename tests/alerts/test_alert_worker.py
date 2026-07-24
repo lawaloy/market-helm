@@ -225,6 +225,116 @@ def test_run_user_check_dedupes_and_uppercases_watch_symbols(db_users) -> None:
     load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
 
 
+def test_run_user_check_skips_non_dict_conditions(db_users) -> None:
+    """Truthy non-dict conditions previously AttributeError'd before evaluate()."""
+    user_a, _user_b = db_users
+    save_user_alerts_config(
+        user_a,
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "poison-str",
+                    "enabled": True,
+                    "condition": "price_threshold",
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "poison-list",
+                    "enabled": True,
+                    "condition": [{"type": "price_threshold", "symbol": "MSFT"}],
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "null-condition",
+                    "enabled": True,
+                    "condition": None,
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "good",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                    "notifications": ["log"],
+                },
+            ],
+        },
+    )
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=(
+            "2026-06-09",
+            {"AAPL": 150.0},
+            [{"symbol": "AAPL", "close": 150.0}],
+        ),
+    ) as load_snapshot:
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            result = alert_worker.run_user_check(user_a)
+
+    assert result["triggered"] == 1
+    load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
+
+
+def test_run_user_check_strips_padded_and_skips_sentinel_symbols(db_users) -> None:
+    """User-scoped checks must strip watches and never fetch fake NAN/NONE tickers."""
+    user_a, _user_b = db_users
+    save_user_alerts_config(
+        user_a,
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "padded",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "  msft  ",
+                        "operator": "less_than",
+                        "value": 400,
+                    },
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "sentinel-nan",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "nan",
+                        "operator": "less_than",
+                        "value": 10,
+                    },
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "sentinel-none",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": None,
+                        "operator": "greater_than",
+                        "value": 1,
+                    },
+                    "notifications": ["log"],
+                },
+            ],
+        },
+    )
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=("2026-06-09", {}, []),
+    ) as load_snapshot:
+        alert_worker.run_user_check(user_a)
+
+    load_snapshot.assert_called_once_with(["MSFT"], fetch_missing_quotes=True)
+
+
 def test_run_db_worker_cycle_evaluates_snapshot_and_delivers_per_user(db_users) -> None:
     """Hosted worker cycle should wire orchestrator, queue processing, and user storage."""
     user_a, user_b = db_users
