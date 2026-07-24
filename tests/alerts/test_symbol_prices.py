@@ -29,3 +29,21 @@ def test_resolve_symbol_prices_fetches_missing(_mock_saved, mock_fetcher_cls):
 
     assert prices == {"AAPL": 180.5, "NVDA": 900.0}
     fetcher.fetch_symbol_data.assert_called_once_with("NVDA")
+
+
+@patch(
+    "src.alerts.symbol_prices.prices_from_saved_daily_data",
+    return_value={"AAPL": 180.5, "MSFT": 400.0},
+)
+def test_resolve_symbol_prices_skips_blank_and_dedupes_case(_mock_saved):
+    """Quote pickers must ignore empty tokens and treat ticker case as identical."""
+    prices = resolve_symbol_prices(
+        ["", "  ", "aapl", "AAPL", "msft"],
+        fetch_missing=False,
+    )
+
+    assert prices == {"AAPL": 180.5, "MSFT": 400.0}
+
+
+def test_resolve_symbol_prices_returns_empty_for_blank_only_input():
+    assert resolve_symbol_prices(["", "   "], fetch_missing=False) == {}
