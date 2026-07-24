@@ -79,7 +79,9 @@ def polish_alerts_config(
     ``ALERT_EMAIL_TO`` is never written into another tenant's config.
     """
     polished = dict(config)
-    defaults = dict(polished.get("defaults") or {})
+    raw_defaults = polished.get("defaults")
+    # Truthy non-dict defaults (list/str/number) crash dict(); soft-fail to {}.
+    defaults = dict(raw_defaults) if isinstance(raw_defaults, dict) else {}
 
     if seed_env_email:
         env_email = (os.environ.get("ALERT_EMAIL_TO") or "").strip()
@@ -232,7 +234,8 @@ def apply_alert_defaults(alert: Dict[str, Any], defaults: Optional[Dict[str, Any
 def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Remove webhook URLs from persisted config — secrets belong in server env only."""
     cleaned = dict(config)
-    defaults = dict(cleaned.get("defaults") or {})
+    raw_defaults = cleaned.get("defaults")
+    defaults = dict(raw_defaults) if isinstance(raw_defaults, dict) else {}
     defaults.pop("webhook_url", None)
     cleaned["defaults"] = defaults
     cleaned["alerts"] = [

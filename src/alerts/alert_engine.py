@@ -127,9 +127,9 @@ class AlertEngine:
     def _within_cooldown(self, alert: Dict) -> bool:
         try:
             cooldown_minutes = int(alert.get("cooldown_minutes", 0) or 0)
-        except (TypeError, ValueError):
-            # File-mode configs may carry junk cooldown values; treat as no cooldown
-            # so one bad alert cannot abort evaluation of sibling watches.
+        except (TypeError, ValueError, OverflowError):
+            # File-mode configs may carry junk / Inf cooldown values; treat as no
+            # cooldown so one bad alert cannot abort evaluation of sibling watches.
             logger.warning(
                 "Invalid cooldown_minutes on alert %s; treating as 0",
                 alert.get("id"),
