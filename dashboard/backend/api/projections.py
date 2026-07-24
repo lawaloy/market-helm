@@ -2,7 +2,7 @@
 Projections API endpoints
 """
 import math
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
@@ -11,17 +11,30 @@ from datetime import datetime, timedelta
 router = APIRouter()
 
 
-def _safe_float(value: Any, default: float = 0.0) -> float:
-    """Coerce numeric summary fields; fall back when missing, non-numeric, or non-finite."""
+def _finite_float(value: Any) -> Optional[float]:
+    """Return float when finite; otherwise None (missing/non-numeric/NaN/Inf)."""
     try:
         if value is None:
-            return default
+            return None
         result = float(value)
         if not math.isfinite(result):
-            return default
+            return None
         return result
     except (TypeError, ValueError):
-        return default
+        return None
+
+
+def _safe_volume(value: Any) -> int:
+    """Coerce volume to a finite int; bad/missing cells become 0 (never abort the list)."""
+    try:
+        if value is None:
+            return 0
+        result = float(value)
+        if not math.isfinite(result):
+            return 0
+        return int(result)
+    except (TypeError, ValueError):
+        return 0
 
 
 @router.get("/summary", response_model=ProjectionsSummary)
@@ -44,13 +57,13 @@ async def get_projections_summary():
         # Calculate statistics
         total_projections = len(df)
         avg_confidence = (
-            _safe_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
-        )
+            _finite_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
+        ) or 0.0
         avg_expected_change = (
-            _safe_float(df['expected_change_percent'].mean())
+            _finite_float(df['expected_change_percent'].mean())
             if 'expected_change_percent' in df.columns
             else 0.0
-        )
+        ) or 0.0
         
         # Determine sentiment
         if avg_expected_change > 1.0:
@@ -128,7 +141,7 @@ async def get_opportunities(
         # Load projections and daily data
         proj_df = loader.load_projections()
         daily_df = loader.load_daily_data()
-
+        
         # Missing ranking columns → empty list (not KeyError→500)
         if (
             proj_df is None
@@ -156,25 +169,53 @@ async def get_opportunities(
         opportunities = []
         for _, row in sorted_df.iterrows():
             symbol = row['symbol']
-            
+
+            # Required projection numerics: skip the row instead of int(NaN)→500
+            # or Pydantic serializing NaN/Inf as JSON null.
+            target_price = _finite_float(row.get('target_mid'))
+            expected_change = _finite_float(row.get('expected_change_percent'))
+            confidence_f = _finite_float(row.get('confidence'))
+            if (
+                target_price is None
+                or expected_change is None
+                or confidence_f is None
+            ):
+                continue
+
             # Get current price from daily data
             stock_daily = daily_df[daily_df['symbol'] == symbol]
-            current_price = float(stock_daily.iloc[0]['close']) if not stock_daily.empty else 0
-            volume = int(stock_daily.iloc[0].get('volume', 0)) if not stock_daily.empty else 0
-            
+            if stock_daily.empty:
+                current_price = 0.0
+                volume = 0
+            else:
+                daily_row = stock_daily.iloc[0]
+                current_price = _finite_float(daily_row.get('close')) or 0.0
+                volume = _safe_volume(daily_row.get('volume', 0))
+
+            momentum = (
+                _finite_float(row.get('momentum_score'))
+                if 'momentum_score' in row.index
+                else None
+            )
+            volatility = (
+                _finite_float(row.get('volatility_score'))
+                if 'volatility_score' in row.index
+                else None
+            )
+
             opportunities.append(Opportunity(
                 symbol=symbol,
                 name=row.get('name', symbol),
                 currentPrice=current_price,
-                targetPrice=float(row['target_mid']),
-                expectedChange=float(row['expected_change_percent']),
-                confidence=int(row['confidence']),
+                targetPrice=target_price,
+                expectedChange=expected_change,
+                confidence=int(confidence_f),
                 risk=row['risk_level'],
                 trend=row['trend'],
                 reason=row.get('reason', ''),
                 volume=volume,
-                momentum=float(row.get('momentum_score', 0)) if 'momentum_score' in row else None,
-                volatility=float(row.get('volatility_score', 0)) if 'volatility_score' in row else None
+                momentum=momentum,
+                volatility=volatility,
             ))
         
         return OpportunitiesResponse(
