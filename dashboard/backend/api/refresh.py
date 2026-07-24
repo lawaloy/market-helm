@@ -129,6 +129,9 @@ def run_daily_tracker():
             refresh_status["progress"] = "Refresh cancelled."
             return
 
+        if refresh_status["last_status"] == "timeout":
+            return
+
         if _refresh_process.returncode == 0:
             refresh_status["last_status"] = "success"
             refresh_status["last_refresh"] = datetime.now().isoformat()
