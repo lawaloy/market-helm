@@ -87,6 +87,28 @@ def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
     assert prices_from_saved_daily_data() == {"AAPL": 180.5}
 
 
+@patch("src.services.data_fetcher.StockDataFetcher")
+@patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
+def test_resolve_symbol_prices_skips_non_finite_live_quotes(_mock_saved, mock_fetcher_cls):
+    """Live Finnhub quotes with NaN/inf closes must not enter the quote map."""
+    fetcher = MagicMock()
+
+    def fetch_symbol_data(symbol: str):
+        if symbol == "OK":
+            return {"symbol": symbol, "close": 12.5}
+        if symbol == "NAN":
+            return {"symbol": symbol, "close": float("nan")}
+        if symbol == "INF":
+            return {"symbol": symbol, "price": float("inf")}
+        return {"symbol": symbol, "close": float("-inf")}
+
+    fetcher.fetch_symbol_data.side_effect = fetch_symbol_data
+    mock_fetcher_cls.return_value = fetcher
+
+    prices = resolve_symbol_prices(["OK", "NAN", "INF", "NINF"], fetch_missing=True)
+    assert prices == {"OK": 12.5}
+
+
 @patch("src.services.data_fetcher.StockDataFetcher", side_effect=ValueError("API key required"))
 @patch(
     "src.alerts.symbol_prices.prices_from_saved_daily_data",
