@@ -8,4 +8,4 @@ collected 27 items
 tests\alerts\test_alert_engine.py ...................                    [ 70%]
 tests\workflows\test_tracker.py ........                                 [100%]
 
-======================= 27 passed, 13 warnings in 0.94s =======================
+======================= 27 passed, 13 warnings in 1.12s =======================
