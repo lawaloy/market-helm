@@ -50,7 +50,7 @@ class WebhookNotifier:
             or os.environ.get("ALERT_WEBHOOK_FORMAT")
             or "json"
         )
-        return cls(url=str(url).strip(), payload_format=str(payload_format).lower())
+        return cls(url=str(url).strip(), payload_format=str(payload_format).strip().lower())
 
     @staticmethod
     def _alert_text(event: Dict[str, Any], markdown: str = "slack") -> str:
