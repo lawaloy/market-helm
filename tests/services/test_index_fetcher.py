@@ -44,6 +44,43 @@ def test_load_from_cache_returns_fresh_symbols_and_ignores_stale(tmp_path):
     assert fetcher._load_from_cache("S&P 500") is None
 
 
+def test_load_from_cache_normalizes_padded_dedupes_and_skips_sentinels(tmp_path):
+    """Dirty cache rows must not leak padded/duplicate/fake NAN tickers into fetches."""
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    cache_file = tmp_path / "SP_500_symbols.json"
+    cache_file.write_text(
+        json.dumps(
+            {
+                "date": datetime.now().isoformat(),
+                "symbols": [" aapl ", "AAPL", "msft", None, "NAN", "  ", "GOOG"],
+            }
+        )
+    )
+
+    assert fetcher._load_from_cache("S&P 500") == ["AAPL", "MSFT", "GOOG"]
+
+
+def test_get_sp500_symbols_normalizes_package_symbols_before_cache(tmp_path):
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    package = MagicMock()
+    # Need >400 after normalize/dedupe for the sanity gate.
+    package.get_stocks_by_index.return_value = (
+        [{"symbol": f"s{i}"} for i in range(401)]
+        + [{"symbol": " S0 "}, {"symbol": None}, {"symbol": "NAN"}]
+    )
+    fetcher.package_available = True
+    fetcher.ticker_symbols = package
+
+    symbols = fetcher.get_sp500_symbols()
+
+    assert len(symbols) == 401
+    assert symbols[0] == "S0"
+    assert "NAN" not in symbols
+    cached = json.loads((tmp_path / "SP_500_symbols.json").read_text())
+    assert cached["symbols"] == symbols
+    assert cached["symbols"][0] == "S0"
+
+
 def test_get_sp500_symbols_uses_cache_before_package(tmp_path, monkeypatch):
     fetcher = IndexFetcher(cache_dir=str(tmp_path))
     package = MagicMock()
@@ -78,22 +115,6 @@ def test_get_sp500_symbols_falls_back_when_package_returns_too_few(tmp_path):
 
     assert symbols == fetcher._get_minimal_fallback("S&P 500")
     assert not (tmp_path / "SP_500_symbols.json").exists()
-
-
-def test_get_sp500_symbols_caches_valid_package_result(tmp_path):
-    fetcher = IndexFetcher(cache_dir=str(tmp_path))
-    package = MagicMock()
-    package.get_stocks_by_index.return_value = [
-        {"symbol": f"S{i}"} for i in range(401)
-    ]
-    fetcher.package_available = True
-    fetcher.ticker_symbols = package
-
-    symbols = fetcher.get_sp500_symbols()
-
-    assert len(symbols) == 401
-    cached = json.loads((tmp_path / "SP_500_symbols.json").read_text())
-    assert cached["symbols"] == symbols
 
 
 def test_get_nasdaq100_symbols_uses_cache_then_fallback(tmp_path, monkeypatch):
