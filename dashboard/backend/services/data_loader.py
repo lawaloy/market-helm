@@ -149,10 +149,15 @@ class DataLoader:
         
         try:
             with open(file_path, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, OSError) as exc:
             # Corrupt JSON must map to ValueError → API 404, not generic 500.
             raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
+        # Valid JSON that is not an object (null/[]/"x") would AttributeError
+        # on summary_data.get(...) in /api/market/summary — treat as unreadable.
+        if not isinstance(data, dict):
+            raise ValueError(f"Summary file unreadable: {file_path.name}")
+        return data
     
     def get_available_dates(self) -> List[str]:
         """Get list of all available dates"""
