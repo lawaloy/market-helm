@@ -47,6 +47,11 @@ def _fmt_money(value: Any) -> str:
     return f"${formatted}" if formatted != _MISSING else _MISSING
 
 
+def _as_dict(value: Any) -> dict:
+    """Coerce nested workflow payload sections; non-dicts must not AttributeError."""
+    return value if isinstance(value, dict) else {}
+
+
 def display_results(result: dict):
     """
     Display workflow results in CLI format.
@@ -58,12 +63,12 @@ def display_results(result: dict):
         logger.error(f"Workflow failed: {result.get('error', 'Unknown error')}")
         return
     
-    analysis = result.get("analysis", {})
-    index_comparison = result.get("index_comparison", {})
-    projections = result.get("projections", {})
-    projection_summary = result.get("projection_summary", {})
+    analysis = _as_dict(result.get("analysis", {}))
+    index_comparison = _as_dict(result.get("index_comparison", {}))
+    projections = _as_dict(result.get("projections", {}))
+    projection_summary = _as_dict(result.get("projection_summary", {}))
     ai_summary = result.get("ai_summary")
-    metadata = result.get("metadata", {})
+    metadata = _as_dict(result.get("metadata", {}))
     
     # Header
     logger.info("=" * 60)
@@ -79,8 +84,8 @@ def display_results(result: dict):
         logger.info("")
     
     # Summary statistics
-    if "summary" in analysis:
-        summary = analysis["summary"]
+    summary = analysis.get("summary")
+    if isinstance(summary, dict):
         logger.info(f"Date: {metadata.get('date', datetime.now().date())}")
         logger.info(f"Total Stocks Tracked: {summary.get('total_stocks', 0)}")
         logger.info(f"Gainers: {summary.get('gainers', 0)}")
@@ -92,22 +97,28 @@ def display_results(result: dict):
         logger.info("")
     
     # Top gainers
-    if "top_gainers" in analysis and analysis["top_gainers"]:
+    top_gainers = analysis.get("top_gainers")
+    if isinstance(top_gainers, list) and top_gainers:
         logger.info("Top 5 Gainers:")
-        for i, stock in enumerate(analysis["top_gainers"], 1):
+        for i, stock in enumerate(top_gainers, 1):
+            if not isinstance(stock, dict):
+                continue
             logger.info(
-                f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
+                f"  {i}. {stock.get('symbol', '?')} ({stock.get('name', 'N/A')}): "
                 f"{_fmt_pct(stock.get('change_percent'), signed=True)} @ "
                 f"{_fmt_money(stock.get('close'))}"
             )
         logger.info("")
     
     # Top losers
-    if "top_losers" in analysis and analysis["top_losers"]:
+    top_losers = analysis.get("top_losers")
+    if isinstance(top_losers, list) and top_losers:
         logger.info("Top 5 Losers:")
-        for i, stock in enumerate(analysis["top_losers"], 1):
+        for i, stock in enumerate(top_losers, 1):
+            if not isinstance(stock, dict):
+                continue
             logger.info(
-                f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
+                f"  {i}. {stock.get('symbol', '?')} ({stock.get('name', 'N/A')}): "
                 f"{_fmt_pct(stock.get('change_percent'))} @ "
                 f"{_fmt_money(stock.get('close'))}"
             )
@@ -117,12 +128,17 @@ def display_results(result: dict):
     if index_comparison:
         logger.info("Index Performance:")
         for index_name, stats in index_comparison.items():
+            if not isinstance(stats, dict):
+                continue
             logger.info(f"  {index_name}:")
-            logger.info(f"    Stocks: {stats['stock_count']}")
+            logger.info(f"    Stocks: {stats.get('stock_count', 0)}")
             logger.info(
                 f"    Avg Change: {_fmt_pct(stats.get('average_change_percent'))}"
             )
-            logger.info(f"    Gainers: {stats['gainers']} | Losers: {stats['losers']}")
+            logger.info(
+                f"    Gainers: {stats.get('gainers', 0)} | "
+                f"Losers: {stats.get('losers', 0)}"
+            )
         logger.info("")
     
     # Projection summary
@@ -145,22 +161,25 @@ def display_results(result: dict):
         
         # Recommendation breakdown
         recommendations = projection_summary.get('recommendations', {})
-        if recommendations:
+        if isinstance(recommendations, dict) and recommendations:
             logger.info("Recommendation Breakdown:")
             for rec, count in sorted(recommendations.items(), key=lambda x: x[1], reverse=True):
                 logger.info(f"  {rec}: {count}")
             logger.info("")
         
         # Top opportunities
-        opportunities = projection_summary.get('top_opportunities', {})
+        opportunities = _as_dict(projection_summary.get('top_opportunities', {}))
         
-        if opportunities.get('strong_buys'):
+        strong_buys = opportunities.get('strong_buys')
+        if isinstance(strong_buys, list) and strong_buys:
             logger.info("Top 5 BUY Opportunities:")
-            for i, stock in enumerate(opportunities['strong_buys'][:5], 1):
-                proj = projections.get(stock['symbol'])
-                if proj:
+            for i, stock in enumerate(strong_buys[:5], 1):
+                if not isinstance(stock, dict):
+                    continue
+                proj = projections.get(stock.get('symbol'))
+                if isinstance(proj, dict):
                     logger.info(
-                        f"  {i}. {proj['symbol']} - Target: "
+                        f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
                         f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
@@ -168,13 +187,16 @@ def display_results(result: dict):
                     logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
         
-        if opportunities.get('strong_sells'):
+        strong_sells = opportunities.get('strong_sells')
+        if isinstance(strong_sells, list) and strong_sells:
             logger.info("Top 5 SELL Warnings:")
-            for i, stock in enumerate(opportunities['strong_sells'][:5], 1):
-                proj = projections.get(stock['symbol'])
-                if proj:
+            for i, stock in enumerate(strong_sells[:5], 1):
+                if not isinstance(stock, dict):
+                    continue
+                proj = projections.get(stock.get('symbol'))
+                if isinstance(proj, dict):
                     logger.info(
-                        f"  {i}. {proj['symbol']} - Target: "
+                        f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
                         f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
@@ -187,7 +209,7 @@ def display_results(result: dict):
         logger.info("")
     
     # File paths
-    file_paths = result.get("file_paths", {})
+    file_paths = _as_dict(result.get("file_paths", {}))
     if file_paths.get("data"):
         logger.info(f"Data saved to: {file_paths['data']}")
     if file_paths.get("summary"):

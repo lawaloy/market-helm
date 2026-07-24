@@ -127,9 +127,9 @@ class AlertEngine:
     def _within_cooldown(self, alert: Dict) -> bool:
         try:
             cooldown_minutes = int(alert.get("cooldown_minutes", 0) or 0)
-        except (TypeError, ValueError):
-            # File-mode configs may carry junk cooldown values; treat as no cooldown
-            # so one bad alert cannot abort evaluation of sibling watches.
+        except (TypeError, ValueError, OverflowError):
+            # File-mode configs may carry junk / Inf cooldown values; treat as no
+            # cooldown so one bad alert cannot abort evaluation of sibling watches.
             logger.warning(
                 "Invalid cooldown_minutes on alert %s; treating as 0",
                 alert.get("id"),
@@ -149,7 +149,14 @@ class AlertEngine:
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
         alert = apply_alert_defaults(alert, self.defaults)
-        notifier_names = alert.get("notifications") or ["log"]
+        raw_notifications = alert.get("notifications")
+        # Non-lists (e.g. int/str) are not iterable channel names; strings also
+        # make `"email" in notifications` true via substring membership.
+        notifier_names = (
+            raw_notifications if isinstance(raw_notifications, list) else ["log"]
+        )
+        if not notifier_names:
+            notifier_names = ["log"]
         instances: List[Any] = []
         for name in notifier_names:
             if name == "log":
@@ -196,7 +203,8 @@ class AlertEngine:
                     (
                         s
                         for s in stocks
-                        if normalize_ticker(s.get("symbol")) == symbol
+                        if isinstance(s, dict)
+                        and normalize_ticker(s.get("symbol")) == symbol
                     ),
                     None,
                 )
@@ -204,6 +212,8 @@ class AlertEngine:
                     triggered_symbols = [symbol]
             elif condition_type == "screening_match":
                 for stock in stocks:
+                    if not isinstance(stock, dict):
+                        continue
                     if evaluate_screening_match(condition, stock):
                         # Mirror price_threshold: drop None/NaN/padded sentinels
                         # so events never carry raw CSV junk into notifications.

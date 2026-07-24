@@ -50,6 +50,9 @@ def enrich_stock_data_with_names(data: list) -> list:
     Modifies in place and returns the same list.
     """
     for row in data:
+        # Skip poison / hand-edited non-dict rows so save_daily_data can continue.
+        if not isinstance(row, dict):
+            continue
         key = normalize_ticker(row.get("symbol"))
         if key is None:
             continue
