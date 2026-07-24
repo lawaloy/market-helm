@@ -109,7 +109,16 @@ class AlertEngine:
         return True
 
     def _within_cooldown(self, alert: Dict) -> bool:
-        cooldown_minutes = int(alert.get("cooldown_minutes", 0))
+        try:
+            cooldown_minutes = int(alert.get("cooldown_minutes", 0) or 0)
+        except (TypeError, ValueError):
+            # File-mode configs may carry junk cooldown values; treat as no cooldown
+            # so one bad alert cannot abort evaluation of sibling watches.
+            logger.warning(
+                "Invalid cooldown_minutes on alert %s; treating as 0",
+                alert.get("id"),
+            )
+            return False
         if cooldown_minutes <= 0:
             return False
         last_triggered = self.storage.get_last_triggered(alert["id"])

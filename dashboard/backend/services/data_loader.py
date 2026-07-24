@@ -1,6 +1,7 @@
 """
 Data loading service for reading CSV and JSON files
 """
+import math
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -227,7 +228,11 @@ class DataLoader:
                 stock_data = daily_df[daily_df["symbol"] == sym]
                 if stock_data.empty:
                     continue
-                return d, float(stock_data.iloc[0]["close"])
+                close = float(stock_data.iloc[0]["close"])
+                # Skip non-finite closes so accuracy samples stay JSON-safe.
+                if not math.isfinite(close):
+                    continue
+                return d, close
             except Exception:
                 continue
         return None
@@ -270,7 +275,7 @@ class DataLoader:
                     predicted = float(row_dict["target_mid"])
                 except (KeyError, TypeError, ValueError):
                     continue
-                if predicted <= 0:
+                if not math.isfinite(predicted) or predicted <= 0:
                     continue
 
                 target_date = self._projection_target_date(row_dict, run_date)

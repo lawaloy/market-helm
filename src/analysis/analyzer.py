@@ -4,9 +4,23 @@ MarketHelm - Data Analyzer Module
 Analyzes stock market data and generates summaries.
 """
 
+import math
 import pandas as pd
-from typing import Dict, List
+from typing import Any, Dict, List
 from datetime import datetime
+
+
+def _finite_float(value: Any, default: float = 0.0) -> float:
+    """Coerce aggregates to a finite float for JSON-safe summary output."""
+    try:
+        if value is None:
+            return default
+        result = float(value)
+        if not math.isfinite(result):
+            return default
+        return result
+    except (TypeError, ValueError):
+        return default
 
 
 class StockAnalyzer:
@@ -57,17 +71,24 @@ class StockAnalyzer:
             exchange_stats = {}
             for exchange_code in exchange_grouped.index:
                 exchange_stats[exchange_code] = {
-                    'avg_change_percent': float(exchange_grouped.loc[exchange_code, ('change_percent', 'mean')]),
+                    'avg_change_percent': _finite_float(
+                        exchange_grouped.loc[exchange_code, ('change_percent', 'mean')]
+                    ),
                     'stock_count': int(exchange_grouped.loc[exchange_code, ('change_percent', 'count')]),
-                    'total_volume': int(exchange_grouped.loc[exchange_code, ('volume', 'sum')])
+                    'total_volume': int(
+                        _finite_float(
+                            exchange_grouped.loc[exchange_code, ('volume', 'sum')],
+                            default=0.0,
+                        )
+                    ),
                 }
         else:
             exchange_stats = {}
         
-        # Price statistics
-        avg_change = df['change_percent'].mean()
-        max_change = df['change_percent'].max()
-        min_change = df['change_percent'].min()
+        # Price statistics — coerce non-finite means/extrema so summary JSON stays valid.
+        avg_change = _finite_float(df['change_percent'].mean())
+        max_change = _finite_float(df['change_percent'].max())
+        min_change = _finite_float(df['change_percent'].min())
         
         return {
             'date': datetime.now().date().isoformat(),

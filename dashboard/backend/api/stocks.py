@@ -81,27 +81,43 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
             
             if not stock_proj.empty:
                 proj_row = stock_proj.iloc[0]
-                
-                # Calculate target date
-                proj_date = datetime.strptime(date, "%Y-%m-%d")
-                target_date = (proj_date + timedelta(days=5)).strftime("%Y-%m-%d")
-                
-                projection_data = ProjectionData(
-                    targetDate=target_date,
-                    targetPrice=float(proj_row['target_mid']),
-                    expectedChange=float(proj_row['expected_change_percent']),
-                    confidence=int(proj_row['confidence']),
-                    recommendation=proj_row['recommendation'],
-                    risk=proj_row['risk_level'],
-                    trend=proj_row['trend']
-                )
-                
-                # Build technical data if available
-                technical_data = TechnicalData(
-                    momentum=float(proj_row.get('momentum_score', 0)) if 'momentum_score' in proj_row else None,
-                    volatility=float(proj_row.get('volatility_score', 0)) if 'volatility_score' in proj_row else None,
-                    rsi=None  # Not available in current data
-                )
+
+                # Soft-fail projection when required numerics are missing/non-finite
+                # so Pydantic cannot serialize NaN/Inf as JSON null on the detail card.
+                target_price = _finite_float(proj_row.get("target_mid"))
+                expected_change = _finite_float(proj_row.get("expected_change_percent"))
+                confidence_f = _finite_float(proj_row.get("confidence"))
+                if (
+                    target_price is not None
+                    and expected_change is not None
+                    and confidence_f is not None
+                ):
+                    proj_date = datetime.strptime(date, "%Y-%m-%d")
+                    target_date = (proj_date + timedelta(days=5)).strftime("%Y-%m-%d")
+
+                    projection_data = ProjectionData(
+                        targetDate=target_date,
+                        targetPrice=target_price,
+                        expectedChange=expected_change,
+                        confidence=int(confidence_f),
+                        recommendation=proj_row["recommendation"],
+                        risk=proj_row["risk_level"],
+                        trend=proj_row["trend"],
+                    )
+
+                    technical_data = TechnicalData(
+                        momentum=(
+                            _finite_float(proj_row.get("momentum_score"))
+                            if "momentum_score" in proj_row.index
+                            else None
+                        ),
+                        volatility=(
+                            _finite_float(proj_row.get("volatility_score"))
+                            if "volatility_score" in proj_row.index
+                            else None
+                        ),
+                        rsi=None,  # Not available in current data
+                    )
         
         except Exception:
             # No projection data available
