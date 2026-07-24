@@ -53,5 +53,9 @@
       "last 1 safari version"
     ]
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "@emnapi/core": "1.11.2",
+    "@emnapi/runtime": "1.11.2"
+  }
 }
