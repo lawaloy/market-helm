@@ -139,6 +139,35 @@ def test_fetch_missing_watch_quotes_skips_invalid_live_prices(mock_fetcher_cls, 
     assert fetcher.fetch_symbol_data.call_count == 2
 
 
+@patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cls, caplog):
+    """NaN/inf live closes must not enter alert evaluation stocks."""
+    fetcher = MagicMock()
+
+    def fetch_symbol(symbol):
+        if symbol == "NAN":
+            return {"symbol": symbol, "close": float("nan")}
+        if symbol == "INF":
+            return {"symbol": symbol, "price": float("inf")}
+        return {"symbol": symbol, "close": 410.25}
+
+    fetcher.fetch_symbol_data.side_effect = fetch_symbol
+    mock_fetcher_cls.return_value = fetcher
+
+    with caplog.at_level("WARNING"):
+        enriched = _fetch_missing_watch_quotes(
+            [{"symbol": "AAPL", "close": 180.0}],
+            ["NAN", "INF", "MSFT"],
+        )
+
+    assert enriched == [
+        {"symbol": "AAPL", "close": 180.0},
+        {"symbol": "MSFT", "close": 410.25},
+    ]
+    assert "Skipping invalid quote for watch symbol NAN" in caplog.text
+    assert "Skipping invalid quote for watch symbol INF" in caplog.text
+
+
 def test_stocks_from_daily_df_skips_invalid_closes(caplog):
     """One corrupt saved row must not wipe the rest of the daily dataset."""
     df = pd.DataFrame(
@@ -148,6 +177,7 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
             {"symbol": "", "close": 10.0},
             {"symbol": "MSFT", "close": "410.5"},
             {"symbol": "NONE", "close": float("nan")},
+            {"symbol": "INF", "close": float("inf")},
         ]
     )
 
@@ -160,6 +190,7 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
     ]
     assert "Skipping invalid saved quote for BAD" in caplog.text
     assert "Skipping invalid saved quote for NONE" in caplog.text
+    assert "Skipping invalid saved quote for INF" in caplog.text
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
