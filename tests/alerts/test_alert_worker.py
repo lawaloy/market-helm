@@ -8,6 +8,7 @@ from src.alerts import alert_worker
 from src.storage.alert_jobs import JOB_DELIVER, JOB_EVALUATE_SYMBOL, pending_job_count
 from src.storage.alert_watches import sync_watches_from_config
 from src.storage.database import get_connection, init_database
+from src.storage.user_alerts import save_user_alerts_config
 from src.storage.users import create_user
 
 
@@ -22,7 +23,7 @@ def db_users(tmp_path, monkeypatch):
     )
 
 
-def _price_watch(alert_id: str, threshold: float = 200.0):
+def _price_watch(alert_id: str, threshold: float = 200.0, symbol: str = "AAPL"):
     return {
         "defaults": {},
         "alerts": [
@@ -33,11 +34,11 @@ def _price_watch(alert_id: str, threshold: float = 200.0):
                 "cooldown_minutes": 0,
                 "condition": {
                     "type": "price_threshold",
-                    "symbol": "AAPL",
+                    "symbol": symbol,
                     "operator": "less_than",
                     "value": threshold,
                 },
-                "notifiers": [{"type": "console"}],
+                "notifications": ["log"],
             }
         ],
     }
@@ -75,6 +76,153 @@ def test_run_check_once_uses_db_cycle(mock_db_cycle, monkeypatch) -> None:
     result = alert_worker.run_check_once()
     assert result["triggered"] == 2
     mock_db_cycle.assert_called_once()
+
+
+def test_run_user_check_requires_database(monkeypatch) -> None:
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL"):
+        alert_worker.run_user_check("user-1")
+
+
+def test_run_user_check_returns_no_watches_when_config_missing(db_users) -> None:
+    user_a, _user_b = db_users
+    result = alert_worker.run_user_check(user_a)
+    assert result == {
+        "triggered": 0,
+        "events": [],
+        "last_data_date": None,
+        "message": "No active watches configured.",
+    }
+
+
+def test_run_user_check_returns_no_watches_when_alerts_disabled(db_users) -> None:
+    user_a, _user_b = db_users
+    save_user_alerts_config(
+        user_a,
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "disabled",
+                    "enabled": False,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                    "notifications": ["log"],
+                }
+            ],
+        },
+    )
+    result = alert_worker.run_user_check(user_a)
+    assert result["triggered"] == 0
+    assert result["message"] == "No active watches configured."
+
+
+def test_run_user_check_reports_missing_market_data(db_users) -> None:
+    user_a, _user_b = db_users
+    save_user_alerts_config(user_a, _price_watch("aapl-low"))
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=("2026-06-09", {}, []),
+    ) as load_snapshot:
+        result = alert_worker.run_user_check(user_a)
+
+    assert result == {
+        "triggered": 0,
+        "events": [],
+        "last_data_date": "2026-06-09",
+        "message": "No market data available.",
+    }
+    load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
+
+
+def test_run_user_check_only_evaluates_requested_user(db_users) -> None:
+    """Manual hosted checks must never fan out into another tenant's watches."""
+    user_a, user_b = db_users
+    save_user_alerts_config(user_a, _price_watch("aapl-low-a"))
+    save_user_alerts_config(user_b, _price_watch("aapl-low-b"))
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=(
+            "2026-06-09",
+            {"AAPL": 150.0},
+            [{"symbol": "AAPL", "close": 150.0}],
+        ),
+    ) as load_snapshot:
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+            with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
+                result = alert_worker.run_user_check(user_a)
+
+    assert result["triggered"] == 1
+    assert result["last_data_date"] == "2026-06-09"
+    assert result["message"] is None
+    assert send.call_count == 1
+    mock_cycle.assert_not_called()
+    load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT user_id, alert_id FROM alert_trigger_state ORDER BY alert_id"
+        ).fetchall()
+    assert [(row["user_id"], row["alert_id"]) for row in rows] == [
+        (user_a, "aapl-low-a"),
+    ]
+
+
+def test_run_user_check_dedupes_and_uppercases_watch_symbols(db_users) -> None:
+    user_a, _user_b = db_users
+    save_user_alerts_config(
+        user_a,
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "aapl-a",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "aapl",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "aapl-b",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "greater_than",
+                        "value": 100,
+                    },
+                    "notifications": ["log"],
+                },
+                {
+                    "id": "screen",
+                    "enabled": True,
+                    "condition": {
+                        "type": "screening_match",
+                        "filters": {"volume_threshold": 1_000_000},
+                    },
+                    "notifications": ["log"],
+                },
+            ],
+        },
+    )
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=("2026-06-09", {}, []),
+    ) as load_snapshot:
+        alert_worker.run_user_check(user_a)
+
+    load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
 
 
 def test_run_db_worker_cycle_evaluates_snapshot_and_delivers_per_user(db_users) -> None:
