@@ -135,7 +135,7 @@ class StockProjector:
                 momentum, volatility, volume, stock_for_confidence
             )
             
-            # Generate reasoning (use coerced optionals — raw volume/change can be non-numeric)
+            # Generate reasoning (use coerced optionals ΓÇö raw volume/change can be non-numeric)
             reason = self._generate_reason(
                 {**stock_for_confidence, "volume": volume},
                 momentum,
@@ -241,7 +241,7 @@ class StockProjector:
         volatility_factor = volatility / 100  # 0 to 1
         
         # Base expected move on recent momentum
-        base_move_pct = momentum_factor * 5  # Up to ±5% base move
+        base_move_pct = momentum_factor * 5  # Up to ┬▒5% base move
         
         # Adjust for continuation or mean reversion
         if abs(change_pct) > 5:
