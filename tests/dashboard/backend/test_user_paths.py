@@ -39,3 +39,23 @@ def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path):
     assert d.exists()
     assert not md.exists()
     assert (d / "data" / "daily.csv").read_text() == "sym"
+
+
+def test_user_config_dir_soft_fails_when_legacy_rename_raises(monkeypatch, tmp_path):
+    home = _fake_home(monkeypatch, tmp_path)
+    md = home / ".market-desk"
+    md.mkdir()
+    (md / "keep.txt").write_text("legacy")
+
+    from dashboard.backend import user_paths
+
+    def boom(_self, _dest):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "rename", boom)
+
+    d = user_paths.user_config_dir()
+    assert d == home / ".market-helm"
+    assert not d.exists()
+    assert md.exists()
+    assert (md / "keep.txt").read_text() == "legacy"

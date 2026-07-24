@@ -341,6 +341,30 @@ class TestAlertsConfigAPI:
         assert data["latest_deliveries"][0]["channel"] == "email"
         assert data["latest_deliveries"][0]["success"] is True
 
+    def test_get_status_preserves_timestamp_when_deliveries_raise(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        """Delivery channel lookup failure must not wipe last_triggered_at."""
+
+        class PartialStorage:
+            def latest_event_timestamp(self):
+                return "2026-07-24T10:00:00"
+
+        monkeypatch.setattr(
+            "src.alerts.alert_storage.AlertStorage",
+            lambda data_dir=None: PartialStorage(),
+        )
+        monkeypatch.setattr(
+            "src.alerts.delivery_status.latest_deliveries_by_channel",
+            lambda _storage: (_ for _ in ()).throw(RuntimeError("delivery index corrupt")),
+        )
+
+        r = client.get("/api/alerts/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["last_triggered_at"] == "2026-07-24T10:00:00"
+        assert data["latest_deliveries"] == []
+
     def test_run_without_config(self, client, alerts_config_dir):
         r = client.post("/api/alerts/run")
         assert r.status_code == 200
