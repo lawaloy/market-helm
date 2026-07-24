@@ -83,6 +83,8 @@ async def get_projections_summary():
             riskProfile=risk_profile
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -151,6 +153,8 @@ async def get_opportunities(
             opportunities=opportunities
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
