@@ -89,6 +89,8 @@ def polish_alerts_config(
     polished["defaults"] = defaults
     alerts: list[Dict[str, Any]] = []
     for alert in polished.get("alerts") or []:
+        if not isinstance(alert, dict):
+            continue
         cleaned = dict(alert)
         email = str(cleaned.get("email_to") or "").strip().lower()
         if email in _PLACEHOLDER_EMAILS:
@@ -102,6 +104,8 @@ def polish_alerts_config(
 
 
 def _price_alert_key(condition: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(condition, dict):
+        return None
     if condition.get("type") != "price_threshold":
         return None
     symbol = normalize_ticker(condition.get("symbol"))
@@ -117,7 +121,11 @@ def dedupe_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
     seen: set[str] = set()
     unique: list[Dict[str, Any]] = []
     for alert in config.get("alerts") or []:
-        key = _price_alert_key(alert.get("condition") or {}) or str(alert.get("id"))
+        if not isinstance(alert, dict):
+            continue
+        raw_condition = alert.get("condition")
+        condition = raw_condition if isinstance(raw_condition, dict) else {}
+        key = _price_alert_key(condition) or str(alert.get("id"))
         if key in seen:
             continue
         seen.add(key)
@@ -153,12 +161,20 @@ def init_user_alerts_config(force: bool = False) -> Path:
 
 
 def load_alerts_config(explicit: Optional[Path] = None) -> Tuple[Path, Optional[Dict[str, Any]]]:
-    """Return resolved config path and parsed JSON, or None if the file is missing."""
+    """Return resolved config path and parsed JSON, or None if the file is missing/unreadable."""
     path = resolve_alerts_config_path(explicit) if explicit is None else Path(explicit)
     if not path.exists():
         return path, None
-    with open(path, "r", encoding="utf-8") as handle:
-        return path, json.load(handle)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        # Treat corrupt/unreadable config like a missing file so Settings GET
+        # can soft-fail instead of 500ing on hand-edited JSON.
+        return path, None
+    if not isinstance(data, dict):
+        return path, None
+    return path, data
 
 
 def save_alerts_config(config: Dict[str, Any], explicit: Optional[Path] = None) -> Path:
@@ -182,9 +198,13 @@ def get_enabled_watch_symbols() -> List[str]:
         return []
     symbols: set[str] = set()
     for alert in raw.get("alerts") or []:
+        if not isinstance(alert, dict):
+            continue
         if not alert.get("enabled"):
             continue
         condition = alert.get("condition") or {}
+        if not isinstance(condition, dict):
+            continue
         if condition.get("type") != "price_threshold":
             continue
         symbol = normalize_ticker(condition.get("symbol"))
@@ -218,6 +238,7 @@ def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
     cleaned["alerts"] = [
         {k: v for k, v in alert.items() if k != "webhook_url"}
         for alert in cleaned.get("alerts") or []
+        if isinstance(alert, dict)
     ]
     return cleaned
 
