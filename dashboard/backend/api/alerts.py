@@ -386,12 +386,20 @@ async def get_alerts_status(
             _, raw = load_user_alerts_config(user_id)
             if raw:
                 alerts = raw.get("alerts") or []
-                active_watches = sum(1 for alert in alerts if alert.get("enabled"))
+                active_watches = sum(
+                    1
+                    for alert in alerts
+                    if isinstance(alert, dict) and alert.get("enabled")
+                )
     elif path.exists():
         _, raw = load_alerts_config(path)
         if raw:
-            alerts = raw.get("alerts") or []
-            active_watches = sum(1 for alert in alerts if alert.get("enabled"))
+            alerts = polish_alerts_config(raw).get("alerts") or []
+            active_watches = sum(
+                1
+                for alert in alerts
+                if isinstance(alert, dict) and alert.get("enabled")
+            )
 
     try:
         if database_enabled() and user_id:
