@@ -56,8 +56,14 @@ async def get_projections_summary():
         
         # Calculate statistics
         total_projections = len(df)
-        avg_confidence = float(df['confidence'].mean()) if 'confidence' in df.columns else 0
-        avg_expected_change = float(df['expected_change_percent'].mean()) if 'expected_change_percent' in df.columns else 0
+        avg_confidence = (
+            _finite_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
+        ) or 0.0
+        avg_expected_change = (
+            _finite_float(df['expected_change_percent'].mean())
+            if 'expected_change_percent' in df.columns
+            else 0.0
+        ) or 0.0
         
         # Determine sentiment
         if avg_expected_change > 1.0:
@@ -136,6 +142,15 @@ async def get_opportunities(
         proj_df = loader.load_projections()
         daily_df = loader.load_daily_data()
         
+        # Missing ranking columns → empty list (not KeyError→500)
+        if (
+            proj_df is None
+            or getattr(proj_df, "empty", False)
+            or "recommendation" not in proj_df.columns
+            or "confidence" not in proj_df.columns
+        ):
+            return OpportunitiesResponse(type=type, count=0, opportunities=[])
+
         # Map type to recommendation string
         rec_map = {
             "STRONG_BUY": "STRONG BUY",

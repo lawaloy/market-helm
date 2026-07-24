@@ -210,7 +210,9 @@ async def get_top_movers(
     try:
         loader = get_data_loader()
         df = loader.load_daily_data()
-        
+        if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
+            raise HTTPException(status_code=404, detail="No data available.")
+
         # Filter by sign first so a large limit cannot mix gainers into losers
         # (or vice versa) when fewer matching movers exist than `limit`.
         if type == "gainers":
@@ -237,7 +239,7 @@ async def get_top_movers(
             ))
         
         return MoversResponse(type=type, data=movers)
-    
+
     except HTTPException:
         raise
     except ValueError:
