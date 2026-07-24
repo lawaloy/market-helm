@@ -27,7 +27,15 @@ def _stocks_from_daily_df(df) -> List[Dict[str, Any]]:
         close = row.get("close", row.get("price"))
         if not symbol or close is None:
             continue
-        stocks.append({"symbol": symbol, "close": float(close)})
+        try:
+            close_value = float(close)
+        except (TypeError, ValueError):
+            logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
+            continue
+        if close_value != close_value:  # NaN
+            logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
+            continue
+        stocks.append({"symbol": symbol, "close": close_value})
     return stocks
 
 

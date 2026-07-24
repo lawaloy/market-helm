@@ -131,6 +131,34 @@ def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     log_notifier.send.assert_called_once_with(events[0])
 
 
+def test_evaluate_falls_back_to_log_notifier_for_unknown_notifier_name():
+    """Unknown notification channels must not silently drop a triggered alert."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = {
+        "id": "aapl-drop",
+        "name": "AAPL Drop",
+        "notifications": ["bogus-channel"],
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch("src.alerts.alert_engine.LogNotifier") as log_notifier_cls:
+        log_notifier = log_notifier_cls.return_value
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    log_notifier_cls.assert_called_once_with()
+    log_notifier.send.assert_called_once_with(events[0])
+    storage.record_event.assert_called_once_with(events[0])
+
+
 def test_evaluate_dispatches_email_notifier_for_triggered_alert():
     """Triggered email alerts are persisted and delivered with the engine event payload."""
     storage = MagicMock()
