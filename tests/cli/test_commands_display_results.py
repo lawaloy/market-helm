@@ -125,3 +125,86 @@ def test_display_results_logs_failure_without_raising(caplog) -> None:
     with caplog.at_level("ERROR"):
         display_results({"success": False, "error": "boom"})
     assert "Workflow failed: boom" in caplog.text
+
+
+def test_display_results_survives_nested_non_dict_shapes(caplog) -> None:
+    """Corrupt summary JSON nests must not exit(1) after a successful save."""
+    with caplog.at_level("INFO"):
+        display_results(
+            {
+                "success": True,
+                "analysis": {
+                    "summary": "not-a-dict",
+                    "top_gainers": [
+                        "AAPL",
+                        {
+                            "symbol": "MSFT",
+                            "name": "Microsoft",
+                            "change_percent": 1.5,
+                            "close": 400.0,
+                        },
+                    ],
+                    "top_losers": [None, 42],
+                },
+                "index_comparison": {
+                    "S&P 500": "bad",
+                    "NASDAQ": {
+                        "stock_count": 2,
+                        "average_change_percent": 0.5,
+                        "gainers": 1,
+                        "losers": 1,
+                    },
+                },
+                "projection_summary": {
+                    "total_projections": 1,
+                    "average_confidence": 70,
+                    "average_expected_change": 1.0,
+                    "recommendations": ["buy"],
+                    "top_opportunities": {
+                        "strong_buys": [
+                            "junk",
+                            {"symbol": "AAPL"},
+                        ],
+                        "strong_sells": "not-a-list",
+                    },
+                },
+                "projections": {
+                    "AAPL": {
+                        "symbol": "AAPL",
+                        "target_mid": 200.0,
+                        "expected_change_percent": 2.0,
+                        "confidence": 80,
+                        "reason": "ok",
+                    },
+                    "MSFT": "not-a-projection",
+                },
+                "metadata": ["not", "a", "dict"],
+                "file_paths": "not-a-dict",
+            }
+        )
+
+    text = caplog.text
+    assert "MSFT" in text
+    assert "NASDAQ" in text
+    assert "AAPL" in text
+    assert "Daily tracking complete!" in text
+    # Non-dict summary/recommendations/file_paths must be skipped, not crash
+    assert "Total Stocks Tracked" not in text
+    assert "Recommendation Breakdown" not in text
+    assert "Data saved to:" not in text
+
+
+def test_display_results_coerces_top_level_non_dict_sections(caplog) -> None:
+    with caplog.at_level("INFO"):
+        display_results(
+            {
+                "success": True,
+                "analysis": "corrupt",
+                "index_comparison": ["x"],
+                "projections": ["x"],
+                "projection_summary": "corrupt",
+                "metadata": None,
+                "file_paths": None,
+            }
+        )
+    assert "Daily tracking complete!" in caplog.text
