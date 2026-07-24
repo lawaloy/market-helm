@@ -94,3 +94,66 @@ def test_get_sp500_symbols_caches_valid_package_result(tmp_path):
     assert len(symbols) == 401
     cached = json.loads((tmp_path / "SP_500_symbols.json").read_text())
     assert cached["symbols"] == symbols
+
+
+def test_get_nasdaq100_symbols_uses_cache_then_fallback(tmp_path, monkeypatch):
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    monkeypatch.setattr(fetcher, "_load_from_cache", lambda _name: ["MSFT", "AAPL"])
+    assert fetcher.get_nasdaq100_symbols() == ["MSFT", "AAPL"]
+
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    fetcher.package_available = False
+    fetcher.ticker_symbols = None
+    symbols = fetcher.get_nasdaq100_symbols()
+    assert symbols == fetcher._get_minimal_fallback("NASDAQ-100")
+    assert "NVDA" in symbols
+
+
+def test_get_nasdaq100_symbols_falls_back_when_package_returns_too_few(tmp_path):
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    package = MagicMock()
+    package.get_stocks_by_index.return_value = [{"symbol": "MSFT"}]
+    fetcher.package_available = True
+    fetcher.ticker_symbols = package
+
+    symbols = fetcher.get_nasdaq100_symbols()
+
+    assert symbols == fetcher._get_minimal_fallback("NASDAQ-100")
+    assert not (tmp_path / "NASDAQ_100_symbols.json").exists()
+
+
+def test_get_dow30_symbols_tries_index_name_variants(tmp_path):
+    """First variants may raise or return too few; a later name can still succeed."""
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    package = MagicMock()
+
+    def _by_index(name: str):
+        if name == "DOW JONES":
+            raise RuntimeError("unknown index")
+        if name == "Dow Jones":
+            return [{"symbol": "IBM"}]  # too few (<30)
+        return [{"symbol": f"D{i}"} for i in range(30)]
+
+    package.get_stocks_by_index.side_effect = _by_index
+    fetcher.package_available = True
+    fetcher.ticker_symbols = package
+
+    symbols = fetcher.get_dow30_symbols()
+
+    assert len(symbols) == 30
+    assert symbols[0] == "D0"
+    cached = json.loads((tmp_path / "Dow_Jones_symbols.json").read_text())
+    assert cached["symbols"] == symbols
+
+
+def test_get_dow30_symbols_falls_back_when_all_variants_fail(tmp_path):
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    package = MagicMock()
+    package.get_stocks_by_index.side_effect = RuntimeError("no dow")
+    fetcher.package_available = True
+    fetcher.ticker_symbols = package
+
+    symbols = fetcher.get_dow30_symbols()
+
+    assert symbols == fetcher._get_minimal_fallback("Dow Jones")
+    assert "GS" in symbols

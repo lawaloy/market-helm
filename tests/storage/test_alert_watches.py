@@ -5,8 +5,11 @@ import json
 import pytest
 
 from src.storage.alert_watches import (
+    MAX_DELIVERY_LOG,
+    latest_deliveries_for_user,
     list_enabled_symbols,
     list_watches_for_symbol,
+    record_delivery,
     sync_watches_from_config,
 )
 from src.storage.database import get_connection, init_database
@@ -149,3 +152,85 @@ class TestAlertWatches:
         init_database()
 
         assert list_enabled_symbols() == []
+
+
+class TestAlertDeliveryLog:
+    def test_record_delivery_prunes_to_max_per_user(self, db_user):
+        """Oldest rows are deleted once a user exceeds MAX_DELIVERY_LOG."""
+        from datetime import datetime, timedelta, timezone
+
+        other = create_user("other-delivery@example.com", "password123")["id"]
+        base = datetime(2026, 7, 1, tzinfo=timezone.utc)
+        for i in range(MAX_DELIVERY_LOG + 5):
+            record_delivery(
+                db_user,
+                "aapl-drop",
+                "email",
+                success=True,
+                timestamp=(base + timedelta(minutes=i)).isoformat(),
+            )
+        # Peer tenant must not be pruned away by this user's growth.
+        record_delivery(
+            other,
+            "peer",
+            "email",
+            success=True,
+            timestamp="2026-06-01T00:00:00+00:00",
+        )
+
+        with get_connection() as conn:
+            n_user = conn.execute(
+                "SELECT COUNT(*) AS n FROM alert_delivery_log WHERE user_id = ?",
+                (db_user,),
+            ).fetchone()["n"]
+            n_other = conn.execute(
+                "SELECT COUNT(*) AS n FROM alert_delivery_log WHERE user_id = ?",
+                (other,),
+            ).fetchone()["n"]
+            oldest = conn.execute(
+                """
+                SELECT timestamp FROM alert_delivery_log
+                WHERE user_id = ?
+                ORDER BY timestamp ASC, id ASC
+                LIMIT 1
+                """,
+                (db_user,),
+            ).fetchone()["timestamp"]
+
+        assert n_user == MAX_DELIVERY_LOG
+        assert n_other == 1
+        # First five minute offsets (0..4) should be gone.
+        assert oldest == (base + timedelta(minutes=5)).isoformat()
+
+    def test_latest_deliveries_for_user_keeps_newest_per_channel(self, db_user):
+        record_delivery(
+            db_user,
+            "a1",
+            "email",
+            success=False,
+            error="old",
+            timestamp="2026-07-24T10:00:00+00:00",
+        )
+        record_delivery(
+            db_user,
+            "a1",
+            "email",
+            success=True,
+            timestamp="2026-07-24T11:00:00+00:00",
+        )
+        record_delivery(
+            db_user,
+            "a2",
+            "webhook",
+            success=False,
+            error="timeout",
+            timestamp="2026-07-24T11:30:00+00:00",
+        )
+
+        latest = {row["channel"]: row for row in latest_deliveries_for_user(db_user)}
+        assert set(latest) == {"email", "webhook"}
+        assert latest["email"]["success"] is True
+        assert latest["email"]["error"] is None
+        assert latest["webhook"]["success"] is False
+        assert latest["webhook"]["error"] == "timeout"
+        assert latest["webhook"]["alert_id"] == "a2"
