@@ -132,6 +132,15 @@ def test_polish_alerts_config_strips_placeholders(monkeypatch) -> None:
     assert "webhook_url" not in polished["alerts"][0]
 
 
+def test_polish_alerts_config_can_skip_env_email_seed(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_EMAIL_TO", "global@example.org")
+    polished = polish_alerts_config(
+        {"defaults": {}, "alerts": []},
+        seed_env_email=False,
+    )
+    assert polished["defaults"].get("email_to") in (None, "")
+
+
 def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
     config = {
         "alerts": [
