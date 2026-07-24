@@ -52,6 +52,62 @@ def test_load_market_snapshot_backfills_watch_quotes_when_saved_data_missing():
     fetch_missing.assert_called_once_with([], ["NVDA"])
 
 
+def test_load_market_snapshot_skips_non_finite_prices_in_map():
+    """Non-finite closes must not enter the snapshot price map for alert jobs."""
+    loader = MagicMock()
+    loader.get_latest_date.return_value = "2026-06-09"
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [{"symbol": "AAPL", "close": 180.0}]
+    )
+
+    with (
+        patch("src.alerts.market_snapshot._load_env"),
+        patch("dashboard.backend.services.data_loader.get_data_loader", return_value=loader),
+        patch(
+            "src.alerts.market_snapshot._fetch_missing_watch_quotes",
+            return_value=[
+                {"symbol": "AAPL", "close": 180.0},
+                # Real tickers: NAN/INF are invalid ticker sentinels.
+                {"symbol": "MSFT", "close": float("nan")},
+                {"symbol": "TSLA", "price": float("inf")},
+            ],
+        ),
+    ):
+        last_date, prices, stocks = load_market_snapshot(["MSFT", "TSLA"])
+
+    assert last_date == "2026-06-09"
+    assert prices == {"AAPL": 180.0}
+    assert len(stocks) == 3
+
+
+def test_load_market_snapshot_normalizes_padded_watch_symbols():
+    """Watch list whitespace must strip so padded symbols match saved AAPL rows."""
+    loader = MagicMock()
+    loader.get_latest_date.return_value = "2026-06-09"
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [{"symbol": "AAPL", "close": 180.0}]
+    )
+
+    with (
+        patch("src.alerts.market_snapshot._load_env"),
+        patch("dashboard.backend.services.data_loader.get_data_loader", return_value=loader),
+        patch(
+            "src.alerts.market_snapshot._fetch_missing_watch_quotes",
+            side_effect=lambda stocks, symbols: stocks,
+        ) as fetch_missing,
+    ):
+        last_date, prices, stocks = load_market_snapshot(
+            [" AAPL ", "  ", float("nan"), "nvda", "NVDA"]
+        )
+
+    assert last_date == "2026-06-09"
+    assert prices == {"AAPL": 180.0}
+    # Normalized/deduped watches only; blank and NaN sentinels never reach the fetch helper.
+    fetch_missing.assert_called_once_with(
+        [{"symbol": "AAPL", "close": 180.0}],
+        ["AAPL", "NVDA"],
+    )
+
 def test_load_market_snapshot_skips_blank_symbols_and_non_numeric_closes():
     loader = MagicMock()
     loader.get_latest_date.return_value = "2026-06-09"

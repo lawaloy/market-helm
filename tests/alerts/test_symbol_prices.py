@@ -45,8 +45,39 @@ def test_resolve_symbol_prices_skips_blank_and_dedupes_case(_mock_saved):
     assert prices == {"AAPL": 180.5, "MSFT": 400.0}
 
 
+@patch(
+    "src.alerts.symbol_prices.prices_from_saved_daily_data",
+    return_value={"AAPL": 180.5, "MSFT": 400.0},
+)
+def test_resolve_symbol_prices_strips_surrounding_whitespace(_mock_saved):
+    """Surrounding whitespace must not prevent matching saved tickers."""
+    prices = resolve_symbol_prices(
+        [" AAPL ", "\tMSFT\n", "  "],
+        fetch_missing=False,
+    )
+
+    assert prices == {"AAPL": 180.5, "MSFT": 400.0}
+
+
 def test_resolve_symbol_prices_returns_empty_for_blank_only_input():
     assert resolve_symbol_prices(["", "   "], fetch_missing=False) == {}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_skips_invalid_symbol_tokens(mock_get_loader):
+    """None/NaN/blank symbols must not enter the quote map as NONE/NAN."""
+    loader = MagicMock()
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.5},
+            {"symbol": None, "close": 1.0},
+            {"symbol": float("nan"), "close": 2.0},
+            {"symbol": "  ", "close": 3.0},
+            {"symbol": " msft ", "close": 400.0},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    assert prices_from_saved_daily_data() == {"AAPL": 180.5, "MSFT": 400.0}
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
@@ -69,6 +100,44 @@ def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_
 
     mock_get_loader.side_effect = ValueError("No daily data files found")
     assert prices_from_saved_daily_data() == {}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
+    """NaN/inf closes must not enter the quote map as JSON-null floats."""
+    loader = MagicMock()
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.5},
+            {"symbol": "NAN", "close": float("nan")},
+            {"symbol": "INF", "close": float("inf")},
+            {"symbol": "NINF", "close": float("-inf")},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    assert prices_from_saved_daily_data() == {"AAPL": 180.5}
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+@patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
+def test_resolve_symbol_prices_skips_non_finite_live_quotes(_mock_saved, mock_fetcher_cls):
+    """Live Finnhub quotes with NaN/inf closes must not enter the quote map."""
+    fetcher = MagicMock()
+
+    def fetch_symbol_data(symbol: str):
+        if symbol == "OK":
+            return {"symbol": symbol, "close": 12.5}
+        if symbol == "NAN":
+            return {"symbol": symbol, "close": float("nan")}
+        if symbol == "INF":
+            return {"symbol": symbol, "price": float("inf")}
+        return {"symbol": symbol, "close": float("-inf")}
+
+    fetcher.fetch_symbol_data.side_effect = fetch_symbol_data
+    mock_fetcher_cls.return_value = fetcher
+
+    prices = resolve_symbol_prices(["OK", "NAN", "INF", "NINF"], fetch_missing=True)
+    assert prices == {"OK": 12.5}
 
 
 @patch("src.services.data_fetcher.StockDataFetcher", side_effect=ValueError("API key required"))

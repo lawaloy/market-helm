@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List
 
 from src.alerts.alert_engine import AlertEngine
 from src.alerts.alert_paths import get_enabled_watch_symbols
+from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +25,21 @@ def _load_env() -> None:
 def _stocks_from_daily_df(df) -> List[Dict[str, Any]]:
     stocks: List[Dict[str, Any]] = []
     for _, row in df.iterrows():
-        symbol = str(row.get("symbol", "")).upper()
+        # Drop pandas None/NaN sentinels that stringify into fake tickers (NONE/NAN).
+        symbol = normalize_ticker(row.get("symbol"))
         close = row.get("close", row.get("price"))
         if not symbol or close is None:
             continue
-        stocks.append({"symbol": symbol, "close": float(close)})
+        try:
+            close_value = float(close)
+        except (TypeError, ValueError):
+            logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
+            continue
+        # float("inf") is not NaN; reject all non-finite closes.
+        if not math.isfinite(close_value):
+            logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
+            continue
+        stocks.append({"symbol": symbol, "close": close_value})
     return stocks
 
 
@@ -38,8 +50,18 @@ def _fetch_missing_watch_quotes(
     if not watch_symbols:
         return stocks
 
-    present = {str(stock.get("symbol", "")).upper() for stock in stocks if stock.get("symbol")}
-    missing = [symbol for symbol in watch_symbols if symbol not in present]
+    present = {
+        key
+        for key in (normalize_ticker(stock.get("symbol")) for stock in stocks)
+        if key
+    }
+    missing = [
+        key
+        for key in (normalize_ticker(symbol) for symbol in watch_symbols)
+        if key and key not in present
+    ]
+    # Preserve caller order while deduping normalized tickers.
+    missing = list(dict.fromkeys(missing))
     if not missing:
         return stocks
 
@@ -64,10 +86,14 @@ def _fetch_missing_watch_quotes(
         if close is None:
             continue
         try:
-            enriched.append({"symbol": symbol.upper(), "close": float(close)})
+            close_value = float(close)
         except (TypeError, ValueError):
             logger.warning("Skipping invalid quote for watch symbol %s: %r", symbol, close)
             continue
+        if not math.isfinite(close_value):
+            logger.warning("Skipping invalid quote for watch symbol %s: %r", symbol, close)
+            continue
+        enriched.append({"symbol": symbol, "close": close_value})
         logger.info("Fetched live quote for watch symbol %s", symbol)
 
     return enriched

@@ -4,6 +4,7 @@ Unit tests for Stock Projector module.
 Tests the projection generation, recommendation logic, and confidence scoring.
 """
 
+import math
 import pytest
 from datetime import datetime, timedelta
 
@@ -298,6 +299,51 @@ class TestStockProjector:
         }
         assert projector._project_stock(invalid_stock) is None
 
+    def test_project_stock_nan_close_returns_none(self, projector):
+        """NaN close must not emit NaN projection targets."""
+        nan_close = {
+            'symbol': 'NANC', 'close': float('nan'), 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 100, 'market_cap': 50000
+        }
+        assert projector._project_stock(nan_close) is None
+
+    def test_project_stock_nan_change_percent_returns_none(self, projector):
+        """NaN change_percent must not poison momentum/targets."""
+        nan_change = {
+            'symbol': 'NANP', 'close': 100.0, 'change_percent': float('nan'),
+            'volume': 1000000, 'previous_close': 98.0, 'market_cap': 50000
+        }
+        assert projector._project_stock(nan_change) is None
+
+    def test_project_stock_non_numeric_close_returns_none(self, projector):
+        """Non-numeric close is rejected before target math."""
+        bad = {
+            'symbol': 'BAD', 'close': 'n/a', 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 100, 'market_cap': 50000
+        }
+        assert projector._project_stock(bad) is None
+
+    def test_project_stock_non_numeric_volume_still_projects(self, projector):
+        """Bad optional volume must not abort an otherwise valid projection."""
+        stock = {
+            'symbol': 'VOLX', 'close': 100.0, 'change_percent': 2.0,
+            'volume': 'n/a', 'previous_close': 98.0, 'market_cap': 50000
+        }
+        projection = projector._project_stock(stock)
+        assert projection is not None
+        assert projection['symbol'] == 'VOLX'
+        assert isinstance(projection['confidence'], int)
+
+    def test_project_stock_non_finite_market_cap_still_projects(self, projector):
+        """NaN/inf market_cap must not abort confidence scoring."""
+        stock = {
+            'symbol': 'CAPX', 'close': 100.0, 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 98.0, 'market_cap': float('nan')
+        }
+        projection = projector._project_stock(stock)
+        assert projection is not None
+        assert projection['symbol'] == 'CAPX'
+
     # ========== Batch Projection Tests ==========
 
     def test_generate_projections_multiple_stocks(self, projector, sample_stocks_list):
@@ -337,6 +383,79 @@ class TestStockProjector:
         projections = projector.generate_projections(sample_stocks_list)
         summary = projector.generate_projection_summary(projections)
         assert sum(summary['recommendations'].values()) == len(projections)
+
+    def test_projection_summary_top_opportunities_ranked_and_capped(self, projector):
+        """Top opportunity lists stay confidence-sorted and capped at five."""
+        projections = {}
+        for i in range(7):
+            symbol = f"BUY{i}"
+            projections[symbol] = {
+                "symbol": symbol,
+                "target_mid": 100 + i,
+                "confidence": 50 + i,
+                "expected_change_percent": float(i),
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            }
+        for i in range(6):
+            symbol = f"SELL{i}"
+            projections[symbol] = {
+                "symbol": symbol,
+                "target_mid": 90 - i,
+                "confidence": 40 + i,
+                "expected_change_percent": -float(i),
+                "recommendation": "STRONG SELL",
+                "trend": "down",
+            }
+
+        summary = projector.generate_projection_summary(projections)
+        buys = summary["top_opportunities"]["strong_buys"]
+        sells = summary["top_opportunities"]["strong_sells"]
+
+        assert len(buys) == 5
+        assert [row["symbol"] for row in buys] == ["BUY6", "BUY5", "BUY4", "BUY3", "BUY2"]
+        assert [row["confidence"] for row in buys] == [56, 55, 54, 53, 52]
+        assert len(sells) == 5
+        assert [row["symbol"] for row in sells] == ["SELL5", "SELL4", "SELL3", "SELL2", "SELL1"]
+        assert summary["total_projections"] == 13
+
+    def test_projection_summary_ignores_non_finite_confidence_and_change(self, projector):
+        """NaN/inf confidence or expected_change must not poison averages or rankings."""
+        projections = {
+            "OK": {
+                "symbol": "OK",
+                "target_mid": 110.0,
+                "confidence": 70.0,
+                "expected_change_percent": 2.5,
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+            "NANCONF": {
+                "symbol": "NANCONF",
+                "target_mid": 999.0,
+                "confidence": float("nan"),
+                "expected_change_percent": 50.0,
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+            "INFCHG": {
+                "symbol": "INFCHG",
+                "target_mid": 120.0,
+                "confidence": 90.0,
+                "expected_change_percent": float("inf"),
+                "recommendation": "STRONG SELL",
+                "trend": "down",
+            },
+        }
+
+        summary = projector.generate_projection_summary(projections)
+
+        assert summary["average_confidence"] == 80.0  # (70 + 90) / 2; NaN confidence skipped
+        assert summary["average_expected_change"] == 26.25  # (2.5 + 50) / 2; inf skipped
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_buys"]] == ["OK"]
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_sells"]] == ["INFCHG"]
+        assert math.isfinite(summary["average_confidence"])
+        assert math.isfinite(summary["average_expected_change"])
 
     # ========== Date and Timestamp Tests ==========
 

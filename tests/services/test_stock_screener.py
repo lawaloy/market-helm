@@ -53,12 +53,48 @@ def test_score_helpers_cover_boundary_bands():
     assert screener._score_market_cap(100_000_000_000) == 100.0
 
 
+def test_score_helpers_treat_non_finite_as_zero():
+    """NaN/inf quote fields must not inflate screener rankings."""
+    screener = _screener()
+
+    assert screener._score_volume(float("nan")) == 0.0
+    assert screener._score_volume(float("inf")) == 0.0
+    assert screener._score_price_change(float("nan")) == 0.0
+    assert screener._score_price_change(float("-inf")) == 0.0
+    assert screener._score_price_range(float("nan")) == 0.0
+    assert screener._score_market_cap(float("inf")) == 0.0
+
+    score = screener.calculate_score(
+        {
+            "volume": float("inf"),
+            "change_percent": float("nan"),
+            "close": float("inf"),
+            "market_cap": float("nan"),
+        }
+    )
+    assert score == 0.0
+
+
 def test_screen_stock_returns_none_when_api_payload_missing():
     client = MagicMock()
     client.get_stock_data_for_screening.return_value = None
     screener = StockScreener(api_client=client)
 
     assert screener.screen_stock("AAPL") is None
+
+
+def test_screen_stock_returns_none_for_non_finite_close():
+    client = MagicMock()
+    client.get_stock_data_for_screening.return_value = {
+        "symbol": "BAD",
+        "volume": 5_000_000,
+        "change_percent": 4.0,
+        "close": float("nan"),
+        "market_cap": 10_000_000_000,
+    }
+    screener = StockScreener(api_client=client)
+
+    assert screener.screen_stock("BAD") is None
 
 
 def test_get_qualified_symbols_orders_by_score_and_respects_top_n(monkeypatch):
