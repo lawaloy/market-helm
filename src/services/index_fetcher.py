@@ -79,12 +79,19 @@ class IndexFetcher:
             try:
                 with open(cache_file, 'r') as f:
                     cache_data = json.load(f)
-                    cached_date = datetime.fromisoformat(cache_data['date'])
-                    
-                    if datetime.now() - cached_date < self.cache_duration:
-                        symbols = self._normalize_symbol_list(cache_data.get('symbols') or [])
-                        logger.debug(f"Loaded {index_name} symbols from cache ({len(symbols)} symbols)")
-                        return symbols
+                if not isinstance(cache_data, dict):
+                    return None
+                cached_date = datetime.fromisoformat(cache_data['date'])
+                
+                if datetime.now() - cached_date < self.cache_duration:
+                    raw_symbols = cache_data.get('symbols') or []
+                    # String "AAPL" would normalize to ['A','P','L'] and poison
+                    # Finnhub traffic — treat wrong-type cache as a miss.
+                    if not isinstance(raw_symbols, list):
+                        return None
+                    symbols = self._normalize_symbol_list(raw_symbols)
+                    logger.debug(f"Loaded {index_name} symbols from cache ({len(symbols)} symbols)")
+                    return symbols
             except Exception as e:
                 logger.debug(f"Failed to load cache: {e}")
         
