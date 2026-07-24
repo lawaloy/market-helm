@@ -2,7 +2,8 @@
 Alert rule evaluators.
 """
 
-from typing import Dict, List
+import math
+from typing import Dict
 
 
 def _compare(value: float, operator: str, threshold: float) -> bool:
@@ -19,13 +20,24 @@ def _compare(value: float, operator: str, threshold: float) -> bool:
     raise ValueError(f"Unsupported operator: {operator}")
 
 
+def _finite_float(value) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"non-finite numeric value: {value!r}")
+    return number
+
+
 def evaluate_price_threshold(condition: Dict, stock: Dict) -> bool:
     """
     Evaluate a price threshold condition against a single stock record.
     """
     operator = condition.get("operator", "less_than")
-    threshold = float(condition.get("value", 0))
-    price = float(stock.get("close", 0))
+    try:
+        threshold = _finite_float(condition.get("value", 0))
+        price = _finite_float(stock.get("close", 0))
+    except (TypeError, ValueError):
+        # Inf closes would otherwise compare True for greater_than and fire alerts.
+        return False
     return _compare(price, operator, threshold)
 
 
@@ -40,13 +52,24 @@ def evaluate_screening_match(condition: Dict, stock: Dict) -> bool:
     price_min = filters.get("price_min")
     price_max = filters.get("price_max")
 
-    if volume_threshold is not None and float(stock.get("volume", 0)) < float(volume_threshold):
-        return False
-    if min_daily_change_pct is not None and abs(float(stock.get("change_percent", 0))) < float(min_daily_change_pct):
-        return False
-    if price_min is not None and float(stock.get("close", 0)) < float(price_min):
-        return False
-    if price_max is not None and float(stock.get("close", 0)) > float(price_max):
+    try:
+        if volume_threshold is not None:
+            volume = _finite_float(stock.get("volume", 0))
+            if volume < _finite_float(volume_threshold):
+                return False
+        if min_daily_change_pct is not None:
+            change_percent = _finite_float(stock.get("change_percent", 0))
+            if abs(change_percent) < _finite_float(min_daily_change_pct):
+                return False
+        if price_min is not None:
+            close = _finite_float(stock.get("close", 0))
+            if close < _finite_float(price_min):
+                return False
+        if price_max is not None:
+            close = _finite_float(stock.get("close", 0))
+            if close > _finite_float(price_max):
+                return False
+    except (TypeError, ValueError):
         return False
 
     return True

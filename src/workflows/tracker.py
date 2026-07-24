@@ -16,9 +16,16 @@ from ..core.config import get_indices_to_track
 from ..utils.tickers import normalize_ticker
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+import math
 import pandas as pd
 
 logger = setup_logger("workflow")
+
+
+def _finite_numeric_series(series: pd.Series) -> pd.Series:
+    """Coerce to numeric and drop null / non-finite values."""
+    values = pd.to_numeric(series, errors="coerce")
+    return values[values.map(lambda value: pd.notna(value) and math.isfinite(float(value)))]
 
 
 class StockTrackerWorkflow:
@@ -258,14 +265,24 @@ class StockTrackerWorkflow:
             for index_name, data in index_data.items():
                 if data:
                     df = pd.DataFrame(data)
-                    avg_change = df['change_percent'].mean()
-                    total_volume = df['volume'].sum()
+                    finite_changes = _finite_numeric_series(df["change_percent"])
+                    finite_volumes = _finite_numeric_series(df["volume"])
+                    avg_change = (
+                        float(finite_changes.mean()) if not finite_changes.empty else 0.0
+                    )
+                    total_volume = (
+                        float(finite_volumes.sum()) if not finite_volumes.empty else 0.0
+                    )
+                    if not math.isfinite(avg_change):
+                        avg_change = 0.0
+                    if not math.isfinite(total_volume):
+                        total_volume = 0.0
                     index_comparison[index_name] = {
                         'stock_count': len(df),
                         'average_change_percent': round(avg_change, 2),
                         'total_volume': int(total_volume),
-                        'gainers': len(df[df['change_percent'] > 0]),
-                        'losers': len(df[df['change_percent'] < 0]),
+                        'gainers': int((finite_changes > 0).sum()),
+                        'losers': int((finite_changes < 0).sum()),
                     }
             
             logger.debug("Data analysis completed")
