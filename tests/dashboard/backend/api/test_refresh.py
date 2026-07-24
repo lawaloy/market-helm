@@ -309,3 +309,42 @@ def test_refresh_mutations_require_auth_in_database_mode(tmp_path, monkeypatch) 
 
     assert client.post("/api/refresh").status_code == 401
     assert client.post("/api/refresh/cancel").status_code == 401
+
+
+def test_run_daily_tracker_omits_no_screener_when_disabled(monkeypatch) -> None:
+    """REFRESH_NO_SCREENER=false must leave the screener enabled in the child CLI."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_NO_SCREENER", "false")
+    monkeypatch.setenv("REFRESH_MAX_WORKERS", "8")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    args, kwargs = popen.call_args
+    command = args[0]
+    assert "--no-screener" not in command
+    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "8"
+    assert refresh.refresh_status["last_status"] == "success"
+
+
+def test_run_daily_tracker_defaults_to_no_screener_and_four_workers(monkeypatch) -> None:
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.delenv("REFRESH_NO_SCREENER", raising=False)
+    monkeypatch.delenv("REFRESH_MAX_WORKERS", raising=False)
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    args, kwargs = popen.call_args
+    assert "--no-screener" in args[0]
+    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "4"
