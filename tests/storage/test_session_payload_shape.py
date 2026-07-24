@@ -66,3 +66,33 @@ def test_bool_exp_rejected(auth_secret, monkeypatch) -> None:
     token = _sign_payload({"sub": "user-1", "exp": True})
     with pytest.raises(AuthError, match="Invalid access token"):
         decode_access_token(token)
+
+
+@pytest.mark.parametrize(
+    "sub",
+    [
+        True,
+        False,
+        123,
+        0,
+        1.5,
+        [],
+        {},
+        ["user-1"],
+        {"id": "user-1"},
+        "   ",
+        "\t\n",
+    ],
+)
+def test_non_string_or_blank_subject_raises_auth_error(auth_secret, monkeypatch, sub) -> None:
+    """Truthy non-strings must not become str(sub) user ids; whitespace is blank."""
+    monkeypatch.setattr(time, "time", lambda: 1_000_000)
+    token = _sign_payload({"sub": sub, "exp": 1_000_100})
+    with pytest.raises(AuthError, match="subject"):
+        decode_access_token(token)
+
+
+def test_string_subject_is_stripped(auth_secret, monkeypatch) -> None:
+    monkeypatch.setattr(time, "time", lambda: 1_000_000)
+    token = _sign_payload({"sub": "  user-abc  ", "exp": 1_000_100})
+    assert decode_access_token(token)["user_id"] == "user-abc"
