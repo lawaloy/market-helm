@@ -131,6 +131,35 @@ def test_update_user_env_vars_replaces_webhook_values_without_dropping_other_set
     ]
 
 
+def test_update_user_env_vars_empty_value_deletes_key(
+    tmp_path: Path, monkeypatch
+) -> None:
+    user_dir = tmp_path / ".market-helm"
+    env_file = user_dir / ".env"
+    user_dir.mkdir()
+    env_file.write_text(
+        "\n".join(
+            [
+                "DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/secret/token",
+                "ALERT_EMAIL_TO=alerts@example.com",
+                "ALERT_WEBHOOK_FORMAT=discord",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+
+    update_user_env_vars({"DISCORD_WEBHOOK_URL": ""})
+
+    lines = env_file.read_text(encoding="utf-8").splitlines()
+    assert lines == [
+        "ALERT_EMAIL_TO=alerts@example.com",
+        "ALERT_WEBHOOK_FORMAT=discord",
+    ]
+    assert "DISCORD_WEBHOOK_URL" not in env_file.read_text(encoding="utf-8")
+
+
 def test_apply_alert_defaults_merges_email_and_webhook() -> None:
     alert = {"notifications": ["email", "webhook"]}
     defaults = {"email_to": "a@example.com", "webhook_url": "https://example.com/hook"}
