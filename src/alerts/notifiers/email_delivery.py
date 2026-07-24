@@ -370,7 +370,11 @@ class MailgunEmailBackend(EmailDeliveryBackend):
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
     host = alert.get("smtp_host") or os.environ.get("SMTP_HOST")
-    port_raw = alert.get("smtp_port") or os.environ.get("SMTP_PORT", "587")
+    # Do not use `or` for port — 0 is falsy but must be rejected as invalid,
+    # not silently replaced by the SMTP_PORT default.
+    port_raw = alert.get("smtp_port")
+    if port_raw is None or (isinstance(port_raw, str) and not str(port_raw).strip()):
+        port_raw = os.environ.get("SMTP_PORT", "587")
     username = alert.get("smtp_user") or os.environ.get("SMTP_USER")
     password = alert.get("smtp_password") or os.environ.get("SMTP_PASSWORD")
 
