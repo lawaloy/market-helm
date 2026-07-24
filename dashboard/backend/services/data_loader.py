@@ -162,6 +162,10 @@ class DataLoader:
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
         """Load historical data for a specific symbol"""
+        sym = normalize_ticker(symbol)
+        if not sym:
+            return []
+
         dates = self.get_available_dates()
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         
@@ -171,9 +175,9 @@ class DataLoader:
                 break
             
             try:
-                # Load daily data
+                # Load daily data — match padded / mixed-case CSV symbols.
                 daily_df = self.load_daily_data(date)
-                stock_data = daily_df[daily_df['symbol'] == symbol]
+                stock_data = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
                 
                 if stock_data.empty:
                     continue
@@ -183,7 +187,7 @@ class DataLoader:
                 # Try to load projections for this date
                 try:
                     proj_df = self.load_projections(date)
-                    proj_data = proj_df[proj_df['symbol'] == symbol]
+                    proj_data = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
                     
                     if not proj_data.empty:
                         proj_record = proj_data.iloc[0].to_dict()

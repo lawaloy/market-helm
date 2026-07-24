@@ -40,10 +40,10 @@ def load_index_symbol_names() -> dict:
         for index_name in ["S&P 500", "NASDAQ 100", "Dow Jones"]:
             try:
                 for stock in data.get_stocks_by_index(index_name):
-                    sym = stock.get("symbol")
+                    sym = normalize_ticker(stock.get("symbol"))
                     name = stock.get("name")
                     if sym and name:
-                        result[str(sym).upper()] = name
+                        result[sym] = name
             except Exception:
                 continue
     except Exception:
@@ -54,11 +54,20 @@ def load_index_symbol_names() -> dict:
 def _resolve_company_names(symbols: list) -> dict:
     """
     Resolve symbol->company name via pytickersymbols (S&P 500, NASDAQ 100, Dow Jones).
+
+    Keys are normalized tickers; blank / sentinel inputs are skipped so None/NaN
+    never become fake NONE/NAN name-map entries.
     """
     if not symbols:
         return {}
     catalog = load_index_symbol_names()
-    return {sym: catalog.get(str(sym).upper(), sym) for sym in symbols}
+    out = {}
+    for sym in symbols:
+        key = normalize_ticker(sym)
+        if not key:
+            continue
+        out[key] = catalog.get(key, key)
+    return out
 
 
 def build_symbol_catalog() -> tuple:
@@ -168,8 +177,9 @@ async def get_tracked_symbols():
         df = loader.load_projections()
         symbols, symbol_names = build_symbol_catalog()
         if not symbols:
-            symbols = df['symbol'].unique().tolist() if 'symbol' in df.columns else []
-            symbol_names = _resolve_company_names(symbols)
+            raw = df["symbol"].unique().tolist() if "symbol" in df.columns else []
+            symbol_names = _resolve_company_names(raw)
+            symbols = sorted(symbol_names.keys())
 
         return {
             "symbols": symbols,
@@ -244,9 +254,23 @@ async def get_historical_summary(
                 ))
                 # Extract symbols and names from first successful load (latest data)
                 if not symbols_list and 'symbol' in df.columns:
-                    symbols_list = sorted(df['symbol'].unique().tolist())
-                    if 'name' in df.columns:
-                        symbol_names = df.drop_duplicates('symbol')[['symbol', 'name']].set_index('symbol')['name'].to_dict()
+                    # Normalize so None/NaN never leak as NONE/NAN list entries.
+                    symbols_list = sorted(
+                        {
+                            key
+                            for key in (normalize_ticker(s) for s in df["symbol"].unique())
+                            if key
+                        }
+                    )
+                    if "name" in df.columns:
+                        symbol_names = {}
+                        for _, row in df.drop_duplicates("symbol").iterrows():
+                            key = normalize_ticker(row["symbol"])
+                            if not key:
+                                continue
+                            stored = row.get("name")
+                            if stored and str(stored).strip() and str(stored).strip() != key:
+                                symbol_names[key] = str(stored).strip()
             except Exception:
                 continue
 
