@@ -172,25 +172,91 @@ class TestMultiUserAlertsAPI:
 
         assert r.status_code == 401
 
-    def test_run_uses_db_worker_cycle(self, client, multi_user_env):
+    def test_run_uses_user_scoped_check(self, client, multi_user_env):
         token = _register(client, "runner@example.com")
         headers = {"Authorization": f"Bearer {token}"}
 
-        with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
-            mock_cycle.return_value = {
+        with patch("src.alerts.alert_worker.run_user_check") as mock_check:
+            mock_check.return_value = {
                 "triggered": 2,
                 "last_data_date": "2026-06-09",
                 "events": [],
                 "message": None,
-                "enqueued": 2,
-                "jobs": {"evaluated": 2, "delivered": 2, "failed": 0},
             }
             r = client.post("/api/alerts/run", headers=headers)
 
         assert r.status_code == 200
         assert r.json()["triggered"] == 2
         assert r.json()["last_data_date"] == "2026-06-09"
-        mock_cycle.assert_called_once()
+        mock_check.assert_called_once()
+        assert mock_check.call_args.args[0]
+
+    def test_run_only_evaluates_authenticated_users_watches(
+        self, client, multi_user_env
+    ):
+        from src.storage.database import get_connection
+
+        token_a = _register(client, "runner-a@example.com")
+        token_b = _register(client, "runner-b@example.com")
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+        payload = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "aapl-low",
+                    "name": "AAPL low",
+                    "enabled": True,
+                    "cooldown_minutes": 60,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                    "notifications": ["log"],
+                }
+            ],
+        }
+        saved_a = client.put("/api/alerts/config", json=payload, headers=headers_a)
+        saved_b = client.put("/api/alerts/config", json=payload, headers=headers_b)
+        assert saved_a.status_code == 200
+        assert saved_b.status_code == 200
+
+        with patch(
+            "src.alerts.market_snapshot.load_market_snapshot",
+            return_value=(
+                "2026-06-09",
+                {"AAPL": 150.0},
+                [{"symbol": "AAPL", "close": 150.0}],
+            ),
+        ):
+            with patch(
+                "src.alerts.alert_engine.LogNotifier.send", return_value=True
+            ) as send:
+                first = client.post("/api/alerts/run", headers=headers_a)
+                second = client.post("/api/alerts/run", headers=headers_a)
+
+        assert first.status_code == 200
+        assert first.json()["triggered"] == 1
+        assert second.status_code == 200
+        assert second.json()["triggered"] == 0
+        assert send.call_count == 1
+        with get_connection() as conn:
+            triggered_users = conn.execute(
+                "SELECT user_id FROM alert_trigger_state ORDER BY user_id"
+            ).fetchall()
+            user_b = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                ("runner-b@example.com",),
+            ).fetchone()
+            user_a = conn.execute(
+                "SELECT id FROM users WHERE email = ?",
+                ("runner-a@example.com",),
+            ).fetchone()
+        assert len(triggered_users) == 1
+        assert triggered_users[0]["user_id"] == user_a["id"]
+        assert triggered_users[0]["user_id"] != user_b["id"]
 
     def test_webhook_secret_is_user_scoped_and_write_only(
         self, client, multi_user_env, tmp_path, monkeypatch
@@ -312,3 +378,201 @@ class TestMultiUserAlertsAPI:
         assert deliveries_a[0]["test"] is True
         assert deliveries_a[0]["error"] is None
         assert status_b.json()["latest_deliveries"] == []
+
+    def test_global_webhook_env_does_not_mark_hosted_channel_ready(
+        self, client, multi_user_env, monkeypatch
+    ):
+        """Hosted mode must ignore global DISCORD_WEBHOOK_URL for channel readiness."""
+        monkeypatch.setenv(
+            "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token"
+        )
+        monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+
+        token = _register(client, "global-webhook@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert client.post("/api/alerts/init", headers=headers).status_code == 200
+
+        response = client.get("/api/alerts/config", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["exists"] is True
+        assert body["channels"]["webhook_url"] is False
+        assert "global/token" not in json.dumps(body)
+
+        without_secret = {
+            "defaults": {"notify_webhook": True, "webhook_format": "discord"},
+            "alerts": [],
+        }
+        put = client.put("/api/alerts/config", json=without_secret, headers=headers)
+        assert put.status_code == 200
+        assert put.json()["channels"]["webhook_url"] is False
+
+    def test_global_email_env_does_not_mark_hosted_recipients_ready(
+        self, client, multi_user_env, monkeypatch
+    ):
+        """Hosted mode must ignore process-wide ALERT_EMAIL_TO for recipient readiness."""
+        monkeypatch.setenv("ALERT_EMAIL_TO", "global-shared@example.com")
+
+        token = _register(client, "global-email@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert client.post("/api/alerts/init", headers=headers).status_code == 200
+
+        response = client.get("/api/alerts/config", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["exists"] is True
+        assert body["config"]["defaults"].get("email_to") in (None, "")
+        assert body["channels"]["email_recipients"] is False
+        assert "global-shared@example.com" not in json.dumps(body)
+
+        without_recipients = {
+            "defaults": {"notify_email": True},
+            "alerts": [],
+        }
+        put = client.put("/api/alerts/config", json=without_recipients, headers=headers)
+        assert put.status_code == 200
+        assert put.json()["channels"]["email_recipients"] is False
+        assert put.json()["config"]["defaults"].get("email_to") in (None, "")
+
+        with_tenant_email = {
+            "defaults": {"email_to": "tenant@example.com", "notify_email": True},
+            "alerts": [],
+        }
+        put2 = client.put("/api/alerts/config", json=with_tenant_email, headers=headers)
+        assert put2.status_code == 200
+        assert put2.json()["channels"]["email_recipients"] is True
+        assert put2.json()["config"]["defaults"]["email_to"] == "tenant@example.com"
+
+    def test_status_active_watches_and_last_triggered_are_user_scoped(
+        self, client, multi_user_env
+    ):
+        from src.alerts.user_alert_storage import UserAlertStorage
+        from src.storage.users import authenticate_user
+
+        token_a = _register(client, "watches-a@example.com")
+        token_b = _register(client, "watches-b@example.com")
+        headers_a = {"Authorization": f"Bearer {token_a}"}
+        headers_b = {"Authorization": f"Bearer {token_b}"}
+
+        payload_a = {
+            "defaults": {"email_to": "a@example.com"},
+            "alerts": [
+                {
+                    "id": "aapl_watch",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                },
+                {
+                    "id": "msft_watch",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "MSFT",
+                        "operator": "greater_than",
+                        "value": 400,
+                    },
+                },
+                {
+                    "id": "disabled_watch",
+                    "enabled": False,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "GOOG",
+                        "operator": "less_than",
+                        "value": 100,
+                    },
+                },
+            ],
+        }
+        payload_b = {
+            "defaults": {"email_to": "b@example.com"},
+            "alerts": [
+                {
+                    "id": "meta_watch",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "META",
+                        "operator": "less_than",
+                        "value": 200,
+                    },
+                }
+            ],
+        }
+
+        assert client.post("/api/alerts/init", headers=headers_a).status_code == 200
+        assert client.put("/api/alerts/config", json=payload_a, headers=headers_a).status_code == 200
+        assert client.post("/api/alerts/init", headers=headers_b).status_code == 200
+        assert client.put("/api/alerts/config", json=payload_b, headers=headers_b).status_code == 200
+
+        user_a = authenticate_user("watches-a@example.com", "password123")
+        assert user_a is not None
+        UserAlertStorage(user_a["id"]).record_event(
+            {"alert_id": "aapl_watch", "timestamp": "2026-07-24T15:30:00Z"}
+        )
+
+        status_a = client.get("/api/alerts/status", headers=headers_a)
+        status_b = client.get("/api/alerts/status", headers=headers_b)
+
+        assert status_a.status_code == 200
+        assert status_b.status_code == 200
+        assert status_a.json()["active_watches"] == 2
+        assert status_a.json()["last_triggered_at"] == "2026-07-24T15:30:00Z"
+        assert status_b.json()["active_watches"] == 1
+        assert status_b.json()["last_triggered_at"] is None
+
+    def test_init_conflict_and_test_requires_existing_config(
+        self, client, multi_user_env
+    ):
+        token = _register(client, "init-conflict@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        first = client.post("/api/alerts/init", headers=headers)
+        assert first.status_code == 200
+
+        payload = {
+            "defaults": {"email_to": "init@example.com"},
+            "alerts": [
+                {
+                    "id": "keep_me",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 100,
+                    },
+                }
+            ],
+        }
+        assert client.put("/api/alerts/config", json=payload, headers=headers).status_code == 200
+
+        conflict = client.post("/api/alerts/init", headers=headers)
+        assert conflict.status_code == 409
+        assert "force=true" in conflict.json()["detail"]
+
+        saved = client.get("/api/alerts/config", headers=headers)
+        assert saved.status_code == 200
+        assert len(saved.json()["config"]["alerts"]) == 1
+        assert saved.json()["config"]["alerts"][0]["id"] == "keep_me"
+
+        forced = client.post("/api/alerts/init?force=true", headers=headers)
+        assert forced.status_code == 200
+        reset = client.get("/api/alerts/config", headers=headers)
+        assert reset.status_code == 200
+        assert reset.json()["exists"] is True
+        assert reset.json()["config"]["alerts"] == []
+
+        other = _register(client, "no-config-yet@example.com")
+        missing = client.post(
+            "/api/alerts/test",
+            json={"id": "missing", "dry_run": True},
+            headers={"Authorization": f"Bearer {other}"},
+        )
+        assert missing.status_code == 404
+        assert missing.json()["detail"] == "No alerts config for this user."

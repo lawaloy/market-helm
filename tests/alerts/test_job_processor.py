@@ -1,5 +1,6 @@
 """Tests for alert job processor (evaluate + deliver)."""
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -353,6 +354,24 @@ class TestJobProcessor:
         assert stats["evaluated"] == 1
         assert pending_job_count([JOB_DELIVER]) == 0
 
+    def test_evaluate_skips_cooldown_with_naive_last_triggered(self, db_user):
+        """Naive ISO markers must not TypeError the whole evaluate job."""
+        from datetime import datetime, timedelta, timezone
+
+        config = _watch_config()
+        config["alerts"][0]["cooldown_minutes"] = 60
+        sync_watches_from_config(db_user, config)
+        naive_ts = (
+            datetime.now(timezone.utc) - timedelta(minutes=5)
+        ).replace(tzinfo=None).isoformat()
+        record_trigger(db_user, "aapl-low", timestamp=naive_ts)
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        stats = process_job_queue("test-worker")
+        assert stats["evaluated"] == 1
+        assert stats["failed"] == 0
+        assert pending_job_count([JOB_DELIVER]) == 0
+
     def test_invalid_watch_does_not_block_symbol_for_other_users(self, db_user):
         bad_user = create_user("bad-watch@example.com", "password123")["id"]
         bad_config = _watch_config()
@@ -399,3 +418,83 @@ class TestJobProcessor:
         assert stats["delivered"] == 2
         urls = {call.args[0] for call in mock_post.call_args_list}
         assert urls == {"https://hooks.example/user-a", "https://hooks.example/user-b"}
+
+    def test_evaluate_strips_padded_payload_symbol(self, db_user):
+        """Whitespace around enqueue symbols must still match stored watches."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "  aapl  ", "price": 150.0, "tick_id": "pad"},
+        )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 1, "failed": 0}
+        with get_connection() as conn:
+            job = conn.execute(
+                "SELECT payload_json FROM alert_jobs WHERE job_type = ?",
+                (JOB_DELIVER,),
+            ).fetchone()
+        event = json.loads(job["payload_json"])["event"]
+        assert event["symbols"] == ["AAPL"]
+
+    @pytest.mark.parametrize(
+        "raw_symbol",
+        [None, float("nan"), "nan", "NONE", "  ", ""],
+    )
+    def test_evaluate_skips_sentinel_payload_symbols(self, db_user, raw_symbol):
+        """Poison/sentinel symbols must soft-skip, not look up fake NONE/NAN watches."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": raw_symbol, "price": 150.0, "tick_id": "sentinel"},
+        )
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+        with get_connection() as conn:
+            row = conn.execute("SELECT COUNT(*) AS n FROM alert_trigger_state").fetchone()
+        assert row["n"] == 0
+
+    def test_evaluate_skips_non_dict_condition_without_blocking_siblings(self, db_user):
+        """Truthy list/string conditions AttributeError'd and aborted sibling watches."""
+        bad_user = create_user("bad-condition@example.com", "password123")["id"]
+        bad_config = _watch_config()
+        bad_config["alerts"][0]["id"] = "bad-condition"
+        sync_watches_from_config(bad_user, bad_config)
+        sync_watches_from_config(db_user, _watch_config())
+
+        with get_connection() as conn:
+            poison = json.dumps(
+                {
+                    "id": "bad-condition",
+                    "name": "Bad",
+                    "enabled": True,
+                    "condition": ["not", "a", "dict"],
+                    "notifications": ["log"],
+                }
+            )
+            conn.execute(
+                "UPDATE alert_watches SET alert_json = ? WHERE user_id = ? AND alert_id = ?",
+                (poison, bad_user, "bad-condition"),
+            )
+            conn.commit()
+
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 0
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT user_id, alert_id FROM alert_trigger_state"
+            ).fetchall()
+        assert {(row["user_id"], row["alert_id"]) for row in rows} == {
+            (db_user, "aapl-low"),
+        }

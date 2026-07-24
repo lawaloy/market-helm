@@ -75,8 +75,28 @@ def email_delivery_configured() -> bool:
     )
 
 
+def _format_symbols(raw: Any) -> str:
+    """Join symbol lists for email body; tolerate None/non-str junk without TypeError."""
+    if raw is None:
+        return "(none)"
+    if isinstance(raw, str):
+        cleaned = raw.strip()
+        return cleaned or "(none)"
+    if not isinstance(raw, (list, tuple)):
+        cleaned = str(raw).strip()
+        return cleaned or "(none)"
+    parts: List[str] = []
+    for item in raw:
+        if item is None:
+            continue
+        text = str(item).strip()
+        if text:
+            parts.append(text)
+    return ", ".join(parts) or "(none)"
+
+
 def format_alert_email(event: Dict[str, Any]) -> tuple[str, str]:
-    symbols = ", ".join(event.get("symbols") or []) or "(none)"
+    symbols = _format_symbols(event.get("symbols"))
     subject = f"MarketHelm alert: {event.get('alert_name', event.get('alert_id', 'alert'))}"
     body = "\n".join(
         [

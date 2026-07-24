@@ -5,12 +5,13 @@ Fetches all stocks from major market indices using Python packages.
 Uses pytickersymbols package for reliable, maintained index lists.
 """
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pathlib import Path
 import json
 import time
 from datetime import datetime, timedelta
 from ..core.logger import setup_logger
+from ..utils.tickers import normalize_ticker
 
 # Try to import pytickersymbols package
 try:
@@ -57,6 +58,19 @@ class IndexFetcher:
         }
         return fallbacks.get(index_name, [])
     
+    @staticmethod
+    def _normalize_symbol_list(raw_symbols: List[Any]) -> List[str]:
+        """Strip/uppercase tickers, drop sentinels/blanks, and dedupe preserving order."""
+        normalized: List[str] = []
+        seen = set()
+        for raw in raw_symbols or []:
+            key = normalize_ticker(raw)
+            if key is None or key in seen:
+                continue
+            seen.add(key)
+            normalized.append(key)
+        return normalized
+
     def _load_from_cache(self, index_name: str) -> Optional[List[str]]:
         """Load index symbols from cache if available and fresh."""
         cache_file = self.cache_dir / f"{index_name.replace(' ', '_').replace('&', '').replace('-', '_')}_symbols.json"
@@ -65,11 +79,19 @@ class IndexFetcher:
             try:
                 with open(cache_file, 'r') as f:
                     cache_data = json.load(f)
-                    cached_date = datetime.fromisoformat(cache_data['date'])
-                    
-                    if datetime.now() - cached_date < self.cache_duration:
-                        logger.debug(f"Loaded {index_name} symbols from cache ({len(cache_data['symbols'])} symbols)")
-                        return cache_data['symbols']
+                if not isinstance(cache_data, dict):
+                    return None
+                cached_date = datetime.fromisoformat(cache_data['date'])
+                
+                if datetime.now() - cached_date < self.cache_duration:
+                    raw_symbols = cache_data.get('symbols') or []
+                    # String "AAPL" would normalize to ['A','P','L'] and poison
+                    # Finnhub traffic — treat wrong-type cache as a miss.
+                    if not isinstance(raw_symbols, list):
+                        return None
+                    symbols = self._normalize_symbol_list(raw_symbols)
+                    logger.debug(f"Loaded {index_name} symbols from cache ({len(symbols)} symbols)")
+                    return symbols
             except Exception as e:
                 logger.debug(f"Failed to load cache: {e}")
         
@@ -82,11 +104,11 @@ class IndexFetcher:
         try:
             cache_data = {
                 'date': datetime.now().isoformat(),
-                'symbols': symbols
+                'symbols': self._normalize_symbol_list(symbols)
             }
             with open(cache_file, 'w') as f:
                 json.dump(cache_data, f)
-            logger.debug(f"Cached {index_name} symbols ({len(symbols)} symbols)")
+            logger.debug(f"Cached {index_name} symbols ({len(cache_data['symbols'])} symbols)")
         except Exception as e:
             logger.warning(f"Failed to save cache: {e}")
     
@@ -106,7 +128,9 @@ class IndexFetcher:
             try:
                 logger.info("Fetching S&P 500 symbols from pytickersymbols package...")
                 stocks = list(self.ticker_symbols.get_stocks_by_index('S&P 500'))
-                symbols = [stock.get('symbol') for stock in stocks if stock.get('symbol')]
+                symbols = self._normalize_symbol_list(
+                    [stock.get('symbol') for stock in stocks]
+                )
                 
                 if symbols and len(symbols) > 400:  # Sanity check
                     self._save_to_cache("S&P 500", symbols)
@@ -117,17 +141,9 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback to static list or Wikipedia
-        logger.info("Falling back to alternative source...")
-        updated = self._update_from_wikipedia("S&P 500")
-        if updated and len(updated) > 400:
-            self._save_to_cache("S&P 500", updated)
-            return updated
-        
-        # Last resort: minimal fallback list
-        logger.warning("Using minimal fallback list - package and Wikipedia both failed")
-        fallback_list = self._get_minimal_fallback("S&P 500")
-        return fallback_list
+        # Last resort: minimal fallback (Wikipedia scraping was removed)
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("S&P 500")
     
     def get_nasdaq100_symbols(self) -> List[str]:
         """Get all NASDAQ-100 stock symbols using pytickersymbols package."""
@@ -140,7 +156,9 @@ class IndexFetcher:
             try:
                 logger.info("Fetching NASDAQ-100 symbols from pytickersymbols package...")
                 stocks = list(self.ticker_symbols.get_stocks_by_index('NASDAQ 100'))
-                symbols = [stock.get('symbol') for stock in stocks if stock.get('symbol')]
+                symbols = self._normalize_symbol_list(
+                    [stock.get('symbol') for stock in stocks]
+                )
                 
                 if symbols and len(symbols) > 90:
                     self._save_to_cache("NASDAQ-100", symbols)
@@ -149,14 +167,8 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback
-        updated = self._update_from_wikipedia("NASDAQ-100")
-        if updated and len(updated) > 90:
-            self._save_to_cache("NASDAQ-100", updated)
-            return updated
-        
-        fallback_list = self._get_minimal_fallback("NASDAQ-100")
-        return fallback_list
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("NASDAQ-100")
     
     def get_dow30_symbols(self) -> List[str]:
         """Get all Dow Jones Industrial Average (30 stocks) symbols using pytickersymbols package."""
@@ -169,13 +181,16 @@ class IndexFetcher:
             try:
                 logger.info("Fetching Dow 30 symbols from pytickersymbols package...")
                 # Try different index name variations
+                symbols: List[str] = []
                 for index_name_variant in ['DOW JONES', 'Dow Jones', 'DJIA']:
                     try:
                         stocks = list(self.ticker_symbols.get_stocks_by_index(index_name_variant))
-                        symbols = [stock.get('symbol') for stock in stocks if stock.get('symbol')]
+                        symbols = self._normalize_symbol_list(
+                            [stock.get('symbol') for stock in stocks]
+                        )
                         if symbols and len(symbols) >= 30:
                             break
-                    except:
+                    except Exception:
                         continue
                 
                 if symbols and len(symbols) >= 30:
@@ -185,14 +200,8 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback
-        updated = self._update_from_wikipedia("Dow Jones")
-        if updated and len(updated) >= 30:
-            self._save_to_cache("Dow Jones", updated)
-            return updated
-        
-        fallback_list = self._get_minimal_fallback("Dow Jones")
-        return fallback_list
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("Dow Jones")
     
     def get_index_symbols(self, index_name: str) -> List[str]:
         """

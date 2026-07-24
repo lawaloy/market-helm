@@ -20,6 +20,7 @@ from src.storage.alert_jobs import (
 )
 from src.storage.alert_watches import list_watches_for_symbol
 from src.storage.database import init_database
+from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,13 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
 
 def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
     payload = job["payload"]
-    symbol = str(payload["symbol"]).upper()
+    symbol = normalize_ticker(payload.get("symbol"))
+    if not symbol:
+        logger.warning(
+            "Skipping evaluate_symbol job with invalid symbol %r",
+            payload.get("symbol"),
+        )
+        return
     price = float(payload["price"])
     stock = {"symbol": symbol, "close": price}
     triggered = 0
@@ -66,12 +73,28 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
         if _within_cooldown(user_id, alert_id, watch["cooldown_minutes"]):
             continue
 
-        condition = alert.get("condition") or {}
+        if not isinstance(alert, dict):
+            logger.warning(
+                "Skipping non-object alert payload for %s user %s on %s",
+                alert_id,
+                user_id,
+                symbol,
+            )
+            continue
+        condition = alert.get("condition")
+        if not isinstance(condition, dict):
+            logger.warning(
+                "Skipping non-object condition for alert %s user %s on %s",
+                alert_id,
+                user_id,
+                symbol,
+            )
+            continue
         if watch["condition_type"] != "price_threshold":
             continue
         try:
             matched = evaluate_price_threshold(condition, stock)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, AttributeError) as exc:
             logger.warning(
                 "Skipping invalid price alert %s for user %s on %s: %s",
                 alert_id,
