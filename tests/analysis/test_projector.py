@@ -298,6 +298,30 @@ class TestStockProjector:
         }
         assert projector._project_stock(invalid_stock) is None
 
+    def test_project_stock_nan_close_returns_none(self, projector):
+        """NaN close must not emit NaN projection targets."""
+        nan_close = {
+            'symbol': 'NANC', 'close': float('nan'), 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 100, 'market_cap': 50000
+        }
+        assert projector._project_stock(nan_close) is None
+
+    def test_project_stock_nan_change_percent_returns_none(self, projector):
+        """NaN change_percent must not poison momentum/targets."""
+        nan_change = {
+            'symbol': 'NANP', 'close': 100.0, 'change_percent': float('nan'),
+            'volume': 1000000, 'previous_close': 98.0, 'market_cap': 50000
+        }
+        assert projector._project_stock(nan_change) is None
+
+    def test_project_stock_non_numeric_close_returns_none(self, projector):
+        """Non-numeric close is rejected before target math."""
+        bad = {
+            'symbol': 'BAD', 'close': 'n/a', 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 100, 'market_cap': 50000
+        }
+        assert projector._project_stock(bad) is None
+
     # ========== Batch Projection Tests ==========
 
     def test_generate_projections_multiple_stocks(self, projector, sample_stocks_list):

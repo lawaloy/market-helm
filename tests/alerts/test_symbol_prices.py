@@ -71,6 +71,22 @@ def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_
     assert prices_from_saved_daily_data() == {}
 
 
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
+    """NaN/inf closes must not enter the quote map as JSON-null floats."""
+    loader = MagicMock()
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.5},
+            {"symbol": "NAN", "close": float("nan")},
+            {"symbol": "INF", "close": float("inf")},
+            {"symbol": "NINF", "close": float("-inf")},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    assert prices_from_saved_daily_data() == {"AAPL": 180.5}
+
+
 @patch("src.services.data_fetcher.StockDataFetcher", side_effect=ValueError("API key required"))
 @patch(
     "src.alerts.symbol_prices.prices_from_saved_daily_data",

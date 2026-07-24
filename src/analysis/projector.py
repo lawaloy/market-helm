@@ -10,6 +10,7 @@ This module analyzes historical stock data and generates:
 
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
+import math
 import pandas as pd
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
@@ -81,19 +82,26 @@ class StockProjector:
         """
         try:
             symbol = stock_data.get('symbol')
-            current_price = stock_data.get('close', 0)
-            change_pct = stock_data.get('change_percent', 0)
+            try:
+                current_price = float(stock_data.get('close', 0) or 0)
+                change_pct = float(stock_data.get('change_percent', 0) or 0)
+            except (TypeError, ValueError):
+                return None
             volume = stock_data.get('volume', 0)
             previous_close = stock_data.get('previous_close', current_price)
-            
-            if current_price <= 0:
+
+            # NaN closes pass `<= 0` and would write NaN targets into projections CSV.
+            if not math.isfinite(current_price) or current_price <= 0:
                 return None
-            
+            if not math.isfinite(change_pct):
+                return None
+
             # Calculate momentum score (-100 to +100)
-            momentum = self._calculate_momentum(stock_data)
-            
+            stock_for_metrics = {**stock_data, "change_percent": change_pct}
+            momentum = self._calculate_momentum(stock_for_metrics)
+
             # Calculate volatility (0 to 100)
-            volatility = self._calculate_volatility(stock_data)
+            volatility = self._calculate_volatility(stock_for_metrics)
             
             # Determine trend direction
             trend = self._determine_trend(momentum, change_pct)
