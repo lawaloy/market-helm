@@ -30,6 +30,11 @@ _refresh_process: subprocess.Popen | None = None
 _refresh_cancel_event = threading.Event()
 
 
+def _has_refresh_credentials(project_root: Path) -> bool:
+    """True when Finnhub can be configured via env var or a project .env file."""
+    return bool(os.getenv("FINNHUB_API_KEY")) or (project_root / ".env").exists()
+
+
 class RefreshResponse(BaseModel):
     status: str
     message: str
@@ -187,9 +192,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
         )
 
     project_root = Path(__file__).parent.parent.parent.parent
-    has_env_key = bool(os.getenv("FINNHUB_API_KEY"))
-    has_env_file = (project_root / ".env").exists()
-    if not (has_env_key or has_env_file):
+    if not _has_refresh_credentials(project_root):
         refresh_status["last_status"] = "error"
         refresh_status["progress"] = "Refresh failed. Please check your API key configuration."
         return RefreshResponse(

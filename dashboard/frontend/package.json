@@ -4,14 +4,14 @@
   "private": true,
   "dependencies": {
     "@headlessui/react": "^2.2.10",
-    "@heroicons/react": "^2.1.1",
+    "@heroicons/react": "^2.2.0",
     "@tailwindcss/postcss": "^4.3.3",
     "axios": "^1.18.1",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.1",
+    "react-router": "8.3.0",
     "recharts": "^3.10.0"
   },
   "devDependencies": {
@@ -26,14 +26,17 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^7.0.2",
     "vite": "^8.1.4",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@emnapi/core": "1.11.2",
+    "@emnapi/runtime": "1.11.2"
   },
   "scripts": {
     "dev": "vite",
     "dev:3001": "vite --mode development3001 --port 3001",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ci": "npm audit --audit-level=high && npm run build && npm test"
   },
   "eslintConfig": {
     "extends": [

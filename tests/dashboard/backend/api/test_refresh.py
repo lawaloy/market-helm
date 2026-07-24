@@ -180,7 +180,8 @@ def test_trigger_refresh_reports_already_running() -> None:
 def test_trigger_refresh_rejects_without_api_key_or_env_file(monkeypatch) -> None:
     """Hosted refresh must fail closed when Finnhub credentials are missing."""
     reset_refresh_state()
-    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    # Stub the credential gate so a developer's real .env cannot make this flaky.
+    monkeypatch.setattr(refresh, "_has_refresh_credentials", lambda _root: False)
 
     response = asyncio.run(refresh.trigger_refresh(BackgroundTasks()))
 
@@ -189,6 +190,19 @@ def test_trigger_refresh_rejects_without_api_key_or_env_file(monkeypatch) -> Non
     assert "API key" in response.message
     assert refresh.refresh_status["last_status"] == "error"
     assert refresh.refresh_status["is_running"] is False
+
+
+def test_has_refresh_credentials_checks_env_var_and_dotenv(tmp_path, monkeypatch) -> None:
+    """Credential detection must ignore ambient process/.env state outside tmp_path."""
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+    monkeypatch.setenv("FINNHUB_API_KEY", "test-key")
+    assert refresh._has_refresh_credentials(tmp_path) is True
+
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("FINNHUB_API_KEY=from-file\n", encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is True
 
 
 def test_run_daily_tracker_timeout_terminates_without_alert_check(monkeypatch) -> None:
