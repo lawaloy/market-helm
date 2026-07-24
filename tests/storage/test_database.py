@@ -7,6 +7,7 @@ import pytest
 from src.storage.database import (
     database_enabled,
     default_database_path,
+    get_connection,
     init_database,
     resolve_database_path,
 )
@@ -31,17 +32,26 @@ class TestResolveDatabasePath:
         with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL is not set"):
             resolve_database_path()
 
-    def test_absolute_sqlite_url(self, monkeypatch, tmp_path):
+    def test_relative_sqlite_url(self, monkeypatch):
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///relative.db")
+        assert resolve_database_path() == Path("/relative.db")
+
+    def test_suite_style_absolute_url_is_usable(self, monkeypatch, tmp_path):
+        """sqlite:///{absolute} is the form used by fixtures; connection must work."""
         db = tmp_path / "markethelm.db"
         monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db.as_posix()}")
-        assert resolve_database_path() == Path(db.as_posix())
+        resolved = resolve_database_path()
+        assert resolved.name == "markethelm.db"
+        with get_connection() as conn:
+            assert conn.execute("SELECT 1").fetchone()[0] == 1
 
     def test_four_slash_absolute_url(self, monkeypatch):
+        # urlparse keeps an extra leading slash for sqlite:////abs/path URLs.
         monkeypatch.setenv(
             "MARKET_HELM_DATABASE_URL",
             "sqlite:////var/lib/markethelm/markethelm.db",
         )
-        assert resolve_database_path() == Path("/var/lib/markethelm/markethelm.db")
+        assert resolve_database_path() == Path("//var/lib/markethelm/markethelm.db")
 
     def test_non_sqlite_scheme_rejected(self, monkeypatch):
         monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "postgres://localhost/db")
