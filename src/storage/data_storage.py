@@ -8,9 +8,60 @@ import pandas as pd
 from ..utils.company_names import enrich_stock_data_with_names
 import os
 import json
+import math
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 from pathlib import Path
+
+
+def _json_safe_value(value: Any) -> Any:
+    """Coerce nested non-finite floats to None for strict JSON writers."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+    return value
+
+
+def _md_reason(value: Any, max_len: int) -> str:
+    """Truncate reason text; None/NaN/non-strings must not raise on slice/len."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and not math.isfinite(value):
+        return ""
+    # pandas may surface missing cells as NaN floats before string columns.
+    if pd.isna(value):
+        return ""
+    text = str(value)
+    if len(text) > max_len:
+        return text[:max_len] + "..."
+    return text
+
+
+def _md_money(value: Any) -> str:
+    """Format a money cell; None/NaN/Inf must not raise on :.2f."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "—"
+    if not math.isfinite(number):
+        return "—"
+    return f"${number:.2f}"
+
+
+def _md_pct(value: Any, precision: int = 1, signed: bool = True) -> str:
+    """Format a percent cell; non-finite values render as an em dash."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "—"
+    if not math.isfinite(number):
+        return "—"
+    if signed:
+        return f"{number:+.{precision}f}%"
+    return f"{number:.{precision}f}%"
 
 
 def _data_date_for_filename() -> datetime.date:
@@ -103,8 +154,11 @@ class DataStorage:
         summary_path = self.data_dir / f"summary_{date.strftime('%Y-%m-%d')}.json"
         
         summary_data["date"] = str(date)
+        # Default json.dump writes non-standard NaN/Infinity literals; coerce first
+        # and refuse allow_nan so dashboard/CLI consumers always get strict JSON.
+        payload = _json_safe_value(summary_data)
         with open(summary_path, 'w') as f:
-            json.dump(summary_data, f, indent=2)
+            json.dump(payload, f, indent=2, allow_nan=False)
         
         return str(summary_path)
     
@@ -201,9 +255,30 @@ class DataStorage:
         # Executive Summary
         md.append("## Executive Summary")
         md.append("")
-        md.append(f"- **Average Confidence Level:** {avg_confidence:.1f}%")
-        md.append(f"- **Expected Market Direction:** {'+' if avg_expected_change >= 0 else ''}{avg_expected_change:.2f}%")
-        md.append(f"- **Market Sentiment:** {'Bullish' if avg_expected_change > 0.5 else 'Bearish' if avg_expected_change < -0.5 else 'Neutral'}")
+        # Means can be NaN when every row is non-finite; avoid :.2f TypeError
+        # on None and keep a readable Neutral sentiment fallback.
+        conf_text = (
+            f"{float(avg_confidence):.1f}%"
+            if pd.notna(avg_confidence) and math.isfinite(float(avg_confidence))
+            else "—"
+        )
+        if pd.notna(avg_expected_change) and math.isfinite(float(avg_expected_change)):
+            avg_change = float(avg_expected_change)
+            direction = f"{'+' if avg_change >= 0 else ''}{avg_change:.2f}%"
+            sentiment = (
+                "Bullish"
+                if avg_change > 0.5
+                else "Bearish"
+                if avg_change < -0.5
+                else "Neutral"
+            )
+        else:
+            direction = "—"
+            sentiment = "Neutral"
+
+        md.append(f"- **Average Confidence Level:** {conf_text}")
+        md.append(f"- **Expected Market Direction:** {direction}")
+        md.append(f"- **Market Sentiment:** {sentiment}")
         md.append("")
         
         # Recommendation distribution
@@ -253,9 +328,13 @@ class DataStorage:
             md.append("| Symbol | Current → Target | Change | Confidence | Reason |")
             md.append("| ------ | ---------------- | ------ | ---------- | ------ |")
             for _, stock in strong_buys.iterrows():
-                reason_short = stock['reason'][:55] + "..." if len(stock['reason']) > 55 else stock['reason']
-                md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} → ${stock['target_mid']:.2f} | "
-                         f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {reason_short} |")
+                reason_short = _md_reason(stock.get("reason"), 55)
+                md.append(
+                    f"| **{stock['symbol']}** | "
+                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_pct(stock.get('expected_change_percent'))} | "
+                    f"{stock['confidence']}% | {reason_short} |"
+                )
         md.append("")
         md.append("---")
         md.append("")
@@ -270,8 +349,12 @@ class DataStorage:
             md.append("| Symbol | Current | Target | Change | Confidence | Risk |")
             md.append("| ------ | ------- | ------ | ------ | ---------- | ---- |")
             for _, stock in buys.iterrows():
-                md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} | ${stock['target_mid']:.2f} | "
-                         f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {stock['risk_level']} |")
+                md.append(
+                    f"| **{stock['symbol']}** | {_md_money(stock.get('current_price'))} | "
+                    f"{_md_money(stock.get('target_mid'))} | "
+                    f"{_md_pct(stock.get('expected_change_percent'))} | "
+                    f"{stock['confidence']}% | {stock['risk_level']} |"
+                )
         md.append("")
         md.append("---")
         md.append("")
@@ -286,9 +369,13 @@ class DataStorage:
             md.append("| Symbol | Current | Target | Change | Confidence | Risk | Reason |")
             md.append("| ------ | ------- | ------ | ------ | ---------- | ---- | ------ |")
             for _, stock in strong_sells.iterrows():
-                reason_short = stock['reason'][:50] + "..." if len(stock['reason']) > 50 else stock['reason']
-                md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} | ${stock['target_mid']:.2f} | "
-                         f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {stock['risk_level']} | {reason_short} |")
+                reason_short = _md_reason(stock.get("reason"), 50)
+                md.append(
+                    f"| **{stock['symbol']}** | {_md_money(stock.get('current_price'))} | "
+                    f"{_md_money(stock.get('target_mid'))} | "
+                    f"{_md_pct(stock.get('expected_change_percent'))} | "
+                    f"{stock['confidence']}% | {stock['risk_level']} | {reason_short} |"
+                )
         md.append("")
         md.append("---")
         md.append("")
@@ -301,8 +388,12 @@ class DataStorage:
         md.append("| Symbol | Current | Target | Expected Gain | Confidence | Recommendation |")
         md.append("| ------ | ------- | ------ | ------------- | ---------- | -------------- |")
         for _, stock in top_gainers.iterrows():
-            md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} | ${stock['target_mid']:.2f} | "
-                     f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {stock['recommendation']} |")
+            md.append(
+                f"| **{stock['symbol']}** | {_md_money(stock.get('current_price'))} | "
+                f"{_md_money(stock.get('target_mid'))} | "
+                f"{_md_pct(stock.get('expected_change_percent'))} | "
+                f"{stock['confidence']}% | {stock['recommendation']} |"
+            )
         md.append("")
         
         # Top Decliners
@@ -313,8 +404,12 @@ class DataStorage:
         md.append("| Symbol | Current | Target | Expected Decline | Confidence | Recommendation |")
         md.append("| ------ | ------- | ------ | ---------------- | ---------- | -------------- |")
         for _, stock in top_decliners.iterrows():
-            md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} | ${stock['target_mid']:.2f} | "
-                     f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {stock['recommendation']} |")
+            md.append(
+                f"| **{stock['symbol']}** | {_md_money(stock.get('current_price'))} | "
+                f"{_md_money(stock.get('target_mid'))} | "
+                f"{_md_pct(stock.get('expected_change_percent'))} | "
+                f"{stock['confidence']}% | {stock['recommendation']} |"
+            )
         md.append("")
         md.append("---")
         md.append("")
@@ -329,8 +424,12 @@ class DataStorage:
             md.append("| Symbol | Current → Target | Expected Change | Confidence | Recommendation | Trend |")
             md.append("| ------ | ---------------- | --------------- | ---------- | -------------- | ----- |")
             for _, stock in high_confidence.iterrows():
-                md.append(f"| **{stock['symbol']}** | ${stock['current_price']:.2f} → ${stock['target_mid']:.2f} | "
-                         f"{stock['expected_change_percent']:+.1f}% | {stock['confidence']}% | {stock['recommendation']} | {stock['trend']} |")
+                md.append(
+                    f"| **{stock['symbol']}** | "
+                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_pct(stock.get('expected_change_percent'))} | "
+                    f"{stock['confidence']}% | {stock['recommendation']} | {stock['trend']} |"
+                )
         md.append("")
         md.append("---")
         md.append("")

@@ -9,6 +9,8 @@ import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
+from src.utils.tickers import normalize_ticker
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = 300
@@ -77,10 +79,13 @@ def run_user_check(user_id: str) -> Dict[str, Any]:
 
     watch_symbols: List[str] = []
     for alert in engine.alerts:
-        condition = alert.get("condition") or {}
+        # Truthy non-dict conditions (str/list) AttributeError on .get; mirror
+        # alert_paths.get_enabled_watch_symbols / AlertEngine.evaluate soft-fail.
+        raw_condition = alert.get("condition")
+        condition = raw_condition if isinstance(raw_condition, dict) else {}
         if condition.get("type") != "price_threshold":
             continue
-        symbol = str(condition.get("symbol") or "").strip().upper()
+        symbol = normalize_ticker(condition.get("symbol"))
         if symbol and symbol not in watch_symbols:
             watch_symbols.append(symbol)
 
