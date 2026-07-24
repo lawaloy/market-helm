@@ -232,3 +232,25 @@ def test_evaluate_fires_again_after_aware_cooldown_expires():
     notifier.send.assert_called_once_with(events[0])
     storage.record_event.assert_called_once_with(events[0])
 
+
+def test_evaluate_skips_unsupported_condition_type_and_continues():
+    """One bad condition type must not block later valid watches."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    bad = {
+        "id": "weird",
+        "name": "Weird",
+        "enabled": True,
+        "notifications": ["log"],
+        "condition": {"type": "volume_zscore", "symbol": "AAPL"},
+    }
+    good = _price_alert()
+    engine = AlertEngine([bad, good], storage=storage)
+
+    with patch("src.alerts.alert_engine.LogNotifier") as log_notifier_cls:
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["alert_id"] == "aapl-drop"
+    log_notifier_cls.return_value.send.assert_called_once_with(events[0])
+

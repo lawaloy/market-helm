@@ -107,3 +107,56 @@ class TestStockTrackerWorkflow:
 
         assert result["success"] is False
         assert "error" in result
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+    @patch("src.alerts.alert_paths.get_enabled_watch_symbols", return_value=[])
+    @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500", "NASDAQ-100"])
+    @patch("src.workflows.tracker.StockDataFetcher")
+    @patch("src.workflows.tracker.DataStorage")
+    @patch("src.workflows.tracker.AlertEngine")
+    def test_workflow_top_n_stocks_keeps_highest_volume(
+        self,
+        mock_alert,
+        mock_storage_cls,
+        mock_fetcher_cls,
+        mock_indices,
+        _mock_watches,
+        temp_data_dir,
+    ):
+        """Day-trading top_n must rank by volume across indices."""
+        from src.workflows.tracker import StockTrackerWorkflow
+
+        stocks = [
+            {"symbol": "LOW", "close": 10.0, "volume": 100, "change_percent": 0.1, "index_name": "S&P 500"},
+            {"symbol": "MID", "close": 20.0, "volume": 5_000, "change_percent": 0.2, "index_name": "S&P 500"},
+            {"symbol": "HIGH", "close": 30.0, "volume": 50_000, "change_percent": 0.3, "index_name": "NASDAQ-100"},
+            {"symbol": "TOP", "close": 40.0, "volume": 90_000, "change_percent": 0.4, "index_name": "NASDAQ-100"},
+        ]
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_all_indices.return_value = {
+            "S&P 500": stocks[:2],
+            "NASDAQ-100": stocks[2:],
+        }
+        mock_fetcher_cls.return_value = mock_fetcher
+
+        mock_storage = MagicMock()
+        mock_storage.save_daily_data.return_value = str(temp_data_dir / "daily.csv")
+        mock_storage.save_summary.return_value = str(temp_data_dir / "summary.json")
+        mock_storage.save_projections.return_value = str(temp_data_dir / "proj.csv")
+        mock_storage_cls.return_value = mock_storage
+        mock_alert.from_config.return_value = None
+
+        workflow = StockTrackerWorkflow(include_profile=False)
+        workflow.fetcher = mock_fetcher
+        workflow.storage = mock_storage
+        workflow.alert_engine = None
+        workflow.ai_summarizer.enabled = False
+
+        result = workflow.run(use_screener=False, top_n_stocks=2)
+
+        assert result["success"] is True
+        kept = [row["symbol"] for row in result["data"]]
+        assert kept == ["TOP", "HIGH"]
+        mock_fetcher.fetch_all_indices.assert_called_once()
+        kwargs = mock_fetcher.fetch_all_indices.call_args.kwargs
+        assert kwargs["max_symbols_per_index"] == 1
