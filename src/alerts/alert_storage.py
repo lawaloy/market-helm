@@ -9,11 +9,9 @@ import json
 
 MAX_DELIVERY_LOG = 100
 
-_EMPTY_HISTORY: Dict[str, Any] = {
-    "last_triggered": {},
-    "events": [],
-    "delivery_log": [],
-}
+
+def _empty_history() -> Dict[str, Any]:
+    return {"last_triggered": {}, "events": [], "delivery_log": []}
 
 
 class AlertStorage:
@@ -27,14 +25,14 @@ class AlertStorage:
 
     def _load(self) -> Dict:
         if not self.history_path.exists():
-            return dict(_EMPTY_HISTORY)
+            return _empty_history()
         try:
             with open(self.history_path, "r") as f:
                 data = json.load(f)
         except Exception:
-            return dict(_EMPTY_HISTORY)
+            return _empty_history()
         if not isinstance(data, dict):
-            return dict(_EMPTY_HISTORY)
+            return _empty_history()
         last_triggered = data.get("last_triggered")
         if not isinstance(last_triggered, dict):
             last_triggered = {}
