@@ -251,6 +251,66 @@ def test_run_daily_tracker_clamps_small_and_invalid_top_n(monkeypatch) -> None:
     assert command[command.index("--top-n") + 1] == "10"
 
 
+def test_run_daily_tracker_falls_back_on_invalid_timeout_env(monkeypatch) -> None:
+    """Invalid REFRESH_TIMEOUT_SECONDS must not crash after spawn or orphan the child."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+    sleep_calls: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+        # Advance wall clock past the default 600s timeout on first poll loop.
+        if len(sleep_calls) == 1:
+            fake_process._running = False
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "not-an-int")
+    monkeypatch.setattr(refresh.time, "sleep", fake_sleep)
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    # Make poll loop see a finished process immediately.
+    fake_process._running = False
+    refresh.run_daily_tracker()
+
+    assert popen.called
+    assert refresh.refresh_status["last_status"] == "success"
+    assert refresh.refresh_status["is_running"] is False
+    assert refresh._refresh_process is None
+
+
+def test_run_daily_tracker_invalid_timeout_still_manages_running_child(monkeypatch) -> None:
+    """Even with a bad timeout env, the spawned process must remain tracked until exit."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0, running=True)
+    popen = MagicMock(return_value=fake_process)
+    polls = {"n": 0}
+
+    original_poll = fake_process.poll
+
+    def poll_then_finish():
+        polls["n"] += 1
+        if polls["n"] >= 2:
+            fake_process._running = False
+        return original_poll()
+
+    fake_process.poll = poll_then_finish  # type: ignore[method-assign]
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "abc")
+    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    assert popen.called
+    assert polls["n"] >= 2
+    assert refresh.refresh_status["last_status"] == "success"
+    assert refresh._refresh_process is None
+
+
 def test_cancel_refresh_terminates_running_process() -> None:
     reset_refresh_state()
     fake_process = FakeProcess(returncode=0, running=True)
@@ -309,3 +369,42 @@ def test_refresh_mutations_require_auth_in_database_mode(tmp_path, monkeypatch) 
 
     assert client.post("/api/refresh").status_code == 401
     assert client.post("/api/refresh/cancel").status_code == 401
+
+
+def test_run_daily_tracker_omits_no_screener_when_disabled(monkeypatch) -> None:
+    """REFRESH_NO_SCREENER=false must leave the screener enabled in the child CLI."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_NO_SCREENER", "false")
+    monkeypatch.setenv("REFRESH_MAX_WORKERS", "8")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    args, kwargs = popen.call_args
+    command = args[0]
+    assert "--no-screener" not in command
+    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "8"
+    assert refresh.refresh_status["last_status"] == "success"
+
+
+def test_run_daily_tracker_defaults_to_no_screener_and_four_workers(monkeypatch) -> None:
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.delenv("REFRESH_NO_SCREENER", raising=False)
+    monkeypatch.delenv("REFRESH_MAX_WORKERS", raising=False)
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    args, kwargs = popen.call_args
+    assert "--no-screener" in args[0]
+    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "4"

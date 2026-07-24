@@ -1,5 +1,6 @@
 """Tests for alert config path resolution."""
 
+import sys
 from pathlib import Path
 
 from src.alerts.alert_paths import (
@@ -12,13 +13,80 @@ from src.alerts.alert_paths import (
     save_alerts_config,
     dedupe_alerts_config,
     strip_webhook_secrets_from_config,
+    user_config_dir,
 )
+
+
+def _fake_home(monkeypatch, tmp_path: Path) -> Path:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    if sys.platform == "win32":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
 
 
 def test_resolve_prefers_explicit_path(tmp_path: Path) -> None:
     custom = tmp_path / "custom.json"
     custom.write_text('{"alerts": []}', encoding="utf-8")
     assert resolve_alerts_config_path(custom) == custom
+
+
+def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    legacy = home / ".market-desk"
+    legacy.mkdir()
+    (legacy / "alerts.json").write_text('{"alerts": []}', encoding="utf-8")
+
+    resolved = user_config_dir()
+
+    assert resolved == home / ".market-helm"
+    assert resolved.exists()
+    assert not legacy.exists()
+    assert (resolved / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
+
+
+def test_user_config_dir_keeps_existing_market_helm(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    dest = home / ".market-helm"
+    dest.mkdir()
+    (dest / "alerts.json").write_text('{"alerts": [{"id": "keep"}]}', encoding="utf-8")
+    legacy = home / ".market-desk"
+    legacy.mkdir()
+    (legacy / "alerts.json").write_text('{"alerts": [{"id": "stale"}]}', encoding="utf-8")
+
+    resolved = user_config_dir()
+
+    assert resolved == dest
+    assert legacy.exists()
+    assert (dest / "alerts.json").read_text(encoding="utf-8") == '{"alerts": [{"id": "keep"}]}'
+
+
+def test_resolve_alerts_config_path_precedence(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    user_dir = home / ".market-helm"
+    user_dir.mkdir()
+    user_path = user_dir / "alerts.json"
+    user_path.write_text('{"alerts": [{"id": "user"}]}', encoding="utf-8")
+
+    repo_root = tmp_path / "repo"
+    repo_config = repo_root / "config"
+    repo_config.mkdir(parents=True)
+    repo_path = repo_config / "alerts.json"
+    repo_path.write_text('{"alerts": [{"id": "repo"}]}', encoding="utf-8")
+    monkeypatch.setattr("src.alerts.alert_paths._REPO_ROOT", repo_root)
+
+    env_path = tmp_path / "env-alerts.json"
+    env_path.write_text('{"alerts": [{"id": "env"}]}', encoding="utf-8")
+    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(env_path))
+    assert resolve_alerts_config_path() == env_path
+
+    monkeypatch.delenv("MARKET_HELM_ALERTS_CONFIG", raising=False)
+    assert resolve_alerts_config_path() == user_path
+
+    user_path.unlink()
+    assert resolve_alerts_config_path() == repo_path
+
+    repo_path.unlink()
+    assert resolve_alerts_config_path() == user_path
 
 
 def test_init_user_alerts_config_creates_file(monkeypatch, tmp_path: Path) -> None:
@@ -64,6 +132,15 @@ def test_polish_alerts_config_strips_placeholders(monkeypatch) -> None:
     assert "webhook_url" not in polished["alerts"][0]
 
 
+def test_polish_alerts_config_can_skip_env_email_seed(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_EMAIL_TO", "global@example.org")
+    polished = polish_alerts_config(
+        {"defaults": {}, "alerts": []},
+        seed_env_email=False,
+    )
+    assert polished["defaults"].get("email_to") in (None, "")
+
+
 def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
     config = {
         "alerts": [
@@ -84,6 +161,63 @@ def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
     deduped = dedupe_alerts_config(config)
     assert len(deduped["alerts"]) == 2
     assert deduped["alerts"][0]["id"] == "aapl_drop"
+
+
+def test_dedupe_alerts_config_normalizes_padded_symbols() -> None:
+    """Padded/cased symbols must collapse to one price-threshold key."""
+    config = {
+        "alerts": [
+            {
+                "id": "aapl_first",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "  aapl  ",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+            {
+                "id": "aapl_padded_copy",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert len(deduped["alerts"]) == 1
+    assert deduped["alerts"][0]["id"] == "aapl_first"
+
+
+def test_dedupe_alerts_config_falls_back_for_sentinel_symbols() -> None:
+    """None/NaN sentinel symbols must not share a fake NAN/NONE dedupe key."""
+    config = {
+        "alerts": [
+            {
+                "id": "bad_none",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": None,
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+            {
+                "id": "bad_nan",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "nan",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert [a["id"] for a in deduped["alerts"]] == ["bad_none", "bad_nan"]
 
 
 def test_strip_webhook_secrets_from_config() -> None:
