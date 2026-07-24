@@ -3,7 +3,14 @@
 import pytest
 
 from src.storage.database import init_database
-from src.storage.users import UserError, authenticate_user, create_user, get_user_by_id
+from src.storage.users import (
+    UserError,
+    _hash_password,
+    _verify_password,
+    authenticate_user,
+    create_user,
+    get_user_by_id,
+)
 
 
 @pytest.fixture
@@ -46,6 +53,26 @@ class TestUsers:
             )
 
         assert authenticate_user("corrupt@example.com", "password123") is None
+
+    def test_verify_password_rejects_wrong_scheme(self):
+        """Non-scrypt schemes must soft-return False, not raise."""
+        stored = _hash_password("password123")
+        wrong_scheme = "bcrypt$" + stored.split("$", 1)[1]
+        assert _verify_password("password123", wrong_scheme) is False
+
+    def test_verify_password_rejects_truncated_and_bad_hex(self):
+        """Truncated or non-hex hash fields must soft-return False."""
+        stored = _hash_password("password123")
+        parts = stored.split("$")
+        # Drop digest hex entirely
+        truncated = "$".join(parts[:5])
+        assert _verify_password("password123", truncated) is False
+        # Corrupt salt hex
+        bad_hex = "$".join(parts[:4] + ["zzzz", parts[5]])
+        assert _verify_password("password123", bad_hex) is False
+        # Valid format, wrong password still False
+        assert _verify_password("wrong-password", stored) is False
+        assert _verify_password("password123", stored) is True
 
     def test_short_password_rejected(self, db):
         with pytest.raises(UserError, match="8 characters"):

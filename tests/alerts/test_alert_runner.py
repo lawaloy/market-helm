@@ -182,7 +182,8 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
             {"symbol": "", "close": 10.0},
             {"symbol": "MSFT", "close": "410.5"},
             {"symbol": "GOOG", "close": float("nan")},
-            {"symbol": "INF", "close": float("inf")},
+            # Use a real ticker: "INF" is an invalid ticker sentinel.
+            {"symbol": "TSLA", "close": float("inf")},
         ]
     )
 
@@ -195,7 +196,7 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
     ]
     assert "Skipping invalid saved quote for BAD" in caplog.text
     assert "Skipping invalid saved quote for GOOG" in caplog.text
-    assert "Skipping invalid saved quote for INF" in caplog.text
+    assert "Skipping invalid saved quote for TSLA" in caplog.text
 
 
 def test_stocks_from_daily_df_skips_invalid_symbol_tokens():
