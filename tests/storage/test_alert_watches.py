@@ -6,11 +6,13 @@ import pytest
 
 from src.storage.alert_watches import (
     MAX_DELIVERY_LOG,
+    InvalidAlertWatchConfig,
     latest_deliveries_for_user,
     list_enabled_symbols,
     list_watches_for_symbol,
     record_delivery,
     sync_watches_from_config,
+    validate_watches_config,
 )
 from src.storage.database import get_connection, init_database
 from src.storage.user_alerts import save_user_alerts_config
@@ -152,6 +154,72 @@ class TestAlertWatches:
         init_database()
 
         assert list_enabled_symbols() == []
+
+    def test_validate_rejects_non_finite_price_threshold(self, db_user):
+        """NaN/Inf thresholds must fail closed so watches cannot store corrupt prices."""
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with pytest.raises(InvalidAlertWatchConfig, match="invalid price threshold"):
+                validate_watches_config(
+                    db_user,
+                    {
+                        "defaults": {},
+                        "alerts": [
+                            {
+                                "id": "bad-finite",
+                                "enabled": True,
+                                "condition": {
+                                    "type": "price_threshold",
+                                    "symbol": "AAPL",
+                                    "operator": "less_than",
+                                    "value": bad,
+                                },
+                            }
+                        ],
+                    },
+                )
+
+    def test_sync_normalizes_padded_and_rejects_sentinel_symbols(self, db_user):
+        """Watch index keys strip whitespace; blank/NaN symbols store as NULL."""
+        save_user_alerts_config(
+            db_user,
+            {
+                "defaults": {},
+                "alerts": [
+                    {
+                        "id": "padded",
+                        "enabled": True,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": " aapl ",
+                            "operator": "less_than",
+                            "value": 200,
+                        },
+                    },
+                    {
+                        "id": "sentinel",
+                        "enabled": True,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": "nan",
+                            "operator": "less_than",
+                            "value": 10,
+                        },
+                    },
+                ],
+            },
+        )
+
+        assert list_enabled_symbols() == ["AAPL"]
+        assert len(list_watches_for_symbol(" AAPL ")) == 1
+        assert list_watches_for_symbol("nan") == []
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT alert_id, symbol FROM alert_watches WHERE user_id = ? ORDER BY alert_id",
+                (db_user,),
+            ).fetchall()
+        by_id = {row["alert_id"]: row["symbol"] for row in rows}
+        assert by_id["padded"] == "AAPL"
+        assert by_id["sentinel"] is None
 
 
 class TestAlertDeliveryLog:

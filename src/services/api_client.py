@@ -5,10 +5,11 @@ Professional API client for fetching stock data using official APIs.
 Uses Finnhub API (official, reliable, free tier: 60 calls/minute).
 """
 
+import math
 import os
 import threading
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import deque
 import requests
@@ -21,6 +22,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = setup_logger("api_client")
+
+
+def _finite_number(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
+    """Coerce to a finite float; non-numeric / NaN / Inf → default (or None)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    return number
 
 
 class RateLimiter:
@@ -177,7 +189,14 @@ class FinnhubClient:
                 
                 # Handle 429 rate limit errors explicitly
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', 60))
+                    raw_retry_after = response.headers.get('Retry-After', 60)
+                    try:
+                        retry_after = int(raw_retry_after)
+                    except (TypeError, ValueError):
+                        # HTTP-date or garbage headers must not abort the fetch path.
+                        retry_after = 60
+                    if retry_after < 0:
+                        retry_after = 60
                     if attempt < max_retries - 1:
                         logger.warning(f"Rate limit exceeded (429). Waiting {retry_after} seconds...")
                         time.sleep(retry_after)
@@ -297,16 +316,23 @@ class FinnhubClient:
             if not quote or quote.get("c") is None:
                 logger.debug(f"No quote data for {symbol}")
                 return None
-            
-            current_price = quote.get("c", 0)
-            previous_close = quote.get("pc", current_price)
+
+            current_price = _finite_number(quote.get("c"), default=None)
+            if current_price is None:
+                logger.debug(f"Non-finite quote close for {symbol}")
+                return None
+
+            previous_close = _finite_number(quote.get("pc"), default=None)
+            if previous_close is None:
+                previous_close = current_price
             change = current_price - previous_close
             change_pct = (change / previous_close * 100) if previous_close > 0 else 0.0
+            volume = _finite_number(quote.get("v"), default=0.0) or 0.0
             
             return {
                 "symbol": symbol,
                 "close": current_price,
-                "volume": quote.get("v", 0),
+                "volume": volume,
                 "change_percent": change_pct,
                 "market_cap": 0,  # Will be fetched later for qualified stocks
                 "name": symbol,  # Will be fetched later
@@ -348,26 +374,35 @@ class FinnhubClient:
             # Use it when present; only fall back to symbol when profile failed or is empty.
             name = (profile.get("name") or symbol) if profile else symbol
 
-            # Use previous close from quote (no need for candles)
-            current_price = quote.get("c", 0)
-            previous_close = quote.get("pc", current_price)
+            current_price = _finite_number(quote.get("c"), default=None)
+            if current_price is None:
+                logger.debug(f"Non-finite quote close for {symbol}")
+                return None
+
+            previous_close = _finite_number(quote.get("pc"), default=None)
+            if previous_close is None:
+                previous_close = current_price
             change = current_price - previous_close
             change_pct = (change / previous_close * 100) if previous_close > 0 else 0.0
+            volume = _finite_number(quote.get("v"), default=0.0) or 0.0
+            market_cap = _finite_number(
+                profile.get("marketCapitalization", 0), default=0.0
+            ) or 0.0
 
             return {
                 "symbol": symbol,
                 "date": datetime.now().date(),
-                "open": quote.get("o", current_price),
+                "open": _finite_number(quote.get("o"), default=current_price),
                 "close": current_price,
-                "high": quote.get("h", current_price),
-                "low": quote.get("l", current_price),
-                "volume": quote.get("v", 0),
+                "high": _finite_number(quote.get("h"), default=current_price),
+                "low": _finite_number(quote.get("l"), default=current_price),
+                "volume": volume,
                 "previous_close": previous_close,
                 "change": change,
                 "change_percent": change_pct,
                 "name": name,
                 "exchange": profile.get("exchange", "Unknown"),
-                "market_cap": profile.get("marketCapitalization", 0),
+                "market_cap": market_cap,
             }
         
         except Exception as e:

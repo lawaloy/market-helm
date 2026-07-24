@@ -1,14 +1,53 @@
 """Tests for storage module."""
 
 import unittest
+import unittest.mock
 import tempfile
 import shutil
 from pathlib import Path
 import pandas as pd
 import json
-from datetime import date
+from datetime import date, datetime
+from unittest.mock import patch
 
-from src.storage.data_storage import DataStorage
+from src.storage.data_storage import DataStorage, _data_date_for_filename
+
+
+class TestDataDateForFilename:
+    """Write-path trading-day stamp used when save callers omit an explicit date."""
+
+    def test_weekday_uses_today(self):
+        # 2026-07-22 is a Wednesday.
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 22, 12, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 22)
+
+    def test_saturday_rolls_back_to_friday(self):
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 25, 9, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 24)
+
+    def test_sunday_rolls_back_to_friday(self):
+        with patch("src.storage.data_storage.datetime") as mock_dt:
+            mock_dt.now.return_value = datetime(2026, 7, 26, 9, 0, 0)
+            assert _data_date_for_filename() == date(2026, 7, 24)
+
+    def test_save_daily_data_uses_trading_day_filename(self, tmp_path):
+        storage = DataStorage(data_dir=str(tmp_path))
+        with patch(
+            "src.storage.data_storage._data_date_for_filename",
+            return_value=date(2026, 7, 24),
+        ):
+            path = storage.save_daily_data(
+                [{"symbol": "AAPL", "name": "Apple", "close": 150.0}]
+            )
+        assert path is not None
+        assert Path(path).name == "daily_data_2026-07-24.csv"
+
+    def test_save_daily_data_empty_returns_none(self, tmp_path):
+        storage = DataStorage(data_dir=str(tmp_path))
+        assert storage.save_daily_data([]) is None
+        assert list(tmp_path.glob("daily_data_*.csv")) == []
 
 
 class TestDataStorage(unittest.TestCase):
@@ -68,6 +107,100 @@ class TestDataStorage(unittest.TestCase):
             loaded_summary = json.load(f)
         self.assertIsInstance(loaded_summary, dict)
         self.assertEqual(loaded_summary['total_stocks'], 2)
+
+    def test_save_projections_writes_ordered_csv_and_markdown(self):
+        """Projection CSV keeps the stable column order and still emits markdown."""
+        projections = {
+            "AAPL": {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "current_price": 180.0,
+                "target_low": 175.0,
+                "target_mid": 185.0,
+                "target_high": 195.0,
+                "expected_change_percent": 2.5,
+                "recommendation": "BUY",
+                "confidence": 80,
+                "trend": "up",
+                "momentum_score": 0.6,
+                "volatility_score": 0.2,
+                "risk_level": "medium",
+                "reason": "momentum",
+                "projection_date": "2026-05-25",
+                "generated_at": "2026-05-20T12:00:00",
+                "extra_ignored": True,
+            }
+        }
+
+        csv_path = Path(self.storage.save_projections(projections, date=date(2026, 5, 20)))
+        self.assertTrue(csv_path.exists())
+        df = pd.read_csv(csv_path)
+        self.assertEqual(
+            list(df.columns),
+            [
+                "symbol",
+                "name",
+                "current_price",
+                "target_low",
+                "target_mid",
+                "target_high",
+                "expected_change_percent",
+                "recommendation",
+                "confidence",
+                "trend",
+                "momentum_score",
+                "volatility_score",
+                "risk_level",
+                "reason",
+                "projection_date",
+                "generated_at",
+            ],
+        )
+        self.assertEqual(df.iloc[0]["symbol"], "AAPL")
+        md_path = csv_path.with_suffix(".md")
+        self.assertTrue(md_path.exists())
+        self.assertIn("Stock Market Projections Report", md_path.read_text(encoding="utf-8"))
+
+    def test_save_projections_still_returns_csv_when_markdown_fails(self):
+        """Markdown report failures must not block the projections CSV path."""
+        projections = {
+            "AAPL": {
+                "symbol": "AAPL",
+                "current_price": 180.0,
+                "expected_change_percent": 1.0,
+                "recommendation": "HOLD",
+                "confidence": 50,
+                "trend": "flat",
+            }
+        }
+
+        with unittest.mock.patch.object(
+            DataStorage,
+            "_generate_projection_markdown",
+            side_effect=RuntimeError("markdown boom"),
+        ):
+            csv_path = Path(
+                self.storage.save_projections(projections, date=date(2026, 5, 21))
+            )
+
+        self.assertTrue(csv_path.exists())
+        self.assertFalse(csv_path.with_suffix(".md").exists())
+        self.assertEqual(pd.read_csv(csv_path).iloc[0]["symbol"], "AAPL")
+
+    def test_save_projections_empty_returns_none(self):
+        self.assertIsNone(self.storage.save_projections({}))
+
+    def test_load_daily_data_missing_file_returns_none(self):
+        """Absent daily CSV soft-fails to None instead of raising."""
+        self.assertIsNone(self.storage.load_daily_data(date=date(2099, 1, 1)))
+
+    def test_load_daily_data_corrupt_csv_returns_none(self):
+        """Unreadable daily CSV soft-fails to None so callers can skip the day."""
+        bad_path = Path(self.test_data_dir) / "daily_data_2099-01-02.csv"
+        bad_path.write_bytes(b"\xff\xfe not,valid,csv\n\x00\x01")
+        with unittest.mock.patch("builtins.print"):
+            loaded = self.storage.load_daily_data(date=date(2099, 1, 2))
+        self.assertIsNone(loaded)
 
 
 if __name__ == '__main__':

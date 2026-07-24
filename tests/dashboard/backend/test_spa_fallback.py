@@ -67,3 +67,31 @@ def test_spa_fallback_skips_non_get_and_non_html(tmp_path: Path) -> None:
     assert post.text == "missing"
     assert json_get.status_code == 404
     assert json_get.text == "missing"
+
+
+def test_spa_fallback_serves_index_for_default_accept_header(tmp_path: Path) -> None:
+    """Browsers and TestClient often send Accept: */*; deep links must still resolve."""
+    index = tmp_path / "index.html"
+    index.write_text("<html>spa</html>", encoding="utf-8")
+    app = _make_app()
+
+    with patch("dashboard.backend.main._INDEX", index):
+        app.add_middleware(SpaFallbackMiddleware)
+        client = TestClient(app)
+        response = client.get("/summary", headers={"Accept": "*/*"})
+
+    assert response.status_code == 200
+    assert response.text == "<html>spa</html>"
+
+
+def test_spa_fallback_returns_original_404_when_index_missing(tmp_path: Path) -> None:
+    missing_index = tmp_path / "does-not-exist.html"
+    app = _make_app()
+
+    with patch("dashboard.backend.main._INDEX", missing_index):
+        app.add_middleware(SpaFallbackMiddleware)
+        client = TestClient(app)
+        response = client.get("/alerts/foo", headers={"Accept": "text/html"})
+
+    assert response.status_code == 404
+    assert response.text == "missing"
