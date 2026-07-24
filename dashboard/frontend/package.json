@@ -4,7 +4,7 @@
   "private": true,
   "dependencies": {
     "@headlessui/react": "^2.2.10",
-    "@heroicons/react": "^2.1.1",
+    "@heroicons/react": "^2.2.0",
     "@tailwindcss/postcss": "^4.3.3",
     "axios": "^1.18.1",
     "html2canvas": "^1.4.1",
@@ -33,7 +33,8 @@
     "dev:3001": "vite --mode development3001 --port 3001",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ci": "npm audit --audit-level=high && npm run build && npm test"
   },
   "eslintConfig": {
     "extends": [
