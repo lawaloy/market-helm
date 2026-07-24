@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
@@ -46,7 +47,22 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
             payload.get("symbol"),
         )
         return
-    price = float(payload["price"])
+    try:
+        price = float(payload["price"])
+    except (KeyError, TypeError, ValueError):
+        logger.warning(
+            "Skipping evaluate_symbol job with invalid price %r for %s",
+            payload.get("price"),
+            symbol,
+        )
+        return
+    if not math.isfinite(price):
+        logger.warning(
+            "Skipping evaluate_symbol job with non-finite price %r for %s",
+            payload.get("price"),
+            symbol,
+        )
+        return
     stock = {"symbol": symbol, "close": price}
     triggered = 0
 
