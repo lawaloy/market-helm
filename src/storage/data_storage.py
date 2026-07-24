@@ -8,9 +8,21 @@ import pandas as pd
 from ..utils.company_names import enrich_stock_data_with_names
 import os
 import json
+import math
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import Any, List, Dict, Optional
 from pathlib import Path
+
+
+def _json_safe_value(value: Any) -> Any:
+    """Coerce nested non-finite floats to None for strict JSON writers."""
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {key: _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+    return value
 
 
 def _data_date_for_filename() -> datetime.date:
@@ -103,8 +115,11 @@ class DataStorage:
         summary_path = self.data_dir / f"summary_{date.strftime('%Y-%m-%d')}.json"
         
         summary_data["date"] = str(date)
+        # Default json.dump writes non-standard NaN/Infinity literals; coerce first
+        # and refuse allow_nan so dashboard/CLI consumers always get strict JSON.
+        payload = _json_safe_value(summary_data)
         with open(summary_path, 'w') as f:
-            json.dump(summary_data, f, indent=2)
+            json.dump(payload, f, indent=2, allow_nan=False)
         
         return str(summary_path)
     
