@@ -255,6 +255,86 @@ class TestAlertsConfigAPI:
         assert data["latest_deliveries"][0]["channel"] == "email"
         assert data["latest_deliveries"][0]["success"] is True
 
+    def test_get_status_soft_fails_when_projections_loader_raises(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        class BoomLoader:
+            def get_latest_date(self):
+                raise ValueError("no data available")
+
+            def load_projections(self):
+                raise RuntimeError("corrupt projections")
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.get_data_loader",
+            lambda: BoomLoader(),
+        )
+        path = alerts_config_dir / "alerts.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "alerts": [
+                        {"id": "a1", "enabled": True},
+                        {"id": "a2", "enabled": False},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        r = client.get("/api/alerts/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["tracked_symbols"] == []
+        assert data["last_data_date"] is None
+        assert data["active_watches"] == 1
+
+    def test_get_status_soft_fails_when_delivery_storage_raises(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        class BoomStorage:
+            def latest_event_timestamp(self):
+                raise RuntimeError("disk error")
+
+        monkeypatch.setattr(
+            "src.alerts.alert_storage.AlertStorage",
+            lambda data_dir=None: BoomStorage(),
+        )
+
+        r = client.get("/api/alerts/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["last_triggered_at"] is None
+        assert data["latest_deliveries"] == []
+
+    def test_get_symbols_soft_fails_tracked_when_projections_raise(
+        self, client, monkeypatch
+    ):
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.build_symbol_catalog",
+            lambda: (["AAPL"], {"AAPL": "Apple Inc."}),
+        )
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.prices_from_saved_daily_data",
+            lambda: {"AAPL": 180.0},
+        )
+
+        class BoomLoader:
+            def load_projections(self):
+                raise ValueError("missing projections")
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.get_data_loader",
+            lambda: BoomLoader(),
+        )
+
+        r = client.get("/api/alerts/symbols")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbols"] == ["AAPL"]
+        assert data["tracked_symbols"] == []
+        assert data["prices"]["AAPL"] == 180.0
+
     def test_run_without_config(self, client, alerts_config_dir):
         r = client.post("/api/alerts/run")
         assert r.status_code == 200
