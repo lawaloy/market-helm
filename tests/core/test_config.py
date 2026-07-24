@@ -39,6 +39,14 @@ class TestCoreConfig(unittest.TestCase):
         indices = get_indices_to_track()
         self.assertEqual(indices, _DEFAULT_INDICES)
 
+    @patch('pathlib.Path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data='{not-json')
+    def test_corrupt_config_uses_defaults(self, mock_file, mock_exists):
+        """Corrupt exchanges.json must not crash fetch/tracker boot."""
+        mock_exists.return_value = True
+        indices = get_indices_to_track()
+        self.assertEqual(indices, _DEFAULT_INDICES)
+
 
 if __name__ == '__main__':
     unittest.main()
