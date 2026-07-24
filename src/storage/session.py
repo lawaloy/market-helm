@@ -6,6 +6,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
 import time
 from typing import Any, Dict, Optional
@@ -56,14 +57,23 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         if not hmac.compare_digest(_b64url_decode(sig_segment), expected_sig):
             raise AuthError("Invalid token signature.")
         payload = json.loads(_b64url_decode(body_segment))
+        if not isinstance(payload, dict):
+            raise AuthError("Invalid access token.")
         # Treat exp == now as expired so zero-TTL tokens cannot authenticate.
-        if int(payload.get("exp", 0)) <= int(time.time()):
+        # Non-finite exp (Infinity from allow_nan JSON) must not OverflowError → 500.
+        exp = payload.get("exp", 0)
+        if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+            raise AuthError("Invalid access token.")
+        if not math.isfinite(exp):
+            raise AuthError("Invalid access token.")
+        if int(exp) <= int(time.time()):
             raise AuthError("Token expired.")
         user_id = payload.get("sub")
-        if not user_id:
+        # Reject non-strings (True/123/{} stringify into fake IDs) and blank subjects.
+        if not isinstance(user_id, str) or not user_id.strip():
             raise AuthError("Invalid token subject.")
-        return {"user_id": str(user_id)}
+        return {"user_id": user_id.strip()}
     except AuthError:
         raise
-    except (ValueError, json.JSONDecodeError, KeyError) as exc:
+    except (ValueError, json.JSONDecodeError, KeyError, OverflowError, TypeError) as exc:
         raise AuthError("Invalid access token.") from exc

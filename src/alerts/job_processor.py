@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
@@ -23,6 +24,22 @@ from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _event_timestamp(event: Dict[str, Any]) -> datetime | None:
+    raw = event.get("timestamp")
+    if not raw:
+        return None
+    try:
+        return _as_utc(datetime.fromisoformat(str(raw).replace("Z", "+00:00")))
+    except ValueError:
+        return None
 
 
 def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool:
@@ -46,7 +63,22 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
             payload.get("symbol"),
         )
         return
-    price = float(payload["price"])
+    try:
+        price = float(payload["price"])
+    except (KeyError, TypeError, ValueError):
+        logger.warning(
+            "Skipping evaluate_symbol job with invalid price %r for %s",
+            payload.get("price"),
+            symbol,
+        )
+        return
+    if not math.isfinite(price):
+        logger.warning(
+            "Skipping evaluate_symbol job with non-finite price %r for %s",
+            payload.get("price"),
+            symbol,
+        )
+        return
     stock = {"symbol": symbol, "close": price}
     triggered = 0
 
@@ -57,12 +89,28 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
         if _within_cooldown(user_id, alert_id, watch["cooldown_minutes"]):
             continue
 
-        condition = alert.get("condition") or {}
+        if not isinstance(alert, dict):
+            logger.warning(
+                "Skipping non-object alert payload for %s user %s on %s",
+                alert_id,
+                user_id,
+                symbol,
+            )
+            continue
+        condition = alert.get("condition")
+        if not isinstance(condition, dict):
+            logger.warning(
+                "Skipping non-object condition for alert %s user %s on %s",
+                alert_id,
+                user_id,
+                symbol,
+            )
+            continue
         if watch["condition_type"] != "price_threshold":
             continue
         try:
             matched = evaluate_price_threshold(condition, stock)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, AttributeError) as exc:
             logger.warning(
                 "Skipping invalid price alert %s for user %s on %s: %s",
                 alert_id,
@@ -96,11 +144,28 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
     logger.info("evaluate_symbol %s: enqueued %s delivery job(s)", symbol, triggered)
 
 
-def _process_deliver(job: Dict[str, Any]) -> None:
+def _process_deliver(job: Dict[str, Any]) -> bool:
     payload = job["payload"]
     user_id = payload["user_id"]
     alert_id = payload["alert_id"]
     event = dict(payload["event"])
+    storage = UserAlertStorage(user_id)
+
+    # A worker can die after the notification and trigger marker commit but before
+    # completing the queue job. Stale-job recovery must not resend that event.
+    if job["attempts"] > 1:
+        event_at = _event_timestamp(event)
+        last_triggered = storage.get_last_triggered(alert_id)
+        if event_at is not None and last_triggered is not None:
+            last_triggered = _as_utc(last_triggered)
+            if last_triggered >= event_at:
+                logger.info(
+                    "Skipping already-delivered retry for alert %s (job %s, attempt %s)",
+                    alert_id,
+                    job["id"],
+                    job["attempts"],
+                )
+                return False
 
     from src.storage.alert_watches import get_watch
 
@@ -110,11 +175,11 @@ def _process_deliver(job: Dict[str, Any]) -> None:
 
     alert = watch["alert"]
     defaults = watch["defaults"]
-    storage = UserAlertStorage(user_id)
     engine = AlertEngine([alert], storage=storage, defaults=defaults)
 
     if not engine.deliver_event(alert, event):
         raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
+    return True
 
 
 def process_job_queue(
@@ -142,9 +207,10 @@ def process_job_queue(
         deliver_jobs = claim_jobs([JOB_DELIVER], wid, limit=limit)
         for job in deliver_jobs:
             try:
-                _process_deliver(job)
+                delivered = _process_deliver(job)
                 complete_job(job["id"])
-                stats["delivered"] += 1
+                if delivered:
+                    stats["delivered"] += 1
             except Exception as exc:
                 logger.exception("deliver job %s failed", job["id"])
                 fail_job(job["id"], str(exc))

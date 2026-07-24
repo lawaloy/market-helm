@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.alerts.job_processor import process_job_queue
+from src.alerts.job_processor import _process_deliver, process_job_queue
 from src.storage.alert_jobs import (
     JOB_DELIVER,
     JOB_EVALUATE_SYMBOL,
@@ -187,6 +187,59 @@ class TestJobProcessor:
         assert job["locked_at"] is None
         assert job["locked_by"] is None
         assert trigger is not None
+
+    def test_stale_recovery_does_not_redeliver_completed_event(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        event = {
+            "alert_id": "aapl-low",
+            "alert_name": "AAPL low",
+            "symbols": ["AAPL"],
+            "timestamp": "2026-06-09T12:00:00Z",
+            "condition_type": "price_threshold",
+            "user_id": db_user,
+        }
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": db_user, "alert_id": "aapl-low", "event": event},
+        )
+        claimed = claim_jobs([JOB_DELIVER], "crashed-after-delivery")
+
+        with patch(
+            "src.alerts.alert_engine.LogNotifier.send", return_value=True
+        ) as mock_send:
+            assert _process_deliver(claimed[0]) is True
+            with get_connection() as conn:
+                trigger_before = conn.execute(
+                    """
+                    SELECT last_triggered_at FROM alert_trigger_state
+                    WHERE user_id = ? AND alert_id = ?
+                    """,
+                    (db_user, "aapl-low"),
+                ).fetchone()["last_triggered_at"]
+                conn.execute(
+                    "UPDATE alert_jobs SET locked_at = ? WHERE id = ?",
+                    ("2000-01-01T00:00:00+00:00", job_id),
+                )
+
+            stats = process_job_queue("recovery-worker")
+
+        assert stats == {"evaluated": 0, "delivered": 0, "failed": 0}
+        assert mock_send.call_count == 1
+        with get_connection() as conn:
+            job = conn.execute(
+                "SELECT status, attempts FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+            trigger_after = conn.execute(
+                """
+                SELECT last_triggered_at FROM alert_trigger_state
+                WHERE user_id = ? AND alert_id = ?
+                """,
+                (db_user, "aapl-low"),
+            ).fetchone()["last_triggered_at"]
+        assert job["status"] == STATUS_COMPLETED
+        assert job["attempts"] == 2
+        assert trigger_after == trigger_before
 
     def test_failed_delivery_does_not_record_trigger(self, db_user):
         sync_watches_from_config(db_user, _watch_config())
@@ -405,3 +458,69 @@ class TestJobProcessor:
         with get_connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS n FROM alert_trigger_state").fetchone()
         assert row["n"] == 0
+
+    @pytest.mark.parametrize(
+        "bad_price",
+        ["x", None, float("nan"), float("inf"), float("-inf")],
+    )
+    def test_evaluate_skips_invalid_or_nonfinite_price(self, db_user, bad_price):
+        """Bad/Inf price must soft-skip the job, not ValueError the worker."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "price": bad_price, "tick_id": "bad-price"},
+        )
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_evaluate_skips_missing_price_key(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "tick_id": "no-price"})
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_evaluate_skips_non_dict_condition_without_blocking_siblings(self, db_user):
+        """Truthy list/string conditions AttributeError'd and aborted sibling watches."""
+        bad_user = create_user("bad-condition@example.com", "password123")["id"]
+        bad_config = _watch_config()
+        bad_config["alerts"][0]["id"] = "bad-condition"
+        sync_watches_from_config(bad_user, bad_config)
+        sync_watches_from_config(db_user, _watch_config())
+
+        with get_connection() as conn:
+            poison = json.dumps(
+                {
+                    "id": "bad-condition",
+                    "name": "Bad",
+                    "enabled": True,
+                    "condition": ["not", "a", "dict"],
+                    "notifications": ["log"],
+                }
+            )
+            conn.execute(
+                "UPDATE alert_watches SET alert_json = ? WHERE user_id = ? AND alert_id = ?",
+                (poison, bad_user, "bad-condition"),
+            )
+            conn.commit()
+
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 0
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT user_id, alert_id FROM alert_trigger_state"
+            ).fetchall()
+        assert {(row["user_id"], row["alert_id"]) for row in rows} == {
+            (db_user, "aapl-low"),
+        }

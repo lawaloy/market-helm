@@ -129,6 +129,18 @@ class TestMarketAPI:
         assert data["losers"] == 1
         assert "date" in data
 
+    def test_market_overview_strips_spaces_from_index_keys(self, client):
+        """Index keys drop spaces only so 'S&P 500' becomes 'S&P500'."""
+        r = client.get("/api/market/overview")
+        assert r.status_code == 200
+        indices = r.json()["indices"]
+        assert set(indices) == {"S&P500", "NASDAQ-100"}
+        assert indices["S&P500"]["stocks"] == 2
+        assert indices["S&P500"]["gainers"] == 2
+        assert indices["S&P500"]["losers"] == 0
+        assert indices["NASDAQ-100"]["stocks"] == 1
+        assert indices["NASDAQ-100"]["losers"] == 1
+
     def test_market_movers_gainers(self, client):
         """GET /api/market/movers?type=gainers returns top gainers."""
         r = client.get("/api/market/movers", params={"type": "gainers", "limit": 5})
@@ -650,6 +662,96 @@ class TestProjectionsAPI:
         assert by_symbol["ORPHAN"]["volume"] == 0
 
 
+class TestStocksAPIEdges:
+    """Stock detail/historical error and soft-fail paths."""
+
+    def test_stock_detail_404_when_no_latest_date(self, temp_data_dir):
+        import dashboard.backend.api.stocks
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = None
+        with patch.object(
+            dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/stocks/AAPL")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available"
+
+    def test_stock_detail_survives_projection_load_failure(
+        self, client, mock_data_loader
+    ):
+        mock_data_loader.load_projections = MagicMock(
+            side_effect=FileNotFoundError("projections missing")
+        )
+        r = client.get("/api/stocks/AAPL")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert data["currentData"]["price"] == 150.0
+        assert data["projection"] is None
+        assert data["technical"] is None
+
+    def test_stock_historical_404_when_empty(self, client, mock_data_loader):
+        mock_data_loader.load_historical_data = MagicMock(return_value=[])
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No historical data found."
+
+
+class TestProjectionsSentimentBands:
+    """Projections summary sentiment thresholds (±1.0)."""
+
+    def _write_projections(self, temp_data_dir, changes):
+        df = pd.DataFrame(
+            {
+                "symbol": [f"S{i}" for i in range(len(changes))],
+                "name": [f"Stock {i}" for i in range(len(changes))],
+                "target_mid": [100.0] * len(changes),
+                "expected_change_percent": changes,
+                "confidence": [50] * len(changes),
+                "recommendation": ["HOLD"] * len(changes),
+                "risk_level": ["Medium"] * len(changes),
+                "trend": ["Neutral"] * len(changes),
+            }
+        )
+        path = temp_data_dir / "projections_2026-01-15.csv"
+        df.to_csv(path, index=False)
+        return path
+
+    def test_sentiment_neutral_and_bearish_bands(self, client, temp_data_dir):
+        self._write_projections(temp_data_dir, [0.5, -0.5])
+        neutral = client.get("/api/projections/summary").json()
+        assert neutral["sentiment"] == "Neutral"
+        assert neutral["expectedMarketMove"] == 0.0
+
+        self._write_projections(temp_data_dir, [-2.0, -1.5])
+        bearish = client.get("/api/projections/summary").json()
+        assert bearish["sentiment"] == "Bearish"
+        assert bearish["expectedMarketMove"] == -1.75
+
+    def test_projections_summary_404_when_no_date(self, temp_data_dir):
+        import dashboard.backend.api.projections
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = None
+        with patch.object(
+            dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/projections/summary")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available"
+
+
 class TestHistoryAccuracyAPI:
     """Projection accuracy endpoint."""
 
@@ -801,3 +903,74 @@ class TestHistorySummaryAPI:
         assert point["averageConfidence"] == 0.0
         assert point["expectedMarketMove"] == 0.0
         assert point["sentiment"] == "Neutral"
+
+    def test_dates_and_symbols_endpoints(self, client, mock_data_loader, temp_data_dir):
+        """GET /api/history/dates and /symbols return catalog data."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "ZZZZ"],
+                "name": ["Apple Inc.", "Custom Co"],
+                "confidence": [50, 60],
+                "expected_change_percent": [0.5, -0.2],
+                "recommendation": ["HOLD", "BUY"],
+                "target_mid": [100.0, 10.0],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history.load_index_symbol_names",
+            return_value={"MSFT": "Microsoft"},
+        ):
+            dates = client.get("/api/history/dates")
+            symbols = client.get("/api/history/symbols")
+
+        assert dates.status_code == 200
+        assert "2026-01-15" in dates.json()["dates"]
+        assert symbols.status_code == 200
+        body = symbols.json()
+        assert body["date"] == "2026-01-15"
+        assert "MSFT" in body["symbols"]
+        assert "ZZZZ" in body["symbols"]
+        assert body["names"]["ZZZZ"] == "Custom Co"
+
+    def test_summary_skips_bad_dates_and_sets_sentiment(self, client, mock_data_loader, temp_data_dir):
+        """Historical summary skips unloadable dates and classifies sentiment bands."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "confidence": [80],
+                "expected_change_percent": [2.5],
+                "recommendation": ["BUY"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "confidence": [40],
+                "expected_change_percent": [-1.5],
+                "recommendation": ["SELL"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        (temp_data_dir / "projections_2026-01-14.csv").write_text("broken")
+        # Daily files so get_available_dates includes these days
+        for d in ("2026-01-16", "2026-01-15", "2026-01-14"):
+            pd.DataFrame(
+                {"symbol": ["AAPL"], "close": [1.0], "change_percent": [0.0]}
+            ).to_csv(temp_data_dir / f"daily_data_{d}.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history._resolve_company_names",
+            side_effect=lambda syms: {s: s for s in syms},
+        ):
+            r = client.get("/api/history/summary", params={"days": 10})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["lastDate"] == "2026-01-16"
+        assert body["firstDate"] == "2026-01-14"
+        sentiments = {p["date"]: p["sentiment"] for p in body["data"]}
+        assert sentiments["2026-01-16"] == "Bullish"
+        assert sentiments["2026-01-15"] == "Bearish"
+        assert "2026-01-14" not in sentiments
+        assert "AAPL" in body["symbols"]

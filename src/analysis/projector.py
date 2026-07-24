@@ -135,7 +135,7 @@ class StockProjector:
                 momentum, volatility, volume, stock_for_confidence
             )
             
-            # Generate reasoning (use coerced optionals — raw volume/change can be non-numeric)
+            # Generate reasoning (use coerced optionals ΓÇö raw volume/change can be non-numeric)
             reason = self._generate_reason(
                 {**stock_for_confidence, "volume": volume},
                 momentum,
@@ -241,7 +241,7 @@ class StockProjector:
         volatility_factor = volatility / 100  # 0 to 1
         
         # Base expected move on recent momentum
-        base_move_pct = momentum_factor * 5  # Up to ±5% base move
+        base_move_pct = momentum_factor * 5  # Up to ┬▒5% base move
         
         # Adjust for continuation or mean reversion
         if abs(change_pct) > 5:
@@ -424,6 +424,18 @@ class StockProjector:
             return {}
         
         df = pd.DataFrame(projections.values())
+
+        def _finite_series(column: str) -> pd.Series:
+            numeric = pd.to_numeric(df[column], errors='coerce')
+            return numeric.map(
+                lambda value: float(value)
+                if pd.notna(value) and math.isfinite(value)
+                else float('nan')
+            )
+
+        confidence = _finite_series('confidence')
+        expected_change = _finite_series('expected_change_percent')
+        finite_confidence = confidence.notna()
         
         # Count recommendations
         rec_counts = df['recommendation'].value_counts().to_dict()
@@ -431,30 +443,44 @@ class StockProjector:
         # Count trends
         trend_counts = df['trend'].value_counts().to_dict()
         
-        # Calculate averages — all-NaN columns yield NaN means; coerce for JSON-safe summaries.
-        def _finite_mean(series: pd.Series, default: float = 0.0) -> float:
-            try:
-                value = float(series.mean())
-            except (TypeError, ValueError):
-                return default
-            return value if math.isfinite(value) else default
+        # Calculate averages from finite values only (inf/NaN must not poison JSON).
+        avg_confidence = float(confidence[finite_confidence].mean()) if finite_confidence.any() else 0.0
+        finite_expected = expected_change.notna()
+        avg_expected_change = (
+            float(expected_change[finite_expected].mean()) if finite_expected.any() else 0.0
+        )
 
-        avg_confidence = _finite_mean(df["confidence"])
-        avg_expected_change = _finite_mean(df["expected_change_percent"])
-
-        # Identify top opportunities (finite confidence only)
-        conf_numeric = pd.to_numeric(df["confidence"], errors="coerce")
-        conf_ok = df[conf_numeric.apply(
-            lambda value: bool(math.isfinite(value)) if pd.notna(value) else False
-        )]
-        strong_buys = conf_ok[conf_ok["recommendation"] == "STRONG BUY"].nlargest(
-            5, "confidence"
-        )[["symbol", "target_mid", "confidence"]].to_dict("records")
-
-        strong_sells = conf_ok[conf_ok["recommendation"] == "STRONG SELL"].nlargest(
-            5, "confidence"
-        )[["symbol", "target_mid", "confidence"]].to_dict("records")
-
+        ranked = df.loc[finite_confidence].copy()
+        ranked['_confidence'] = confidence.loc[finite_confidence]
+        ranked['_target_mid'] = pd.to_numeric(ranked['target_mid'], errors='coerce').map(
+            lambda value: float(value)
+            if pd.notna(value) and math.isfinite(value)
+            else 0.0
+        )
+        
+        # Identify top opportunities
+        strong_buys = [
+            {
+                'symbol': row['symbol'],
+                'target_mid': float(row['_target_mid']),
+                'confidence': float(row['_confidence']),
+            }
+            for _, row in ranked[ranked['recommendation'] == 'STRONG BUY']
+            .nlargest(5, '_confidence')
+            .iterrows()
+        ]
+        
+        strong_sells = [
+            {
+                'symbol': row['symbol'],
+                'target_mid': float(row['_target_mid']),
+                'confidence': float(row['_confidence']),
+            }
+            for _, row in ranked[ranked['recommendation'] == 'STRONG SELL']
+            .nlargest(5, '_confidence')
+            .iterrows()
+        ]
+        
         summary = {
             'total_projections': len(projections),
             'recommendations': rec_counts,

@@ -172,6 +172,55 @@ class TestAlertJobs:
         assert row["status"] == STATUS_PENDING
         assert row["attempts"] == 1
 
+    def test_claim_jobs_fails_corrupt_payload_and_claims_siblings(self, db):
+        """Corrupt payload_json must fail closed so workers are not stuck on one row."""
+        poison_id = enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "POISON"})
+        good_id = enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET payload_json = ? WHERE id = ?",
+                ("{not-json", poison_id),
+            )
+
+        claimed = claim_jobs([JOB_EVALUATE_SYMBOL], "worker-poison", limit=5)
+
+        assert [job["id"] for job in claimed] == [good_id]
+        assert claimed[0]["payload"]["symbol"] == "AAPL"
+        with get_connection() as conn:
+            poison = conn.execute(
+                "SELECT status, last_error, locked_at, locked_by FROM alert_jobs WHERE id = ?",
+                (poison_id,),
+            ).fetchone()
+            good = conn.execute(
+                "SELECT status FROM alert_jobs WHERE id = ?",
+                (good_id,),
+            ).fetchone()
+        assert poison["status"] == STATUS_FAILED
+        assert poison["locked_at"] is None
+        assert poison["locked_by"] is None
+        assert "Invalid job payload" in poison["last_error"]
+        assert good["status"] == STATUS_PROCESSING
+
+        # A later claim must not resurrect the poison pill.
+        assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-poison-2", limit=5) == []
+
+    def test_claim_jobs_fails_non_object_payload(self, db):
+        job_id = enqueue_job(JOB_DELIVER, {"user_id": "u1"})
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET payload_json = ? WHERE id = ?",
+                ("[]", job_id),
+            )
+
+        assert claim_jobs([JOB_DELIVER], "worker-array") == []
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT status, last_error FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_FAILED
+        assert "JSON object" in row["last_error"]
+
     def test_claim_jobs_marks_corrupt_payload_failed_and_claims_peers(self, db):
         """Corrupt payload_json must not poison the claim transaction/queue."""
         good_id = enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})

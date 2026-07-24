@@ -4,6 +4,7 @@ Unit tests for Stock Projector module.
 Tests the projection generation, recommendation logic, and confidence scoring.
 """
 
+import math
 import pytest
 from datetime import datetime, timedelta
 
@@ -418,39 +419,43 @@ class TestStockProjector:
         assert [row["symbol"] for row in sells] == ["SELL5", "SELL4", "SELL3", "SELL2", "SELL1"]
         assert summary["total_projections"] == 13
 
-    def test_projection_summary_all_nan_averages_are_finite(self, projector):
-        """All-NaN confidence/expected_change must not poison summary JSON."""
-        import json
-        import math
-
+    def test_projection_summary_ignores_non_finite_confidence_and_change(self, projector):
+        """NaN/inf confidence or expected_change must not poison averages or rankings."""
         projections = {
-            "A": {
-                "symbol": "A",
-                "target_mid": 100.0,
-                "confidence": float("nan"),
-                "expected_change_percent": float("nan"),
-                "recommendation": "HOLD",
-                "trend": "sideways",
-            },
-            "B": {
-                "symbol": "B",
-                "target_mid": 90.0,
-                "confidence": float("nan"),
-                "expected_change_percent": float("inf"),
+            "OK": {
+                "symbol": "OK",
+                "target_mid": 110.0,
+                "confidence": 70.0,
+                "expected_change_percent": 2.5,
                 "recommendation": "STRONG BUY",
                 "trend": "up",
             },
+            "NANCONF": {
+                "symbol": "NANCONF",
+                "target_mid": 999.0,
+                "confidence": float("nan"),
+                "expected_change_percent": 50.0,
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+            "INFCHG": {
+                "symbol": "INFCHG",
+                "target_mid": 120.0,
+                "confidence": 90.0,
+                "expected_change_percent": float("inf"),
+                "recommendation": "STRONG SELL",
+                "trend": "down",
+            },
         }
+
         summary = projector.generate_projection_summary(projections)
 
-        assert summary["average_confidence"] == 0.0
-        assert summary["average_expected_change"] == 0.0
-        assert summary["top_opportunities"]["strong_buys"] == []
+        assert summary["average_confidence"] == 80.0  # (70 + 90) / 2; NaN confidence skipped
+        assert summary["average_expected_change"] == 26.25  # (2.5 + 50) / 2; inf skipped
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_buys"]] == ["OK"]
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_sells"]] == ["INFCHG"]
         assert math.isfinite(summary["average_confidence"])
         assert math.isfinite(summary["average_expected_change"])
-        encoded = json.dumps(summary)
-        assert "NaN" not in encoded
-        assert "Infinity" not in encoded
 
     # ========== Date and Timestamp Tests ==========
 
@@ -498,3 +503,39 @@ class TestStockProjector:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v', '--tb=short'])
+
+    def test_projection_summary_all_nan_averages_are_finite(self, projector):
+        """All-NaN confidence/expected_change must not poison summary JSON."""
+        import json
+        import math
+
+        projections = {
+            "A": {
+                "symbol": "A",
+                "target_mid": 100.0,
+                "confidence": float("nan"),
+                "expected_change_percent": float("nan"),
+                "recommendation": "HOLD",
+                "trend": "sideways",
+            },
+            "B": {
+                "symbol": "B",
+                "target_mid": 90.0,
+                "confidence": float("nan"),
+                "expected_change_percent": float("inf"),
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+        }
+        summary = projector.generate_projection_summary(projections)
+
+        assert summary["average_confidence"] == 0.0
+        assert summary["average_expected_change"] == 0.0
+        assert summary["top_opportunities"]["strong_buys"] == []
+        assert math.isfinite(summary["average_confidence"])
+        assert math.isfinite(summary["average_expected_change"])
+        encoded = json.dumps(summary)
+        assert "NaN" not in encoded
+        assert "Infinity" not in encoded
+
+    # ========== Date and Timestamp Tests ==========

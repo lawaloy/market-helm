@@ -152,8 +152,8 @@ def claim_jobs(
             try:
                 claimed.append(_row_to_job(job_row))
             except (TypeError, ValueError, json.JSONDecodeError) as exc:
-                # Corrupt payload_json would otherwise roll back the claim
-                # transaction and leave the same PENDING row to poison the queue.
+                # Corrupt payload_json must fail closed here. Raising would roll back
+                # the claim txn and re-select the same ORDER BY id head forever.
                 conn.execute(
                     """
                     UPDATE alert_jobs
@@ -247,10 +247,13 @@ def new_worker_id() -> str:
 
 
 def _row_to_job(row: Any) -> Dict[str, Any]:
+    payload = json.loads(row["payload_json"])
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be a JSON object")
     return {
         "id": int(row["id"]),
         "job_type": row["job_type"],
-        "payload": json.loads(row["payload_json"]),
+        "payload": payload,
         "status": row["status"],
         "attempts": int(row["attempts"]),
         "max_attempts": int(row["max_attempts"]),

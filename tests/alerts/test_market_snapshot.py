@@ -67,12 +67,13 @@ def test_load_market_snapshot_skips_non_finite_prices_in_map():
             "src.alerts.market_snapshot._fetch_missing_watch_quotes",
             return_value=[
                 {"symbol": "AAPL", "close": 180.0},
-                {"symbol": "NAN", "close": float("nan")},
-                {"symbol": "INF", "price": float("inf")},
+                # Real tickers: NAN/INF are invalid ticker sentinels.
+                {"symbol": "MSFT", "close": float("nan")},
+                {"symbol": "TSLA", "price": float("inf")},
             ],
         ),
     ):
-        last_date, prices, stocks = load_market_snapshot(["NAN", "INF"])
+        last_date, prices, stocks = load_market_snapshot(["MSFT", "TSLA"])
 
     assert last_date == "2026-06-09"
     assert prices == {"AAPL": 180.0}
