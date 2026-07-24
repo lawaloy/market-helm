@@ -3,7 +3,13 @@
 import pytest
 
 from src.storage.database import init_database
-from src.storage.users import UserError, authenticate_user, create_user, get_user_by_id
+from src.storage.users import (
+    UserError,
+    _verify_password,
+    authenticate_user,
+    create_user,
+    get_user_by_id,
+)
 
 
 @pytest.fixture
@@ -46,6 +52,14 @@ class TestUsers:
             )
 
         assert authenticate_user("corrupt@example.com", "password123") is None
+
+    def test_verify_password_rejects_wrong_scheme_truncated_and_bad_hex(self):
+        """Malformed stored hashes must return False, never raise into login."""
+        assert _verify_password("password123", "bcrypt$x$y$z$salt$digest") is False
+        assert _verify_password("password123", "scrypt$16384$8$1") is False
+        assert _verify_password("password123", "scrypt$16384$8$1$zz$aa") is False
+        assert _verify_password("password123", "") is False
+        assert _verify_password("password123", None) is False  # type: ignore[arg-type]
 
     def test_short_password_rejected(self, db):
         with pytest.raises(UserError, match="8 characters"):

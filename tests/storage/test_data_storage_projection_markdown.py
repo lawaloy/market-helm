@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.storage.data_storage import DataStorage, _md_money, _md_reason
+from src.storage.data_storage import DataStorage, _md_money, _md_pct, _md_reason
 
 
 def _projection_row(**overrides):
@@ -43,6 +43,17 @@ def test_md_money_handles_none_nan_inf() -> None:
     assert _md_money(None) == "—"
     assert _md_money(float("nan")) == "—"
     assert _md_money(float("inf")) == "—"
+
+
+def test_md_pct_handles_none_nan_inf_and_signed() -> None:
+    """Non-finite / non-numeric percents must not raise on format specs."""
+    assert _md_pct(2.5) == "+2.5%"
+    assert _md_pct(-1.25, precision=2) == "-1.25%"
+    assert _md_pct(2.5, signed=False) == "2.5%"
+    assert _md_pct(None) == "—"
+    assert _md_pct(float("nan")) == "—"
+    assert _md_pct(float("inf")) == "—"
+    assert _md_pct("not-a-number") == "—"
 
 
 def test_save_projections_writes_markdown_with_null_reason_and_prices(tmp_path) -> None:

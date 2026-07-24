@@ -35,7 +35,11 @@ def _hash_password(password: str) -> str:
 
 
 def _verify_password(password: str, stored: str) -> bool:
+    """Return False for wrong password or corrupt/non-string hashes (never raise)."""
     try:
+        # NULL / non-str DB values must not AttributeError into a login 500.
+        if not isinstance(stored, str):
+            return False
         scheme, n_raw, r_raw, p_raw, salt_hex, digest_hex = stored.split("$", 5)
         if scheme != "scrypt":
             return False
