@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { fieldClass } from '../components/alerts/alertsUtils';
 import { useAuth } from '../contexts/AuthContext';
 
