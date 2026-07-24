@@ -346,6 +346,89 @@ class TestAlertsConfigAPI:
         assert r.status_code == 200
         assert r.json()["triggered"] == 0
 
+    def test_put_config_rejects_alert_without_id(self, client, alerts_config_dir):
+        payload = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "name": "missing id",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "less_than",
+                        "value": 150,
+                    },
+                    "notifications": ["log"],
+                }
+            ],
+        }
+        r = client.put("/api/alerts/config", json=payload)
+        assert r.status_code == 400
+        assert "id" in r.json()["detail"].lower()
+
+    def test_get_config_scrubs_webhook_secrets_on_disk(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        """Legacy on-disk webhook URLs must be rewritten without secrets."""
+        config_path = alerts_config_dir / "alerts.json"
+        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        config_path.write_text(
+            json.dumps(
+                {
+                    "defaults": {
+                        "webhook_url": "https://discord.com/api/webhooks/leaked/token",
+                        "webhook_format": "discord",
+                    },
+                    "alerts": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        r = client.get("/api/alerts/config")
+        assert r.status_code == 200
+        assert r.json()["config"]["defaults"].get("webhook_url") is None
+
+        saved = json.loads(config_path.read_text(encoding="utf-8"))
+        assert "webhook_url" not in saved.get("defaults", {})
+        assert "leaked/token" not in config_path.read_text(encoding="utf-8")
+
+    def test_get_config_seeds_webhook_format_from_env(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        config_path = alerts_config_dir / "alerts.json"
+        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
+        config_path.write_text(
+            json.dumps({"defaults": {}, "alerts": []}),
+            encoding="utf-8",
+        )
+
+        r = client.get("/api/alerts/config")
+        assert r.status_code == 200
+        assert r.json()["config"]["defaults"]["webhook_format"] == "slack"
+
+    def test_run_maps_no_market_data_to_404(self, client, alerts_config_dir, monkeypatch):
+        monkeypatch.setattr(
+            "src.alerts.alert_worker.run_check_once",
+            lambda: {"message": "No market data available.", "triggered": 0},
+        )
+        r = client.post("/api/alerts/run")
+        assert r.status_code == 404
+        assert "No market data available" in r.json()["detail"]
+
+    def test_run_maps_unexpected_failure_to_500(
+        self, client, alerts_config_dir, monkeypatch
+    ):
+        def boom():
+            raise RuntimeError("worker crashed")
+
+        monkeypatch.setattr("src.alerts.alert_worker.run_check_once", boom)
+        r = client.post("/api/alerts/run")
+        assert r.status_code == 500
+        assert r.json()["detail"] == "Alert check failed."
+
     def test_normalize_config_rejects_non_list_alerts_and_normalizes_format(self):
         from fastapi import HTTPException
 
