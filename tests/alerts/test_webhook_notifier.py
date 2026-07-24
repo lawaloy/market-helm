@@ -12,6 +12,30 @@ def test_from_alert_returns_none_without_url() -> None:
         assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None
 
 
+def test_from_alert_returns_none_for_whitespace_only_url() -> None:
+    with patch.dict("os.environ", {}, clear=True):
+        assert (
+            WebhookNotifier.from_alert(
+                {"id": "a1", "webhook_url": "   ", "notifications": ["webhook"]}
+            )
+            is None
+        )
+
+
+def test_from_alert_strips_url_and_lowercases_format() -> None:
+    notifier = WebhookNotifier.from_alert(
+        {
+            "id": "a1",
+            "webhook_url": "  https://example.com/hook  ",
+            "webhook_format": " Discord ",
+            "notifications": ["webhook"],
+        }
+    )
+    assert notifier is not None
+    assert notifier._url == "https://example.com/hook"
+    assert notifier._payload_format == "discord"
+
+
 def test_from_alert_uses_webhook_url_field() -> None:
     n = WebhookNotifier.from_alert(
         {"id": "a1", "webhook_url": "https://example.com/hook", "notifications": ["webhook"]}

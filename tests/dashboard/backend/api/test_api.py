@@ -136,6 +136,9 @@ class TestMarketAPI:
         data = r.json()
         assert data["type"] == "gainers"
         assert len(data["data"]) >= 1
+        assert all(row["changePercent"] > 0 for row in data["data"])
+        percents = [row["changePercent"] for row in data["data"]]
+        assert percents == sorted(percents, reverse=True)
 
     def test_market_movers_losers(self, client):
         """GET /api/market/movers?type=losers returns top losers."""
@@ -143,6 +146,24 @@ class TestMarketAPI:
         assert r.status_code == 200
         data = r.json()
         assert data["type"] == "losers"
+        assert len(data["data"]) == 1
+        assert all(row["changePercent"] < 0 for row in data["data"])
+        assert data["data"][0]["symbol"] == "GOOGL"
+
+    def test_market_movers_do_not_backfill_opposite_sign(self, client):
+        """Large limit must not mix gainers into losers (or vice versa)."""
+        losers = client.get("/api/market/movers", params={"type": "losers", "limit": 50})
+        assert losers.status_code == 200
+        loser_rows = losers.json()["data"]
+        assert len(loser_rows) == 1
+        assert all(row["changePercent"] < 0 for row in loser_rows)
+
+        gainers = client.get("/api/market/movers", params={"type": "gainers", "limit": 50})
+        assert gainers.status_code == 200
+        gainer_rows = gainers.json()["data"]
+        assert len(gainer_rows) == 2
+        assert all(row["changePercent"] > 0 for row in gainer_rows)
+        assert [row["symbol"] for row in gainer_rows] == ["AAPL", "MSFT"]
 
 
 class TestSummaryAPI:
@@ -177,6 +198,39 @@ class TestSummaryAPI:
         ai = client.get("/api/summary").json()
         assert ai["source"] == "ai"
         assert ai["summary"] == "Markets advanced on strong tech leadership."
+
+    def test_summary_demo_tolerates_partial_legacy_fields(
+        self, client, temp_data_dir, sample_summary
+    ):
+        """Partial/legacy summary JSON must soft-fail to a demo string, not 500."""
+        path = temp_data_dir / "summary_2026-01-15.json"
+        with open(path) as f:
+            payload = json.load(f)
+
+        payload.pop("ai_summary", None)
+        payload["analysis"] = {
+            "summary": {
+                "gainers": "2",
+                "losers": None,
+                "average_change_percent": "not-a-number",
+            },
+            "top_gainers": [{"symbol": "AAPL"}],  # missing change_percent
+            "top_losers": [{"change_percent": -1.5}],  # missing symbol
+        }
+        payload["exchange_comparison"] = {
+            "NYSE": {"average_change_percent": None},
+            "NASDAQ": "legacy-non-dict",
+        }
+        with open(path, "w") as f:
+            json.dump(payload, f)
+
+        r = client.get("/api/summary")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["source"] == "demo"
+        assert "sentiment" in data["summary"]
+        assert "AAPL led" not in data["summary"]
+        assert "declined" not in data["summary"]
 
 
 @pytest.fixture
