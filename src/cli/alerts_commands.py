@@ -38,7 +38,10 @@ def _load_config(path: Path) -> Dict[str, Any]:
         return json.load(handle)
 
 
-def _format_condition(condition: Dict[str, Any]) -> str:
+def _format_condition(condition: Any) -> str:
+    # Hand-edited alerts.json may store null / strings where objects are expected.
+    if not isinstance(condition, dict):
+        return "?"
     ctype = condition.get("type", "?")
     if ctype == "price_threshold":
         return (
@@ -46,7 +49,8 @@ def _format_condition(condition: Dict[str, Any]) -> str:
             f"{condition.get('value')}"
         )
     if ctype == "screening_match":
-        filters = condition.get("filters", {})
+        raw_filters = condition.get("filters", {})
+        filters = raw_filters if isinstance(raw_filters, dict) else {}
         parts = [f"{key}={value}" for key, value in filters.items()]
         return "screening: " + ", ".join(parts)
     return ctype
@@ -92,8 +96,12 @@ def cmd_list(config_path: Optional[Path] = None) -> int:
     for alert in alerts:
         enabled = alert.get("enabled", False)
         status = "enabled" if enabled else "disabled"
-        notifications = ", ".join(alert.get("notifications") or ["log"])
-        condition = _format_condition(alert.get("condition", {}))
+        raw_notifications = alert.get("notifications")
+        # Non-list notifications are not channel names (and strings join by char).
+        notifications = ", ".join(
+            raw_notifications if isinstance(raw_notifications, list) else ["log"]
+        )
+        condition = _format_condition(alert.get("condition"))
         logger.info(
             "%s  [%s]  %s",
             alert.get("id", "?"),
@@ -152,12 +160,15 @@ def run_alert_test(
     if alert is None:
         raise ValueError(f"No alert with id {alert_id!r}")
 
+    raw_condition = alert.get("condition")
+    condition = raw_condition if isinstance(raw_condition, dict) else {}
     event = {
         "alert_id": alert["id"],
         "alert_name": alert.get("name", alert["id"]),
         "symbols": ["TEST"],
         "timestamp": datetime.utcnow().isoformat(),
-        "condition_type": alert.get("condition", {}).get("type", "test"),
+        # Null / non-dict condition previously AttributeError'd Settings "Send test".
+        "condition_type": condition.get("type", "test"),
         "test": True,
     }
 

@@ -131,6 +131,34 @@ def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     log_notifier.send.assert_called_once_with(events[0])
 
 
+def test_evaluate_falls_back_to_log_notifier_for_unknown_notifier_name():
+    """Unknown notification channels must not silently drop a triggered alert."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = {
+        "id": "aapl-drop",
+        "name": "AAPL Drop",
+        "notifications": ["bogus-channel"],
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch("src.alerts.alert_engine.LogNotifier") as log_notifier_cls:
+        log_notifier = log_notifier_cls.return_value
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    log_notifier_cls.assert_called_once_with()
+    log_notifier.send.assert_called_once_with(events[0])
+    storage.record_event.assert_called_once_with(events[0])
+
+
 def test_evaluate_dispatches_email_notifier_for_triggered_alert():
     """Triggered email alerts are persisted and delivered with the engine event payload."""
     storage = MagicMock()
@@ -310,4 +338,79 @@ def test_deliver_event_continues_after_exception_and_records_success():
     assert record_delivery.call_count == 2
     assert record_delivery.call_args_list[0].kwargs["success"] is False
     assert record_delivery.call_args_list[1].kwargs["success"] is True
+
+
+def test_evaluate_continues_when_cooldown_minutes_is_non_numeric():
+    """Junk cooldown_minutes must not abort sibling watches in file-mode configs."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    bad = _price_alert(id="bad-cooldown", cooldown_minutes="later")
+    good = _price_alert(
+        id="good-watch",
+        name="MSFT Drop",
+        cooldown_minutes=5,
+        condition={
+            "type": "price_threshold",
+            "symbol": "MSFT",
+            "operator": "less_than",
+            "value": 300,
+        },
+    )
+    engine = AlertEngine([bad, good], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate(
+            [
+                {"symbol": "AAPL", "close": 149.5},
+                {"symbol": "MSFT", "close": 290.0},
+            ]
+        )
+
+    assert {e["alert_id"] for e in events} == {"bad-cooldown", "good-watch"}
+    assert notifier.send.call_count == 2
+    assert storage.record_event.call_count == 2
+
+
+def test_evaluate_matches_padded_watch_symbol_to_saved_quote():
+    """Whitespace around a watch symbol must still match the saved ticker."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": " aapl ",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    notifier.send.assert_called_once()
+
+
+def test_evaluate_skips_sentinel_watch_symbols():
+    """None/NaN stringified symbols must not match or trigger alerts."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": "nan",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+
+    events = engine.evaluate([{"symbol": "NAN", "close": 1.0}])
+
+    assert events == []
+    storage.record_event.assert_not_called()
 

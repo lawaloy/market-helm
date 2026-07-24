@@ -128,3 +128,48 @@ class TestAuthAPI:
 
         assert r.status_code == 401
         assert r.json()["detail"] == "User not found."
+
+    @pytest.mark.parametrize("secret", [None, "too-short"])
+    def test_register_maps_missing_or_short_auth_secret_to_500(
+        self, client, tmp_path, monkeypatch, secret
+    ):
+        """Register with DB on but bad AUTH_SECRET must 500 (not opaque crash)."""
+        db_path = tmp_path / "auth-secret.db"
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+        if secret is None:
+            monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+        else:
+            monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", secret)
+        from src.storage.database import init_database
+
+        init_database()
+
+        r = client.post(
+            "/api/auth/register",
+            json={"email": "nosecret@example.com", "password": "password123"},
+        )
+        assert r.status_code == 500
+        assert "MARKET_HELM_AUTH_SECRET" in r.json()["detail"]
+
+    def test_login_maps_missing_auth_secret_to_500(self, client, tmp_path, monkeypatch):
+        """Login after user creation must map AuthError from missing secret to 500."""
+        db_path = tmp_path / "auth-login-secret.db"
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+        monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+        from src.storage.database import init_database
+
+        init_database()
+
+        registered = client.post(
+            "/api/auth/register",
+            json={"email": "login-secret@example.com", "password": "password123"},
+        )
+        assert registered.status_code == 200
+
+        monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+        r = client.post(
+            "/api/auth/login",
+            json={"email": "login-secret@example.com", "password": "password123"},
+        )
+        assert r.status_code == 500
+        assert "MARKET_HELM_AUTH_SECRET" in r.json()["detail"]
