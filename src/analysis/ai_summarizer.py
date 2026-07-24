@@ -4,8 +4,9 @@ MarketHelm - AI Summarizer Module
 Uses OpenAI API to generate natural language summaries of market data.
 """
 
+import math
 import os
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from ..core.logger import setup_logger
 
@@ -13,6 +14,17 @@ from ..core.logger import setup_logger
 load_dotenv()
 
 logger = setup_logger("ai_summarizer")
+
+
+def _finite_float(value: Any, default: float = 0.0) -> float:
+    """Coerce null/NaN/Inf (or non-numeric) values to a finite float for formatting."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    return number
 
 
 class AISummarizer:
@@ -48,7 +60,7 @@ class AISummarizer:
         # Overall market sentiment
         gainers = summary_data.get('gainers', 0)
         losers = summary_data.get('losers', 0)
-        avg_change = summary_data.get('average_change_percent', 0)
+        avg_change = _finite_float(summary_data.get('average_change_percent', 0))
         
         if gainers > losers:
             sentiment = "positive"
@@ -62,17 +74,23 @@ class AISummarizer:
         # Highlight top movers
         if top_gainers:
             top_gainer = top_gainers[0]
-            summary_parts.append(f"{top_gainer['symbol']} led gains with a {top_gainer['change_percent']:.2f}% increase.")
+            change = _finite_float(top_gainer.get('change_percent'))
+            summary_parts.append(f"{top_gainer['symbol']} led gains with a {change:.2f}% increase.")
         
         if top_losers:
             top_loser = top_losers[0]
-            summary_parts.append(f"{top_loser['symbol']} declined {abs(top_loser['change_percent']):.2f}%, marking the largest drop.")
+            change = _finite_float(top_loser.get('change_percent'))
+            summary_parts.append(f"{top_loser['symbol']} declined {abs(change):.2f}%, marking the largest drop.")
         
-        # Exchange performance
-        best_exchange = max(exchange_comparison.items(), key=lambda x: x[1].get('average_change_percent', 0), default=None)
+        # Exchange performance (skip non-finite averages when ranking)
+        def _exchange_avg(item):
+            return _finite_float((item[1] or {}).get('average_change_percent', 0))
+
+        best_exchange = max(exchange_comparison.items(), key=_exchange_avg, default=None)
         if best_exchange:
             exchange_name, stats = best_exchange
-            summary_parts.append(f"The {exchange_name} exchange performed best with an average {stats['average_change_percent']:.2f}% gain.")
+            exchange_avg = _finite_float(stats.get('average_change_percent', 0))
+            summary_parts.append(f"The {exchange_name} exchange performed best with an average {exchange_avg:.2f}% gain.")
         
         return " ".join(summary_parts)
     

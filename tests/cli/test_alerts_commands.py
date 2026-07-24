@@ -96,6 +96,36 @@ def test_cmd_test_returns_error_when_live_delivery_fails(
     assert alerts_commands.cmd_test("a1", config_path=config) == 1
 
 
+def test_run_alert_test_records_delivery_then_raises_when_send_throws(tmp_path: Path) -> None:
+    config = {
+        "alerts": [
+            {
+                "id": "a1",
+                "name": "Hook",
+                "enabled": True,
+                "notifications": ["webhook"],
+                "webhook_url": "https://hooks.example/services/T000/B000/XXXXXXXX",
+                "webhook_format": "json",
+                "condition": {"type": "price_threshold", "symbol": "AAPL"},
+            }
+        ]
+    }
+    storage = MagicMock()
+
+    with patch("src.alerts.notifiers.webhook_notifier.requests.post") as mock_post:
+        mock_post.side_effect = RuntimeError("network down")
+        with pytest.raises(RuntimeError, match="No test notifications were delivered"):
+            alerts_commands.run_alert_test("a1", config=config, storage=storage)
+
+    storage.record_delivery.assert_called_once()
+    kwargs = storage.record_delivery.call_args.kwargs
+    assert kwargs["alert_id"] == "a1"
+    assert kwargs["channel"] == "webhook"
+    assert kwargs["success"] is False
+    assert kwargs["test"] is True
+    assert "network down" in (kwargs["error"] or "")
+
+
 def test_cmd_test_missing_id(tmp_path: Path) -> None:
     config = tmp_path / "alerts.json"
     config.write_text(json.dumps({"alerts": []}), encoding="utf-8")
