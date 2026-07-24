@@ -450,8 +450,8 @@ class TestStockProjector:
 
         summary = projector.generate_projection_summary(projections)
 
-        assert summary["average_confidence"] == 80.0  # (70 + 90) / 2
-        assert summary["average_expected_change"] == 2.5  # only finite expected change
+        assert summary["average_confidence"] == 80.0  # (70 + 90) / 2; NaN confidence skipped
+        assert summary["average_expected_change"] == 26.25  # (2.5 + 50) / 2; inf skipped
         assert [row["symbol"] for row in summary["top_opportunities"]["strong_buys"]] == ["OK"]
         assert [row["symbol"] for row in summary["top_opportunities"]["strong_sells"]] == ["INFCHG"]
         assert math.isfinite(summary["average_confidence"])

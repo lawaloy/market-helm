@@ -216,10 +216,22 @@ class TestStockAnalyzer(unittest.TestCase):
         self.assertEqual(summary["gainers"], 2)  # GOOD + INFVOL (finite change)
         self.assertEqual(summary["losers"], 1)
         self.assertEqual(summary["unchanged"], 0)
-        self.assertEqual([row["symbol"] for row in result["top_gainers"]], ["INFVOL", "GOOD"])
-        self.assertEqual([row["symbol"] for row in result["top_losers"]], ["LOSER", "GOOD", "INFVOL"])
-        # Inf volume is excluded; NaN change row still has finite volume but is allowed in volume board.
-        self.assertEqual([row["symbol"] for row in result["top_volume"]], ["NANPCT", "GOOD", "LOSER"])
+        # Leaderboards rank all finite-change rows (same semantics as before).
+        self.assertEqual(
+            [row["symbol"] for row in result["top_gainers"]],
+            ["INFVOL", "GOOD", "LOSER"],
+        )
+        self.assertEqual(
+            [row["symbol"] for row in result["top_losers"]],
+            ["LOSER", "GOOD", "INFVOL"],
+        )
+        # Inf volume is excluded; NaN-change row still ranks by finite volume.
+        self.assertEqual(
+            [row["symbol"] for row in result["top_volume"]],
+            ["NANPCT", "GOOD", "LOSER"],
+        )
+        self.assertNotIn("INFVOL", [row["symbol"] for row in result["top_volume"]])
+        self.assertNotIn("NANPCT", [row["symbol"] for row in result["top_gainers"]])
         self.assertTrue(all(math.isfinite(row["change_percent"]) for row in result["top_gainers"]))
         self.assertTrue(all(math.isfinite(row["volume"]) for row in result["top_volume"]))
 
