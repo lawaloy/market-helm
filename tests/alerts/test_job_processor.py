@@ -459,6 +459,32 @@ class TestJobProcessor:
             row = conn.execute("SELECT COUNT(*) AS n FROM alert_trigger_state").fetchone()
         assert row["n"] == 0
 
+    @pytest.mark.parametrize(
+        "bad_price",
+        ["x", None, float("nan"), float("inf"), float("-inf")],
+    )
+    def test_evaluate_skips_invalid_or_nonfinite_price(self, db_user, bad_price):
+        """Bad/Inf price must soft-skip the job, not ValueError the worker."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "price": bad_price, "tick_id": "bad-price"},
+        )
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+
+    def test_evaluate_skips_missing_price_key(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "tick_id": "no-price"})
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+
     def test_evaluate_skips_non_dict_condition_without_blocking_siblings(self, db_user):
         """Truthy list/string conditions AttributeError'd and aborted sibling watches."""
         bad_user = create_user("bad-condition@example.com", "password123")["id"]
