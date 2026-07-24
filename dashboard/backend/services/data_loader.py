@@ -111,8 +111,11 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Daily data file not found for date: {date}")
         
-        df = pd.read_csv(file_path)
-        return df
+        try:
+            return pd.read_csv(file_path)
+        except Exception as exc:
+            # ParserError/OSError must surface as ValueError so APIs map to 404.
+            raise ValueError(f"Daily data unreadable: {file_path.name}") from exc
     
     def load_projections(self, date: Optional[str] = None) -> pd.DataFrame:
         """Load projections CSV"""
@@ -125,8 +128,10 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Projections file not found for date: {date}")
         
-        df = pd.read_csv(file_path)
-        return df
+        try:
+            return pd.read_csv(file_path)
+        except Exception as exc:
+            raise ValueError(f"Projections unreadable: {file_path.name}") from exc
     
     def load_summary(self, date: Optional[str] = None) -> Dict:
         """Load summary JSON"""
@@ -139,8 +144,12 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Summary file not found for date: {date}")
         
-        with open(file_path, 'r') as f:
-            return json.load(f)
+        try:
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            # Corrupt JSON must map to ValueError → API 404, not generic 500.
+            raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
     
     def get_available_dates(self) -> List[str]:
         """Get list of all available dates"""
