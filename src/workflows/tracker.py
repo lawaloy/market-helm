@@ -13,6 +13,7 @@ from ..analysis.projector import StockProjector
 from ..alerts.alert_engine import AlertEngine
 from ..core.logger import setup_logger
 from ..core.config import get_indices_to_track
+from ..utils.tickers import normalize_ticker
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import pandas as pd
@@ -190,7 +191,15 @@ class StockTrackerWorkflow:
 
             watch_symbols = get_enabled_watch_symbols()
             if watch_symbols:
-                existing = {str(stock.get("symbol", "")).upper() for stock in all_data}
+                # Normalize so padded index symbols match stripped watch keys;
+                # drop None/NaN sentinels that would otherwise become "NONE"/"NAN".
+                existing = {
+                    key
+                    for key in (
+                        normalize_ticker(stock.get("symbol")) for stock in all_data
+                    )
+                    if key
+                }
                 for symbol in watch_symbols:
                     if symbol in existing:
                         continue

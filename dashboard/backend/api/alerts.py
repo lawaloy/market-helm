@@ -364,7 +364,13 @@ async def get_alerts_status(
         last_date = loader.get_latest_date()
         df = loader.load_projections()
         if not df.empty and "symbol" in df.columns:
-            tracked = sorted({str(s).upper() for s in df["symbol"].unique()})
+            tracked = sorted(
+                {
+                    key
+                    for key in (normalize_ticker(s) for s in df["symbol"].unique())
+                    if key
+                }
+            )
     except (ValueError, Exception):
         pass
 

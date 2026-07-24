@@ -155,3 +155,60 @@ class TestStockTrackerWorkflow:
         assert result["projections"] == {}
         mock_storage.save_daily_data.assert_called_once()
         mock_storage.save_summary.assert_called_once()
+
+    @patch("src.alerts.alert_paths.get_enabled_watch_symbols", return_value=["AAPL", "MSFT"])
+    @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
+    @patch("src.workflows.tracker.StockDataFetcher")
+    @patch("src.workflows.tracker.DataStorage")
+    @patch("src.workflows.tracker.AlertEngine")
+    def test_fetch_data_treats_padded_index_symbols_as_already_present(
+        self,
+        mock_alert,
+        mock_storage_cls,
+        mock_fetcher_cls,
+        mock_indices,
+        mock_watches,
+    ):
+        """Padded/cased index symbols match normalized watches; skip duplicate fetch."""
+        from src.workflows.tracker import StockTrackerWorkflow
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_all_indices.return_value = {
+            "S&P 500": [
+                {
+                    "symbol": " aapl ",
+                    "name": "Apple",
+                    "close": 150.0,
+                    "volume": 1_000_000,
+                    "index_name": "S&P 500",
+                },
+                {
+                    "symbol": float("nan"),
+                    "name": "Bad",
+                    "close": 1.0,
+                    "volume": 1,
+                    "index_name": "S&P 500",
+                },
+            ]
+        }
+        mock_fetcher.fetch_symbol_data.return_value = {
+            "symbol": "MSFT",
+            "name": "Microsoft",
+            "close": 400.0,
+            "volume": 2_000_000,
+            "index_name": "WATCH",
+        }
+        mock_fetcher_cls.return_value = mock_fetcher
+        mock_alert.from_config.return_value = None
+
+        workflow = StockTrackerWorkflow(include_profile=False)
+        workflow.fetcher = mock_fetcher
+
+        result = workflow._fetch_data(use_screener=False)
+
+        assert result["success"] is True
+        symbols = [row["symbol"] for row in result["data"]]
+        # Padded AAPL already present → only MSFT fetched once.
+        mock_fetcher.fetch_symbol_data.assert_called_once_with("MSFT")
+        assert "MSFT" in symbols
+        assert any(str(s).strip().upper() == "AAPL" for s in symbols)
