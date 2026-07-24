@@ -260,3 +260,35 @@ def test_evaluate_fires_again_after_aware_cooldown_expires():
     notifier.send.assert_called_once_with(events[0])
     storage.record_event.assert_called_once_with(events[0])
 
+
+def test_evaluate_continues_when_cooldown_minutes_is_non_numeric():
+    """Junk cooldown_minutes must not abort sibling watches in file-mode configs."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    bad = _price_alert(id="bad-cooldown", cooldown_minutes="later")
+    good = _price_alert(
+        id="good-watch",
+        name="MSFT Drop",
+        cooldown_minutes=5,
+        condition={
+            "type": "price_threshold",
+            "symbol": "MSFT",
+            "operator": "less_than",
+            "value": 300,
+        },
+    )
+    engine = AlertEngine([bad, good], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate(
+            [
+                {"symbol": "AAPL", "close": 149.5},
+                {"symbol": "MSFT", "close": 290.0},
+            ]
+        )
+
+    assert {e["alert_id"] for e in events} == {"bad-cooldown", "good-watch"}
+    assert notifier.send.call_count == 2
+    assert storage.record_event.call_count == 2
+

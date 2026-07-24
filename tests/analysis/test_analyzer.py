@@ -145,6 +145,31 @@ class TestStockAnalyzer(unittest.TestCase):
         result = self.analyzer.analyze_daily_data(rows)
         self.assertEqual(result["exchange_statistics"], {})
 
+    def test_analyze_all_nan_change_percent_yields_finite_summary(self):
+        """All-NaN change_percent must not write nan into summary JSON."""
+        rows = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "change_percent": float("nan"),
+                "close": 180.0,
+                "volume": 1_000,
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft",
+                "change_percent": float("nan"),
+                "close": 350.0,
+                "volume": 2_000,
+            },
+        ]
+        result = self.analyzer.analyze_daily_data(rows)
+        summary = result["summary"]
+        self.assertEqual(summary["average_change_percent"], 0.0)
+        self.assertEqual(summary["max_change_percent"], 0.0)
+        self.assertEqual(summary["min_change_percent"], 0.0)
+        self.assertEqual(summary["total_stocks"], 2)
+
 
 if __name__ == '__main__':
     unittest.main()

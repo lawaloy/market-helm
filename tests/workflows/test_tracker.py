@@ -107,3 +107,51 @@ class TestStockTrackerWorkflow:
 
         assert result["success"] is False
         assert "error" in result
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+    @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
+    @patch("src.workflows.tracker.StockDataFetcher")
+    @patch("src.workflows.tracker.DataStorage")
+    @patch("src.workflows.tracker.AlertEngine")
+    def test_analyze_and_projections_soft_fail(
+        self, mock_alert, mock_storage_cls, mock_fetcher_cls, mock_indices, sample_stock_data, temp_data_dir
+    ):
+        """Analyzer/projector exceptions yield empty dicts so the run can continue."""
+        from src.workflows.tracker import StockTrackerWorkflow
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_all_indices.return_value = {"S&P 500": sample_stock_data}
+        mock_fetcher_cls.return_value = mock_fetcher
+
+        mock_storage = MagicMock()
+        mock_storage.save_daily_data.return_value = str(
+            temp_data_dir / "daily_data_2026-01-15.csv"
+        )
+        mock_storage.save_summary.return_value = str(
+            temp_data_dir / "summary_2026-01-15.json"
+        )
+        mock_storage.save_projections.return_value = str(
+            temp_data_dir / "projections_2026-01-15.csv"
+        )
+        mock_storage_cls.return_value = mock_storage
+        mock_alert.from_config.return_value = None
+
+        workflow = StockTrackerWorkflow(include_profile=False)
+        workflow.fetcher = mock_fetcher
+        workflow.storage = mock_storage
+        workflow.alert_engine = None
+        workflow.ai_summarizer.enabled = False
+        workflow.analyzer.analyze_daily_data = MagicMock(
+            side_effect=RuntimeError("analyzer boom")
+        )
+        workflow.projector.generate_projections = MagicMock(
+            side_effect=RuntimeError("projector boom")
+        )
+
+        result = workflow.run(use_screener=False)
+
+        assert result["success"] is True
+        assert result["analysis"] == {}
+        assert result["projections"] == {}
+        mock_storage.save_daily_data.assert_called_once()
+        mock_storage.save_summary.assert_called_once()

@@ -268,3 +268,46 @@ class TestDataLoader:
             },
             "samples": [],
         }
+
+    def test_load_projections_raises_value_error_on_corrupt_csv(self, loader, temp_data_dir):
+        """Unreadable projections CSV raises ValueError (not raw ParserError)."""
+        (temp_data_dir / "projections_2026-01-15.csv").write_text(
+            'col1,col2\n1,"unclosed', encoding="utf-8"
+        )
+        with pytest.raises(ValueError, match="Projections unreadable"):
+            loader.load_projections()
+
+    def test_compute_projection_accuracy_skips_nan_close_and_predicted(
+        self, loader, temp_data_dir
+    ):
+        """NaN actual close or predicted target_mid must not produce null error pcts."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "MSFT"],
+                "close": [float("nan"), 200.0],
+                "change_percent": [0.0, 0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "MSFT", "GOOGL"],
+                "target_mid": [100.0, float("nan"), 120.0],
+                "recommendation": ["BUY", "HOLD", "SELL"],
+                "projection_date": ["2026-01-15", "2026-01-15", "2026-01-15"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+        # Need a run-date daily file so run_dates includes the projection day.
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [95.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        # AAPL skipped (NaN close), MSFT skipped (NaN predicted), GOOGL has no close → 0
+        assert out["summary"]["sampleCount"] == 0
+        assert out["summary"]["meanAbsErrorPct"] is None
+        assert out["samples"] == []
