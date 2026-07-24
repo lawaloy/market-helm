@@ -387,3 +387,22 @@ def test_smtp_backend_ssl_on_465() -> None:
     assert backend._use_ssl is True
     assert backend._use_tls is False
 
+
+@patch("src.alerts.notifiers.email_delivery.requests.post")
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "SENDGRID_API_KEY": "sg-test-key",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_sendgrid_request_exception_is_retriable(mock_post: MagicMock) -> None:
+    mock_post.side_effect = requests.RequestException("connection reset")
+    notifier = EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]})
+    assert notifier is not None
+    with patch("src.alerts.notifiers.delivery_retry.time.sleep"):
+        assert notifier.send({"alert_id": "a1", "alert_name": "Test", "symbols": []}) is False
+    assert mock_post.call_count == 3

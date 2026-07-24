@@ -153,3 +153,66 @@ def test_main_run_loop_parses_interval(mock_loop, _mock_load_env) -> None:
 
     assert exc_info.value.code == 0
     mock_loop.assert_called_once_with(120)
+
+
+def test_cmd_init_refuses_existing_config_without_force(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    example = tmp_path / "alerts.example.json"
+    example.write_text('{"defaults": {}, "alerts": []}', encoding="utf-8")
+    user_dir = tmp_path / "home" / ".market-helm"
+    user_dir.mkdir(parents=True)
+    existing = user_dir / "alerts.json"
+    existing.write_text('{"defaults": {}, "alerts": [{"id": "keep-me"}]}', encoding="utf-8")
+    monkeypatch.setattr("src.alerts.alert_paths.bundled_example_path", lambda: example)
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+
+    with caplog.at_level("ERROR"):
+        assert alerts_commands.cmd_init(force=False) == 1
+
+    assert "already exists" in caplog.text
+    assert "--force" in caplog.text
+    assert json.loads(existing.read_text(encoding="utf-8"))["alerts"][0]["id"] == "keep-me"
+
+
+def test_cmd_init_force_overwrites_existing_config(monkeypatch, tmp_path: Path) -> None:
+    example = tmp_path / "alerts.example.json"
+    example.write_text(
+        json.dumps(
+            {
+                "defaults": {},
+                "alerts": [{"id": "from-example", "enabled": False, "notifications": ["log"]}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    user_dir = tmp_path / "home" / ".market-helm"
+    user_dir.mkdir(parents=True)
+    existing = user_dir / "alerts.json"
+    existing.write_text(
+        json.dumps({"defaults": {}, "alerts": [{"id": "old-rule"}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("src.alerts.alert_paths.bundled_example_path", lambda: example)
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+    monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
+
+    assert alerts_commands.cmd_init(force=True) == 0
+
+    written = json.loads(existing.read_text(encoding="utf-8"))
+    assert [alert["id"] for alert in written["alerts"]] == ["from-example"]
+
+
+def test_cmd_init_missing_bundled_example_returns_error(
+    monkeypatch, tmp_path: Path, caplog
+) -> None:
+    missing = tmp_path / "missing-alerts.example.json"
+    user_dir = tmp_path / "home" / ".market-helm"
+    monkeypatch.setattr("src.alerts.alert_paths.bundled_example_path", lambda: missing)
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+
+    with caplog.at_level("ERROR"):
+        assert alerts_commands.cmd_init() == 1
+
+    assert "Bundled example not found" in caplog.text
+    assert not (user_dir / "alerts.json").exists()

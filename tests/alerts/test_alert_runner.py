@@ -114,6 +114,21 @@ def test_fetch_missing_watch_quotes_does_not_initialize_fetcher_when_all_symbols
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_soft_fails_when_fetcher_cannot_boot(
+    mock_fetcher_cls, caplog
+):
+    mock_fetcher_cls.side_effect = RuntimeError("missing FINNHUB_API_KEY")
+    stocks = [{"symbol": "AAPL", "close": 180.0}]
+
+    with caplog.at_level("WARNING"):
+        enriched = _fetch_missing_watch_quotes(stocks, ["NVDA"])
+
+    assert enriched is stocks
+    assert "Could not fetch watch symbols (API unavailable)" in caplog.text
+    mock_fetcher_cls.assert_called_once_with(include_profile=False)
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
 def test_fetch_missing_watch_quotes_skips_invalid_live_prices(mock_fetcher_cls, caplog):
     fetcher = MagicMock()
 

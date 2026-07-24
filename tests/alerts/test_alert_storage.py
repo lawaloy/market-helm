@@ -3,6 +3,27 @@
 from src.alerts.alert_storage import AlertStorage
 
 
+def test_load_corrupt_history_returns_empty(tmp_path):
+    storage = AlertStorage(data_dir=tmp_path)
+    storage.history_path.write_text("{not-json", encoding="utf-8")
+
+    history = storage._load()
+
+    assert history == {"last_triggered": {}, "events": [], "delivery_log": []}
+    assert storage.get_last_triggered("any") is None
+    assert storage.latest_event_timestamp() is None
+
+
+def test_get_last_triggered_returns_none_for_unparseable_iso(tmp_path):
+    storage = AlertStorage(data_dir=tmp_path)
+    storage.history_path.write_text(
+        '{"last_triggered": {"a1": "not-a-timestamp"}, "events": [], "delivery_log": []}',
+        encoding="utf-8",
+    )
+
+    assert storage.get_last_triggered("a1") is None
+
+
 def test_latest_event_timestamp_empty(tmp_path):
     storage = AlertStorage(data_dir=tmp_path)
     assert storage.latest_event_timestamp() is None
