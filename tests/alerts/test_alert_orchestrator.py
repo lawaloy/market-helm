@@ -34,6 +34,11 @@ def _watch(alert_id, symbol):
 
 
 class TestAlertOrchestrator:
+    def test_requires_database(self, monkeypatch):
+        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL"):
+            run_orchestrator_tick()
+
     def test_no_watches_message(self, db_user):
         result = run_orchestrator_tick()
         assert result["enqueued"] == 0
@@ -91,3 +96,25 @@ class TestAlertOrchestrator:
         assert result["message"] is None
         assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 1
         mock_snapshot.assert_called_once_with(["AAPL", "MSFT"], fetch_missing_quotes=True)
+
+    @patch("src.alerts.alert_orchestrator.load_market_snapshot")
+    def test_no_priced_symbols_when_prices_do_not_match_watches(
+        self, mock_snapshot, db_user
+    ):
+        sync_watches_from_config(
+            db_user,
+            {
+                "defaults": {},
+                "alerts": [_watch("aapl", "AAPL")],
+            },
+        )
+        # Snapshot has prices, but none for enabled watches.
+        mock_snapshot.return_value = ("2026-06-09", {"MSFT": 420.0}, [])
+
+        result = run_orchestrator_tick()
+
+        assert result["enqueued"] == 0
+        assert result["last_data_date"] == "2026-06-09"
+        assert result["message"] == "No priced symbols for enabled watches."
+        assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
+        mock_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
