@@ -95,12 +95,12 @@ def polish_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
 def _price_alert_key(condition: Dict[str, Any]) -> Optional[str]:
     if condition.get("type") != "price_threshold":
         return None
-    symbol = condition.get("symbol")
+    symbol = normalize_ticker(condition.get("symbol"))
     operator = condition.get("operator")
     value = condition.get("value")
     if not symbol or not operator or value is None:
         return None
-    return f"{str(symbol).upper()}|{operator}|{value}"
+    return f"{symbol}|{operator}|{value}"
 
 
 def dedupe_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:

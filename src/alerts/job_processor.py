@@ -20,6 +20,7 @@ from src.storage.alert_jobs import (
 )
 from src.storage.alert_watches import list_watches_for_symbol
 from src.storage.database import init_database
+from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,13 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
 
 def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
     payload = job["payload"]
-    symbol = str(payload["symbol"]).upper()
+    symbol = normalize_ticker(payload.get("symbol"))
+    if not symbol:
+        logger.warning(
+            "Skipping evaluate_symbol job with invalid symbol %r",
+            payload.get("symbol"),
+        )
+        return
     price = float(payload["price"])
     stock = {"symbol": symbol, "close": price}
     triggered = 0
