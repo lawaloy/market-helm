@@ -131,6 +131,34 @@ def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     log_notifier.send.assert_called_once_with(events[0])
 
 
+def test_evaluate_falls_back_to_log_notifier_for_unknown_notifier_name():
+    """Unknown notification channels must not silently drop a triggered alert."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = {
+        "id": "aapl-drop",
+        "name": "AAPL Drop",
+        "notifications": ["bogus-channel"],
+        "condition": {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150,
+        },
+    }
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch("src.alerts.alert_engine.LogNotifier") as log_notifier_cls:
+        log_notifier = log_notifier_cls.return_value
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    log_notifier_cls.assert_called_once_with()
+    log_notifier.send.assert_called_once_with(events[0])
+    storage.record_event.assert_called_once_with(events[0])
+
+
 def test_evaluate_dispatches_email_notifier_for_triggered_alert():
     """Triggered email alerts are persisted and delivered with the engine event payload."""
     storage = MagicMock()
@@ -231,4 +259,158 @@ def test_evaluate_fires_again_after_aware_cooldown_expires():
     assert len(events) == 1
     notifier.send.assert_called_once_with(events[0])
     storage.record_event.assert_called_once_with(events[0])
+
+
+def test_from_config_returns_none_when_file_missing(tmp_path):
+    """Missing alerts config must soft-fail so workers skip quietly."""
+    assert AlertEngine.from_config(tmp_path / "missing-alerts.json") is None
+
+
+def test_from_config_returns_none_for_corrupt_json(tmp_path):
+    """Corrupt JSON must soft-fail to None instead of crashing the worker."""
+    path = tmp_path / "alerts.json"
+    path.write_text("{not-json", encoding="utf-8")
+
+    with patch(
+        "src.alerts.alert_engine.resolve_alerts_config_path", return_value=path
+    ):
+        assert AlertEngine.from_config(path) is None
+
+
+def test_from_config_dict_returns_none_when_all_alerts_disabled():
+    """Only enabled rules load; an all-disabled config yields no engine."""
+    engine = AlertEngine.from_config_dict(
+        {
+            "defaults": {"email_to": "a@b.com"},
+            "alerts": [_price_alert(enabled=False)],
+        }
+    )
+    assert engine is None
+
+
+def test_from_config_dict_keeps_only_enabled_alerts():
+    enabled = _price_alert(id="on", enabled=True)
+    disabled = _price_alert(id="off", enabled=False)
+    engine = AlertEngine.from_config_dict({"alerts": [enabled, disabled]})
+
+    assert engine is not None
+    assert [alert["id"] for alert in engine.alerts] == ["on"]
+
+
+def test_deliver_event_records_notifier_exception_without_marking_delivered():
+    """Raising notifiers are failure-recorded and must not start cooldown."""
+    storage = MagicMock()
+    notifier = MagicMock()
+    notifier.send.side_effect = RuntimeError("smtp down")
+    alert = _price_alert(notifications=["log"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch.object(engine, "_build_notifiers", return_value=[notifier]):
+        with patch("src.alerts.alert_engine.record_notifier_delivery") as record_delivery:
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+    record_delivery.assert_called_once()
+    kwargs = record_delivery.call_args.kwargs
+    assert kwargs["success"] is False
+    assert "smtp down" in kwargs["error"]
+
+
+def test_deliver_event_continues_after_exception_and_records_success():
+    """One failing notifier must not block a later successful channel."""
+    storage = MagicMock()
+    failing = MagicMock()
+    failing.send.side_effect = RuntimeError("webhook down")
+    succeeding = MagicMock()
+    succeeding.send.return_value = True
+    alert = _price_alert(notifications=["webhook", "log"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch.object(engine, "_build_notifiers", return_value=[failing, succeeding]):
+        with patch("src.alerts.alert_engine.record_notifier_delivery") as record_delivery:
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is True
+    storage.record_event.assert_called_once_with(event)
+    assert record_delivery.call_count == 2
+    assert record_delivery.call_args_list[0].kwargs["success"] is False
+    assert record_delivery.call_args_list[1].kwargs["success"] is True
+
+
+def test_evaluate_continues_when_cooldown_minutes_is_non_numeric():
+    """Junk cooldown_minutes must not abort sibling watches in file-mode configs."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    bad = _price_alert(id="bad-cooldown", cooldown_minutes="later")
+    good = _price_alert(
+        id="good-watch",
+        name="MSFT Drop",
+        cooldown_minutes=5,
+        condition={
+            "type": "price_threshold",
+            "symbol": "MSFT",
+            "operator": "less_than",
+            "value": 300,
+        },
+    )
+    engine = AlertEngine([bad, good], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate(
+            [
+                {"symbol": "AAPL", "close": 149.5},
+                {"symbol": "MSFT", "close": 290.0},
+            ]
+        )
+
+    assert {e["alert_id"] for e in events} == {"bad-cooldown", "good-watch"}
+    assert notifier.send.call_count == 2
+    assert storage.record_event.call_count == 2
+
+
+def test_evaluate_matches_padded_watch_symbol_to_saved_quote():
+    """Whitespace around a watch symbol must still match the saved ticker."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": " aapl ",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    notifier.send.assert_called_once()
+
+
+def test_evaluate_skips_sentinel_watch_symbols():
+    """None/NaN stringified symbols must not match or trigger alerts."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": "nan",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+
+    events = engine.evaluate([{"symbol": "NAN", "close": 1.0}])
+
+    assert events == []
+    storage.record_event.assert_not_called()
 

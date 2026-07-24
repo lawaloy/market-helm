@@ -108,6 +108,111 @@ class TestStockTrackerWorkflow:
         assert result["success"] is False
         assert "error" in result
 
+    @patch.dict("os.environ", {"OPENAI_API_KEY": ""}, clear=False)
+    @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
+    @patch("src.workflows.tracker.StockDataFetcher")
+    @patch("src.workflows.tracker.DataStorage")
+    @patch("src.workflows.tracker.AlertEngine")
+    def test_analyze_and_projections_soft_fail(
+        self, mock_alert, mock_storage_cls, mock_fetcher_cls, mock_indices, sample_stock_data, temp_data_dir
+    ):
+        """Analyzer/projector exceptions yield empty dicts so the run can continue."""
+        from src.workflows.tracker import StockTrackerWorkflow
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_all_indices.return_value = {"S&P 500": sample_stock_data}
+        mock_fetcher_cls.return_value = mock_fetcher
+
+        mock_storage = MagicMock()
+        mock_storage.save_daily_data.return_value = str(
+            temp_data_dir / "daily_data_2026-01-15.csv"
+        )
+        mock_storage.save_summary.return_value = str(
+            temp_data_dir / "summary_2026-01-15.json"
+        )
+        mock_storage.save_projections.return_value = str(
+            temp_data_dir / "projections_2026-01-15.csv"
+        )
+        mock_storage_cls.return_value = mock_storage
+        mock_alert.from_config.return_value = None
+
+        workflow = StockTrackerWorkflow(include_profile=False)
+        workflow.fetcher = mock_fetcher
+        workflow.storage = mock_storage
+        workflow.alert_engine = None
+        workflow.ai_summarizer.enabled = False
+        workflow.analyzer.analyze_daily_data = MagicMock(
+            side_effect=RuntimeError("analyzer boom")
+        )
+        workflow.projector.generate_projections = MagicMock(
+            side_effect=RuntimeError("projector boom")
+        )
+
+        result = workflow.run(use_screener=False)
+
+        assert result["success"] is True
+        assert result["analysis"] == {}
+        assert result["projections"] == {}
+        mock_storage.save_daily_data.assert_called_once()
+        mock_storage.save_summary.assert_called_once()
+
+    @patch("src.alerts.alert_paths.get_enabled_watch_symbols", return_value=["AAPL", "MSFT"])
+    @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
+    @patch("src.workflows.tracker.StockDataFetcher")
+    @patch("src.workflows.tracker.DataStorage")
+    @patch("src.workflows.tracker.AlertEngine")
+    def test_fetch_data_treats_padded_index_symbols_as_already_present(
+        self,
+        mock_alert,
+        mock_storage_cls,
+        mock_fetcher_cls,
+        mock_indices,
+        mock_watches,
+    ):
+        """Padded/cased index symbols match normalized watches; skip duplicate fetch."""
+        from src.workflows.tracker import StockTrackerWorkflow
+
+        mock_fetcher = MagicMock()
+        mock_fetcher.fetch_all_indices.return_value = {
+            "S&P 500": [
+                {
+                    "symbol": " aapl ",
+                    "name": "Apple",
+                    "close": 150.0,
+                    "volume": 1_000_000,
+                    "index_name": "S&P 500",
+                },
+                {
+                    "symbol": float("nan"),
+                    "name": "Bad",
+                    "close": 1.0,
+                    "volume": 1,
+                    "index_name": "S&P 500",
+                },
+            ]
+        }
+        mock_fetcher.fetch_symbol_data.return_value = {
+            "symbol": "MSFT",
+            "name": "Microsoft",
+            "close": 400.0,
+            "volume": 2_000_000,
+            "index_name": "WATCH",
+        }
+        mock_fetcher_cls.return_value = mock_fetcher
+        mock_alert.from_config.return_value = None
+
+        workflow = StockTrackerWorkflow(include_profile=False)
+        workflow.fetcher = mock_fetcher
+
+        result = workflow._fetch_data(use_screener=False)
+
+        assert result["success"] is True
+        symbols = [row["symbol"] for row in result["data"]]
+        # Padded AAPL already present → only MSFT fetched once.
+        mock_fetcher.fetch_symbol_data.assert_called_once_with("MSFT")
+        assert "MSFT" in symbols
+        assert any(str(s).strip().upper() == "AAPL" for s in symbols)
+
     @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
     @patch("src.alerts.alert_paths.get_enabled_watch_symbols", return_value=["TSLA", "AAPL", "TSLA"])
     @patch("src.workflows.tracker.StockDataFetcher")
