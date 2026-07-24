@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, Tuple
 from src.alerts.alert_paths import polish_alerts_config
 
 from .database import get_connection
-from .alert_watches import validate_watches_config
+from .alert_watches import sync_watches_from_config, validate_watches_config
 
 _EMPTY_CONFIG: Dict[str, Any] = {"defaults": {}, "alerts": []}
 
@@ -105,9 +105,7 @@ def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
             """,
             (user_id, blob, updated_at),
         )
-    from .alert_watches import sync_watches_from_config
-
-    sync_watches_from_config(user_id, payload)
+        sync_watches_from_config(user_id, payload, connection=conn)
 
 
 def init_user_alerts_config(user_id: str, *, force: bool = False) -> None:
