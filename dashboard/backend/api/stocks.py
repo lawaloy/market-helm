@@ -168,15 +168,24 @@ async def get_stock_historical(
                 continue
 
             proj = record.get('projection')
-            # Convert to camelCase for frontend
+            # Convert to camelCase for frontend; omit nested projection when required
+            # numerics are missing/non-finite (mirrors stock detail soft-fail).
             projection = None
             if proj:
-                projection = {
-                    'targetPrice': proj.get('target_price'),
-                    'confidence': proj.get('confidence'),
-                    'recommendation': proj.get('recommendation'),
-                    'expectedChange': proj.get('expected_change'),
-                }
+                target_price = _finite_float(proj.get('target_price'))
+                expected_change = _finite_float(proj.get('expected_change'))
+                confidence = _finite_float(proj.get('confidence'))
+                if (
+                    target_price is not None
+                    and expected_change is not None
+                    and confidence is not None
+                ):
+                    projection = {
+                        'targetPrice': target_price,
+                        'confidence': confidence,
+                        'recommendation': proj.get('recommendation'),
+                        'expectedChange': expected_change,
+                    }
 
             volume_raw = record.get("volume", 0)
             try:
