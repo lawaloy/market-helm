@@ -32,6 +32,7 @@ from src.cli.alerts_commands import _load_env, run_alert_test
 from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.utils.tickers import normalize_ticker
 from src.storage.alert_watches import InvalidAlertWatchConfig
 
 router = APIRouter()
@@ -304,7 +305,13 @@ async def get_alert_symbol_catalog():
         loader = get_data_loader()
         df = loader.load_projections()
         if not df.empty and "symbol" in df.columns:
-            tracked = sorted({str(s).upper() for s in df["symbol"].unique()})
+            tracked = sorted(
+                {
+                    key
+                    for key in (normalize_ticker(s) for s in df["symbol"].unique())
+                    if key
+                }
+            )
     except (ValueError, Exception):
         pass
     return {
@@ -320,7 +327,9 @@ async def get_alert_symbol_catalog():
 async def get_symbol_quotes(symbols: str = Query("", description="Comma-separated tickers")) -> SymbolQuotesResponse:
     """Latest prices for up to 15 symbols (saved data, then live quotes)."""
     _load_env()
-    parsed = [str(symbol).upper() for symbol in symbols.split(",") if str(symbol).strip()][:15]
+    parsed = [
+        key for key in (normalize_ticker(symbol) for symbol in symbols.split(",")) if key
+    ][:15]
     if not parsed:
         return SymbolQuotesResponse(prices={})
     return SymbolQuotesResponse(prices=resolve_symbol_prices(parsed, fetch_missing=True))
@@ -330,7 +339,9 @@ async def get_symbol_quotes(symbols: str = Query("", description="Comma-separate
 async def post_symbol_quotes(body: SymbolQuotesRequest) -> SymbolQuotesResponse:
     """Latest prices for up to 15 symbols (saved data, then live quotes)."""
     _load_env()
-    symbols = [str(symbol).upper() for symbol in body.symbols if str(symbol).strip()][:15]
+    symbols = [
+        key for key in (normalize_ticker(symbol) for symbol in body.symbols) if key
+    ][:15]
     if not symbols:
         return SymbolQuotesResponse(prices={})
     return SymbolQuotesResponse(prices=resolve_symbol_prices(symbols, fetch_missing=True))

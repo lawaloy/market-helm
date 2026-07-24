@@ -7,6 +7,8 @@ import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
+from src.utils.tickers import normalize_ticker
+
 logger = logging.getLogger(__name__)
 
 _MAX_LIVE_FETCH = 15
@@ -34,7 +36,7 @@ def prices_from_saved_daily_data() -> Dict[str, float]:
         return prices
 
     for _, row in df.iterrows():
-        symbol = str(row.get("symbol", "")).upper()
+        symbol = normalize_ticker(row.get("symbol"))
         close = row.get("close", row.get("price"))
         if not symbol or close is None:
             continue
@@ -58,7 +60,10 @@ def resolve_symbol_prices(
     Return prices for the requested symbols.
     Uses saved daily data first, then optional live Finnhub quotes for gaps.
     """
-    normalized = list(dict.fromkeys(str(symbol).upper() for symbol in symbols if str(symbol).strip()))
+    # Strip surrounding whitespace so " AAPL " matches saved "AAPL".
+    normalized = list(
+        dict.fromkeys(key for key in (normalize_ticker(symbol) for symbol in symbols) if key)
+    )
     if not normalized:
         return {}
 
