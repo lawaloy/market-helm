@@ -1,5 +1,6 @@
 """Tests for alert job processor (evaluate + deliver)."""
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -364,3 +365,43 @@ class TestJobProcessor:
         assert stats["delivered"] == 2
         urls = {call.args[0] for call in mock_post.call_args_list}
         assert urls == {"https://hooks.example/user-a", "https://hooks.example/user-b"}
+
+    def test_evaluate_strips_padded_payload_symbol(self, db_user):
+        """Whitespace around enqueue symbols must still match stored watches."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "  aapl  ", "price": 150.0, "tick_id": "pad"},
+        )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 1, "failed": 0}
+        with get_connection() as conn:
+            job = conn.execute(
+                "SELECT payload_json FROM alert_jobs WHERE job_type = ?",
+                (JOB_DELIVER,),
+            ).fetchone()
+        event = json.loads(job["payload_json"])["event"]
+        assert event["symbols"] == ["AAPL"]
+
+    @pytest.mark.parametrize(
+        "raw_symbol",
+        [None, float("nan"), "nan", "NONE", "  ", ""],
+    )
+    def test_evaluate_skips_sentinel_payload_symbols(self, db_user, raw_symbol):
+        """Poison/sentinel symbols must soft-skip, not look up fake NONE/NAN watches."""
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": raw_symbol, "price": 150.0, "tick_id": "sentinel"},
+        )
+
+        stats = process_job_queue("test-worker")
+
+        assert stats == {"evaluated": 1, "delivered": 0, "failed": 0}
+        assert pending_job_count([JOB_DELIVER]) == 0
+        with get_connection() as conn:
+            row = conn.execute("SELECT COUNT(*) AS n FROM alert_trigger_state").fetchone()
+        assert row["n"] == 0

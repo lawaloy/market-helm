@@ -86,6 +86,63 @@ def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
     assert deduped["alerts"][0]["id"] == "aapl_drop"
 
 
+def test_dedupe_alerts_config_normalizes_padded_symbols() -> None:
+    """Padded/cased symbols must collapse to one price-threshold key."""
+    config = {
+        "alerts": [
+            {
+                "id": "aapl_first",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "  aapl  ",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+            {
+                "id": "aapl_padded_copy",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert len(deduped["alerts"]) == 1
+    assert deduped["alerts"][0]["id"] == "aapl_first"
+
+
+def test_dedupe_alerts_config_falls_back_for_sentinel_symbols() -> None:
+    """None/NaN sentinel symbols must not share a fake NAN/NONE dedupe key."""
+    config = {
+        "alerts": [
+            {
+                "id": "bad_none",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": None,
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+            {
+                "id": "bad_nan",
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "nan",
+                    "operator": "less_than",
+                    "value": 150,
+                },
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert [a["id"] for a in deduped["alerts"]] == ["bad_none", "bad_nan"]
+
+
 def test_strip_webhook_secrets_from_config() -> None:
     config = {
         "defaults": {"webhook_url": "https://discord.com/secret", "email_to": "a@example.com"},

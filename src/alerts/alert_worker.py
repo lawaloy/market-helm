@@ -9,6 +9,8 @@ import time
 import uuid
 from typing import Any, Callable, Dict, List, Optional
 
+from src.utils.tickers import normalize_ticker
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = 300
@@ -80,7 +82,7 @@ def run_user_check(user_id: str) -> Dict[str, Any]:
         condition = alert.get("condition") or {}
         if condition.get("type") != "price_threshold":
             continue
-        symbol = str(condition.get("symbol") or "").strip().upper()
+        symbol = normalize_ticker(condition.get("symbol"))
         if symbol and symbol not in watch_symbols:
             watch_symbols.append(symbol)
 
