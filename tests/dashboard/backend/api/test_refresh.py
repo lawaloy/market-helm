@@ -88,13 +88,18 @@ def test_run_daily_tracker_discards_child_output_to_prevent_deadlock(monkeypatch
 def test_run_daily_tracker_honors_cancel_event_without_alert_check(monkeypatch) -> None:
     """Cancel must stop the child and skip the post-refresh alert worker."""
     reset_refresh_state()
-    refresh._refresh_cancel_event.set()
     fake_process = FakeProcess(returncode=0, running=True)
     alert_check = MagicMock(return_value={"triggered": 0})
 
-    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(return_value=fake_process))
+    def popen_and_cancel(*_args, **_kwargs):
+        # Simulate /refresh/cancel after the child starts (tracker clears the event first).
+        refresh._refresh_cancel_event.set()
+        return fake_process
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(side_effect=popen_and_cancel))
     monkeypatch.setenv("REFRESH_TOP_N", "0")
     monkeypatch.setattr("src.alerts.alert_worker.run_check_once", alert_check)
+    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: None)
 
     refresh.run_daily_tracker()
 
