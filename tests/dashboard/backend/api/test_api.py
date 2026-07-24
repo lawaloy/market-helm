@@ -974,3 +974,94 @@ class TestHistorySummaryAPI:
         assert sentiments["2026-01-15"] == "Bearish"
         assert "2026-01-14" not in sentiments
         assert "AAPL" in body["symbols"]
+
+    def test_market_movers_skips_non_finite_price_and_coerces_bad_volume(
+        self, temp_data_dir
+    ):
+        """One NaN price or volume must not 500 the movers card or emit null JSON."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["GOOD", "BADPRICE", "BADVOL"],
+                "name": ["Good Co", "Bad Price", "Bad Vol"],
+                "close": [100.0, float("nan"), 50.0],
+                "change": [5.0, 1.0, 2.0],
+                "change_percent": [5.0, 2.0, 4.0],
+                "volume": [1_000_000, 2_000_000, float("nan")],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/movers", params={"type": "gainers", "limit": 10})
+
+        assert r.status_code == 200
+        data = r.json()["data"]
+        by_symbol = {row["symbol"]: row for row in data}
+        assert "BADPRICE" not in by_symbol
+        assert by_symbol["GOOD"]["price"] == 100.0
+        assert by_symbol["GOOD"]["volume"] == 1_000_000
+        assert by_symbol["BADVOL"]["price"] == 50.0
+        assert by_symbol["BADVOL"]["volume"] == 0
+
+    def test_opportunities_skips_non_finite_projection_and_coerces_daily(
+        self, temp_data_dir
+    ):
+        """NaN confidence/volume must not 500 opportunities or emit null targets."""
+        import dashboard.backend.api.projections
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_projections.return_value = pd.DataFrame(
+            {
+                "symbol": ["KEEP", "BADCONF", "KEEP2"],
+                "name": ["Keep Co", "Bad Conf", "Keep Two"],
+                "target_mid": [110.0, 120.0, 130.0],
+                "expected_change_percent": [10.0, 12.0, 8.0],
+                "confidence": [90.0, float("nan"), 80.0],
+                "risk_level": ["Low", "High", "Medium"],
+                "trend": ["Bullish", "Bullish", "Bullish"],
+                "recommendation": ["STRONG BUY", "STRONG BUY", "STRONG BUY"],
+                "reason": ["ok", "bad", "ok"],
+                "momentum_score": [1.0, 2.0, float("nan")],
+                "volatility_score": [0.5, 0.5, 0.4],
+            }
+        )
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["KEEP", "BADCONF", "KEEP2"],
+                "close": [100.0, 100.0, float("inf")],
+                "volume": [1_000_000, 2_000_000, float("nan")],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.projections,
+            "get_data_loader",
+            return_value=mock_loader,
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get(
+                "/api/projections/opportunities",
+                params={"type": "STRONG_BUY", "limit": 10},
+            )
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["count"] == 3
+        by_symbol = {row["symbol"]: row for row in data["opportunities"]}
+        assert "BADCONF" not in by_symbol
+        assert by_symbol["KEEP"]["currentPrice"] == 100.0
+        assert by_symbol["KEEP"]["volume"] == 1_000_000
+        assert by_symbol["KEEP"]["confidence"] == 90
+        assert by_symbol["KEEP2"]["currentPrice"] == 0.0
+        assert by_symbol["KEEP2"]["volume"] == 0
+        assert by_symbol["KEEP2"]["momentum"] is None
