@@ -2,8 +2,9 @@
 Historical trends API endpoints
 """
 import logging
+import math
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel
 
@@ -11,6 +12,19 @@ from dashboard.backend.services.data_loader import get_data_loader
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce numeric aggregates; fall back when missing, non-numeric, or non-finite."""
+    try:
+        if value is None:
+            return default
+        result = float(value)
+        if not math.isfinite(result):
+            return default
+        return result
+    except (TypeError, ValueError):
+        return default
 
 
 def load_index_symbol_names() -> dict:
@@ -189,8 +203,14 @@ async def get_historical_summary(
                     continue
 
                 total = len(df)
-                avg_confidence = float(df['confidence'].mean()) if 'confidence' in df.columns else 0
-                avg_expected = float(df['expected_change_percent'].mean()) if 'expected_change_percent' in df.columns else 0
+                avg_confidence = (
+                    _safe_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
+                )
+                avg_expected = (
+                    _safe_float(df['expected_change_percent'].mean())
+                    if 'expected_change_percent' in df.columns
+                    else 0.0
+                )
 
                 if avg_expected > 1.0:
                     sentiment = "Bullish"

@@ -1,12 +1,28 @@
 """
 Stocks API endpoints
 """
+import math
+from typing import Any, Optional
+
 from fastapi import APIRouter, HTTPException, Path, Query
 from dashboard.backend.models.stock import StockDetail, CurrentData, ProjectionData, TechnicalData, HistoricalData, HistoricalPoint
 from dashboard.backend.services.data_loader import get_data_loader
 from datetime import datetime, timedelta
 
 router = APIRouter()
+
+
+def _finite_float(value: Any) -> Optional[float]:
+    """Return float when finite; otherwise None (missing/non-numeric/NaN/Inf)."""
+    try:
+        if value is None:
+            return None
+        result = float(value)
+        if not math.isfinite(result):
+            return None
+        return result
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/{symbol}", response_model=StockDetail)
@@ -27,14 +43,32 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
             raise HTTPException(status_code=404, detail="Stock not found.")
         
         stock_row = stock_daily.iloc[0]
-        
+        for col in ("close", "change", "change_percent"):
+            if col not in stock_row.index:
+                raise HTTPException(status_code=404, detail="Stock not found.")
+
+        price = _finite_float(stock_row["close"])
+        change = _finite_float(stock_row["change"])
+        change_percent = _finite_float(stock_row["change_percent"])
+        if price is None or change is None or change_percent is None:
+            raise HTTPException(status_code=404, detail="Stock not found.")
+
         # Build current data
+        volume_raw = stock_row.get("volume", 0)
+        try:
+            volume = int(float(volume_raw)) if volume_raw is not None and math.isfinite(float(volume_raw)) else 0
+        except (TypeError, ValueError):
+            volume = 0
+        market_cap = None
+        if "market_cap" in stock_row.index:
+            market_cap = _finite_float(stock_row.get("market_cap"))
+
         current_data = CurrentData(
-            price=float(stock_row['close']),
-            change=float(stock_row['change']),
-            changePercent=float(stock_row['change_percent']),
-            volume=int(stock_row.get('volume', 0)),
-            marketCap=float(stock_row.get('market_cap', 0)) if 'market_cap' in stock_row else None
+            price=price,
+            change=change,
+            changePercent=change_percent,
+            volume=volume,
+            marketCap=market_cap
         )
         
         # Try to load projection data
@@ -102,6 +136,12 @@ async def get_stock_historical(
         
         historical_points = []
         for record in historical_records:
+            close = _finite_float(record.get("close"))
+            change = _finite_float(record.get("change_percent"))
+            if close is None or change is None:
+                # Skip corrupt/partial days so one bad row cannot 500 the series.
+                continue
+
             proj = record.get('projection')
             # Convert to camelCase for frontend
             projection = None
@@ -113,13 +153,26 @@ async def get_stock_historical(
                     'expectedChange': proj.get('expected_change'),
                 }
 
+            volume_raw = record.get("volume", 0)
+            try:
+                volume = (
+                    int(float(volume_raw))
+                    if volume_raw is not None and math.isfinite(float(volume_raw))
+                    else 0
+                )
+            except (TypeError, ValueError):
+                volume = 0
+
             historical_points.append(HistoricalPoint(
                 date=record['date'],
-                close=float(record['close']),
-                change=float(record['change_percent']),
-                volume=int(record.get('volume', 0)),
+                close=close,
+                change=change,
+                volume=volume,
                 projection=projection
             ))
+
+        if not historical_points:
+            raise HTTPException(status_code=404, detail="No historical data found.")
         
         return HistoricalData(
             symbol=symbol.upper(),

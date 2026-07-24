@@ -74,6 +74,22 @@ class TestDataLoader:
         assert isinstance(result, dict)
         assert result["date"] == "2026-01-15"
 
+    def test_load_summary_raises_value_error_on_corrupt_json(self, loader, temp_data_dir):
+        """Corrupt summary JSON raises ValueError so APIs can map to 404."""
+        (temp_data_dir / "summary_2026-01-15.json").write_text(
+            "{not-json", encoding="utf-8"
+        )
+        with pytest.raises(ValueError, match="Summary file unreadable"):
+            loader.load_summary()
+
+    def test_load_daily_data_raises_value_error_on_corrupt_csv(self, loader, temp_data_dir):
+        """Unreadable daily CSV raises ValueError (not raw ParserError)."""
+        (temp_data_dir / "daily_data_2026-01-15.csv").write_text(
+            'col1,col2\n1,"unclosed', encoding="utf-8"
+        )
+        with pytest.raises(ValueError, match="Daily data unreadable"):
+            loader.load_daily_data()
+
     def test_get_latest_date_returns_date_string(self, loader, temp_data_dir):
         """get_latest_date returns date from most recent file by filename date."""
         df = pd.DataFrame({"symbol": ["A"], "close": [100.0], "change_percent": [0.0]})

@@ -363,6 +363,110 @@ class TestStocksAPI:
         assert r.status_code == 404
         assert r.json()["detail"] == "Stock not found."
 
+    def test_stock_detail_404_when_price_fields_missing(self, temp_data_dir):
+        """Missing close/change/change_percent must 404 instead of KeyError→500."""
+        import dashboard.backend.api.stocks
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {"symbol": ["AAPL"], "name": ["Apple"]}
+        )
+        with patch.object(
+            dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/stocks/AAPL")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Stock not found."
+
+    def test_stock_detail_404_when_price_is_nan(self, temp_data_dir):
+        """Non-finite close/change/change_percent must 404 (not null JSON numbers)."""
+        import dashboard.backend.api.stocks
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [float("nan")],
+                "change": [1.0],
+                "change_percent": [0.5],
+                "volume": [1_000],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/stocks/AAPL")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Stock not found."
+
+    def test_stock_historical_skips_nan_days(self, client, mock_data_loader, temp_data_dir):
+        """One corrupt day is omitted; valid siblings still return 200."""
+        from datetime import datetime, timedelta
+
+        recent = datetime.now().strftime("%Y-%m-%d")
+        prior = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [float("nan")],
+                "change": [0.0],
+                "change_percent": [float("nan")],
+                "volume": [1],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [150.0],
+                "change": [1.0],
+                "change_percent": [0.7],
+                "volume": [2_000],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{prior}.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 200
+        data = r.json()
+        assert [point["date"] for point in data["data"]] == [prior]
+        assert data["data"][0]["close"] == 150.0
+
+    def test_stock_historical_404_when_all_points_invalid(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """If every day is non-finite, historical returns 404 like an empty series."""
+        from datetime import datetime
+
+        recent = datetime.now().strftime("%Y-%m-%d")
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [float("nan")],
+                "change": [0.0],
+                "change_percent": [float("inf")],
+                "volume": [1],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No historical data found."
+
     def test_stock_historical_returns_points(self, client, mock_data_loader, temp_data_dir):
         from datetime import datetime, timedelta
 
@@ -536,3 +640,42 @@ class TestMarketAPIErrors:
             r = client.get("/api/summary")
 
         assert r.status_code == 404
+
+    def test_summary_404_when_json_corrupt(self, client, mock_data_loader, temp_data_dir):
+        """Corrupt summary JSON must 404 via ValueError mapping, not generic 500."""
+        path = temp_data_dir / "summary_2026-01-15.json"
+        path.write_text("{not-valid-json", encoding="utf-8")
+
+        r = client.get("/api/summary")
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available."
+
+
+class TestHistorySummaryAPI:
+    """Historical projections summary endpoint."""
+
+    def test_history_summary_coerces_all_nan_means(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """All-NaN confidence/expected means must serialize as finite 0.0 + Neutral."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "MSFT"],
+                "name": ["Apple", "Microsoft"],
+                "target_mid": [160.0, 360.0],
+                "expected_change_percent": [float("nan"), float("nan")],
+                "confidence": [float("nan"), float("nan")],
+                "recommendation": ["HOLD", "HOLD"],
+                "risk_level": ["Medium", "Medium"],
+                "trend": ["Neutral", "Neutral"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        r = client.get("/api/history/summary", params={"days": 7})
+        assert r.status_code == 200
+        data = r.json()
+        assert len(data["data"]) == 1
+        point = data["data"][0]
+        assert point["averageConfidence"] == 0.0
+        assert point["expectedMarketMove"] == 0.0
+        assert point["sentiment"] == "Neutral"
