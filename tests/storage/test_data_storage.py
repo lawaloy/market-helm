@@ -1,6 +1,7 @@
 """Tests for storage module."""
 
 import unittest
+import unittest.mock
 import tempfile
 import shutil
 from pathlib import Path
@@ -106,6 +107,100 @@ class TestDataStorage(unittest.TestCase):
             loaded_summary = json.load(f)
         self.assertIsInstance(loaded_summary, dict)
         self.assertEqual(loaded_summary['total_stocks'], 2)
+
+    def test_save_projections_writes_ordered_csv_and_markdown(self):
+        """Projection CSV keeps the stable column order and still emits markdown."""
+        projections = {
+            "AAPL": {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "current_price": 180.0,
+                "target_low": 175.0,
+                "target_mid": 185.0,
+                "target_high": 195.0,
+                "expected_change_percent": 2.5,
+                "recommendation": "BUY",
+                "confidence": 80,
+                "trend": "up",
+                "momentum_score": 0.6,
+                "volatility_score": 0.2,
+                "risk_level": "medium",
+                "reason": "momentum",
+                "projection_date": "2026-05-25",
+                "generated_at": "2026-05-20T12:00:00",
+                "extra_ignored": True,
+            }
+        }
+
+        csv_path = Path(self.storage.save_projections(projections, date=date(2026, 5, 20)))
+        self.assertTrue(csv_path.exists())
+        df = pd.read_csv(csv_path)
+        self.assertEqual(
+            list(df.columns),
+            [
+                "symbol",
+                "name",
+                "current_price",
+                "target_low",
+                "target_mid",
+                "target_high",
+                "expected_change_percent",
+                "recommendation",
+                "confidence",
+                "trend",
+                "momentum_score",
+                "volatility_score",
+                "risk_level",
+                "reason",
+                "projection_date",
+                "generated_at",
+            ],
+        )
+        self.assertEqual(df.iloc[0]["symbol"], "AAPL")
+        md_path = csv_path.with_suffix(".md")
+        self.assertTrue(md_path.exists())
+        self.assertIn("Stock Market Projections Report", md_path.read_text(encoding="utf-8"))
+
+    def test_save_projections_still_returns_csv_when_markdown_fails(self):
+        """Markdown report failures must not block the projections CSV path."""
+        projections = {
+            "AAPL": {
+                "symbol": "AAPL",
+                "current_price": 180.0,
+                "expected_change_percent": 1.0,
+                "recommendation": "HOLD",
+                "confidence": 50,
+                "trend": "flat",
+            }
+        }
+
+        with unittest.mock.patch.object(
+            DataStorage,
+            "_generate_projection_markdown",
+            side_effect=RuntimeError("markdown boom"),
+        ):
+            csv_path = Path(
+                self.storage.save_projections(projections, date=date(2026, 5, 21))
+            )
+
+        self.assertTrue(csv_path.exists())
+        self.assertFalse(csv_path.with_suffix(".md").exists())
+        self.assertEqual(pd.read_csv(csv_path).iloc[0]["symbol"], "AAPL")
+
+    def test_save_projections_empty_returns_none(self):
+        self.assertIsNone(self.storage.save_projections({}))
+
+    def test_load_daily_data_missing_file_returns_none(self):
+        """Absent daily CSV soft-fails to None instead of raising."""
+        self.assertIsNone(self.storage.load_daily_data(date=date(2099, 1, 1)))
+
+    def test_load_daily_data_corrupt_csv_returns_none(self):
+        """Unreadable daily CSV soft-fails to None so callers can skip the day."""
+        bad_path = Path(self.test_data_dir) / "daily_data_2099-01-02.csv"
+        bad_path.write_bytes(b"\xff\xfe not,valid,csv\n\x00\x01")
+        with unittest.mock.patch("builtins.print"):
+            loaded = self.storage.load_daily_data(date=date(2099, 1, 2))
+        self.assertIsNone(loaded)
 
 
 if __name__ == '__main__':

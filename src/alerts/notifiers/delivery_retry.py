@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -45,10 +46,16 @@ def _float_env(name: str, default: float) -> float:
     if not raw:
         return default
     try:
-        return float(raw)
+        value = float(raw)
     except ValueError:
         logger.warning("Invalid %s=%r; using default %s", name, raw, default)
         return default
+    # float("inf") / float("nan") parse, but sleep(inf) raises OverflowError and
+    # NaN delays poison retry math — treat non-finite like invalid input.
+    if not math.isfinite(value):
+        logger.warning("Non-finite %s=%r; using default %s", name, raw, default)
+        return default
+    return value
 
 
 def resolve_delivery_retry_settings() -> DeliveryRetrySettings:

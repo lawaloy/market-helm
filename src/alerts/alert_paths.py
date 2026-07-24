@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from src.utils.tickers import normalize_ticker
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -66,18 +68,31 @@ def _is_placeholder_webhook(url: str) -> bool:
     return host == "example.com" or host.endswith(".example.com")
 
 
-def polish_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Remove bundled placeholders and seed defaults from environment when available."""
-    polished = dict(config)
-    defaults = dict(polished.get("defaults") or {})
+def polish_alerts_config(
+    config: Dict[str, Any],
+    *,
+    seed_env_email: bool = True,
+) -> Dict[str, Any]:
+    """Remove bundled placeholders and optionally seed defaults from environment.
 
-    env_email = (os.environ.get("ALERT_EMAIL_TO") or "").strip()
-    if env_email and not defaults.get("email_to"):
-        defaults["email_to"] = env_email
+    Hosted multi-user saves must pass ``seed_env_email=False`` so a process-wide
+    ``ALERT_EMAIL_TO`` is never written into another tenant's config.
+    """
+    polished = dict(config)
+    raw_defaults = polished.get("defaults")
+    # Truthy non-dict defaults (list/str/number) crash dict(); soft-fail to {}.
+    defaults = dict(raw_defaults) if isinstance(raw_defaults, dict) else {}
+
+    if seed_env_email:
+        env_email = (os.environ.get("ALERT_EMAIL_TO") or "").strip()
+        if env_email and not defaults.get("email_to"):
+            defaults["email_to"] = env_email
 
     polished["defaults"] = defaults
     alerts: list[Dict[str, Any]] = []
     for alert in polished.get("alerts") or []:
+        if not isinstance(alert, dict):
+            continue
         cleaned = dict(alert)
         email = str(cleaned.get("email_to") or "").strip().lower()
         if email in _PLACEHOLDER_EMAILS:
@@ -91,14 +106,16 @@ def polish_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _price_alert_key(condition: Dict[str, Any]) -> Optional[str]:
+    if not isinstance(condition, dict):
+        return None
     if condition.get("type") != "price_threshold":
         return None
-    symbol = condition.get("symbol")
+    symbol = normalize_ticker(condition.get("symbol"))
     operator = condition.get("operator")
     value = condition.get("value")
     if not symbol or not operator or value is None:
         return None
-    return f"{str(symbol).upper()}|{operator}|{value}"
+    return f"{symbol}|{operator}|{value}"
 
 
 def dedupe_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -106,7 +123,11 @@ def dedupe_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
     seen: set[str] = set()
     unique: list[Dict[str, Any]] = []
     for alert in config.get("alerts") or []:
-        key = _price_alert_key(alert.get("condition") or {}) or str(alert.get("id"))
+        if not isinstance(alert, dict):
+            continue
+        raw_condition = alert.get("condition")
+        condition = raw_condition if isinstance(raw_condition, dict) else {}
+        key = _price_alert_key(condition) or str(alert.get("id"))
         if key in seen:
             continue
         seen.add(key)
@@ -142,12 +163,20 @@ def init_user_alerts_config(force: bool = False) -> Path:
 
 
 def load_alerts_config(explicit: Optional[Path] = None) -> Tuple[Path, Optional[Dict[str, Any]]]:
-    """Return resolved config path and parsed JSON, or None if the file is missing."""
+    """Return resolved config path and parsed JSON, or None if the file is missing/unreadable."""
     path = resolve_alerts_config_path(explicit) if explicit is None else Path(explicit)
     if not path.exists():
         return path, None
-    with open(path, "r", encoding="utf-8") as handle:
-        return path, json.load(handle)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        # Treat corrupt/unreadable config like a missing file so Settings GET
+        # can soft-fail instead of 500ing on hand-edited JSON.
+        return path, None
+    if not isinstance(data, dict):
+        return path, None
+    return path, data
 
 
 def save_alerts_config(config: Dict[str, Any], explicit: Optional[Path] = None) -> Path:
@@ -171,14 +200,18 @@ def get_enabled_watch_symbols() -> List[str]:
         return []
     symbols: set[str] = set()
     for alert in raw.get("alerts") or []:
+        if not isinstance(alert, dict):
+            continue
         if not alert.get("enabled"):
             continue
         condition = alert.get("condition") or {}
+        if not isinstance(condition, dict):
+            continue
         if condition.get("type") != "price_threshold":
             continue
-        symbol = condition.get("symbol")
+        symbol = normalize_ticker(condition.get("symbol"))
         if symbol:
-            symbols.add(str(symbol).upper())
+            symbols.add(symbol)
     return sorted(symbols)
 
 
@@ -186,8 +219,13 @@ def apply_alert_defaults(alert: Dict[str, Any], defaults: Optional[Dict[str, Any
     """Merge config-level defaults into a rule for notification delivery."""
     if not defaults:
         return alert
+    if not isinstance(defaults, dict):
+        return alert
     merged = dict(alert)
-    notifications = merged.get("notifications") or []
+    raw_notifications = merged.get("notifications")
+    # Require a real list: strings make `"email" in notifications` true via
+    # substring search and would mis-seed email_to from defaults.
+    notifications = raw_notifications if isinstance(raw_notifications, list) else []
     if "email" in notifications and not merged.get("email_to") and defaults.get("email_to"):
         merged["email_to"] = defaults["email_to"]
     if "webhook" in notifications:
@@ -201,12 +239,14 @@ def apply_alert_defaults(alert: Dict[str, Any], defaults: Optional[Dict[str, Any
 def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Remove webhook URLs from persisted config — secrets belong in server env only."""
     cleaned = dict(config)
-    defaults = dict(cleaned.get("defaults") or {})
+    raw_defaults = cleaned.get("defaults")
+    defaults = dict(raw_defaults) if isinstance(raw_defaults, dict) else {}
     defaults.pop("webhook_url", None)
     cleaned["defaults"] = defaults
     cleaned["alerts"] = [
         {k: v for k, v in alert.items() if k != "webhook_url"}
         for alert in cleaned.get("alerts") or []
+        if isinstance(alert, dict)
     ]
     return cleaned
 
