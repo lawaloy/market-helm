@@ -189,6 +189,128 @@ def test_mailgun_request_exception_is_retriable(mock_post: MagicMock) -> None:
     "os.environ",
     {
         "ALERT_EMAIL_PROVIDER": "mailgun",
+        "MAILGUN_DOMAIN": "mg.markethelm.example",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_mailgun_backend_requires_api_key() -> None:
+    from src.alerts.notifiers.email_delivery import build_mailgun_backend
+
+    assert build_mailgun_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+    assert email_delivery_configured() is False
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "mailgun",
+        "MAILGUN_API_KEY": "   ",
+        "MAILGUN_DOMAIN": "mg.markethelm.example",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_mailgun_backend_rejects_blank_api_key() -> None:
+    from src.alerts.notifiers.email_delivery import build_mailgun_backend
+
+    assert build_mailgun_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "mailgun",
+        "MAILGUN_API_KEY": "mg-test-key",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_mailgun_backend_requires_domain() -> None:
+    from src.alerts.notifiers.email_delivery import build_mailgun_backend
+
+    assert build_mailgun_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+    assert email_delivery_configured() is False
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "mailgun",
+        "MAILGUN_API_KEY": "mg-test-key",
+        "MAILGUN_DOMAIN": "  ",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_mailgun_backend_rejects_blank_domain() -> None:
+    from src.alerts.notifiers.email_delivery import build_mailgun_backend
+
+    assert build_mailgun_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_sendgrid_backend_requires_api_key() -> None:
+    from src.alerts.notifiers.email_delivery import build_sendgrid_backend
+
+    assert build_sendgrid_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+    assert email_delivery_configured() is False
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "SENDGRID_API_KEY": "  ",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_sendgrid_backend_rejects_blank_api_key() -> None:
+    from src.alerts.notifiers.email_delivery import build_sendgrid_backend
+
+    assert build_sendgrid_backend() is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_HOST": "smtp.example.com",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+        "ALERT_EMAIL_TO": "user@example.com",
+    },
+    clear=True,
+)
+def test_smtp_backend_requires_credentials() -> None:
+    from src.alerts.notifiers.email_delivery import build_smtp_backend
+
+    assert build_smtp_backend({}) is None
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "mailgun",
         "MAILGUN_API_KEY": "mg-test-key",
         "MAILGUN_DOMAIN": "mg.markethelm.example",
         "MAILGUN_API_BASE": "https://api.eu.mailgun.net",
