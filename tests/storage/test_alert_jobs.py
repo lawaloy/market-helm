@@ -171,3 +171,35 @@ class TestAlertJobs:
             ).fetchone()
         assert row["status"] == STATUS_PENDING
         assert row["attempts"] == 1
+
+    def test_claim_jobs_marks_corrupt_payload_failed_and_claims_peers(self, db):
+        """Corrupt payload_json must not poison the claim transaction/queue."""
+        good_id = enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+        poison_id = enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "MSFT", "price": 300.0})
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE alert_jobs SET payload_json = ? WHERE id = ?",
+                ("{not-json", poison_id),
+            )
+
+        claimed = claim_jobs([JOB_EVALUATE_SYMBOL], "worker-poison", limit=5)
+
+        assert [job["id"] for job in claimed] == [good_id]
+        assert claimed[0]["payload"]["symbol"] == "AAPL"
+        with get_connection() as conn:
+            poison = conn.execute(
+                "SELECT status, last_error, locked_at, locked_by FROM alert_jobs WHERE id = ?",
+                (poison_id,),
+            ).fetchone()
+            good = conn.execute(
+                "SELECT status FROM alert_jobs WHERE id = ?",
+                (good_id,),
+            ).fetchone()
+        assert poison["status"] == STATUS_FAILED
+        assert poison["locked_at"] is None
+        assert poison["locked_by"] is None
+        assert "Invalid job payload" in poison["last_error"]
+        assert good["status"] == STATUS_PROCESSING
+
+        # Subsequent claims must not re-raise on the failed poison row.
+        assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-poison-2", limit=5) == []
