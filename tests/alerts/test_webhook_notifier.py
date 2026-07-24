@@ -128,6 +128,29 @@ def test_build_payload_discord_format() -> None:
     }
 
 
+def test_build_payload_odd_fields_use_safe_fallbacks() -> None:
+    discord = WebhookNotifier("https://example.com/hook", payload_format="discord")
+    discord_payload = discord.build_payload(
+        {
+            "alert_id": "rule-42",
+            "symbols": None,
+            "condition_type": "price_threshold",
+            "timestamp": "2026-05-21T12:00:00",
+        }
+    )
+    assert discord_payload["content"] == (
+        "**MarketHelm alert:** rule-42\n"
+        "**Symbols:** (none)\n"
+        "**Condition:** price_threshold\n"
+        "**Time (UTC):** 2026-05-21T12:00:00"
+    )
+
+    json_notifier = WebhookNotifier("https://example.com/hook", payload_format="json")
+    event = {"alert_id": "rule-42", "symbols": [], "extra": {"ok": True}}
+    assert json_notifier.build_payload(event) == event
+    assert json_notifier.build_payload(event) is not event
+
+
 @patch.dict("os.environ", {"DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/x/y"}, clear=False)
 def test_from_alert_falls_back_to_discord_env_url() -> None:
     n = WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]})
