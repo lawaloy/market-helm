@@ -219,8 +219,13 @@ def apply_alert_defaults(alert: Dict[str, Any], defaults: Optional[Dict[str, Any
     """Merge config-level defaults into a rule for notification delivery."""
     if not defaults:
         return alert
+    if not isinstance(defaults, dict):
+        return alert
     merged = dict(alert)
-    notifications = merged.get("notifications") or []
+    raw_notifications = merged.get("notifications")
+    # Require a real list: strings make `"email" in notifications` true via
+    # substring search and would mis-seed email_to from defaults.
+    notifications = raw_notifications if isinstance(raw_notifications, list) else []
     if "email" in notifications and not merged.get("email_to") and defaults.get("email_to"):
         merged["email_to"] = defaults["email_to"]
     if "webhook" in notifications:
