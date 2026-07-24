@@ -170,6 +170,77 @@ class TestStockAnalyzer(unittest.TestCase):
         self.assertEqual(summary["min_change_percent"], 0.0)
         self.assertEqual(summary["total_stocks"], 2)
 
+    def test_analyze_skips_nan_rows_in_top_lists(self):
+        """Non-finite change_percent/volume must not appear in top_* lists."""
+        import json
+        import math
+
+        rows = [
+            {
+                "symbol": "GOOD",
+                "name": "Good Co",
+                "change_percent": 2.5,
+                "close": 100.0,
+                "volume": 5_000,
+            },
+            {
+                "symbol": "NANPCT",
+                "name": "Bad Pct",
+                "change_percent": float("nan"),
+                "close": 50.0,
+                "volume": 9_000,
+            },
+            {
+                "symbol": "INFVOL",
+                "name": "Bad Vol",
+                "change_percent": -1.0,
+                "close": 40.0,
+                "volume": float("inf"),
+            },
+            {
+                "symbol": "LOSER",
+                "name": "Loser Co",
+                "change_percent": -3.0,
+                "close": 30.0,
+                "volume": 1_000,
+            },
+        ]
+        result = self.analyzer.analyze_daily_data(rows)
+
+        gainer_symbols = [row["symbol"] for row in result["top_gainers"]]
+        loser_symbols = [row["symbol"] for row in result["top_losers"]]
+        volume_symbols = [row["symbol"] for row in result["top_volume"]]
+
+        # Finite change_percent rows only (INFVOL has finite change, NaN pct excluded).
+        self.assertEqual(gainer_symbols, ["GOOD", "INFVOL", "LOSER"])
+        self.assertEqual(loser_symbols, ["LOSER", "INFVOL", "GOOD"])
+        self.assertNotIn("NANPCT", gainer_symbols + loser_symbols)
+
+        # Finite volume only (INFVOL excluded); NANPCT still ranks by volume.
+        self.assertEqual(volume_symbols, ["NANPCT", "GOOD", "LOSER"])
+        self.assertNotIn("INFVOL", volume_symbols)
+        nanpct_volume = next(row for row in result["top_volume"] if row["symbol"] == "NANPCT")
+        self.assertEqual(nanpct_volume["change_percent"], 0.0)
+        self.assertEqual(nanpct_volume["volume"], 9_000)
+
+        # Summary counts exclude NaN comparisons (NaN is neither >0, <0, nor ==0).
+        summary = result["summary"]
+        self.assertEqual(summary["total_stocks"], 4)
+        self.assertEqual(summary["gainers"], 1)
+        self.assertEqual(summary["losers"], 2)
+        self.assertEqual(summary["unchanged"], 0)
+
+        # Top lists must be strict-JSON serializable (no NaN/Infinity literals).
+        encoded = json.dumps(result["top_gainers"] + result["top_losers"] + result["top_volume"])
+        self.assertNotIn("NaN", encoded)
+        self.assertNotIn("Infinity", encoded)
+        for row in result["top_gainers"] + result["top_losers"] + result["top_volume"]:
+            self.assertTrue(math.isfinite(float(row["change_percent"])))
+            if "close" in row:
+                self.assertTrue(math.isfinite(float(row["close"])))
+            if "volume" in row:
+                self.assertTrue(math.isfinite(float(row["volume"])))
+
 
 if __name__ == '__main__':
     unittest.main()

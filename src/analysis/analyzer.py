@@ -23,6 +23,12 @@ def _finite_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _finite_mask(series: pd.Series) -> pd.Series:
+    """True where values coerce to a finite float (excludes NaN/inf)."""
+    numeric = pd.to_numeric(series, errors="coerce")
+    return numeric.apply(lambda value: bool(math.isfinite(value)) if pd.notna(value) else False)
+
+
 class StockAnalyzer:
     """Analyzes stock market data and generates insights."""
     
@@ -47,19 +53,26 @@ class StockAnalyzer:
         losers = len(df[df['change_percent'] < 0])
         unchanged = len(df[df['change_percent'] == 0])
         
-        # Top gainers and losers
-        top_gainers = df.nlargest(5, 'change_percent')[
-            ['symbol', 'name', 'change_percent', 'close']
-        ].to_dict('records')
-        
-        top_losers = df.nsmallest(5, 'change_percent')[
-            ['symbol', 'name', 'change_percent', 'close']
-        ].to_dict('records')
-        
-        # Highest volume
-        top_volume = df.nlargest(5, 'volume')[
-            ['symbol', 'name', 'volume', 'change_percent']
-        ].to_dict('records')
+        # Top gainers/losers/volume — skip non-finite rows so summary JSON stays valid.
+        change_ok = df[_finite_mask(df["change_percent"])]
+        top_gainers = change_ok.nlargest(5, "change_percent")[
+            ["symbol", "name", "change_percent", "close"]
+        ].to_dict("records")
+
+        top_losers = change_ok.nsmallest(5, "change_percent")[
+            ["symbol", "name", "change_percent", "close"]
+        ].to_dict("records")
+
+        volume_ok = df[_finite_mask(df["volume"])]
+        top_volume = volume_ok.nlargest(5, "volume")[
+            ["symbol", "name", "volume", "change_percent"]
+        ].to_dict("records")
+        for row in top_volume:
+            row["change_percent"] = _finite_float(row.get("change_percent"))
+            row["volume"] = int(_finite_float(row.get("volume")))
+        for row in top_gainers + top_losers:
+            row["change_percent"] = _finite_float(row.get("change_percent"))
+            row["close"] = _finite_float(row.get("close"))
         
         # Exchange breakdown
         if 'exchange_code' in df.columns:

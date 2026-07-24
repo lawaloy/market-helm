@@ -431,19 +431,30 @@ class StockProjector:
         # Count trends
         trend_counts = df['trend'].value_counts().to_dict()
         
-        # Calculate averages
-        avg_confidence = df['confidence'].mean()
-        avg_expected_change = df['expected_change_percent'].mean()
-        
-        # Identify top opportunities
-        strong_buys = df[df['recommendation'] == 'STRONG BUY'].nlargest(
-            5, 'confidence'
-        )[['symbol', 'target_mid', 'confidence']].to_dict('records')
-        
-        strong_sells = df[df['recommendation'] == 'STRONG SELL'].nlargest(
-            5, 'confidence'
-        )[['symbol', 'target_mid', 'confidence']].to_dict('records')
-        
+        # Calculate averages — all-NaN columns yield NaN means; coerce for JSON-safe summaries.
+        def _finite_mean(series: pd.Series, default: float = 0.0) -> float:
+            try:
+                value = float(series.mean())
+            except (TypeError, ValueError):
+                return default
+            return value if math.isfinite(value) else default
+
+        avg_confidence = _finite_mean(df["confidence"])
+        avg_expected_change = _finite_mean(df["expected_change_percent"])
+
+        # Identify top opportunities (finite confidence only)
+        conf_numeric = pd.to_numeric(df["confidence"], errors="coerce")
+        conf_ok = df[conf_numeric.apply(
+            lambda value: bool(math.isfinite(value)) if pd.notna(value) else False
+        )]
+        strong_buys = conf_ok[conf_ok["recommendation"] == "STRONG BUY"].nlargest(
+            5, "confidence"
+        )[["symbol", "target_mid", "confidence"]].to_dict("records")
+
+        strong_sells = conf_ok[conf_ok["recommendation"] == "STRONG SELL"].nlargest(
+            5, "confidence"
+        )[["symbol", "target_mid", "confidence"]].to_dict("records")
+
         summary = {
             'total_projections': len(projections),
             'recommendations': rec_counts,
