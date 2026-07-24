@@ -34,3 +34,20 @@ def test_main_forwards_flags_to_workflow(argv, include_profile, use_screener, to
     ctor.assert_called_once_with(include_profile=include_profile)
     workflow.run.assert_called_once_with(use_screener=use_screener, top_n_stocks=top_n)
     display.assert_called_once_with(workflow.run.return_value)
+
+
+def test_main_dispatches_alerts_subcommand_without_daily_workflow(monkeypatch):
+    """`market-helm alerts ...` must hand off argv and skip the daily tracker."""
+    monkeypatch.setattr(
+        "sys.argv",
+        ["market-helm", "alerts", "run", "--loop", "--interval", "120"],
+    )
+
+    with patch("src.cli.alerts_commands.main") as alerts_main:
+        with patch("src.cli.commands.StockTrackerWorkflow") as ctor:
+            from src.cli.commands import main
+
+            main()
+
+    alerts_main.assert_called_once_with(["run", "--loop", "--interval", "120"])
+    ctor.assert_not_called()
