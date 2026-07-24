@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.alerts.alert_runner import _fetch_missing_watch_quotes, _load_env, _stocks_from_daily_df
@@ -40,8 +41,12 @@ def load_market_snapshot(
         if not symbol or close is None:
             continue
         try:
-            prices[symbol] = float(close)
+            value = float(close)
         except (TypeError, ValueError):
             continue
+        # Defense in depth: keep snapshot prices JSON-safe for alert jobs.
+        if not math.isfinite(value):
+            continue
+        prices[symbol] = value
 
     return last_date, prices, stocks

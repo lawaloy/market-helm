@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Dict, List
 
 from src.alerts.alert_engine import AlertEngine
@@ -32,7 +33,8 @@ def _stocks_from_daily_df(df) -> List[Dict[str, Any]]:
         except (TypeError, ValueError):
             logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
             continue
-        if close_value != close_value:  # NaN
+        # float("inf") is not NaN; reject all non-finite closes.
+        if not math.isfinite(close_value):
             logger.warning("Skipping invalid saved quote for %s: %r", symbol, close)
             continue
         stocks.append({"symbol": symbol, "close": close_value})
@@ -72,10 +74,14 @@ def _fetch_missing_watch_quotes(
         if close is None:
             continue
         try:
-            enriched.append({"symbol": symbol.upper(), "close": float(close)})
+            close_value = float(close)
         except (TypeError, ValueError):
             logger.warning("Skipping invalid quote for watch symbol %s: %r", symbol, close)
             continue
+        if not math.isfinite(close_value):
+            logger.warning("Skipping invalid quote for watch symbol %s: %r", symbol, close)
+            continue
+        enriched.append({"symbol": symbol.upper(), "close": close_value})
         logger.info("Fetched live quote for watch symbol %s", symbol)
 
     return enriched

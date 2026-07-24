@@ -56,7 +56,8 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         if not hmac.compare_digest(_b64url_decode(sig_segment), expected_sig):
             raise AuthError("Invalid token signature.")
         payload = json.loads(_b64url_decode(body_segment))
-        if int(payload.get("exp", 0)) < int(time.time()):
+        # Treat exp == now as expired so zero-TTL tokens cannot authenticate.
+        if int(payload.get("exp", 0)) <= int(time.time()):
             raise AuthError("Token expired.")
         user_id = payload.get("sub")
         if not user_id:
