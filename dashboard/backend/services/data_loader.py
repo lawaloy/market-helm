@@ -10,6 +10,8 @@ import json
 from datetime import datetime, timedelta
 from functools import lru_cache
 
+from src.utils.tickers import normalize_ticker
+
 
 def _default_data_dir() -> Path:
     """Resolve data directory: DATA_DIR env, repo data/ when developing, else user data dir."""
@@ -219,13 +221,18 @@ class DataLoader:
         self, symbol: str, target_date: str
     ) -> Optional[Tuple[str, float]]:
         """First available daily close for symbol on or after target_date."""
-        sym = symbol.upper()
+        sym = normalize_ticker(symbol)
+        if not sym:
+            return None
         for d in sorted(self.get_available_dates()):
             if d < target_date:
                 continue
             try:
                 daily_df = self.load_daily_data(d)
-                stock_data = daily_df[daily_df["symbol"] == sym]
+                # Match padded / mixed-case daily symbols to the normalized key.
+                stock_data = daily_df[
+                    daily_df["symbol"].map(normalize_ticker) == sym
+                ]
                 if stock_data.empty:
                     continue
                 close = float(stock_data.iloc[0]["close"])
@@ -268,7 +275,8 @@ class DataLoader:
 
             for _, row in proj_df.iterrows():
                 row_dict = row.to_dict()
-                symbol = str(row_dict.get("symbol", "")).upper()
+                # Skip None/NaN/blank so accuracy never reports fake NONE/NAN tickers.
+                symbol = normalize_ticker(row_dict.get("symbol"))
                 if not symbol:
                     continue
                 try:

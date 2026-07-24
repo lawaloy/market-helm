@@ -285,6 +285,36 @@ class TestAlertsConfigAPI:
         assert r.status_code == 200
         assert r.json()["tracked_symbols"] == ["AAPL", "MSFT"]
 
+    def test_get_status_normalizes_tracked_symbols(self, client, alerts_config_dir, monkeypatch):
+        """Status tracked list strips padding and drops None/NaN sentinels."""
+        import pandas as pd
+
+        loader = MagicMock()
+        loader.get_latest_date.return_value = "2026-01-15"
+        loader.load_projections.return_value = pd.DataFrame(
+            {
+                "symbol": [" aapl ", None, float("nan"), "  ", "msft", "AAPL"],
+            }
+        )
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.get_data_loader",
+            lambda: loader,
+        )
+        monkeypatch.setattr(
+            "src.alerts.alert_storage.AlertStorage",
+            lambda data_dir=None: MagicMock(
+                latest_event_timestamp=MagicMock(return_value=None),
+            ),
+        )
+        monkeypatch.setattr(
+            "src.alerts.delivery_status.latest_deliveries_by_channel",
+            lambda storage: [],
+        )
+
+        r = client.get("/api/alerts/status")
+        assert r.status_code == 200
+        assert r.json()["tracked_symbols"] == ["AAPL", "MSFT"]
+
     def test_get_status(self, client, alerts_config_dir, tmp_path, monkeypatch):
         from src.alerts.alert_storage import AlertStorage
 

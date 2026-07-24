@@ -311,3 +311,47 @@ class TestDataLoader:
         assert out["summary"]["sampleCount"] == 0
         assert out["summary"]["meanAbsErrorPct"] is None
         assert out["samples"] == []
+
+    def test_compute_projection_accuracy_normalizes_padded_and_skips_sentinels(
+        self, loader, temp_data_dir
+    ):
+        """Padded symbols match daily rows; None/NaN never become NONE/NAN samples."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "  msft  "],
+                "close": [100.0, 200.0],
+                "change_percent": [0.0, 0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": [" aapl ", None, float("nan"), "  ", "MSFT"],
+                "target_mid": [110.0, 50.0, 60.0, 70.0, 210.0],
+                "recommendation": ["BUY", "HOLD", "HOLD", "HOLD", "SELL"],
+                "projection_date": [
+                    "2026-01-15",
+                    "2026-01-15",
+                    "2026-01-15",
+                    "2026-01-15",
+                    "2026-01-15",
+                ],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [95.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        assert out["summary"]["sampleCount"] == 2
+        symbols = {s["symbol"] for s in out["samples"]}
+        assert symbols == {"AAPL", "MSFT"}
+        assert "NONE" not in symbols
+        assert "NAN" not in symbols
+        by_sym = {s["symbol"]: s for s in out["samples"]}
+        assert by_sym["AAPL"]["absErrorPct"] == pytest.approx(9.091, abs=0.01)
+        assert by_sym["MSFT"]["absErrorPct"] == pytest.approx(4.762, abs=0.01)
