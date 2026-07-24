@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -109,22 +110,39 @@ def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
     _rows_from_config(user_id, config, _utc_now())
 
 
-def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
+def _replace_watches(
+    conn: sqlite3.Connection,
+    user_id: str,
+    rows: List[tuple],
+) -> None:
+    conn.execute("DELETE FROM alert_watches WHERE user_id = ?", (user_id,))
+    if rows:
+        conn.executemany(
+            """
+            INSERT INTO alert_watches (
+                user_id, alert_id, enabled, condition_type, symbol, operator,
+                threshold, alert_json, defaults_json, cooldown_minutes, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+
+
+def sync_watches_from_config(
+    user_id: str,
+    config: Dict[str, Any],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
+) -> None:
     """Replace user's watch rows from a Helmtower alerts config payload."""
     rows = _rows_from_config(user_id, config, _utc_now())
 
+    if connection is not None:
+        _replace_watches(connection, user_id, rows)
+        return
+
     with get_connection() as conn:
-        conn.execute("DELETE FROM alert_watches WHERE user_id = ?", (user_id,))
-        if rows:
-            conn.executemany(
-                """
-                INSERT INTO alert_watches (
-                    user_id, alert_id, enabled, condition_type, symbol, operator,
-                    threshold, alert_json, defaults_json, cooldown_minutes, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                rows,
-            )
+        _replace_watches(conn, user_id, rows)
 
 
 def list_enabled_symbols() -> List[str]:
