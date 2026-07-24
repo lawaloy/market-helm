@@ -1,5 +1,6 @@
 """Tests for alert config path resolution."""
 
+import sys
 from pathlib import Path
 
 from src.alerts.alert_paths import (
@@ -12,13 +13,80 @@ from src.alerts.alert_paths import (
     save_alerts_config,
     dedupe_alerts_config,
     strip_webhook_secrets_from_config,
+    user_config_dir,
 )
+
+
+def _fake_home(monkeypatch, tmp_path: Path) -> Path:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    if sys.platform == "win32":
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    return tmp_path
 
 
 def test_resolve_prefers_explicit_path(tmp_path: Path) -> None:
     custom = tmp_path / "custom.json"
     custom.write_text('{"alerts": []}', encoding="utf-8")
     assert resolve_alerts_config_path(custom) == custom
+
+
+def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    legacy = home / ".market-desk"
+    legacy.mkdir()
+    (legacy / "alerts.json").write_text('{"alerts": []}', encoding="utf-8")
+
+    resolved = user_config_dir()
+
+    assert resolved == home / ".market-helm"
+    assert resolved.exists()
+    assert not legacy.exists()
+    assert (resolved / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
+
+
+def test_user_config_dir_keeps_existing_market_helm(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    dest = home / ".market-helm"
+    dest.mkdir()
+    (dest / "alerts.json").write_text('{"alerts": [{"id": "keep"}]}', encoding="utf-8")
+    legacy = home / ".market-desk"
+    legacy.mkdir()
+    (legacy / "alerts.json").write_text('{"alerts": [{"id": "stale"}]}', encoding="utf-8")
+
+    resolved = user_config_dir()
+
+    assert resolved == dest
+    assert legacy.exists()
+    assert (dest / "alerts.json").read_text(encoding="utf-8") == '{"alerts": [{"id": "keep"}]}'
+
+
+def test_resolve_alerts_config_path_precedence(monkeypatch, tmp_path: Path) -> None:
+    home = _fake_home(monkeypatch, tmp_path)
+    user_dir = home / ".market-helm"
+    user_dir.mkdir()
+    user_path = user_dir / "alerts.json"
+    user_path.write_text('{"alerts": [{"id": "user"}]}', encoding="utf-8")
+
+    repo_root = tmp_path / "repo"
+    repo_config = repo_root / "config"
+    repo_config.mkdir(parents=True)
+    repo_path = repo_config / "alerts.json"
+    repo_path.write_text('{"alerts": [{"id": "repo"}]}', encoding="utf-8")
+    monkeypatch.setattr("src.alerts.alert_paths._REPO_ROOT", repo_root)
+
+    env_path = tmp_path / "env-alerts.json"
+    env_path.write_text('{"alerts": [{"id": "env"}]}', encoding="utf-8")
+    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(env_path))
+    assert resolve_alerts_config_path() == env_path
+
+    monkeypatch.delenv("MARKET_HELM_ALERTS_CONFIG", raising=False)
+    assert resolve_alerts_config_path() == user_path
+
+    user_path.unlink()
+    assert resolve_alerts_config_path() == repo_path
+
+    repo_path.unlink()
+    assert resolve_alerts_config_path() == user_path
 
 
 def test_init_user_alerts_config_creates_file(monkeypatch, tmp_path: Path) -> None:
