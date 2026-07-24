@@ -137,7 +137,11 @@ def _channel_status(
 ) -> ChannelStatus:
     defaults = config.get("defaults") or {}
     has_rule_email = any(alert.get("email_to") for alert in config.get("alerts", []))
-    has_default_email = bool(defaults.get("email_to") or os.environ.get("ALERT_EMAIL_TO"))
+    # Hosted (DB) mode must not treat process-wide ALERT_EMAIL_TO as this tenant's
+    # recipients — same isolation rule as webhook env vars below.
+    has_default_email = bool(defaults.get("email_to"))
+    if not database_enabled():
+        has_default_email = has_default_email or bool(os.environ.get("ALERT_EMAIL_TO"))
     if database_enabled():
         webhook_ready = bool(has_webhook_secret)
     else:
@@ -202,7 +206,7 @@ async def get_alerts_config(
     _load_env()
     exists, raw = _load_raw_config(user_id)
     if raw is not None:
-        raw = polish_alerts_config(raw)
+        raw = polish_alerts_config(raw, seed_env_email=not database_enabled())
         if not database_enabled():
             scrubbed = strip_webhook_secrets_from_config(raw)
             if scrubbed != raw:
@@ -245,7 +249,9 @@ async def put_alerts_config(
         _, saved = load_user_alerts_config(user_id)
         if saved is not None:
             status_source = saved
-    status_source = polish_alerts_config(status_source)
+    status_source = polish_alerts_config(
+        status_source, seed_env_email=not database_enabled()
+    )
     has_webhook_secret = _has_webhook_secret(status_source)
     public = _public_config(status_source)
     return AlertsConfigResponse(
@@ -380,12 +386,20 @@ async def get_alerts_status(
             _, raw = load_user_alerts_config(user_id)
             if raw:
                 alerts = raw.get("alerts") or []
-                active_watches = sum(1 for alert in alerts if alert.get("enabled"))
+                active_watches = sum(
+                    1
+                    for alert in alerts
+                    if isinstance(alert, dict) and alert.get("enabled")
+                )
     elif path.exists():
         _, raw = load_alerts_config(path)
         if raw:
-            alerts = raw.get("alerts") or []
-            active_watches = sum(1 for alert in alerts if alert.get("enabled"))
+            alerts = polish_alerts_config(raw).get("alerts") or []
+            active_watches = sum(
+                1
+                for alert in alerts
+                if isinstance(alert, dict) and alert.get("enabled")
+            )
 
     try:
         if database_enabled() and user_id:

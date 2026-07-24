@@ -407,6 +407,42 @@ class TestMultiUserAlertsAPI:
         assert put.status_code == 200
         assert put.json()["channels"]["webhook_url"] is False
 
+    def test_global_email_env_does_not_mark_hosted_recipients_ready(
+        self, client, multi_user_env, monkeypatch
+    ):
+        """Hosted mode must ignore process-wide ALERT_EMAIL_TO for recipient readiness."""
+        monkeypatch.setenv("ALERT_EMAIL_TO", "global-shared@example.com")
+
+        token = _register(client, "global-email@example.com")
+        headers = {"Authorization": f"Bearer {token}"}
+        assert client.post("/api/alerts/init", headers=headers).status_code == 200
+
+        response = client.get("/api/alerts/config", headers=headers)
+        assert response.status_code == 200
+        body = response.json()
+        assert body["exists"] is True
+        assert body["config"]["defaults"].get("email_to") in (None, "")
+        assert body["channels"]["email_recipients"] is False
+        assert "global-shared@example.com" not in json.dumps(body)
+
+        without_recipients = {
+            "defaults": {"notify_email": True},
+            "alerts": [],
+        }
+        put = client.put("/api/alerts/config", json=without_recipients, headers=headers)
+        assert put.status_code == 200
+        assert put.json()["channels"]["email_recipients"] is False
+        assert put.json()["config"]["defaults"].get("email_to") in (None, "")
+
+        with_tenant_email = {
+            "defaults": {"email_to": "tenant@example.com", "notify_email": True},
+            "alerts": [],
+        }
+        put2 = client.put("/api/alerts/config", json=with_tenant_email, headers=headers)
+        assert put2.status_code == 200
+        assert put2.json()["channels"]["email_recipients"] is True
+        assert put2.json()["config"]["defaults"]["email_to"] == "tenant@example.com"
+
     def test_status_active_watches_and_last_triggered_are_user_scoped(
         self, client, multi_user_env
     ):
