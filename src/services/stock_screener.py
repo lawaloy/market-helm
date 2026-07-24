@@ -30,7 +30,13 @@ class StockScreener:
             filters_config: Dictionary with filter settings (or None for defaults)
             api_client: Optional FinnhubClient instance (creates new one if not provided)
         """
+        # Truthy non-dicts (hand-edited filters.json list/string/number) must not
+        # reach scoring paths that subscript filters by string key.
+        if not isinstance(filters_config, dict):
+            filters_config = None
         self.filters = filters_config or self._get_default_filters()
+        if not isinstance(self.filters.get("weights"), dict):
+            self.filters = {**self.filters, "weights": self._get_default_filters()["weights"]}
         
         try:
             self.api_client = api_client or FinnhubClient()
@@ -57,6 +63,17 @@ class StockScreener:
                 "market_cap": 0.20,  # 20% weight
             }
         }
+
+    def _safe_top_n(self, default: int = 100) -> int:
+        """Coerce filters.top_n to a non-negative int; bad/non-finite → default."""
+        raw = self.filters.get("top_n", default) if isinstance(self.filters, dict) else default
+        try:
+            number = float(raw)
+        except (TypeError, ValueError):
+            return default
+        if not math.isfinite(number):
+            return default
+        return max(0, int(number))
     
     @staticmethod
     def _finite_number(value: Any, default: float = 0.0) -> float:
@@ -260,8 +277,8 @@ class StockScreener:
         # Sort by score (highest first)
         screened_stocks.sort(key=lambda x: x["screener_score"], reverse=True)
         
-        # Take top N
-        top_n = self.filters.get("top_n", 100)
+        # Take top N (coerce bad top_n from hand-edited filters.json)
+        top_n = self._safe_top_n(default=100)
         top_stocks = screened_stocks[:top_n]
         
         logger.info(f"Screened {len(screened_stocks)} qualified stocks, selected top {len(top_stocks)}")
