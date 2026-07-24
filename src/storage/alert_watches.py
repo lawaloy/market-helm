@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -39,9 +40,21 @@ def _coerce_threshold(raw_value: Any, alert_id: str) -> Optional[float]:
 
 
 def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
+    # Inf/NaN raise OverflowError via int(float("inf")) or fail isfinite —
+    # must become InvalidAlertWatchConfig so backfill/save don't 500.
     try:
-        return int(raw_value or 0)
+        as_float = float(raw_value or 0)
     except (TypeError, ValueError) as exc:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        ) from exc
+    if not math.isfinite(as_float):
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        )
+    try:
+        return int(as_float)
+    except (TypeError, ValueError, OverflowError) as exc:
         raise InvalidAlertWatchConfig(
             f"Alert '{alert_id}' has an invalid cooldown_minutes value."
         ) from exc
@@ -50,7 +63,8 @@ def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
 def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> List[tuple]:
     if not isinstance(config, dict):
         raise InvalidAlertWatchConfig("Alerts config must be an object.")
-    defaults = config.get("defaults") or {}
+    raw_defaults = config.get("defaults")
+    defaults = raw_defaults if isinstance(raw_defaults, dict) else {}
     alerts = config.get("alerts") or []
     rows: List[tuple] = []
 
@@ -96,22 +110,39 @@ def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
     _rows_from_config(user_id, config, _utc_now())
 
 
-def sync_watches_from_config(user_id: str, config: Dict[str, Any]) -> None:
+def _replace_watches(
+    conn: sqlite3.Connection,
+    user_id: str,
+    rows: List[tuple],
+) -> None:
+    conn.execute("DELETE FROM alert_watches WHERE user_id = ?", (user_id,))
+    if rows:
+        conn.executemany(
+            """
+            INSERT INTO alert_watches (
+                user_id, alert_id, enabled, condition_type, symbol, operator,
+                threshold, alert_json, defaults_json, cooldown_minutes, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+
+
+def sync_watches_from_config(
+    user_id: str,
+    config: Dict[str, Any],
+    *,
+    connection: Optional[sqlite3.Connection] = None,
+) -> None:
     """Replace user's watch rows from a Helmtower alerts config payload."""
     rows = _rows_from_config(user_id, config, _utc_now())
 
+    if connection is not None:
+        _replace_watches(connection, user_id, rows)
+        return
+
     with get_connection() as conn:
-        conn.execute("DELETE FROM alert_watches WHERE user_id = ?", (user_id,))
-        if rows:
-            conn.executemany(
-                """
-                INSERT INTO alert_watches (
-                    user_id, alert_id, enabled, condition_type, symbol, operator,
-                    threshold, alert_json, defaults_json, cooldown_minutes, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                rows,
-            )
+        _replace_watches(conn, user_id, rows)
 
 
 def list_enabled_symbols() -> List[str]:
@@ -146,19 +177,52 @@ def list_watches_for_symbol(symbol: str) -> List[Dict[str, Any]]:
         ).fetchall()
     watches: List[Dict[str, Any]] = []
     for row in rows:
+        parsed = _parse_watch_payload(row["alert_json"], row["defaults_json"])
+        if parsed is None:
+            continue
+        alert, defaults = parsed
         watches.append(
             {
                 "user_id": row["user_id"],
                 "alert_id": row["alert_id"],
-                "alert": json.loads(row["alert_json"]),
-                "defaults": json.loads(row["defaults_json"]),
-                "cooldown_minutes": int(row["cooldown_minutes"] or 0),
+                "alert": alert,
+                "defaults": defaults,
+                "cooldown_minutes": _safe_cooldown_minutes(row["cooldown_minutes"]),
                 "condition_type": row["condition_type"],
                 "operator": row["operator"],
                 "threshold": row["threshold"],
             }
         )
     return watches
+
+
+def _parse_watch_payload(
+    alert_json: Any, defaults_json: Any
+) -> Optional[tuple[Dict[str, Any], Dict[str, Any]]]:
+    """Parse stored watch JSON; skip poison non-object alert payloads."""
+    try:
+        alert = json.loads(alert_json)
+        defaults = json.loads(defaults_json)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(alert, dict):
+        return None
+    if not isinstance(defaults, dict):
+        defaults = {}
+    return alert, defaults
+
+
+def _safe_cooldown_minutes(raw_value: Any) -> int:
+    try:
+        as_float = float(raw_value or 0)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(as_float):
+        return 0
+    try:
+        return int(as_float)
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
 
 def get_watch(user_id: str, alert_id: str) -> Optional[Dict[str, Any]]:
@@ -172,10 +236,14 @@ def get_watch(user_id: str, alert_id: str) -> Optional[Dict[str, Any]]:
         ).fetchone()
     if not row:
         return None
+    parsed = _parse_watch_payload(row["alert_json"], row["defaults_json"])
+    if parsed is None:
+        return None
+    alert, defaults = parsed
     return {
-        "alert": json.loads(row["alert_json"]),
-        "defaults": json.loads(row["defaults_json"]),
-        "cooldown_minutes": int(row["cooldown_minutes"] or 0),
+        "alert": alert,
+        "defaults": defaults,
+        "cooldown_minutes": _safe_cooldown_minutes(row["cooldown_minutes"]),
     }
 
 

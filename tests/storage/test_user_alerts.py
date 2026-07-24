@@ -1,9 +1,11 @@
 """Unit tests for per-user alert config storage."""
 
+import sqlite3
+
 import pytest
 
 from src.storage.alert_watches import InvalidAlertWatchConfig, list_watches_for_symbol
-from src.storage.database import init_database
+from src.storage.database import get_connection, init_database
 from src.storage.user_alerts import (
     init_user_alerts_config,
     load_user_alerts_config,
@@ -63,6 +65,58 @@ class TestUserAlerts:
         exists, raw = load_user_alerts_config(db_user)
         assert exists is False
         assert raw is None
+
+    def test_watch_sync_failure_rolls_back_config_update(self, db_user):
+        original = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "original",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "greater_than",
+                        "value": 100,
+                    },
+                }
+            ],
+        }
+        save_user_alerts_config(db_user, original)
+        with get_connection() as conn:
+            conn.execute(
+                """
+                CREATE TRIGGER reject_blocked_watch
+                BEFORE INSERT ON alert_watches
+                WHEN NEW.alert_id = 'blocked'
+                BEGIN
+                    SELECT RAISE(ABORT, 'blocked watch');
+                END
+                """
+            )
+
+        replacement = {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "blocked",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "MSFT",
+                        "operator": "greater_than",
+                        "value": 200,
+                    },
+                }
+            ],
+        }
+        with pytest.raises(sqlite3.IntegrityError, match="blocked watch"):
+            save_user_alerts_config(db_user, replacement)
+
+        _, raw = load_user_alerts_config(db_user)
+        assert raw == original
+        assert list_watches_for_symbol("MSFT") == []
+        assert list_watches_for_symbol("AAPL")[0]["alert_id"] == "original"
 
     def test_save_preserves_per_alert_webhook_secret_when_update_omits_it(self, db_user):
         alert = {
