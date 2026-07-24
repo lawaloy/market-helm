@@ -87,6 +87,29 @@ def test_run_daily_tracker_discards_child_output_to_prevent_deadlock(monkeypatch
     assert refresh.refresh_status["is_running"] is False
 
 
+def test_run_daily_tracker_keeps_success_when_post_refresh_alerts_fail(
+    monkeypatch,
+) -> None:
+    """A failed post-refresh alert check must not flip a successful fetch to error."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    def boom() -> dict:
+        raise RuntimeError("alert worker down")
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", boom)
+
+    refresh.run_daily_tracker()
+
+    assert refresh.refresh_status["last_status"] == "success"
+    assert refresh.refresh_status["is_running"] is False
+    assert "successfully" in refresh.refresh_status["progress"].lower()
+    assert refresh._refresh_process is None
+
+
 def test_run_daily_tracker_honors_cancel_event_without_alert_check(monkeypatch) -> None:
     """Cancel must stop the child and skip the post-refresh alert worker."""
     reset_refresh_state()
