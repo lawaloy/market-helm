@@ -149,10 +149,15 @@ class DataLoader:
         
         try:
             with open(file_path, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, OSError) as exc:
             # Corrupt JSON must map to ValueError → API 404, not generic 500.
             raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
+        # Valid JSON that is not an object (null/[]/"x") would AttributeError
+        # on summary_data.get(...) in /api/market/summary — treat as unreadable.
+        if not isinstance(data, dict):
+            raise ValueError(f"Summary file unreadable: {file_path.name}")
+        return data
     
     def get_available_dates(self) -> List[str]:
         """Get list of all available dates"""
@@ -162,6 +167,10 @@ class DataLoader:
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
         """Load historical data for a specific symbol"""
+        sym = normalize_ticker(symbol)
+        if not sym:
+            return []
+
         dates = self.get_available_dates()
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         
@@ -171,9 +180,9 @@ class DataLoader:
                 break
             
             try:
-                # Load daily data
+                # Load daily data — match padded / mixed-case CSV symbols.
                 daily_df = self.load_daily_data(date)
-                stock_data = daily_df[daily_df['symbol'] == symbol]
+                stock_data = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
                 
                 if stock_data.empty:
                     continue
@@ -183,7 +192,7 @@ class DataLoader:
                 # Try to load projections for this date
                 try:
                     proj_df = self.load_projections(date)
-                    proj_data = proj_df[proj_df['symbol'] == symbol]
+                    proj_data = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
                     
                     if not proj_data.empty:
                         proj_record = proj_data.iloc[0].to_dict()

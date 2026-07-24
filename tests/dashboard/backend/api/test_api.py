@@ -538,6 +538,79 @@ class TestStocksAPI:
         assert point["projection"]["targetPrice"] == 165.0
         assert point["projection"]["recommendation"] == "BUY"
 
+    def test_stock_detail_matches_padded_daily_and_projection_symbols(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """Padded CSV symbols must still resolve via normalize_ticker matching."""
+        pd.DataFrame(
+            {
+                "symbol": [" AAPL "],
+                "name": ["Apple"],
+                "close": [151.0],
+                "change": [1.0],
+                "change_percent": [0.7],
+                "volume": [1_000],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": [" aapl "],
+                "name": ["Apple"],
+                "target_mid": [160.0],
+                "expected_change_percent": [2.0],
+                "confidence": [80],
+                "recommendation": ["BUY"],
+                "risk_level": ["Low"],
+                "trend": ["Bullish"],
+                "momentum_score": [1.1],
+                "volatility_score": [0.4],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        r = client.get("/api/stocks/aapl")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert data["currentData"]["price"] == 151.0
+        assert data["projection"]["targetPrice"] == 160.0
+        assert data["projection"]["recommendation"] == "BUY"
+
+    def test_stock_historical_matches_padded_csv_symbols(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """Historical series must find padded daily/projection rows for the path symbol."""
+        from datetime import date, timedelta
+
+        recent = (date.today() - timedelta(days=1)).isoformat()
+        pd.DataFrame(
+            {
+                "symbol": [" AAPL "],
+                "name": ["Apple"],
+                "close": [155.0],
+                "change": [1.0],
+                "change_percent": [0.5],
+                "volume": [2_000],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["aapl"],
+                "target_mid": [165.0],
+                "confidence": [70],
+                "recommendation": ["BUY"],
+                "expected_change_percent": [3.0],
+            }
+        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert len(data["data"]) >= 1
+        by_date = {point["date"]: point for point in data["data"]}
+        assert by_date[recent]["close"] == 155.0
+        assert by_date[recent]["projection"]["targetPrice"] == 165.0
+
 
 class TestProjectionsAPI:
     """Projections summary and opportunities endpoints."""

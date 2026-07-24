@@ -23,6 +23,21 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _overview_index_key(index_name: Any) -> Optional[str]:
+    """Build overview indices key; skip blank/NaN names that cannot .replace."""
+    if index_name is None:
+        return None
+    if isinstance(index_name, float) and not math.isfinite(index_name):
+        return None
+    try:
+        text = str(index_name).strip()
+    except Exception:
+        return None
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return None
+    return text.replace(" ", "")
+
+
 def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[str, Any]) -> str:
     """Generate a template-based summary when ai_summary is not in the JSON."""
     summary_data = analysis.get("summary", {}) or {}
@@ -113,8 +128,13 @@ async def get_market_overview():
         indices = {}
         if 'index_name' in df.columns:
             for index_name in df['index_name'].unique():
+                key = _overview_index_key(index_name)
+                if key is None:
+                    # Corrupt/missing index labels previously AttributeError'd on
+                    # .replace and 500'd the whole overview payload.
+                    continue
                 index_df = df[df['index_name'] == index_name]
-                indices[index_name.replace(' ', '')] = IndexData(
+                indices[key] = IndexData(
                     stocks=len(index_df),
                     avgChange=round(_safe_float(index_df['change_percent'].mean()), 2),
                     gainers=len(index_df[index_df['change_percent'] > 0]),

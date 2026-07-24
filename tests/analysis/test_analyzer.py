@@ -1,5 +1,6 @@
 """Tests for analysis analyzer module."""
 
+import math
 import unittest
 import pandas as pd
 from datetime import date
@@ -169,6 +170,70 @@ class TestStockAnalyzer(unittest.TestCase):
         self.assertEqual(summary["max_change_percent"], 0.0)
         self.assertEqual(summary["min_change_percent"], 0.0)
         self.assertEqual(summary["total_stocks"], 2)
+        self.assertEqual(summary["gainers"], 0)
+        self.assertEqual(summary["losers"], 0)
+        self.assertEqual(summary["unchanged"], 0)
+        self.assertEqual(result["top_gainers"], [])
+        self.assertEqual(result["top_losers"], [])
+
+    def test_analyze_skips_non_finite_rows_in_leaderboards_and_counts(self):
+        """NaN/inf change or volume must not rank or skew gainer/loser tallies."""
+        rows = [
+            {
+                "symbol": "GOOD",
+                "name": "Good Co",
+                "change_percent": 2.5,
+                "close": 100.0,
+                "volume": 5_000,
+            },
+            {
+                "symbol": "NANPCT",
+                "name": "NaN Pct",
+                "change_percent": float("nan"),
+                "close": 50.0,
+                "volume": 9_999_999,
+            },
+            {
+                "symbol": "INFVOL",
+                "name": "Inf Vol",
+                "change_percent": 9.0,
+                "close": 10.0,
+                "volume": float("inf"),
+            },
+            {
+                "symbol": "LOSER",
+                "name": "Loser Co",
+                "change_percent": -1.0,
+                "close": 20.0,
+                "volume": 1_000,
+            },
+        ]
+
+        result = self.analyzer.analyze_daily_data(rows)
+        summary = result["summary"]
+
+        self.assertEqual(summary["total_stocks"], 4)
+        self.assertEqual(summary["gainers"], 2)  # GOOD + INFVOL (finite change)
+        self.assertEqual(summary["losers"], 1)
+        self.assertEqual(summary["unchanged"], 0)
+        # Leaderboards rank all finite-change rows (same semantics as before).
+        self.assertEqual(
+            [row["symbol"] for row in result["top_gainers"]],
+            ["INFVOL", "GOOD", "LOSER"],
+        )
+        self.assertEqual(
+            [row["symbol"] for row in result["top_losers"]],
+            ["LOSER", "GOOD", "INFVOL"],
+        )
+        # Inf volume is excluded; NaN-change row still ranks by finite volume.
+        self.assertEqual(
+            [row["symbol"] for row in result["top_volume"]],
+            ["NANPCT", "GOOD", "LOSER"],
+        )
+        self.assertNotIn("INFVOL", [row["symbol"] for row in result["top_volume"]])
+        self.assertNotIn("NANPCT", [row["symbol"] for row in result["top_gainers"]])
+        self.assertTrue(all(math.isfinite(row["change_percent"]) for row in result["top_gainers"]))
+        self.assertTrue(all(math.isfinite(row["volume"]) for row in result["top_volume"]))
 
 
 if __name__ == '__main__':

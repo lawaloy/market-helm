@@ -405,3 +405,43 @@ class TestJobProcessor:
         with get_connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS n FROM alert_trigger_state").fetchone()
         assert row["n"] == 0
+
+    def test_evaluate_skips_non_dict_condition_without_blocking_siblings(self, db_user):
+        """Truthy list/string conditions AttributeError'd and aborted sibling watches."""
+        bad_user = create_user("bad-condition@example.com", "password123")["id"]
+        bad_config = _watch_config()
+        bad_config["alerts"][0]["id"] = "bad-condition"
+        sync_watches_from_config(bad_user, bad_config)
+        sync_watches_from_config(db_user, _watch_config())
+
+        with get_connection() as conn:
+            poison = json.dumps(
+                {
+                    "id": "bad-condition",
+                    "name": "Bad",
+                    "enabled": True,
+                    "condition": ["not", "a", "dict"],
+                    "notifications": ["log"],
+                }
+            )
+            conn.execute(
+                "UPDATE alert_watches SET alert_json = ? WHERE user_id = ? AND alert_id = ?",
+                (poison, bad_user, "bad-condition"),
+            )
+            conn.commit()
+
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 0
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT user_id, alert_id FROM alert_trigger_state"
+            ).fetchall()
+        assert {(row["user_id"], row["alert_id"]) for row in rows} == {
+            (db_user, "aapl-low"),
+        }

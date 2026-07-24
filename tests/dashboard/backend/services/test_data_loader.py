@@ -355,3 +355,37 @@ class TestDataLoader:
         by_sym = {s["symbol"]: s for s in out["samples"]}
         assert by_sym["AAPL"]["absErrorPct"] == pytest.approx(9.091, abs=0.01)
         assert by_sym["MSFT"]["absErrorPct"] == pytest.approx(4.762, abs=0.01)
+    def test_load_historical_data_matches_padded_symbols_and_skips_sentinels(
+        self, loader, temp_data_dir
+    ):
+        """Historical lookup must normalize CSV symbols and reject blank/sentinel keys."""
+        from datetime import date, timedelta
+
+        recent = (date.today() - timedelta(days=1)).isoformat()
+        pd.DataFrame(
+            {
+                "symbol": [" AAPL "],
+                "close": [155.0],
+                "change_percent": [0.5],
+                "volume": [1_000],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["aapl"],
+                "target_mid": [165.0],
+                "confidence": [70],
+                "recommendation": ["BUY"],
+                "expected_change_percent": [3.0],
+            }
+        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+
+        rows = loader.load_historical_data(" aapl ", days=7)
+        assert len(rows) == 1
+        assert rows[0]["date"] == recent
+        assert rows[0]["close"] == 155.0
+        assert rows[0]["projection"]["target_price"] == 165.0
+
+        assert loader.load_historical_data(None, days=7) == []
+        assert loader.load_historical_data(float("nan"), days=7) == []
+        assert loader.load_historical_data("NONE", days=7) == []
