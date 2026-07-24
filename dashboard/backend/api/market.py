@@ -38,11 +38,25 @@ def _overview_index_key(index_name: Any) -> Optional[str]:
     return text.replace(" ", "")
 
 
+def _as_dict(value: Any) -> Dict[str, Any]:
+    """Return value when it is a dict; otherwise {} for corrupt summary nests."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> list:
+    """Return value when it is a list; otherwise [] for corrupt mover arrays."""
+    return value if isinstance(value, list) else []
+
+
 def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[str, Any]) -> str:
     """Generate a template-based summary when ai_summary is not in the JSON."""
-    summary_data = analysis.get("summary", {}) or {}
-    top_gainers = (analysis.get("top_gainers") or [])[:2]
-    top_losers = (analysis.get("top_losers") or [])[:2]
+    # Corrupt summary JSON can nest strings/lists where objects/arrays are
+    # expected; soft-fail so /api/summary stays 200 with a usable demo template.
+    analysis = _as_dict(analysis)
+    exchange_comparison = _as_dict(exchange_comparison)
+    summary_data = _as_dict(analysis.get("summary"))
+    top_gainers = _as_list(analysis.get("top_gainers"))[:2]
+    top_losers = _as_list(analysis.get("top_losers"))[:2]
 
     summary_parts = []
     gainers = int(_safe_float(summary_data.get("gainers", 0)))
@@ -62,7 +76,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
     )
 
     if top_gainers:
-        top_gainer = top_gainers[0] or {}
+        top_gainer = _as_dict(top_gainers[0])
         symbol = top_gainer.get("symbol")
         if symbol is not None and "change_percent" in top_gainer:
             change = _safe_float(top_gainer.get("change_percent"))
@@ -71,7 +85,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
             )
 
     if top_losers:
-        top_loser = top_losers[0] or {}
+        top_loser = _as_dict(top_losers[0])
         symbol = top_loser.get("symbol")
         if symbol is not None and "change_percent" in top_loser:
             change = _safe_float(top_loser.get("change_percent"))
@@ -82,7 +96,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
 
     items = [
         (name, stats if isinstance(stats, dict) else {})
-        for name, stats in (exchange_comparison or {}).items()
+        for name, stats in exchange_comparison.items()
     ]
     if items:
         best = max(

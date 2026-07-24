@@ -30,6 +30,26 @@ class TestAuthAPI:
         )
         assert r.status_code == 501
 
+    @pytest.mark.parametrize(
+        "method,path,kwargs",
+        [
+            (
+                "post",
+                "/api/auth/login",
+                {"json": {"email": "a@example.com", "password": "password123"}},
+            ),
+            ("get", "/api/auth/me", {}),
+        ],
+    )
+    def test_login_and_me_disabled_without_database(
+        self, client, monkeypatch, method, path, kwargs
+    ):
+        """Frontend probes /me (and login) for 501 to detect single-user mode."""
+        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        r = getattr(client, method)(path, **kwargs)
+        assert r.status_code == 501
+        assert "Multi-user mode is disabled" in r.json()["detail"]
+
     def test_register_login_and_me(self, client, multi_user_env):
         r = client.post(
             "/api/auth/register",
