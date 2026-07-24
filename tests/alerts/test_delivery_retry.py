@@ -35,6 +35,60 @@ def test_resolve_delivery_retry_settings_from_env() -> None:
     assert settings.max_seconds == 0.0
 
 
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_DELIVERY_MAX_ATTEMPTS": "abc",
+        "ALERT_DELIVERY_RETRY_BASE_SECONDS": "nope",
+        "ALERT_DELIVERY_RETRY_MAX_SECONDS": "",
+    },
+    clear=True,
+)
+def test_resolve_delivery_retry_settings_invalid_env_uses_defaults() -> None:
+    settings = resolve_delivery_retry_settings()
+    assert settings.max_attempts == 3
+    assert settings.base_seconds == 1.0
+    assert settings.max_seconds == 8.0
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_DELIVERY_MAX_ATTEMPTS": "-2",
+        "ALERT_DELIVERY_RETRY_BASE_SECONDS": "-1.5",
+        "ALERT_DELIVERY_RETRY_MAX_SECONDS": "-0.1",
+    },
+    clear=True,
+)
+def test_resolve_delivery_retry_settings_clamps_non_positive() -> None:
+    """max_attempts must stay >= 1 so deliveries still run; delays clamp to 0."""
+    settings = resolve_delivery_retry_settings()
+    assert settings.max_attempts == 1
+    assert settings.base_seconds == 0.0
+    assert settings.max_seconds == 0.0
+
+
+@patch("src.alerts.notifiers.delivery_retry.time.sleep")
+def test_deliver_with_retry_caps_backoff_at_max_seconds(mock_sleep: MagicMock) -> None:
+    attempt = MagicMock(
+        side_effect=[
+            DeliveryAttempt(ok=False, retriable=True),
+            DeliveryAttempt(ok=False, retriable=True),
+            DeliveryAttempt(ok=True),
+        ]
+    )
+    settings = DeliveryRetrySettings(max_attempts=3, base_seconds=5.0, max_seconds=8.0)
+
+    assert deliver_with_retry(
+        operation="Test",
+        alert_id="a1",
+        attempt=attempt,
+        settings=settings,
+    )
+
+    assert mock_sleep.call_args_list == [((5.0,),), ((8.0,),)]
+
+
 def test_deliver_with_retry_succeeds_on_first_attempt() -> None:
     attempt = MagicMock(return_value=DeliveryAttempt(ok=True))
     assert deliver_with_retry(

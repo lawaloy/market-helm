@@ -76,6 +76,25 @@ class TestAlertJobs:
             ).fetchone()
         assert row["status"] == STATUS_FAILED
 
+    def test_fail_job_missing_id_is_noop(self, db):
+        fail_job(99999, "gone")
+
+    def test_fail_job_truncates_error_to_500_chars(self, db):
+        job_id = enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "MSFT"},
+            max_attempts=1,
+        )
+        claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
+        fail_job(job_id, "e" * 600, retry_delay_seconds=0)
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT status, last_error FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert row["status"] == STATUS_FAILED
+        assert row["last_error"] == "e" * 500
+
     def test_claim_recovers_stale_processing_job(self, db):
         job_id = enqueue_job(JOB_DELIVER, {"user_id": "u1", "alert_id": "a1"})
         claim_jobs([JOB_DELIVER], "worker-a")

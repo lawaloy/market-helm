@@ -300,6 +300,24 @@ class TestJobProcessor:
         assert stats["evaluated"] == 1
         assert pending_job_count([JOB_DELIVER]) == 0
 
+    def test_evaluate_skips_cooldown_with_naive_last_triggered(self, db_user):
+        """Naive ISO markers must not TypeError the whole evaluate job."""
+        from datetime import datetime, timedelta, timezone
+
+        config = _watch_config()
+        config["alerts"][0]["cooldown_minutes"] = 60
+        sync_watches_from_config(db_user, config)
+        naive_ts = (
+            datetime.now(timezone.utc) - timedelta(minutes=5)
+        ).replace(tzinfo=None).isoformat()
+        record_trigger(db_user, "aapl-low", timestamp=naive_ts)
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        stats = process_job_queue("test-worker")
+        assert stats["evaluated"] == 1
+        assert stats["failed"] == 0
+        assert pending_job_count([JOB_DELIVER]) == 0
+
     def test_invalid_watch_does_not_block_symbol_for_other_users(self, db_user):
         bad_user = create_user("bad-watch@example.com", "password123")["id"]
         bad_config = _watch_config()
