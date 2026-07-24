@@ -158,6 +158,156 @@ class TestSummaryAPI:
         assert data["source"] in ("ai", "demo")
         assert len(data["summary"]) > 0
 
+    def test_summary_uses_ai_when_non_blank(self, client, temp_data_dir, sample_summary):
+        """Whitespace-only AI text falls back to demo; real AI text is preferred."""
+        path = temp_data_dir / "summary_2026-01-15.json"
+        with open(path) as f:
+            payload = json.load(f)
+
+        payload["ai_summary"] = "   "
+        with open(path, "w") as f:
+            json.dump(payload, f)
+        blank = client.get("/api/summary").json()
+        assert blank["source"] == "demo"
+        assert "gainers" in blank["summary"]
+
+        payload["ai_summary"] = "  Markets advanced on strong tech leadership.  "
+        with open(path, "w") as f:
+            json.dump(payload, f)
+        ai = client.get("/api/summary").json()
+        assert ai["source"] == "ai"
+        assert ai["summary"] == "Markets advanced on strong tech leadership."
+
+
+@pytest.fixture
+def sample_projections(temp_data_dir, sample_daily_data):
+    """Create sample projections CSV aligned with daily fixtures."""
+    df = pd.DataFrame(
+        {
+            "symbol": ["AAPL", "GOOGL", "MSFT", "ORPHAN"],
+            "name": ["Apple", "Alphabet", "Microsoft", "Orphan Co"],
+            "target_mid": [160.0, 2700.0, 360.0, 50.0],
+            "expected_change_percent": [2.5, -1.5, 0.2, 3.0],
+            "confidence": [80, 70, 60, 90],
+            "recommendation": ["STRONG BUY", "SELL", "HOLD", "STRONG BUY"],
+            "risk_level": ["Low", "High", "Medium", "Medium"],
+            "trend": ["Bullish", "Bearish", "Neutral", "Bullish"],
+            "reason": ["momentum", "weakness", "range", "breakout"],
+            "momentum_score": [1.2, -0.8, 0.1, 1.5],
+            "volatility_score": [0.4, 0.9, 0.3, 0.5],
+        }
+    )
+    path = temp_data_dir / "projections_2026-01-15.csv"
+    df.to_csv(path, index=False)
+    return path
+
+
+class TestStocksAPI:
+    """Stock detail and historical endpoints."""
+
+    def test_stock_detail_uppercases_symbol_and_includes_projection(
+        self, client, sample_projections
+    ):
+        r = client.get("/api/stocks/aapl")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert data["name"] == "Apple"
+        assert data["currentData"]["price"] == 150.0
+        assert data["projection"]["recommendation"] == "STRONG BUY"
+        assert data["projection"]["targetPrice"] == 160.0
+        assert data["technical"]["momentum"] == 1.2
+
+    def test_stock_detail_404_for_unknown_symbol(self, client):
+        r = client.get("/api/stocks/ZZZZ")
+        assert r.status_code == 404
+        assert r.json()["detail"] == "Stock not found."
+
+    def test_stock_historical_returns_points(self, client, mock_data_loader, temp_data_dir):
+        from datetime import datetime, timedelta
+
+        recent = datetime.now().strftime("%Y-%m-%d")
+        older = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [155.0],
+                "change": [5.0],
+                "change_percent": [3.3],
+                "volume": [40_000_000],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "target_mid": [165.0],
+                "expected_change_percent": [2.0],
+                "confidence": [75],
+                "recommendation": ["BUY"],
+            }
+        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+        # Stale file outside the requested window should be ignored.
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "close": [100.0],
+                "change": [0.0],
+                "change_percent": [0.0],
+                "volume": [1],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{older}.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 1})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert [point["date"] for point in data["data"]] == [recent]
+        point = data["data"][0]
+        assert point["close"] == 155.0
+        assert point["projection"]["targetPrice"] == 165.0
+        assert point["projection"]["recommendation"] == "BUY"
+
+
+class TestProjectionsAPI:
+    """Projections summary and opportunities endpoints."""
+
+    def test_projections_summary_maps_recommendations_and_sentiment(
+        self, client, sample_projections
+    ):
+        r = client.get("/api/projections/summary")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["date"] == "2026-01-15"
+        assert data["targetDate"] == "2026-01-20"
+        assert data["totalProjections"] == 4
+        assert data["sentiment"] == "Bullish"
+        assert data["recommendations"]["STRONG_BUY"] == 2
+        assert data["recommendations"]["SELL"] == 1
+        assert data["recommendations"]["HOLD"] == 1
+        assert data["trends"]["Bullish"] == 2
+        assert data["riskProfile"]["Medium"] == 2
+
+    def test_opportunities_filters_and_defaults_missing_daily_price(
+        self, client, sample_projections
+    ):
+        r = client.get(
+            "/api/projections/opportunities",
+            params={"type": "STRONG_BUY", "limit": 10},
+        )
+        assert r.status_code == 200
+        data = r.json()
+        assert data["type"] == "STRONG_BUY"
+        assert data["count"] == 2
+        symbols = [row["symbol"] for row in data["opportunities"]]
+        assert symbols == ["ORPHAN", "AAPL"]
+        by_symbol = {row["symbol"]: row for row in data["opportunities"]}
+        assert by_symbol["AAPL"]["currentPrice"] == 150.0
+        assert by_symbol["ORPHAN"]["currentPrice"] == 0
+        assert by_symbol["ORPHAN"]["volume"] == 0
+
 
 class TestHistoryAccuracyAPI:
     """Projection accuracy endpoint."""
