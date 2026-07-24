@@ -31,6 +31,8 @@ def evaluate_price_threshold(condition: Dict, stock: Dict) -> bool:
     """
     Evaluate a price threshold condition against a single stock record.
     """
+    if not isinstance(condition, dict) or not isinstance(stock, dict):
+        return False
     operator = condition.get("operator", "less_than")
     try:
         threshold = _finite_float(condition.get("value", 0))
@@ -46,7 +48,11 @@ def evaluate_screening_match(condition: Dict, stock: Dict) -> bool:
     Evaluate a screening condition using simple numeric thresholds.
     Supported keys: volume_threshold, min_daily_change_pct, price_min, price_max.
     """
-    filters = condition.get("filters", {})
+    if not isinstance(condition, dict) or not isinstance(stock, dict):
+        return False
+    raw_filters = condition.get("filters", {})
+    # Hand-edited configs may set filters to null/list/string; treat as no filters.
+    filters = raw_filters if isinstance(raw_filters, dict) else {}
     volume_threshold = filters.get("volume_threshold")
     min_daily_change_pct = filters.get("min_daily_change_pct")
     price_min = filters.get("price_min")

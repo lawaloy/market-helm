@@ -32,9 +32,20 @@ def get_indices_to_track() -> List[str]:
             try:
                 with open(config_path, 'r') as f:
                     config = json.load(f)
-                    indices = config.get("indices_to_track", _DEFAULT_INDICES)
-                    if indices:
-                        return indices
+                if not isinstance(config, dict):
+                    break
+                indices = config.get("indices_to_track", _DEFAULT_INDICES)
+                # A bare string would iterate character-by-character and poison
+                # the fetch pipeline; require a list of non-empty strings.
+                if not isinstance(indices, list):
+                    break
+                cleaned = [
+                    name.strip()
+                    for name in indices
+                    if isinstance(name, str) and name.strip()
+                ]
+                if cleaned:
+                    return cleaned
             except Exception:
                 # Silent failure - will use defaults
                 break

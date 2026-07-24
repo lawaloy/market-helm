@@ -28,6 +28,20 @@ def _finite_numeric_series(series: pd.Series) -> pd.Series:
     return values[values.map(lambda value: pd.notna(value) and math.isfinite(float(value)))]
 
 
+def _volume_sort_key(row: Any) -> float:
+    """Finite volume for top-N ranking; non-dict / dirty / Inf-NaN sort last."""
+    if not isinstance(row, dict):
+        return float("-inf")
+    raw = row.get("volume", 0)
+    if raw is None:
+        return float("-inf")
+    try:
+        number = float(raw)
+    except (TypeError, ValueError):
+        return float("-inf")
+    return number if math.isfinite(number) else float("-inf")
+
+
 class StockTrackerWorkflow:
     """
     Core workflow for stock tracking.
@@ -186,12 +200,18 @@ class StockTrackerWorkflow:
             # Day trading optimization: Select top N by volume
             if top_n_stocks and len(all_data) > top_n_stocks:
                 logger.info(f"Filtering to top {top_n_stocks} stocks by volume...")
-                # Sort by volume (highest first)
-                all_data_sorted = sorted(all_data, key=lambda x: x.get('volume', 0), reverse=True)
+                # Sort by volume (highest first); None/Inf/NaN/non-dict must not
+                # TypeError the refresh pipeline or poison ranking.
+                all_data_sorted = sorted(all_data, key=_volume_sort_key, reverse=True)
                 all_data = all_data_sorted[:top_n_stocks]
                 logger.info(f"Selected top {len(all_data)} most active stocks")
-                # Log top 5 stocks by volume
-                top_5_symbols = [f"{s['symbol']} ({s.get('volume', 0):,})" for s in all_data[:5]]
+                top_5_symbols = []
+                for stock in all_data[:5]:
+                    if not isinstance(stock, dict):
+                        continue
+                    volume = _volume_sort_key(stock)
+                    volume_txt = f"{int(volume):,}" if math.isfinite(volume) else "?"
+                    top_5_symbols.append(f"{stock.get('symbol')} ({volume_txt})")
                 logger.debug(f"Top 5 by volume: {top_5_symbols}")
 
             from ..alerts.alert_paths import get_enabled_watch_symbols
