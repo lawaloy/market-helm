@@ -53,8 +53,28 @@ class WebhookNotifier:
         return cls(url=str(url).strip(), payload_format=str(payload_format).strip().lower())
 
     @staticmethod
+    def _format_symbols(raw: Any) -> str:
+        """Join symbol lists for display; tolerate None/non-str junk without TypeError."""
+        if raw is None:
+            return "(none)"
+        if isinstance(raw, str):
+            cleaned = raw.strip()
+            return cleaned or "(none)"
+        if not isinstance(raw, (list, tuple)):
+            cleaned = str(raw).strip()
+            return cleaned or "(none)"
+        parts: list[str] = []
+        for item in raw:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                parts.append(text)
+        return ", ".join(parts) or "(none)"
+
+    @staticmethod
     def _alert_text(event: Dict[str, Any], markdown: str = "slack") -> str:
-        symbols = ", ".join(event.get("symbols") or []) or "(none)"
+        symbols = WebhookNotifier._format_symbols(event.get("symbols"))
         alert_name = event.get("alert_name", event.get("alert_id", "alert"))
         test_label = " (test)" if event.get("test") else ""
         condition = event.get("condition_type", "")

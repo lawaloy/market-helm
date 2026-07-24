@@ -99,3 +99,90 @@ class TestAISummarizerDemoSummary:
 
         assert result is not None
         assert "sentiment" in result.lower()
+
+
+class TestAISummarizerOpenAIPath:
+    """OpenAI-enabled path soft-fail and success contracts."""
+
+    def _analysis(self):
+        return {
+            "date": "2026-07-24",
+            "summary": {
+                "total_stocks": 2,
+                "gainers": 1,
+                "losers": 1,
+                "average_change_percent": 0.1,
+            },
+            "top_gainers": [{"symbol": "AAPL", "name": "Apple", "change_percent": 1.0}],
+            "top_losers": [{"symbol": "MSFT", "name": "Microsoft", "change_percent": -0.5}],
+        }
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=False)
+    def test_generate_summary_returns_openai_completion_text(self):
+        """When OpenAI succeeds, return stripped completion content (not demo)."""
+        import sys
+
+        summarizer = AISummarizer()
+        assert summarizer.enabled is True
+
+        exchange_comparison = {
+            "S&P 500": {
+                "average_change_percent": 0.2,
+                "gainers": 1,
+                "losers": 1,
+            }
+        }
+
+        fake_message = type("Msg", (), {"content": "  Markets were mixed today.  "})()
+        fake_choice = type("Choice", (), {"message": fake_message})()
+        fake_response = type("Resp", (), {"choices": [fake_choice]})()
+
+        class FakeCompletions:
+            @staticmethod
+            def create(**_kwargs):
+                return fake_response
+
+        class FakeClient:
+            def __init__(self, api_key=None):
+                self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+        openai_mod = type("openai", (), {"OpenAI": FakeClient})()
+        with patch.dict(sys.modules, {"openai": openai_mod}):
+            result = summarizer.generate_summary(self._analysis(), exchange_comparison)
+
+        assert result == "Markets were mixed today."
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=False)
+    def test_generate_summary_returns_none_when_openai_import_fails(self):
+        """Missing openai package must return None (no silent demo fallback)."""
+        import sys
+
+        summarizer = AISummarizer()
+        with patch.dict(sys.modules, {"openai": None}):
+            result = summarizer.generate_summary(self._analysis(), {})
+
+        assert result is None
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=False)
+    def test_generate_summary_returns_none_on_api_exception(self):
+        """API failures return None so callers can detect empty AI summary."""
+        import sys
+
+        summarizer = AISummarizer()
+
+        class BoomClient:
+            def __init__(self, api_key=None):
+                self.chat = self
+
+            @property
+            def completions(self):
+                return self
+
+            def create(self, **_kwargs):
+                raise RuntimeError("rate limited")
+
+        openai_mod = type("openai", (), {"OpenAI": BoomClient})()
+        with patch.dict(sys.modules, {"openai": openai_mod}):
+            result = summarizer.generate_summary(self._analysis(), {})
+
+        assert result is None

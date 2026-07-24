@@ -14,6 +14,7 @@ from .alert_rules import evaluate_price_threshold, evaluate_screening_match
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
+from src.utils.tickers import normalize_ticker
 
 logger = setup_logger("alerts")
 
@@ -48,9 +49,21 @@ class AlertEngine:
         config: Dict[str, Any],
         storage: Optional[AlertStorage] = None,
     ) -> Optional["AlertEngine"]:
+        # Hand-edited configs may be a list/string/null root or mix non-dict
+        # alert rows; never AttributeError the whole check run.
+        if not isinstance(config, dict):
+            return None
         defaults = config.get("defaults") or {}
+        if not isinstance(defaults, dict):
+            defaults = {}
         alerts = config.get("alerts", [])
-        enabled = [alert for alert in alerts if alert.get("enabled", False)]
+        if not isinstance(alerts, list):
+            return None
+        enabled = [
+            alert
+            for alert in alerts
+            if isinstance(alert, dict) and alert.get("enabled", False)
+        ]
         if not enabled:
             return None
         return AlertEngine(enabled, storage=storage, defaults=defaults)
@@ -65,6 +78,9 @@ class AlertEngine:
                 config = json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load alerts config: {e}")
+            return None
+        if not isinstance(config, dict):
+            logger.warning("Alerts config root must be an object; ignoring")
             return None
         return AlertEngine.from_config_dict(config)
 
@@ -111,9 +127,9 @@ class AlertEngine:
     def _within_cooldown(self, alert: Dict) -> bool:
         try:
             cooldown_minutes = int(alert.get("cooldown_minutes", 0) or 0)
-        except (TypeError, ValueError):
-            # File-mode configs may carry junk cooldown values; treat as no cooldown
-            # so one bad alert cannot abort evaluation of sibling watches.
+        except (TypeError, ValueError, OverflowError):
+            # File-mode configs may carry junk / Inf cooldown values; treat as no
+            # cooldown so one bad alert cannot abort evaluation of sibling watches.
             logger.warning(
                 "Invalid cooldown_minutes on alert %s; treating as 0",
                 alert.get("id"),
@@ -133,7 +149,14 @@ class AlertEngine:
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
         alert = apply_alert_defaults(alert, self.defaults)
-        notifier_names = alert.get("notifications") or ["log"]
+        raw_notifications = alert.get("notifications")
+        # Non-lists (e.g. int/str) are not iterable channel names; strings also
+        # make `"email" in notifications` true via substring membership.
+        notifier_names = (
+            raw_notifications if isinstance(raw_notifications, list) else ["log"]
+        )
+        if not notifier_names:
+            notifier_names = ["log"]
         instances: List[Any] = []
         for name in notifier_names:
             if name == "log":
@@ -163,23 +186,40 @@ class AlertEngine:
                 continue
 
             condition = alert.get("condition", {})
+            if not isinstance(condition, dict):
+                logger.warning(
+                    "Alert %s has non-object condition; skipping",
+                    alert.get("id"),
+                )
+                continue
             condition_type = condition.get("type")
             triggered_symbols: List[str] = []
 
             if condition_type == "price_threshold":
-                symbol = str(condition.get("symbol") or "").upper()
+                symbol = normalize_ticker(condition.get("symbol"))
                 if not symbol:
                     continue
                 stock = next(
-                    (s for s in stocks if str(s.get("symbol", "")).upper() == symbol),
+                    (
+                        s
+                        for s in stocks
+                        if isinstance(s, dict)
+                        and normalize_ticker(s.get("symbol")) == symbol
+                    ),
                     None,
                 )
                 if stock and evaluate_price_threshold(condition, stock):
                     triggered_symbols = [symbol]
             elif condition_type == "screening_match":
                 for stock in stocks:
+                    if not isinstance(stock, dict):
+                        continue
                     if evaluate_screening_match(condition, stock):
-                        triggered_symbols.append(stock.get("symbol"))
+                        # Mirror price_threshold: drop None/NaN/padded sentinels
+                        # so events never carry raw CSV junk into notifications.
+                        symbol = normalize_ticker(stock.get("symbol"))
+                        if symbol:
+                            triggered_symbols.append(symbol)
             else:
                 logger.warning(f"Unsupported alert condition: {condition_type}")
                 continue

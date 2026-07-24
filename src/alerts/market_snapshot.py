@@ -6,6 +6,7 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.alerts.alert_runner import _fetch_missing_watch_quotes, _load_env, _stocks_from_daily_df
+from src.utils.tickers import normalize_ticker
 
 
 def load_market_snapshot(
@@ -30,13 +31,19 @@ def load_market_snapshot(
     except ValueError:
         stocks = []
 
-    symbols = [str(s).upper() for s in (watch_symbols or []) if str(s).strip()]
+    # Strip/reject blank and sentinel tickers so " AAPL " matches saved AAPL
+    # and float('nan') does not become a fake NAN watch fetch.
+    symbols = list(
+        dict.fromkeys(
+            key for key in (normalize_ticker(s) for s in (watch_symbols or [])) if key
+        )
+    )
     if fetch_missing_quotes and symbols:
         stocks = _fetch_missing_watch_quotes(stocks, symbols)
 
     prices: Dict[str, float] = {}
     for stock in stocks:
-        symbol = str(stock.get("symbol") or "").upper()
+        symbol = normalize_ticker(stock.get("symbol"))
         close = stock.get("close", stock.get("price"))
         if not symbol or close is None:
             continue

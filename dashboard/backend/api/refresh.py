@@ -82,6 +82,14 @@ def run_daily_tracker():
         env = os.environ.copy()
         env["STOCK_FETCH_MAX_WORKERS"] = os.getenv("REFRESH_MAX_WORKERS", "4")
 
+        # Parse timeout before spawn so a bad env var cannot orphan a running child
+        # (ValueError used to trip the outer except after Popen and clear _refresh_process).
+        timeout_raw = os.getenv("REFRESH_TIMEOUT_SECONDS", "600")
+        try:
+            max_seconds = max(1, int(timeout_raw))
+        except (TypeError, ValueError):
+            max_seconds = 600
+
         # Do not use PIPE for stdout/stderr: the tracker logs heavily to the console.
         # Unread PIPE buffers deadlock the child once full (parent only drains in communicate()).
         _refresh_process = subprocess.Popen(
@@ -92,7 +100,6 @@ def run_daily_tracker():
             env=env,
         )
 
-        max_seconds = int(os.getenv("REFRESH_TIMEOUT_SECONDS", "600"))
         start_time = time.time()
 
         while True:

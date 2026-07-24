@@ -87,7 +87,13 @@ class StockProjector:
                 change_pct = float(stock_data.get('change_percent', 0) or 0)
             except (TypeError, ValueError):
                 return None
-            volume = stock_data.get('volume', 0)
+            # Optional fields: bad volume/market_cap must not abort projection.
+            try:
+                volume = float(stock_data.get('volume', 0) or 0)
+                if not math.isfinite(volume):
+                    volume = 0.0
+            except (TypeError, ValueError):
+                volume = 0.0
             previous_close = stock_data.get('previous_close', current_price)
 
             # NaN closes pass `<= 0` and would write NaN targets into projections CSV.
@@ -98,6 +104,14 @@ class StockProjector:
 
             # Calculate momentum score (-100 to +100)
             stock_for_metrics = {**stock_data, "change_percent": change_pct}
+            # Keep confidence math on coerced optionals even when raw cells are garbage.
+            try:
+                market_cap = float(stock_data.get('market_cap', 0) or 0)
+                if not math.isfinite(market_cap):
+                    market_cap = 0.0
+            except (TypeError, ValueError):
+                market_cap = 0.0
+            stock_for_confidence = {**stock_for_metrics, "market_cap": market_cap}
             momentum = self._calculate_momentum(stock_for_metrics)
 
             # Calculate volatility (0 to 100)
@@ -118,12 +132,15 @@ class StockProjector:
             
             # Calculate confidence score
             confidence = self._calculate_confidence(
-                momentum, volatility, volume, stock_data
+                momentum, volatility, volume, stock_for_confidence
             )
             
-            # Generate reasoning
+            # Generate reasoning (use coerced optionals — raw volume/change can be non-numeric)
             reason = self._generate_reason(
-                stock_data, momentum, trend, recommendation
+                {**stock_for_confidence, "volume": volume},
+                momentum,
+                trend,
+                recommendation,
             )
             
             # Resolve company name - API often returns symbol when profile fetch fails
@@ -342,6 +359,18 @@ class StockProjector:
         """
         change_pct = stock_data.get('change_percent', 0)
         volume = stock_data.get('volume', 0)
+        try:
+            change_pct = float(change_pct or 0)
+            if not math.isfinite(change_pct):
+                change_pct = 0.0
+        except (TypeError, ValueError):
+            change_pct = 0.0
+        try:
+            volume = float(volume or 0)
+            if not math.isfinite(volume):
+                volume = 0.0
+        except (TypeError, ValueError):
+            volume = 0.0
         
         reasons = []
         
@@ -395,6 +424,18 @@ class StockProjector:
             return {}
         
         df = pd.DataFrame(projections.values())
+
+        def _finite_series(column: str) -> pd.Series:
+            numeric = pd.to_numeric(df[column], errors='coerce')
+            return numeric.map(
+                lambda value: float(value)
+                if pd.notna(value) and math.isfinite(value)
+                else float('nan')
+            )
+
+        confidence = _finite_series('confidence')
+        expected_change = _finite_series('expected_change_percent')
+        finite_confidence = confidence.notna()
         
         # Count recommendations
         rec_counts = df['recommendation'].value_counts().to_dict()
@@ -402,18 +443,43 @@ class StockProjector:
         # Count trends
         trend_counts = df['trend'].value_counts().to_dict()
         
-        # Calculate averages
-        avg_confidence = df['confidence'].mean()
-        avg_expected_change = df['expected_change_percent'].mean()
+        # Calculate averages from finite values only (inf/NaN must not poison JSON).
+        avg_confidence = float(confidence[finite_confidence].mean()) if finite_confidence.any() else 0.0
+        finite_expected = expected_change.notna()
+        avg_expected_change = (
+            float(expected_change[finite_expected].mean()) if finite_expected.any() else 0.0
+        )
+
+        ranked = df.loc[finite_confidence].copy()
+        ranked['_confidence'] = confidence.loc[finite_confidence]
+        ranked['_target_mid'] = pd.to_numeric(ranked['target_mid'], errors='coerce').map(
+            lambda value: float(value)
+            if pd.notna(value) and math.isfinite(value)
+            else 0.0
+        )
         
         # Identify top opportunities
-        strong_buys = df[df['recommendation'] == 'STRONG BUY'].nlargest(
-            5, 'confidence'
-        )[['symbol', 'target_mid', 'confidence']].to_dict('records')
+        strong_buys = [
+            {
+                'symbol': row['symbol'],
+                'target_mid': float(row['_target_mid']),
+                'confidence': float(row['_confidence']),
+            }
+            for _, row in ranked[ranked['recommendation'] == 'STRONG BUY']
+            .nlargest(5, '_confidence')
+            .iterrows()
+        ]
         
-        strong_sells = df[df['recommendation'] == 'STRONG SELL'].nlargest(
-            5, 'confidence'
-        )[['symbol', 'target_mid', 'confidence']].to_dict('records')
+        strong_sells = [
+            {
+                'symbol': row['symbol'],
+                'target_mid': float(row['_target_mid']),
+                'confidence': float(row['_confidence']),
+            }
+            for _, row in ranked[ranked['recommendation'] == 'STRONG SELL']
+            .nlargest(5, '_confidence')
+            .iterrows()
+        ]
         
         summary = {
             'total_projections': len(projections),

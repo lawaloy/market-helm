@@ -145,9 +145,9 @@ def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cl
     fetcher = MagicMock()
 
     def fetch_symbol(symbol):
-        if symbol == "NAN":
+        if symbol == "BAD1":
             return {"symbol": symbol, "close": float("nan")}
-        if symbol == "INF":
+        if symbol == "BAD2":
             return {"symbol": symbol, "price": float("inf")}
         return {"symbol": symbol, "close": 410.25}
 
@@ -157,16 +157,21 @@ def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cl
     with caplog.at_level("WARNING"):
         enriched = _fetch_missing_watch_quotes(
             [{"symbol": "AAPL", "close": 180.0}],
-            ["NAN", "INF", "MSFT"],
+            ["BAD1", "BAD2", "MSFT", "nan", "  "],
         )
 
     assert enriched == [
         {"symbol": "AAPL", "close": 180.0},
         {"symbol": "MSFT", "close": 410.25},
     ]
-    assert "Skipping invalid quote for watch symbol NAN" in caplog.text
-    assert "Skipping invalid quote for watch symbol INF" in caplog.text
-
+    assert "Skipping invalid quote for watch symbol BAD1" in caplog.text
+    assert "Skipping invalid quote for watch symbol BAD2" in caplog.text
+    # Sentinel / blank watches never reach the fetcher.
+    assert [c.args[0] for c in fetcher.fetch_symbol_data.call_args_list] == [
+        "BAD1",
+        "BAD2",
+        "MSFT",
+    ]
 
 def test_stocks_from_daily_df_skips_invalid_closes(caplog):
     """One corrupt saved row must not wipe the rest of the daily dataset."""
@@ -176,8 +181,9 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
             {"symbol": "BAD", "close": "n/a"},
             {"symbol": "", "close": 10.0},
             {"symbol": "MSFT", "close": "410.5"},
-            {"symbol": "NONE", "close": float("nan")},
-            {"symbol": "INF", "close": float("inf")},
+            {"symbol": "GOOG", "close": float("nan")},
+            # Use a real ticker: "INF" is an invalid ticker sentinel.
+            {"symbol": "TSLA", "close": float("inf")},
         ]
     )
 
@@ -189,8 +195,29 @@ def test_stocks_from_daily_df_skips_invalid_closes(caplog):
         {"symbol": "MSFT", "close": 410.5},
     ]
     assert "Skipping invalid saved quote for BAD" in caplog.text
-    assert "Skipping invalid saved quote for NONE" in caplog.text
-    assert "Skipping invalid saved quote for INF" in caplog.text
+    assert "Skipping invalid saved quote for GOOG" in caplog.text
+    assert "Skipping invalid saved quote for TSLA" in caplog.text
+
+
+def test_stocks_from_daily_df_skips_invalid_symbol_tokens():
+    """None/NaN/sentinel symbols must not become fake NONE/NAN tickers."""
+    df = pd.DataFrame(
+        [
+            {"symbol": " aapl ", "close": 180.0},
+            {"symbol": None, "close": 10.0},
+            {"symbol": float("nan"), "close": 20.0},
+            {"symbol": "nan", "close": 30.0},
+            {"symbol": "NONE", "close": 40.0},
+            {"symbol": "MSFT", "close": 410.0},
+        ]
+    )
+
+    stocks = _stocks_from_daily_df(df)
+
+    assert stocks == [
+        {"symbol": "AAPL", "close": 180.0},
+        {"symbol": "MSFT", "close": 410.0},
+    ]
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
@@ -257,3 +284,23 @@ def test_get_enabled_watch_symbols(tmp_path, monkeypatch):
     )
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
     assert get_enabled_watch_symbols() == ["AAPL"]
+
+
+def test_get_enabled_watch_symbols_strips_and_rejects_sentinels(tmp_path, monkeypatch):
+    """Padded watches must match quotes; blank/NaN symbols must not enter the index."""
+    config_path = tmp_path / "alerts.json"
+    config_path.write_text(
+        """
+        {
+          "alerts": [
+            {"id": "a", "enabled": true, "condition": {"type": "price_threshold", "symbol": " aapl "}},
+            {"id": "b", "enabled": true, "condition": {"type": "price_threshold", "symbol": "  "}},
+            {"id": "c", "enabled": true, "condition": {"type": "price_threshold", "symbol": "nan"}},
+            {"id": "d", "enabled": true, "condition": {"type": "price_threshold", "symbol": "msft"}}
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    assert get_enabled_watch_symbols() == ["AAPL", "MSFT"]

@@ -129,6 +129,18 @@ class TestMarketAPI:
         assert data["losers"] == 1
         assert "date" in data
 
+    def test_market_overview_strips_spaces_from_index_keys(self, client):
+        """Index keys drop spaces only so 'S&P 500' becomes 'S&P500'."""
+        r = client.get("/api/market/overview")
+        assert r.status_code == 200
+        indices = r.json()["indices"]
+        assert set(indices) == {"S&P500", "NASDAQ-100"}
+        assert indices["S&P500"]["stocks"] == 2
+        assert indices["S&P500"]["gainers"] == 2
+        assert indices["S&P500"]["losers"] == 0
+        assert indices["NASDAQ-100"]["stocks"] == 1
+        assert indices["NASDAQ-100"]["losers"] == 1
+
     def test_market_movers_gainers(self, client):
         """GET /api/market/movers?type=gainers returns top gainers."""
         r = client.get("/api/market/movers", params={"type": "gainers", "limit": 5})
@@ -164,41 +176,6 @@ class TestMarketAPI:
         assert len(gainer_rows) == 2
         assert all(row["changePercent"] > 0 for row in gainer_rows)
         assert [row["symbol"] for row in gainer_rows] == ["AAPL", "MSFT"]
-
-    def test_market_movers_skips_non_finite_price_and_coerces_bad_volume(
-        self, temp_data_dir
-    ):
-        """One NaN price or volume must not 500 the movers card or emit null JSON."""
-        import dashboard.backend.api.market
-
-        mock_loader = MagicMock()
-        mock_loader.load_daily_data.return_value = pd.DataFrame(
-            {
-                "symbol": ["GOOD", "BADPRICE", "BADVOL"],
-                "name": ["Good Co", "Bad Price", "Bad Vol"],
-                "close": [100.0, float("nan"), 50.0],
-                "change": [5.0, 1.0, 2.0],
-                "change_percent": [5.0, 2.0, 4.0],
-                "volume": [1_000_000, 2_000_000, float("nan")],
-            }
-        )
-        with patch.object(
-            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
-        ):
-            from fastapi.testclient import TestClient
-            from dashboard.backend.main import app
-
-            client = TestClient(app)
-            r = client.get("/api/market/movers", params={"type": "gainers", "limit": 10})
-
-        assert r.status_code == 200
-        data = r.json()["data"]
-        by_symbol = {row["symbol"]: row for row in data}
-        assert "BADPRICE" not in by_symbol
-        assert by_symbol["GOOD"]["price"] == 100.0
-        assert by_symbol["GOOD"]["volume"] == 1_000_000
-        assert by_symbol["BADVOL"]["price"] == 50.0
-        assert by_symbol["BADVOL"]["volume"] == 0
 
     def test_market_overview_404_when_no_latest_date(self, temp_data_dir):
         """No latest date must stay 404 (not swallowed into 500)."""
@@ -573,6 +550,79 @@ class TestStocksAPI:
         assert point["projection"]["targetPrice"] == 165.0
         assert point["projection"]["recommendation"] == "BUY"
 
+    def test_stock_detail_matches_padded_daily_and_projection_symbols(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """Padded CSV symbols must still resolve via normalize_ticker matching."""
+        pd.DataFrame(
+            {
+                "symbol": [" AAPL "],
+                "name": ["Apple"],
+                "close": [151.0],
+                "change": [1.0],
+                "change_percent": [0.7],
+                "volume": [1_000],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": [" aapl "],
+                "name": ["Apple"],
+                "target_mid": [160.0],
+                "expected_change_percent": [2.0],
+                "confidence": [80],
+                "recommendation": ["BUY"],
+                "risk_level": ["Low"],
+                "trend": ["Bullish"],
+                "momentum_score": [1.1],
+                "volatility_score": [0.4],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        r = client.get("/api/stocks/aapl")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert data["currentData"]["price"] == 151.0
+        assert data["projection"]["targetPrice"] == 160.0
+        assert data["projection"]["recommendation"] == "BUY"
+
+    def test_stock_historical_matches_padded_csv_symbols(
+        self, client, mock_data_loader, temp_data_dir
+    ):
+        """Historical series must find padded daily/projection rows for the path symbol."""
+        from datetime import date, timedelta
+
+        recent = (date.today() - timedelta(days=1)).isoformat()
+        pd.DataFrame(
+            {
+                "symbol": [" AAPL "],
+                "name": ["Apple"],
+                "close": [155.0],
+                "change": [1.0],
+                "change_percent": [0.5],
+                "volume": [2_000],
+            }
+        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["aapl"],
+                "target_mid": [165.0],
+                "confidence": [70],
+                "recommendation": ["BUY"],
+                "expected_change_percent": [3.0],
+            }
+        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["symbol"] == "AAPL"
+        assert len(data["data"]) >= 1
+        by_date = {point["date"]: point for point in data["data"]}
+        assert by_date[recent]["close"] == 155.0
+        assert by_date[recent]["projection"]["targetPrice"] == 165.0
+
 
 class TestProjectionsAPI:
     """Projections summary and opportunities endpoints."""
@@ -611,61 +661,95 @@ class TestProjectionsAPI:
         assert by_symbol["ORPHAN"]["currentPrice"] == 0
         assert by_symbol["ORPHAN"]["volume"] == 0
 
-    def test_opportunities_skips_non_finite_projection_and_coerces_daily(
-        self, temp_data_dir
-    ):
-        """NaN confidence/volume must not 500 opportunities or emit null targets."""
-        import dashboard.backend.api.projections
+
+class TestStocksAPIEdges:
+    """Stock detail/historical error and soft-fail paths."""
+
+    def test_stock_detail_404_when_no_latest_date(self, temp_data_dir):
+        import dashboard.backend.api.stocks
 
         mock_loader = MagicMock()
-        mock_loader.get_latest_date.return_value = "2026-01-15"
-        mock_loader.load_projections.return_value = pd.DataFrame(
-            {
-                "symbol": ["KEEP", "BADCONF", "KEEP2"],
-                "name": ["Keep Co", "Bad Conf", "Keep Two"],
-                "target_mid": [110.0, 120.0, 130.0],
-                "expected_change_percent": [10.0, 12.0, 8.0],
-                "confidence": [90.0, float("nan"), 80.0],
-                "risk_level": ["Low", "High", "Medium"],
-                "trend": ["Bullish", "Bullish", "Bullish"],
-                "recommendation": ["STRONG BUY", "STRONG BUY", "STRONG BUY"],
-                "reason": ["ok", "bad", "ok"],
-                "momentum_score": [1.0, 2.0, float("nan")],
-                "volatility_score": [0.5, 0.5, 0.4],
-            }
-        )
-        mock_loader.load_daily_data.return_value = pd.DataFrame(
-            {
-                "symbol": ["KEEP", "BADCONF", "KEEP2"],
-                "close": [100.0, 100.0, float("inf")],
-                "volume": [1_000_000, 2_000_000, float("nan")],
-            }
-        )
+        mock_loader.get_latest_date.return_value = None
         with patch.object(
-            dashboard.backend.api.projections,
-            "get_data_loader",
-            return_value=mock_loader,
+            dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
             from dashboard.backend.main import app
 
             client = TestClient(app)
-            r = client.get(
-                "/api/projections/opportunities",
-                params={"type": "STRONG_BUY", "limit": 10},
-            )
+            r = client.get("/api/stocks/AAPL")
 
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available"
+
+    def test_stock_detail_survives_projection_load_failure(
+        self, client, mock_data_loader
+    ):
+        mock_data_loader.load_projections = MagicMock(
+            side_effect=FileNotFoundError("projections missing")
+        )
+        r = client.get("/api/stocks/AAPL")
         assert r.status_code == 200
         data = r.json()
-        assert data["count"] == 3
-        by_symbol = {row["symbol"]: row for row in data["opportunities"]}
-        assert "BADCONF" not in by_symbol
-        assert by_symbol["KEEP"]["currentPrice"] == 100.0
-        assert by_symbol["KEEP"]["volume"] == 1_000_000
-        assert by_symbol["KEEP"]["confidence"] == 90
-        assert by_symbol["KEEP2"]["currentPrice"] == 0.0
-        assert by_symbol["KEEP2"]["volume"] == 0
-        assert by_symbol["KEEP2"]["momentum"] is None
+        assert data["symbol"] == "AAPL"
+        assert data["currentData"]["price"] == 150.0
+        assert data["projection"] is None
+        assert data["technical"] is None
+
+    def test_stock_historical_404_when_empty(self, client, mock_data_loader):
+        mock_data_loader.load_historical_data = MagicMock(return_value=[])
+        r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No historical data found."
+
+
+class TestProjectionsSentimentBands:
+    """Projections summary sentiment thresholds (±1.0)."""
+
+    def _write_projections(self, temp_data_dir, changes):
+        df = pd.DataFrame(
+            {
+                "symbol": [f"S{i}" for i in range(len(changes))],
+                "name": [f"Stock {i}" for i in range(len(changes))],
+                "target_mid": [100.0] * len(changes),
+                "expected_change_percent": changes,
+                "confidence": [50] * len(changes),
+                "recommendation": ["HOLD"] * len(changes),
+                "risk_level": ["Medium"] * len(changes),
+                "trend": ["Neutral"] * len(changes),
+            }
+        )
+        path = temp_data_dir / "projections_2026-01-15.csv"
+        df.to_csv(path, index=False)
+        return path
+
+    def test_sentiment_neutral_and_bearish_bands(self, client, temp_data_dir):
+        self._write_projections(temp_data_dir, [0.5, -0.5])
+        neutral = client.get("/api/projections/summary").json()
+        assert neutral["sentiment"] == "Neutral"
+        assert neutral["expectedMarketMove"] == 0.0
+
+        self._write_projections(temp_data_dir, [-2.0, -1.5])
+        bearish = client.get("/api/projections/summary").json()
+        assert bearish["sentiment"] == "Bearish"
+        assert bearish["expectedMarketMove"] == -1.75
+
+    def test_projections_summary_404_when_no_date(self, temp_data_dir):
+        import dashboard.backend.api.projections
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = None
+        with patch.object(
+            dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/projections/summary")
+
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available"
 
 
 class TestHistoryAccuracyAPI:
@@ -819,3 +903,165 @@ class TestHistorySummaryAPI:
         assert point["averageConfidence"] == 0.0
         assert point["expectedMarketMove"] == 0.0
         assert point["sentiment"] == "Neutral"
+
+    def test_dates_and_symbols_endpoints(self, client, mock_data_loader, temp_data_dir):
+        """GET /api/history/dates and /symbols return catalog data."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "ZZZZ"],
+                "name": ["Apple Inc.", "Custom Co"],
+                "confidence": [50, 60],
+                "expected_change_percent": [0.5, -0.2],
+                "recommendation": ["HOLD", "BUY"],
+                "target_mid": [100.0, 10.0],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history.load_index_symbol_names",
+            return_value={"MSFT": "Microsoft"},
+        ):
+            dates = client.get("/api/history/dates")
+            symbols = client.get("/api/history/symbols")
+
+        assert dates.status_code == 200
+        assert "2026-01-15" in dates.json()["dates"]
+        assert symbols.status_code == 200
+        body = symbols.json()
+        assert body["date"] == "2026-01-15"
+        assert "MSFT" in body["symbols"]
+        assert "ZZZZ" in body["symbols"]
+        assert body["names"]["ZZZZ"] == "Custom Co"
+
+    def test_summary_skips_bad_dates_and_sets_sentiment(self, client, mock_data_loader, temp_data_dir):
+        """Historical summary skips unloadable dates and classifies sentiment bands."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "confidence": [80],
+                "expected_change_percent": [2.5],
+                "recommendation": ["BUY"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "confidence": [40],
+                "expected_change_percent": [-1.5],
+                "recommendation": ["SELL"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        (temp_data_dir / "projections_2026-01-14.csv").write_text("broken")
+        # Daily files so get_available_dates includes these days
+        for d in ("2026-01-16", "2026-01-15", "2026-01-14"):
+            pd.DataFrame(
+                {"symbol": ["AAPL"], "close": [1.0], "change_percent": [0.0]}
+            ).to_csv(temp_data_dir / f"daily_data_{d}.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history._resolve_company_names",
+            side_effect=lambda syms: {s: s for s in syms},
+        ):
+            r = client.get("/api/history/summary", params={"days": 10})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["lastDate"] == "2026-01-16"
+        assert body["firstDate"] == "2026-01-14"
+        sentiments = {p["date"]: p["sentiment"] for p in body["data"]}
+        assert sentiments["2026-01-16"] == "Bullish"
+        assert sentiments["2026-01-15"] == "Bearish"
+        assert "2026-01-14" not in sentiments
+        assert "AAPL" in body["symbols"]
+
+    def test_market_movers_skips_non_finite_price_and_coerces_bad_volume(
+        self, temp_data_dir
+    ):
+        """One NaN price or volume must not 500 the movers card or emit null JSON."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["GOOD", "BADPRICE", "BADVOL"],
+                "name": ["Good Co", "Bad Price", "Bad Vol"],
+                "close": [100.0, float("nan"), 50.0],
+                "change": [5.0, 1.0, 2.0],
+                "change_percent": [5.0, 2.0, 4.0],
+                "volume": [1_000_000, 2_000_000, float("nan")],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/movers", params={"type": "gainers", "limit": 10})
+
+        assert r.status_code == 200
+        data = r.json()["data"]
+        by_symbol = {row["symbol"]: row for row in data}
+        assert "BADPRICE" not in by_symbol
+        assert by_symbol["GOOD"]["price"] == 100.0
+        assert by_symbol["GOOD"]["volume"] == 1_000_000
+        assert by_symbol["BADVOL"]["price"] == 50.0
+        assert by_symbol["BADVOL"]["volume"] == 0
+
+    def test_opportunities_skips_non_finite_projection_and_coerces_daily(
+        self, temp_data_dir
+    ):
+        """NaN confidence/volume must not 500 opportunities or emit null targets."""
+        import dashboard.backend.api.projections
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_projections.return_value = pd.DataFrame(
+            {
+                "symbol": ["KEEP", "BADCONF", "KEEP2"],
+                "name": ["Keep Co", "Bad Conf", "Keep Two"],
+                "target_mid": [110.0, 120.0, 130.0],
+                "expected_change_percent": [10.0, 12.0, 8.0],
+                "confidence": [90.0, float("nan"), 80.0],
+                "risk_level": ["Low", "High", "Medium"],
+                "trend": ["Bullish", "Bullish", "Bullish"],
+                "recommendation": ["STRONG BUY", "STRONG BUY", "STRONG BUY"],
+                "reason": ["ok", "bad", "ok"],
+                "momentum_score": [1.0, 2.0, float("nan")],
+                "volatility_score": [0.5, 0.5, 0.4],
+            }
+        )
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["KEEP", "BADCONF", "KEEP2"],
+                "close": [100.0, 100.0, float("inf")],
+                "volume": [1_000_000, 2_000_000, float("nan")],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.projections,
+            "get_data_loader",
+            return_value=mock_loader,
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get(
+                "/api/projections/opportunities",
+                params={"type": "STRONG_BUY", "limit": 10},
+            )
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["count"] == 3
+        by_symbol = {row["symbol"]: row for row in data["opportunities"]}
+        assert "BADCONF" not in by_symbol
+        assert by_symbol["KEEP"]["currentPrice"] == 100.0
+        assert by_symbol["KEEP"]["volume"] == 1_000_000
+        assert by_symbol["KEEP"]["confidence"] == 90
+        assert by_symbol["KEEP2"]["currentPrice"] == 0.0
+        assert by_symbol["KEEP2"]["volume"] == 0
+        assert by_symbol["KEEP2"]["momentum"] is None

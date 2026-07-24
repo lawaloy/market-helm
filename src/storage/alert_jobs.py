@@ -147,8 +147,27 @@ def claim_jobs(
                 "SELECT * FROM alert_jobs WHERE id = ?",
                 (job_id,),
             ).fetchone()
-            if job_row:
+            if not job_row:
+                continue
+            try:
                 claimed.append(_row_to_job(job_row))
+            except (TypeError, ValueError, json.JSONDecodeError) as exc:
+                # Corrupt payload_json must fail closed here. Raising would roll back
+                # the claim txn and re-select the same ORDER BY id head forever.
+                conn.execute(
+                    """
+                    UPDATE alert_jobs
+                    SET status = ?, last_error = ?, updated_at = ?,
+                        locked_at = NULL, locked_by = NULL
+                    WHERE id = ?
+                    """,
+                    (
+                        STATUS_FAILED,
+                        f"Invalid job payload: {exc}"[:500],
+                        now,
+                        job_id,
+                    ),
+                )
 
     return claimed
 
@@ -228,10 +247,13 @@ def new_worker_id() -> str:
 
 
 def _row_to_job(row: Any) -> Dict[str, Any]:
+    payload = json.loads(row["payload_json"])
+    if not isinstance(payload, dict):
+        raise ValueError("payload must be a JSON object")
     return {
         "id": int(row["id"]),
         "job_type": row["job_type"],
-        "payload": json.loads(row["payload_json"]),
+        "payload": payload,
         "status": row["status"],
         "attempts": int(row["attempts"]),
         "max_attempts": int(row["max_attempts"]),

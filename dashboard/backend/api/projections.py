@@ -3,7 +3,6 @@ Projections API endpoints
 """
 import math
 from typing import Any, Optional
-
 from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
@@ -112,6 +111,8 @@ async def get_projections_summary():
             riskProfile=risk_profile
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -208,6 +209,8 @@ async def get_opportunities(
             opportunities=opportunities
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:

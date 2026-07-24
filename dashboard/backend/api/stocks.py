@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Path, Query
 from dashboard.backend.models.stock import StockDetail, CurrentData, ProjectionData, TechnicalData, HistoricalData, HistoricalPoint
 from dashboard.backend.services.data_loader import get_data_loader
 from datetime import datetime, timedelta
+from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
 
@@ -29,15 +30,19 @@ def _finite_float(value: Any) -> Optional[float]:
 async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
     """Get detailed information for a specific stock"""
     try:
+        sym = normalize_ticker(symbol)
+        if not sym:
+            raise HTTPException(status_code=404, detail="Stock not found.")
+
         loader = get_data_loader()
         date = loader.get_latest_date()
         
         if not date:
             raise HTTPException(status_code=404, detail="No data available")
         
-        # Load daily data
+        # Load daily data — match padded / mixed-case CSV symbols to the path key.
         daily_df = loader.load_daily_data()
-        stock_daily = daily_df[daily_df['symbol'] == symbol.upper()]
+        stock_daily = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
         
         if stock_daily.empty:
             raise HTTPException(status_code=404, detail="Stock not found.")
@@ -77,7 +82,7 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
         
         try:
             proj_df = loader.load_projections()
-            stock_proj = proj_df[proj_df['symbol'] == symbol.upper()]
+            stock_proj = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
             
             if not stock_proj.empty:
                 proj_row = stock_proj.iloc[0]
@@ -124,8 +129,8 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
             pass
         
         return StockDetail(
-            symbol=symbol.upper(),
-            name=stock_row.get('name', symbol.upper()),
+            symbol=sym,
+            name=stock_row.get("name", sym),
             currentData=current_data,
             projection=projection_data,
             technical=technical_data
@@ -144,8 +149,12 @@ async def get_stock_historical(
 ):
     """Get historical data for a specific stock"""
     try:
+        sym = normalize_ticker(symbol)
+        if not sym:
+            raise HTTPException(status_code=404, detail="No historical data found.")
+
         loader = get_data_loader()
-        historical_records = loader.load_historical_data(symbol.upper(), days)
+        historical_records = loader.load_historical_data(sym, days)
         
         if not historical_records:
             raise HTTPException(status_code=404, detail="No historical data found.")
@@ -159,15 +168,24 @@ async def get_stock_historical(
                 continue
 
             proj = record.get('projection')
-            # Convert to camelCase for frontend
+            # Convert to camelCase for frontend; omit nested projection when required
+            # numerics are missing/non-finite (mirrors stock detail soft-fail).
             projection = None
             if proj:
-                projection = {
-                    'targetPrice': proj.get('target_price'),
-                    'confidence': proj.get('confidence'),
-                    'recommendation': proj.get('recommendation'),
-                    'expectedChange': proj.get('expected_change'),
-                }
+                target_price = _finite_float(proj.get('target_price'))
+                expected_change = _finite_float(proj.get('expected_change'))
+                confidence = _finite_float(proj.get('confidence'))
+                if (
+                    target_price is not None
+                    and expected_change is not None
+                    and confidence is not None
+                ):
+                    projection = {
+                        'targetPrice': target_price,
+                        'confidence': confidence,
+                        'recommendation': proj.get('recommendation'),
+                        'expectedChange': expected_change,
+                    }
 
             volume_raw = record.get("volume", 0)
             try:
@@ -191,7 +209,7 @@ async def get_stock_historical(
             raise HTTPException(status_code=404, detail="No historical data found.")
         
         return HistoricalData(
-            symbol=symbol.upper(),
+            symbol=sym,
             data=historical_points
         )
     
