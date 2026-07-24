@@ -132,7 +132,7 @@ class StockAnalyzer:
         else:
             exchange_stats = {}
         
-        # Price statistics — coerce non-finite means/extrema so summary JSON stays valid.
+        # Price statistics ΓÇö coerce non-finite means/extrema so summary JSON stays valid.
         avg_change = _finite_float(scored['_change'].mean() if len(scored) else 0.0)
         max_change = _finite_float(scored['_change'].max() if len(scored) else 0.0)
         min_change = _finite_float(scored['_change'].min() if len(scored) else 0.0)
