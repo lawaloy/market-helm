@@ -178,6 +178,49 @@ class TestAlertWatches:
                     },
                 )
 
+    def test_sync_normalizes_padded_and_rejects_sentinel_symbols(self, db_user):
+        """Watch index keys strip whitespace; blank/NaN symbols store as NULL."""
+        save_user_alerts_config(
+            db_user,
+            {
+                "defaults": {},
+                "alerts": [
+                    {
+                        "id": "padded",
+                        "enabled": True,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": " aapl ",
+                            "operator": "less_than",
+                            "value": 200,
+                        },
+                    },
+                    {
+                        "id": "sentinel",
+                        "enabled": True,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": "nan",
+                            "operator": "less_than",
+                            "value": 10,
+                        },
+                    },
+                ],
+            },
+        )
+
+        assert list_enabled_symbols() == ["AAPL"]
+        assert len(list_watches_for_symbol(" AAPL ")) == 1
+        assert list_watches_for_symbol("nan") == []
+        with get_connection() as conn:
+            rows = conn.execute(
+                "SELECT alert_id, symbol FROM alert_watches WHERE user_id = ? ORDER BY alert_id",
+                (db_user,),
+            ).fetchall()
+        by_id = {row["alert_id"]: row["symbol"] for row in rows}
+        assert by_id["padded"] == "AAPL"
+        assert by_id["sentinel"] is None
+
 
 class TestAlertDeliveryLog:
     def test_record_delivery_prunes_to_max_per_user(self, db_user):

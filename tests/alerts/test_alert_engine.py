@@ -292,3 +292,46 @@ def test_evaluate_continues_when_cooldown_minutes_is_non_numeric():
     assert notifier.send.call_count == 2
     assert storage.record_event.call_count == 2
 
+
+def test_evaluate_matches_padded_watch_symbol_to_saved_quote():
+    """Whitespace around a watch symbol must still match the saved ticker."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": " aapl ",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+    notifier = MagicMock()
+
+    with patch("src.alerts.alert_engine.LogNotifier", return_value=notifier):
+        events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert len(events) == 1
+    assert events[0]["symbols"] == ["AAPL"]
+    notifier.send.assert_called_once()
+
+
+def test_evaluate_skips_sentinel_watch_symbols():
+    """None/NaN stringified symbols must not match or trigger alerts."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    alert = _price_alert(
+        condition={
+            "type": "price_threshold",
+            "symbol": "nan",
+            "operator": "less_than",
+            "value": 150,
+        }
+    )
+    engine = AlertEngine([alert], storage=storage)
+
+    events = engine.evaluate([{"symbol": "NAN", "close": 1.0}])
+
+    assert events == []
+    storage.record_event.assert_not_called()
+

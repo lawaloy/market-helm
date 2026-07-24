@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
+from src.utils.tickers import normalize_ticker
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -176,9 +178,9 @@ def get_enabled_watch_symbols() -> List[str]:
         condition = alert.get("condition") or {}
         if condition.get("type") != "price_threshold":
             continue
-        symbol = condition.get("symbol")
+        symbol = normalize_ticker(condition.get("symbol"))
         if symbol:
-            symbols.add(str(symbol).upper())
+            symbols.add(symbol)
     return sorted(symbols)
 
 

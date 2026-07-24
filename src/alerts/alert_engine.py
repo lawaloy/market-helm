@@ -14,6 +14,7 @@ from .alert_rules import evaluate_price_threshold, evaluate_screening_match
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
+from src.utils.tickers import normalize_ticker
 
 logger = setup_logger("alerts")
 
@@ -167,11 +168,15 @@ class AlertEngine:
             triggered_symbols: List[str] = []
 
             if condition_type == "price_threshold":
-                symbol = str(condition.get("symbol") or "").upper()
+                symbol = normalize_ticker(condition.get("symbol"))
                 if not symbol:
                     continue
                 stock = next(
-                    (s for s in stocks if str(s.get("symbol", "")).upper() == symbol),
+                    (
+                        s
+                        for s in stocks
+                        if normalize_ticker(s.get("symbol")) == symbol
+                    ),
                     None,
                 )
                 if stock and evaluate_price_threshold(condition, stock):
