@@ -322,3 +322,68 @@ def test_smtp_backend_requires_credentials() -> None:
 def test_mailgun_eu_api_base() -> None:
     backend = MailgunEmailBackend("mg-test-key", "mg.markethelm.example", "https://api.eu.mailgun.net")
     assert backend._api_base == "https://api.eu.mailgun.net"
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "ses",
+        "SENDGRID_API_KEY": "sg-test-key",
+        "ALERT_EMAIL_FROM": "alerts@markethelm.example",
+    },
+    clear=True,
+)
+def test_unknown_provider_falls_back_to_sendgrid_secret() -> None:
+    from src.alerts.notifiers.email_delivery import resolve_email_provider
+
+    assert resolve_email_provider() == "sendgrid"
+    assert email_delivery_configured() is True
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "ALERT_EMAIL_PROVIDER": "sendgrid",
+        "SENDGRID_API_KEY": "sg-test-key",
+    },
+    clear=True,
+)
+def test_sendgrid_not_configured_without_from_address() -> None:
+    assert email_delivery_configured() is False
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_HOST": "smtp.example.com",
+        "SMTP_USER": "user@example.com",
+        "SMTP_PASSWORD": "secret",
+        "SMTP_PORT": "not-a-port",
+    },
+    clear=True,
+)
+def test_smtp_backend_rejects_invalid_port() -> None:
+    from src.alerts.notifiers.email_delivery import build_smtp_backend
+
+    assert build_smtp_backend({}) is None
+
+
+@patch.dict(
+    "os.environ",
+    {
+        "SMTP_HOST": "smtp.example.com",
+        "SMTP_USER": "user@example.com",
+        "SMTP_PASSWORD": "secret",
+        "SMTP_PORT": "465",
+        "SMTP_USE_SSL": "true",
+    },
+    clear=True,
+)
+def test_smtp_backend_ssl_on_465() -> None:
+    from src.alerts.notifiers.email_delivery import build_smtp_backend
+
+    backend = build_smtp_backend({})
+    assert backend is not None
+    assert backend._use_ssl is True
+    assert backend._use_tls is False
+
