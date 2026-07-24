@@ -1,6 +1,7 @@
 """
 Data loading service for reading CSV and JSON files
 """
+import math
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -8,6 +9,8 @@ import pandas as pd
 import json
 from datetime import datetime, timedelta
 from functools import lru_cache
+
+from src.utils.tickers import normalize_ticker
 
 
 def _default_data_dir() -> Path:
@@ -111,8 +114,11 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Daily data file not found for date: {date}")
         
-        df = pd.read_csv(file_path)
-        return df
+        try:
+            return pd.read_csv(file_path)
+        except Exception as exc:
+            # ParserError/OSError must surface as ValueError so APIs map to 404.
+            raise ValueError(f"Daily data unreadable: {file_path.name}") from exc
     
     def load_projections(self, date: Optional[str] = None) -> pd.DataFrame:
         """Load projections CSV"""
@@ -125,8 +131,10 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Projections file not found for date: {date}")
         
-        df = pd.read_csv(file_path)
-        return df
+        try:
+            return pd.read_csv(file_path)
+        except Exception as exc:
+            raise ValueError(f"Projections unreadable: {file_path.name}") from exc
     
     def load_summary(self, date: Optional[str] = None) -> Dict:
         """Load summary JSON"""
@@ -139,8 +147,17 @@ class DataLoader:
             if not file_path.exists():
                 raise ValueError(f"Summary file not found for date: {date}")
         
-        with open(file_path, 'r') as f:
-            return json.load(f)
+        try:
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, OSError) as exc:
+            # Corrupt JSON must map to ValueError → API 404, not generic 500.
+            raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
+        # Valid JSON that is not an object (null/[]/"x") would AttributeError
+        # on summary_data.get(...) in /api/market/summary — treat as unreadable.
+        if not isinstance(data, dict):
+            raise ValueError(f"Summary file unreadable: {file_path.name}")
+        return data
     
     def get_available_dates(self) -> List[str]:
         """Get list of all available dates"""
@@ -150,6 +167,10 @@ class DataLoader:
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
         """Load historical data for a specific symbol"""
+        sym = normalize_ticker(symbol)
+        if not sym:
+            return []
+
         dates = self.get_available_dates()
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         
@@ -159,9 +180,9 @@ class DataLoader:
                 break
             
             try:
-                # Load daily data
+                # Load daily data — match padded / mixed-case CSV symbols.
                 daily_df = self.load_daily_data(date)
-                stock_data = daily_df[daily_df['symbol'] == symbol]
+                stock_data = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
                 
                 if stock_data.empty:
                     continue
@@ -171,7 +192,7 @@ class DataLoader:
                 # Try to load projections for this date
                 try:
                     proj_df = self.load_projections(date)
-                    proj_data = proj_df[proj_df['symbol'] == symbol]
+                    proj_data = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
                     
                     if not proj_data.empty:
                         proj_record = proj_data.iloc[0].to_dict()
@@ -209,16 +230,25 @@ class DataLoader:
         self, symbol: str, target_date: str
     ) -> Optional[Tuple[str, float]]:
         """First available daily close for symbol on or after target_date."""
-        sym = symbol.upper()
+        sym = normalize_ticker(symbol)
+        if not sym:
+            return None
         for d in sorted(self.get_available_dates()):
             if d < target_date:
                 continue
             try:
                 daily_df = self.load_daily_data(d)
-                stock_data = daily_df[daily_df["symbol"] == sym]
+                # Match padded / mixed-case daily symbols to the normalized key.
+                stock_data = daily_df[
+                    daily_df["symbol"].map(normalize_ticker) == sym
+                ]
                 if stock_data.empty:
                     continue
-                return d, float(stock_data.iloc[0]["close"])
+                close = float(stock_data.iloc[0]["close"])
+                # Skip non-finite closes so accuracy samples stay JSON-safe.
+                if not math.isfinite(close):
+                    continue
+                return d, close
             except Exception:
                 continue
         return None
@@ -254,14 +284,15 @@ class DataLoader:
 
             for _, row in proj_df.iterrows():
                 row_dict = row.to_dict()
-                symbol = str(row_dict.get("symbol", "")).upper()
+                # Skip None/NaN/blank so accuracy never reports fake NONE/NAN tickers.
+                symbol = normalize_ticker(row_dict.get("symbol"))
                 if not symbol:
                     continue
                 try:
                     predicted = float(row_dict["target_mid"])
                 except (KeyError, TypeError, ValueError):
                     continue
-                if predicted <= 0:
+                if not math.isfinite(predicted) or predicted <= 0:
                     continue
 
                 target_date = self._projection_target_date(row_dict, run_date)

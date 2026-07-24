@@ -8,6 +8,8 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from src.utils.tickers import normalize_ticker
+
 from .database import get_connection
 
 MAX_DELIVERY_LOG = 100
@@ -67,7 +69,8 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         operator = None
         threshold = None
         if condition_type == "price_threshold":
-            symbol = str(condition.get("symbol") or "").upper() or None
+            # Strip whitespace / reject None-NaN sentinels so watch index keys match quotes.
+            symbol = normalize_ticker(condition.get("symbol"))
             operator = condition.get("operator")
             threshold = _coerce_threshold(condition.get("value"), alert_id)
         cooldown_minutes = _coerce_cooldown(alert.get("cooldown_minutes"), alert_id)
@@ -138,11 +141,17 @@ def list_enabled_symbols() -> List[str]:
             ORDER BY symbol
             """
         ).fetchall()
-    return [str(row["symbol"]).upper() for row in rows]
+    return [
+        key
+        for key in (normalize_ticker(row["symbol"]) for row in rows)
+        if key
+    ]
 
 
 def list_watches_for_symbol(symbol: str) -> List[Dict[str, Any]]:
-    normalized = symbol.upper()
+    normalized = normalize_ticker(symbol)
+    if not normalized:
+        return []
     with get_connection() as conn:
         rows = conn.execute(
             """

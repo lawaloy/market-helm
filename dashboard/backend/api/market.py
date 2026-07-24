@@ -1,7 +1,8 @@
 """
 Market API endpoints
 """
-from typing import Dict, Any, Optional
+import math
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.market import MarketOverview, MoversResponse, StockMover, IndexData
 from dashboard.backend.services.data_loader import get_data_loader
@@ -9,16 +10,44 @@ from dashboard.backend.services.data_loader import get_data_loader
 router = APIRouter()
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Coerce numeric summary fields; fall back when missing, non-numeric, or non-finite."""
+    try:
+        if value is None:
+            return default
+        result = float(value)
+        if not math.isfinite(result):
+            return default
+        return result
+    except (TypeError, ValueError):
+        return default
+
+
+def _overview_index_key(index_name: Any) -> Optional[str]:
+    """Build overview indices key; skip blank/NaN names that cannot .replace."""
+    if index_name is None:
+        return None
+    if isinstance(index_name, float) and not math.isfinite(index_name):
+        return None
+    try:
+        text = str(index_name).strip()
+    except Exception:
+        return None
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return None
+    return text.replace(" ", "")
+
+
 def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[str, Any]) -> str:
     """Generate a template-based summary when ai_summary is not in the JSON."""
-    summary_data = analysis.get("summary", {})
-    top_gainers = analysis.get("top_gainers", [])[:2]
-    top_losers = analysis.get("top_losers", [])[:2]
+    summary_data = analysis.get("summary", {}) or {}
+    top_gainers = (analysis.get("top_gainers") or [])[:2]
+    top_losers = (analysis.get("top_losers") or [])[:2]
 
     summary_parts = []
-    gainers = summary_data.get("gainers", 0)
-    losers = summary_data.get("losers", 0)
-    avg_change = summary_data.get("average_change_percent", 0)
+    gainers = int(_safe_float(summary_data.get("gainers", 0)))
+    losers = int(_safe_float(summary_data.get("losers", 0)))
+    avg_change = _safe_float(summary_data.get("average_change_percent", 0))
 
     if gainers > losers:
         sentiment = "positive"
@@ -33,25 +62,38 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
     )
 
     if top_gainers:
-        top_gainer = top_gainers[0]
-        summary_parts.append(
-            f"{top_gainer['symbol']} led gains with a {top_gainer['change_percent']:.2f}% increase."
-        )
+        top_gainer = top_gainers[0] or {}
+        symbol = top_gainer.get("symbol")
+        if symbol is not None and "change_percent" in top_gainer:
+            change = _safe_float(top_gainer.get("change_percent"))
+            summary_parts.append(
+                f"{symbol} led gains with a {change:.2f}% increase."
+            )
 
     if top_losers:
-        top_loser = top_losers[0]
-        summary_parts.append(
-            f"{top_loser['symbol']} declined {abs(top_loser['change_percent']):.2f}%, "
-            "marking the largest drop."
-        )
+        top_loser = top_losers[0] or {}
+        symbol = top_loser.get("symbol")
+        if symbol is not None and "change_percent" in top_loser:
+            change = _safe_float(top_loser.get("change_percent"))
+            summary_parts.append(
+                f"{symbol} declined {abs(change):.2f}%, "
+                "marking the largest drop."
+            )
 
-    items = list(exchange_comparison.items()) or []
+    items = [
+        (name, stats if isinstance(stats, dict) else {})
+        for name, stats in (exchange_comparison or {}).items()
+    ]
     if items:
-        best = max(items, key=lambda x: x[1].get("average_change_percent", 0))
+        best = max(
+            items,
+            key=lambda x: _safe_float(x[1].get("average_change_percent", 0)),
+        )
         exchange_name, stats = best
+        avg_exchange = _safe_float(stats.get("average_change_percent", 0))
         summary_parts.append(
             f"The {exchange_name} exchange performed best with an average "
-            f"{stats['average_change_percent']:.2f}% gain."
+            f"{avg_exchange:.2f}% gain."
         )
 
     return " ".join(summary_parts)
@@ -69,6 +111,8 @@ async def get_market_overview():
         
         # Load daily data
         df = loader.load_daily_data()
+        if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
+            raise HTTPException(status_code=404, detail="No data available.")
         
         # Calculate overall statistics
         total_stocks = len(df)
@@ -76,18 +120,23 @@ async def get_market_overview():
         losers = len(df[df['change_percent'] < 0])
         unchanged = len(df[df['change_percent'] == 0])
         
-        avg_change = float(df['change_percent'].mean())
-        max_change = float(df['change_percent'].max())
-        min_change = float(df['change_percent'].min())
+        avg_change = _safe_float(df['change_percent'].mean())
+        max_change = _safe_float(df['change_percent'].max())
+        min_change = _safe_float(df['change_percent'].min())
         
         # Calculate per-index statistics
         indices = {}
         if 'index_name' in df.columns:
             for index_name in df['index_name'].unique():
+                key = _overview_index_key(index_name)
+                if key is None:
+                    # Corrupt/missing index labels previously AttributeError'd on
+                    # .replace and 500'd the whole overview payload.
+                    continue
                 index_df = df[df['index_name'] == index_name]
-                indices[index_name.replace(' ', '')] = IndexData(
+                indices[key] = IndexData(
                     stocks=len(index_df),
-                    avgChange=float(index_df['change_percent'].mean()),
+                    avgChange=round(_safe_float(index_df['change_percent'].mean()), 2),
                     gainers=len(index_df[index_df['change_percent'] > 0]),
                     losers=len(index_df[index_df['change_percent'] < 0])
                 )
@@ -104,6 +153,8 @@ async def get_market_overview():
             indices=indices
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -120,11 +171,12 @@ async def get_top_movers(
         loader = get_data_loader()
         df = loader.load_daily_data()
         
-        # Sort by change percentage
+        # Filter by sign first so a large limit cannot mix gainers into losers
+        # (or vice versa) when fewer matching movers exist than `limit`.
         if type == "gainers":
-            sorted_df = df.nlargest(limit, 'change_percent')
+            sorted_df = df[df['change_percent'] > 0].nlargest(limit, 'change_percent')
         else:
-            sorted_df = df.nsmallest(limit, 'change_percent')
+            sorted_df = df[df['change_percent'] < 0].nsmallest(limit, 'change_percent')
         
         movers = []
         for _, row in sorted_df.iterrows():
@@ -139,6 +191,8 @@ async def get_top_movers(
         
         return MoversResponse(type=type, data=movers)
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -150,6 +204,8 @@ async def get_market_summary():
     try:
         loader = get_data_loader()
         summary_data = loader.load_summary()
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:

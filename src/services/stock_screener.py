@@ -6,10 +6,11 @@ Designed for trading automation - finds liquid, active stocks worth tracking.
 Uses official APIs (no scraping).
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
 import time
 import json
 from ..core.logger import setup_logger
@@ -57,8 +58,20 @@ class StockScreener:
             }
         }
     
+    @staticmethod
+    def _finite_number(value: Any, default: float = 0.0) -> float:
+        """Coerce to a finite float; non-numeric / NaN / inf → default."""
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return default
+        if not math.isfinite(number):
+            return default
+        return number
+
     def _score_volume(self, volume: int) -> float:
         """Score based on volume (higher = better)."""
+        volume = self._finite_number(volume, default=0.0)
         threshold = self.filters["volume_threshold"]
         if volume < threshold:
             return 0.0
@@ -74,6 +87,7 @@ class StockScreener:
     
     def _score_price_change(self, change_pct: float) -> float:
         """Score based on price change (absolute value, higher = better)."""
+        change_pct = self._finite_number(change_pct, default=0.0)
         min_change = self.filters["min_daily_change_pct"]
         abs_change = abs(change_pct)
         
@@ -90,6 +104,7 @@ class StockScreener:
     
     def _score_price_range(self, price: float) -> float:
         """Score based on price being in optimal range."""
+        price = self._finite_number(price, default=0.0)
         min_price = self.filters["price_min"]
         max_price = self.filters["price_max"]
         
@@ -107,6 +122,7 @@ class StockScreener:
     
     def _score_market_cap(self, market_cap: float) -> float:
         """Score based on market cap (larger = better, but with diminishing returns)."""
+        market_cap = self._finite_number(market_cap, default=0.0)
         min_cap = self.filters["market_cap_min"]
         
         if market_cap < min_cap:
@@ -117,7 +133,6 @@ class StockScreener:
             return 100.0
         elif market_cap >= min_cap:
             # Logarithmic scale (diminishing returns)
-            import math
             ratio = math.log10(market_cap / min_cap) / math.log10(100)  # log base 100
             return 50.0 + min(50.0, ratio * 50.0)
         return 0.0
@@ -134,16 +149,22 @@ class StockScreener:
         """
         weights = self.filters["weights"]
         
+        volume = self._finite_number(stock_data.get("volume", 0), default=0.0)
+        change_percent = self._finite_number(
+            stock_data.get("change_percent", 0), default=0.0
+        )
+        close = self._finite_number(stock_data.get("close", 0), default=0.0)
+
         # Get individual scores
-        volume_score = self._score_volume(stock_data.get("volume", 0))
-        price_change_score = self._score_price_change(stock_data.get("change_percent", 0))
-        price_range_score = self._score_price_range(stock_data.get("close", 0))
+        volume_score = self._score_volume(volume)
+        price_change_score = self._score_price_change(change_percent)
+        price_range_score = self._score_price_range(close)
         
         # Market cap might not be in stock_data, try to get it
-        market_cap = stock_data.get("market_cap", 0)
+        market_cap = self._finite_number(stock_data.get("market_cap", 0), default=0.0)
         if market_cap == 0:
             # Try to estimate from price and volume, or set default
-            market_cap = stock_data.get("close", 0) * stock_data.get("volume", 0) * 10  # Rough estimate
+            market_cap = close * volume * 10  # Rough estimate
         market_cap_score = self._score_market_cap(market_cap)
         
         # Weighted sum
@@ -172,6 +193,11 @@ class StockScreener:
             stock_data = self.api_client.get_stock_data_for_screening(symbol)
             
             if not stock_data:
+                return None
+
+            # Non-finite core quote fields cannot be ranked meaningfully.
+            close = self._finite_number(stock_data.get("close"), default=float("nan"))
+            if not math.isfinite(close) or close <= 0:
                 return None
             
             # Calculate score (market_cap will be 0, but that's OK for screening)

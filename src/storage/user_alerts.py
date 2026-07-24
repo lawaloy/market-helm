@@ -73,7 +73,10 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
     # In hosted DB mode webhook URLs are per-user secrets. They are stripped only
     # from API responses, not from persisted user records used for delivery.
-    payload = polish_alerts_config(_merge_existing_webhook_secrets(user_id, config))
+    payload = polish_alerts_config(
+        _merge_existing_webhook_secrets(user_id, config),
+        seed_env_email=False,
+    )
     validate_watches_config(user_id, payload)
     updated_at = datetime.now(timezone.utc).isoformat()
     blob = json.dumps(payload, indent=2)
