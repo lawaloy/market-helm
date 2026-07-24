@@ -389,3 +389,130 @@ class TestDataLoader:
         assert loader.load_historical_data(None, days=7) == []
         assert loader.load_historical_data(float("nan"), days=7) == []
         assert loader.load_historical_data("NONE", days=7) == []
+
+    def test_get_latest_date_falls_back_when_only_weekends(self, loader, temp_data_dir):
+        """If every file is a weekend date, still return the newest one."""
+        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
+        df.to_csv(temp_data_dir / "daily_data_2026-01-17.csv", index=False)
+        df.to_csv(temp_data_dir / "daily_data_2026-01-18.csv", index=False)
+
+        assert loader.get_latest_date() == "2026-01-18"
+
+    def test_get_latest_date_skips_weekend_files(self, loader, temp_data_dir):
+        """Prefer Friday over newer Saturday/Sunday filenames."""
+        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
+        df.to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)  # Fri
+        df.to_csv(temp_data_dir / "daily_data_2026-01-17.csv", index=False)  # Sat
+        df.to_csv(temp_data_dir / "daily_data_2026-01-18.csv", index=False)  # Sun
+
+        assert loader.get_latest_date() == "2026-01-16"
+        loaded = loader.load_daily_data()
+        assert list(loaded["symbol"]) == ["A"]
+
+    def test_get_most_recent_trading_day_weekend_rolls_to_friday(self, monkeypatch):
+        """Saturday/Sunday map to the prior Friday."""
+        from datetime import date
+        import dashboard.backend.services.data_loader as dl
+
+        class _Sat:
+            @classmethod
+            def now(cls):
+                class _N:
+                    @staticmethod
+                    def date():
+                        return date(2026, 1, 17)  # Saturday
+
+                return _N()
+
+        class _Sun:
+            @classmethod
+            def now(cls):
+                class _N:
+                    @staticmethod
+                    def date():
+                        return date(2026, 1, 18)  # Sunday
+
+                return _N()
+
+        monkeypatch.setattr(dl, "datetime", _Sat)
+        assert dl.get_most_recent_trading_day() == "2026-01-16"
+        monkeypatch.setattr(dl, "datetime", _Sun)
+        assert dl.get_most_recent_trading_day() == "2026-01-16"
+
+    def test_is_weekday_and_unparseable_dates(self):
+        """Weekdays are open; weekends closed; unparseable dates stay kept."""
+        from dashboard.backend.services.data_loader import _is_weekday
+
+        assert _is_weekday("2026-01-16") is True  # Friday
+        assert _is_weekday("2026-01-17") is False  # Saturday
+        assert _is_weekday("2026-01-18") is False  # Sunday
+        assert _is_weekday("not-a-date") is True
+
+    def test_load_historical_data_merges_projection_and_skips_gaps(
+        self, loader, temp_data_dir, monkeypatch
+    ):
+        """Attach projection fields when present; skip missing/broken dates."""
+        from datetime import date
+        import dashboard.backend.services.data_loader as dl
+
+        class _Now:
+            @classmethod
+            def now(cls):
+                class _N:
+                    @staticmethod
+                    def date():
+                        return date(2026, 1, 20)
+
+                    def __sub__(self, other):
+                        return date(2026, 1, 20) - other
+
+                return _N()
+
+        monkeypatch.setattr(dl, "datetime", _Now)
+
+        pd.DataFrame(
+            {"symbol": ["AAPL"], "close": [100.0], "change_percent": [0.0]}
+        ).to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
+        pd.DataFrame(
+            {"symbol": ["MSFT"], "close": [200.0], "change_percent": [0.0]}
+        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        # Corrupt / unreadable daily file should be skipped
+        (temp_data_dir / "daily_data_2026-01-14.csv").write_text("not,csv\n")
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "target_mid": [110.0],
+                "confidence": [70],
+                "recommendation": ["BUY"],
+                "expected_change_percent": [5.0],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
+
+        rows = loader.load_historical_data("AAPL", days=30)
+        assert len(rows) == 1
+        assert rows[0]["date"] == "2026-01-16"
+        assert rows[0]["projection"]["target_price"] == 110.0
+        assert rows[0]["projection"]["recommendation"] == "BUY"
+
+    def test_needs_fetch_for_latest_trading_day(self, loader, temp_data_dir, monkeypatch):
+        """True when latest trading day is missing; false when present."""
+        from datetime import date
+        import dashboard.backend.services.data_loader as dl
+
+        class _Fri:
+            @classmethod
+            def now(cls):
+                class _N:
+                    @staticmethod
+                    def date():
+                        return date(2026, 1, 16)
+
+                return _N()
+
+        monkeypatch.setattr(dl, "datetime", _Fri)
+        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
+        df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        assert loader.needs_fetch_for_latest_trading_day() is True
+
+        df.to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
+        assert loader.needs_fetch_for_latest_trading_day() is False

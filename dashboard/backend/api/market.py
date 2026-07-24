@@ -48,6 +48,32 @@ def _as_list(value: Any) -> list:
     return value if isinstance(value, list) else []
 
 
+def _finite_float(value: Any) -> Optional[float]:
+    """Return float when finite; otherwise None (missing/non-numeric/NaN/Inf)."""
+    try:
+        if value is None:
+            return None
+        result = float(value)
+        if not math.isfinite(result):
+            return None
+        return result
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_volume(value: Any) -> int:
+    """Coerce volume to a finite int; bad/missing cells become 0 (never abort the list)."""
+    try:
+        if value is None:
+            return 0
+        result = float(value)
+        if not math.isfinite(result):
+            return 0
+        return int(result)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[str, Any]) -> str:
     """Generate a template-based summary when ai_summary is not in the JSON."""
     # Corrupt summary JSON can nest strings/lists where objects/arrays are
@@ -194,13 +220,20 @@ async def get_top_movers(
         
         movers = []
         for _, row in sorted_df.iterrows():
+            # Skip non-finite price fields so one corrupt CSV row cannot null the payload
+            # or abort the whole movers card via int(float('nan')).
+            price = _finite_float(row.get('close'))
+            change = _finite_float(row.get('change'))
+            change_percent = _finite_float(row.get('change_percent'))
+            if price is None or change is None or change_percent is None:
+                continue
             movers.append(StockMover(
                 symbol=row['symbol'],
                 name=row.get('name', row['symbol']),
-                price=float(row['close']),
-                change=float(row['change']),
-                changePercent=float(row['change_percent']),
-                volume=int(row.get('volume', 0))
+                price=price,
+                change=change,
+                changePercent=change_percent,
+                volume=_safe_volume(row.get('volume', 0)),
             ))
         
         return MoversResponse(type=type, data=movers)
