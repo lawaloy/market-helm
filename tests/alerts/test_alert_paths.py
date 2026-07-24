@@ -64,6 +64,68 @@ def test_polish_alerts_config_strips_placeholders(monkeypatch) -> None:
     assert "webhook_url" not in polished["alerts"][0]
 
 
+def test_polish_alerts_config_preserves_existing_defaults_email(monkeypatch) -> None:
+    monkeypatch.setenv("ALERT_EMAIL_TO", "env@example.org")
+    polished = polish_alerts_config(
+        {
+            "defaults": {"email_to": "saved@example.com"},
+            "alerts": [],
+        }
+    )
+    assert polished["defaults"]["email_to"] == "saved@example.com"
+
+
+def test_polish_alerts_config_strips_your_webhook_placeholder(monkeypatch) -> None:
+    monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
+    polished = polish_alerts_config(
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "a1",
+                    "webhook_url": "https://hooks.slack.com/services/your/webhook",
+                    "notifications": ["webhook"],
+                }
+            ],
+        }
+    )
+    assert "webhook_url" not in polished["alerts"][0]
+
+
+def test_dedupe_alerts_config_uses_id_for_non_price_rules() -> None:
+    config = {
+        "alerts": [
+            {
+                "id": "screen_a",
+                "condition": {"type": "screening_match", "filters": {"min_score": 70}},
+            },
+            {
+                "id": "screen_a",
+                "condition": {"type": "screening_match", "filters": {"min_score": 80}},
+            },
+            {
+                "id": "incomplete_price",
+                "condition": {"type": "price_threshold", "symbol": "AAPL"},
+            },
+            {
+                "id": "incomplete_price",
+                "condition": {"type": "price_threshold", "symbol": "MSFT"},
+            },
+            {
+                "id": "other_screen",
+                "condition": {"type": "screening_match", "filters": {"min_score": 90}},
+            },
+        ]
+    }
+    deduped = dedupe_alerts_config(config)
+    assert [alert["id"] for alert in deduped["alerts"]] == [
+        "screen_a",
+        "incomplete_price",
+        "other_screen",
+    ]
+    assert deduped["alerts"][0]["condition"]["filters"]["min_score"] == 70
+
+
 def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
     config = {
         "alerts": [

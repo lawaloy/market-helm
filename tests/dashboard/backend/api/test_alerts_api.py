@@ -259,3 +259,12 @@ class TestAlertsConfigAPI:
         r = client.post("/api/alerts/run")
         assert r.status_code == 200
         assert r.json()["triggered"] == 0
+
+    def test_put_config_rejects_non_list_alerts(self, client, alerts_config_dir):
+        r = client.put(
+            "/api/alerts/config",
+            json={"defaults": {}, "alerts": {"id": "not-a-list"}},
+        )
+        assert r.status_code == 400
+        assert "alerts" in r.json()["detail"].lower()
+        assert not (alerts_config_dir / "alerts.json").exists()
