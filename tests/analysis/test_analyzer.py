@@ -77,6 +77,74 @@ class TestStockAnalyzer(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertEqual(len(result), 0)
 
+    def test_analyze_includes_unchanged_top_volume_and_exchange_stats(self):
+        """Exchange rollups, flat names, and volume leaders must stay populated."""
+        rows = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "change_percent": 1.5,
+                "close": 180.0,
+                "volume": 50_000_000,
+                "exchange_code": "NASDAQ",
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft",
+                "change_percent": 0.0,
+                "close": 400.0,
+                "volume": 40_000_000,
+                "exchange_code": "NASDAQ",
+            },
+            {
+                "symbol": "JPM",
+                "name": "JPMorgan",
+                "change_percent": -0.8,
+                "close": 150.0,
+                "volume": 10_000_000,
+                "exchange_code": "NYSE",
+            },
+            {
+                "symbol": "EMPTY",
+                "name": "EmptyEx",
+                "change_percent": 0.2,
+                "close": 20.0,
+                "volume": 1_000,
+                "exchange_code": "",
+            },
+        ]
+
+        result = self.analyzer.analyze_daily_data(rows)
+
+        summary = result["summary"]
+        self.assertEqual(summary["total_stocks"], 4)
+        self.assertEqual(summary["gainers"], 2)
+        self.assertEqual(summary["losers"], 1)
+        self.assertEqual(summary["unchanged"], 1)
+        self.assertEqual(result["top_volume"][0]["symbol"], "AAPL")
+        self.assertEqual(result["top_volume"][1]["symbol"], "MSFT")
+
+        exchange_stats = result["exchange_statistics"]
+        self.assertEqual(exchange_stats["NASDAQ"]["stock_count"], 2)
+        self.assertEqual(exchange_stats["NASDAQ"]["avg_change_percent"], 0.75)
+        self.assertEqual(exchange_stats["NASDAQ"]["total_volume"], 90_000_000)
+        self.assertEqual(exchange_stats["NYSE"]["stock_count"], 1)
+        self.assertEqual(exchange_stats["NYSE"]["avg_change_percent"], -0.8)
+        self.assertIn("", exchange_stats)
+
+    def test_analyze_without_exchange_code_omits_exchange_statistics(self):
+        rows = [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "change_percent": 1.0,
+                "close": 180.0,
+                "volume": 1_000,
+            }
+        ]
+        result = self.analyzer.analyze_daily_data(rows)
+        self.assertEqual(result["exchange_statistics"], {})
+
 
 if __name__ == '__main__':
     unittest.main()

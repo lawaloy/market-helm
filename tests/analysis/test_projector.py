@@ -338,6 +338,41 @@ class TestStockProjector:
         summary = projector.generate_projection_summary(projections)
         assert sum(summary['recommendations'].values()) == len(projections)
 
+    def test_projection_summary_top_opportunities_ranked_and_capped(self, projector):
+        """Top opportunity lists stay confidence-sorted and capped at five."""
+        projections = {}
+        for i in range(7):
+            symbol = f"BUY{i}"
+            projections[symbol] = {
+                "symbol": symbol,
+                "target_mid": 100 + i,
+                "confidence": 50 + i,
+                "expected_change_percent": float(i),
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            }
+        for i in range(6):
+            symbol = f"SELL{i}"
+            projections[symbol] = {
+                "symbol": symbol,
+                "target_mid": 90 - i,
+                "confidence": 40 + i,
+                "expected_change_percent": -float(i),
+                "recommendation": "STRONG SELL",
+                "trend": "down",
+            }
+
+        summary = projector.generate_projection_summary(projections)
+        buys = summary["top_opportunities"]["strong_buys"]
+        sells = summary["top_opportunities"]["strong_sells"]
+
+        assert len(buys) == 5
+        assert [row["symbol"] for row in buys] == ["BUY6", "BUY5", "BUY4", "BUY3", "BUY2"]
+        assert [row["confidence"] for row in buys] == [56, 55, 54, 53, 52]
+        assert len(sells) == 5
+        assert [row["symbol"] for row in sells] == ["SELL5", "SELL4", "SELL3", "SELL2", "SELL1"]
+        assert summary["total_projections"] == 13
+
     # ========== Date and Timestamp Tests ==========
 
     def test_projection_has_dates(self, projector, sample_stock_bullish):

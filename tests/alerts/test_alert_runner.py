@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, call, patch
 import pandas as pd
 
 from src.alerts.alert_paths import get_enabled_watch_symbols
-from src.alerts.alert_runner import _fetch_missing_watch_quotes, evaluate_alerts_from_latest_data
+from src.alerts.alert_runner import (
+    _fetch_missing_watch_quotes,
+    _stocks_from_daily_df,
+    evaluate_alerts_from_latest_data,
+)
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
@@ -133,6 +137,54 @@ def test_fetch_missing_watch_quotes_skips_invalid_live_prices(mock_fetcher_cls, 
     ]
     assert "Skipping invalid quote for watch symbol NVDA" in caplog.text
     assert fetcher.fetch_symbol_data.call_count == 2
+
+
+def test_stocks_from_daily_df_skips_invalid_closes(caplog):
+    """One corrupt saved row must not wipe the rest of the daily dataset."""
+    df = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.0},
+            {"symbol": "BAD", "close": "n/a"},
+            {"symbol": "", "close": 10.0},
+            {"symbol": "MSFT", "close": "410.5"},
+            {"symbol": "NONE", "close": float("nan")},
+        ]
+    )
+
+    with caplog.at_level("WARNING"):
+        stocks = _stocks_from_daily_df(df)
+
+    assert stocks == [
+        {"symbol": "AAPL", "close": 180.0},
+        {"symbol": "MSFT", "close": 410.5},
+    ]
+    assert "Skipping invalid saved quote for BAD" in caplog.text
+    assert "Skipping invalid saved quote for NONE" in caplog.text
+
+
+@patch("src.alerts.alert_runner.AlertEngine")
+@patch("src.alerts.alert_runner.get_enabled_watch_symbols", return_value=[])
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_evaluate_alerts_keeps_valid_rows_when_saved_close_is_corrupt(
+    mock_get_loader, _mock_watch_symbols, mock_engine_cls
+):
+    loader = MagicMock()
+    loader.get_latest_date.return_value = "2026-05-20"
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.0},
+            {"symbol": "BAD", "close": "not-a-price"},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    engine = MagicMock()
+    engine.evaluate.return_value = []
+    mock_engine_cls.from_config.return_value = engine
+
+    result = evaluate_alerts_from_latest_data(fetch_missing_quotes=False)
+
+    assert result["message"] == "No alerts triggered on latest data."
+    engine.evaluate.assert_called_once_with([{"symbol": "AAPL", "close": 180.0}])
 
 
 @patch("src.alerts.alert_runner.AlertEngine")
