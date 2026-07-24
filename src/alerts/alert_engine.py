@@ -49,9 +49,21 @@ class AlertEngine:
         config: Dict[str, Any],
         storage: Optional[AlertStorage] = None,
     ) -> Optional["AlertEngine"]:
+        # Hand-edited configs may be a list/string/null root or mix non-dict
+        # alert rows; never AttributeError the whole check run.
+        if not isinstance(config, dict):
+            return None
         defaults = config.get("defaults") or {}
+        if not isinstance(defaults, dict):
+            defaults = {}
         alerts = config.get("alerts", [])
-        enabled = [alert for alert in alerts if alert.get("enabled", False)]
+        if not isinstance(alerts, list):
+            return None
+        enabled = [
+            alert
+            for alert in alerts
+            if isinstance(alert, dict) and alert.get("enabled", False)
+        ]
         if not enabled:
             return None
         return AlertEngine(enabled, storage=storage, defaults=defaults)
@@ -66,6 +78,9 @@ class AlertEngine:
                 config = json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load alerts config: {e}")
+            return None
+        if not isinstance(config, dict):
+            logger.warning("Alerts config root must be an object; ignoring")
             return None
         return AlertEngine.from_config_dict(config)
 
@@ -164,6 +179,12 @@ class AlertEngine:
                 continue
 
             condition = alert.get("condition", {})
+            if not isinstance(condition, dict):
+                logger.warning(
+                    "Alert %s has non-object condition; skipping",
+                    alert.get("id"),
+                )
+                continue
             condition_type = condition.get("type")
             triggered_symbols: List[str] = []
 
