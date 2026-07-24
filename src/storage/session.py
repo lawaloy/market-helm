@@ -69,9 +69,10 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         if int(exp) <= int(time.time()):
             raise AuthError("Token expired.")
         user_id = payload.get("sub")
-        if not user_id:
+        # Reject non-strings (True/123/{} stringify into fake IDs) and blank subjects.
+        if not isinstance(user_id, str) or not user_id.strip():
             raise AuthError("Invalid token subject.")
-        return {"user_id": str(user_id)}
+        return {"user_id": user_id.strip()}
     except AuthError:
         raise
     except (ValueError, json.JSONDecodeError, KeyError, OverflowError, TypeError) as exc:
