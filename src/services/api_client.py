@@ -177,7 +177,14 @@ class FinnhubClient:
                 
                 # Handle 429 rate limit errors explicitly
                 if response.status_code == 429:
-                    retry_after = int(response.headers.get('Retry-After', 60))
+                    raw_retry_after = response.headers.get('Retry-After', 60)
+                    try:
+                        retry_after = int(raw_retry_after)
+                    except (TypeError, ValueError):
+                        # HTTP-date or garbage headers must not abort the fetch path.
+                        retry_after = 60
+                    if retry_after < 0:
+                        retry_after = 60
                     if attempt < max_retries - 1:
                         logger.warning(f"Rate limit exceeded (429). Waiting {retry_after} seconds...")
                         time.sleep(retry_after)
