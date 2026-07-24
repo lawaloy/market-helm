@@ -45,8 +45,39 @@ def test_resolve_symbol_prices_skips_blank_and_dedupes_case(_mock_saved):
     assert prices == {"AAPL": 180.5, "MSFT": 400.0}
 
 
+@patch(
+    "src.alerts.symbol_prices.prices_from_saved_daily_data",
+    return_value={"AAPL": 180.5, "MSFT": 400.0},
+)
+def test_resolve_symbol_prices_strips_surrounding_whitespace(_mock_saved):
+    """Surrounding whitespace must not prevent matching saved tickers."""
+    prices = resolve_symbol_prices(
+        [" AAPL ", "\tMSFT\n", "  "],
+        fetch_missing=False,
+    )
+
+    assert prices == {"AAPL": 180.5, "MSFT": 400.0}
+
+
 def test_resolve_symbol_prices_returns_empty_for_blank_only_input():
     assert resolve_symbol_prices(["", "   "], fetch_missing=False) == {}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_skips_invalid_symbol_tokens(mock_get_loader):
+    """None/NaN/blank symbols must not enter the quote map as NONE/NAN."""
+    loader = MagicMock()
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 180.5},
+            {"symbol": None, "close": 1.0},
+            {"symbol": float("nan"), "close": 2.0},
+            {"symbol": "  ", "close": 3.0},
+            {"symbol": " msft ", "close": 400.0},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    assert prices_from_saved_daily_data() == {"AAPL": 180.5, "MSFT": 400.0}
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")

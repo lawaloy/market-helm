@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -228,6 +229,61 @@ class TestAlertsConfigAPI:
         r = client.get("/api/alerts/quotes", params={"symbols": "AON,APH"})
         assert r.status_code == 200
         assert r.json()["prices"]["AON"] == 412.5
+
+    def test_get_quotes_strips_whitespace_before_resolve(self, client, monkeypatch):
+        captured = {}
+
+        def fake_resolve(symbols, fetch_missing=True):
+            captured["symbols"] = symbols
+            return {"AAPL": 180.0}
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            fake_resolve,
+        )
+        r = client.get("/api/alerts/quotes", params={"symbols": " AAPL , msft "})
+        assert r.status_code == 200
+        assert captured["symbols"] == ["AAPL", "MSFT"]
+
+    def test_post_quotes_strips_whitespace_before_resolve(self, client, monkeypatch):
+        captured = {}
+
+        def fake_resolve(symbols, fetch_missing=True):
+            captured["symbols"] = symbols
+            return {"AAPL": 180.0}
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.resolve_symbol_prices",
+            fake_resolve,
+        )
+        r = client.post("/api/alerts/quotes", json={"symbols": [" AAPL ", "  ", "msft"]})
+        assert r.status_code == 200
+        assert captured["symbols"] == ["AAPL", "MSFT"]
+
+    def test_alert_symbol_catalog_skips_invalid_tracked_tokens(self, client, monkeypatch):
+        import pandas as pd
+
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.build_symbol_catalog",
+            lambda: (["AAPL"], {"AAPL": "Apple Inc."}),
+        )
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.prices_from_saved_daily_data",
+            lambda: {"AAPL": 180.0},
+        )
+        loader = MagicMock()
+        loader.load_projections.return_value = pd.DataFrame(
+            {
+                "symbol": ["AAPL", None, float("nan"), "  ", "msft"],
+            }
+        )
+        monkeypatch.setattr(
+            "dashboard.backend.api.alerts.get_data_loader",
+            lambda: loader,
+        )
+        r = client.get("/api/alerts/symbols")
+        assert r.status_code == 200
+        assert r.json()["tracked_symbols"] == ["AAPL", "MSFT"]
 
     def test_get_status(self, client, alerts_config_dir, tmp_path, monkeypatch):
         from src.alerts.alert_storage import AlertStorage

@@ -87,7 +87,13 @@ class StockProjector:
                 change_pct = float(stock_data.get('change_percent', 0) or 0)
             except (TypeError, ValueError):
                 return None
-            volume = stock_data.get('volume', 0)
+            # Optional fields: bad volume/market_cap must not abort projection.
+            try:
+                volume = float(stock_data.get('volume', 0) or 0)
+                if not math.isfinite(volume):
+                    volume = 0.0
+            except (TypeError, ValueError):
+                volume = 0.0
             previous_close = stock_data.get('previous_close', current_price)
 
             # NaN closes pass `<= 0` and would write NaN targets into projections CSV.
@@ -98,6 +104,14 @@ class StockProjector:
 
             # Calculate momentum score (-100 to +100)
             stock_for_metrics = {**stock_data, "change_percent": change_pct}
+            # Keep confidence math on coerced optionals even when raw cells are garbage.
+            try:
+                market_cap = float(stock_data.get('market_cap', 0) or 0)
+                if not math.isfinite(market_cap):
+                    market_cap = 0.0
+            except (TypeError, ValueError):
+                market_cap = 0.0
+            stock_for_confidence = {**stock_for_metrics, "market_cap": market_cap}
             momentum = self._calculate_momentum(stock_for_metrics)
 
             # Calculate volatility (0 to 100)
@@ -118,12 +132,15 @@ class StockProjector:
             
             # Calculate confidence score
             confidence = self._calculate_confidence(
-                momentum, volatility, volume, stock_data
+                momentum, volatility, volume, stock_for_confidence
             )
             
-            # Generate reasoning
+            # Generate reasoning (use coerced optionals — raw volume/change can be non-numeric)
             reason = self._generate_reason(
-                stock_data, momentum, trend, recommendation
+                {**stock_for_confidence, "volume": volume},
+                momentum,
+                trend,
+                recommendation,
             )
             
             # Resolve company name - API often returns symbol when profile fetch fails
@@ -342,6 +359,18 @@ class StockProjector:
         """
         change_pct = stock_data.get('change_percent', 0)
         volume = stock_data.get('volume', 0)
+        try:
+            change_pct = float(change_pct or 0)
+            if not math.isfinite(change_pct):
+                change_pct = 0.0
+        except (TypeError, ValueError):
+            change_pct = 0.0
+        try:
+            volume = float(volume or 0)
+            if not math.isfinite(volume):
+                volume = 0.0
+        except (TypeError, ValueError):
+            volume = 0.0
         
         reasons = []
         

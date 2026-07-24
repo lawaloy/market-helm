@@ -9,6 +9,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel
 
 from dashboard.backend.services.data_loader import get_data_loader
+from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -73,7 +74,10 @@ def build_symbol_catalog() -> tuple:
         if not df.empty and "symbol" in df.columns:
             name_col = "name" if "name" in df.columns else None
             for sym in df["symbol"].unique():
-                sym_key = str(sym).upper()
+                # Skip None/NaN/blank so they never appear as "NONE"/"NAN"/"".
+                sym_key = normalize_ticker(sym)
+                if not sym_key:
+                    continue
                 symbols.add(sym_key)
                 if name_col:
                     stored = df.loc[df["symbol"] == sym, name_col].iloc[0]

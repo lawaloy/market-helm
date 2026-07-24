@@ -322,6 +322,27 @@ class TestStockProjector:
         }
         assert projector._project_stock(bad) is None
 
+    def test_project_stock_non_numeric_volume_still_projects(self, projector):
+        """Bad optional volume must not abort an otherwise valid projection."""
+        stock = {
+            'symbol': 'VOLX', 'close': 100.0, 'change_percent': 2.0,
+            'volume': 'n/a', 'previous_close': 98.0, 'market_cap': 50000
+        }
+        projection = projector._project_stock(stock)
+        assert projection is not None
+        assert projection['symbol'] == 'VOLX'
+        assert isinstance(projection['confidence'], int)
+
+    def test_project_stock_non_finite_market_cap_still_projects(self, projector):
+        """NaN/inf market_cap must not abort confidence scoring."""
+        stock = {
+            'symbol': 'CAPX', 'close': 100.0, 'change_percent': 2.0,
+            'volume': 1000000, 'previous_close': 98.0, 'market_cap': float('nan')
+        }
+        projection = projector._project_stock(stock)
+        assert projection is not None
+        assert projection['symbol'] == 'CAPX'
+
     # ========== Batch Projection Tests ==========
 
     def test_generate_projections_multiple_stocks(self, projector, sample_stocks_list):
