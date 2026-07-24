@@ -1,6 +1,7 @@
 """
 Market API endpoints
 """
+import math
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.market import MarketOverview, MoversResponse, StockMover, IndexData
@@ -10,11 +11,14 @@ router = APIRouter()
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
-    """Coerce numeric summary fields; fall back when missing or non-numeric."""
+    """Coerce numeric summary fields; fall back when missing, non-numeric, or non-finite."""
     try:
         if value is None:
             return default
-        return float(value)
+        result = float(value)
+        if not math.isfinite(result):
+            return default
+        return result
     except (TypeError, ValueError):
         return default
 
@@ -92,6 +96,8 @@ async def get_market_overview():
         
         # Load daily data
         df = loader.load_daily_data()
+        if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
+            raise HTTPException(status_code=404, detail="No data available.")
         
         # Calculate overall statistics
         total_stocks = len(df)
@@ -99,9 +105,9 @@ async def get_market_overview():
         losers = len(df[df['change_percent'] < 0])
         unchanged = len(df[df['change_percent'] == 0])
         
-        avg_change = float(df['change_percent'].mean())
-        max_change = float(df['change_percent'].max())
-        min_change = float(df['change_percent'].min())
+        avg_change = _safe_float(df['change_percent'].mean())
+        max_change = _safe_float(df['change_percent'].max())
+        min_change = _safe_float(df['change_percent'].min())
         
         # Calculate per-index statistics
         indices = {}
@@ -110,7 +116,7 @@ async def get_market_overview():
                 index_df = df[df['index_name'] == index_name]
                 indices[index_name.replace(' ', '')] = IndexData(
                     stocks=len(index_df),
-                    avgChange=float(index_df['change_percent'].mean()),
+                    avgChange=round(_safe_float(index_df['change_percent'].mean()), 2),
                     gainers=len(index_df[index_df['change_percent'] > 0]),
                     losers=len(index_df[index_df['change_percent'] < 0])
                 )
@@ -127,6 +133,8 @@ async def get_market_overview():
             indices=indices
         )
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -163,6 +171,8 @@ async def get_top_movers(
         
         return MoversResponse(type=type, data=movers)
     
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
@@ -174,6 +184,8 @@ async def get_market_summary():
     try:
         loader = get_data_loader()
         summary_data = loader.load_summary()
+    except HTTPException:
+        raise
     except ValueError:
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:

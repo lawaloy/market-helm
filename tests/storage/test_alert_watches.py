@@ -6,11 +6,13 @@ import pytest
 
 from src.storage.alert_watches import (
     MAX_DELIVERY_LOG,
+    InvalidAlertWatchConfig,
     latest_deliveries_for_user,
     list_enabled_symbols,
     list_watches_for_symbol,
     record_delivery,
     sync_watches_from_config,
+    validate_watches_config,
 )
 from src.storage.database import get_connection, init_database
 from src.storage.user_alerts import save_user_alerts_config
@@ -152,6 +154,29 @@ class TestAlertWatches:
         init_database()
 
         assert list_enabled_symbols() == []
+
+    def test_validate_rejects_non_finite_price_threshold(self, db_user):
+        """NaN/Inf thresholds must fail closed so watches cannot store corrupt prices."""
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with pytest.raises(InvalidAlertWatchConfig, match="invalid price threshold"):
+                validate_watches_config(
+                    db_user,
+                    {
+                        "defaults": {},
+                        "alerts": [
+                            {
+                                "id": "bad-finite",
+                                "enabled": True,
+                                "condition": {
+                                    "type": "price_threshold",
+                                    "symbol": "AAPL",
+                                    "operator": "less_than",
+                                    "value": bad,
+                                },
+                            }
+                        ],
+                    },
+                )
 
 
 class TestAlertDeliveryLog:

@@ -165,6 +165,92 @@ class TestMarketAPI:
         assert all(row["changePercent"] > 0 for row in gainer_rows)
         assert [row["symbol"] for row in gainer_rows] == ["AAPL", "MSFT"]
 
+    def test_market_overview_404_when_no_latest_date(self, temp_data_dir):
+        """No latest date must stay 404 (not swallowed into 500)."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = None
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/overview")
+
+        assert r.status_code == 404
+        assert "No data available" in r.json()["detail"]
+
+    def test_market_overview_404_when_daily_empty(self, temp_data_dir):
+        """Empty daily frame is treated as no usable overview data."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {"change_percent": pd.Series(dtype=float)}
+        )
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/overview")
+
+        assert r.status_code == 404
+
+    def test_market_overview_404_when_change_percent_missing(self, temp_data_dir):
+        """Missing change_percent column must 404 instead of KeyError→500."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_daily_data.return_value = pd.DataFrame({"symbol": ["AAPL"]})
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/overview")
+
+        assert r.status_code == 404
+
+    def test_market_overview_coerces_all_nan_change_percent(self, temp_data_dir):
+        """All-NaN change_percent must yield finite 0.0 stats, not null JSON floats."""
+        import dashboard.backend.api.market
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {
+                "symbol": ["AAPL", "MSFT"],
+                "change_percent": [float("nan"), float("nan")],
+                "index_name": ["S&P 500", "S&P 500"],
+            }
+        )
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get("/api/market/overview")
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["totalStocks"] == 2
+        assert data["averageChange"] == 0.0
+        assert data["maxChange"] == 0.0
+        assert data["minChange"] == 0.0
+        assert data["indices"]["S&P500"]["avgChange"] == 0.0
+
 
 class TestSummaryAPI:
     """Test summary API endpoint."""
@@ -417,6 +503,26 @@ class TestMarketAPIErrors:
 
         assert r.status_code == 404
         assert r.json()["detail"] == "No data available."
+
+    def test_data_info_happy_path(self, client, mock_data_loader, temp_data_dir):
+        """GET /api/data-info reports latest date, trading-day target, and needs_fetch."""
+        with patch(
+            "dashboard.backend.services.data_loader.get_data_loader",
+            return_value=mock_data_loader,
+        ):
+            with patch(
+                "dashboard.backend.services.data_loader.get_most_recent_trading_day",
+                return_value="2026-01-16",
+            ):
+                r = client.get("/api/data-info")
+
+        assert r.status_code == 200
+        data = r.json()
+        assert data["data_dir"] == str(temp_data_dir)
+        assert data["latest_date"] == "2026-01-15"
+        assert data["target_trading_day"] == "2026-01-16"
+        assert data["needs_fetch"] is True
+        assert "2026-01-15" in data["available_dates"]
 
     def test_summary_404_when_no_data(self, temp_data_dir):
         """Summary returns 404 when no summary files exist."""
