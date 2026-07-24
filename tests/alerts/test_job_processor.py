@@ -346,3 +346,59 @@ class TestJobProcessor:
         assert stats["delivered"] == 2
         urls = {call.args[0] for call in mock_post.call_args_list}
         assert urls == {"https://hooks.example/user-a", "https://hooks.example/user-b"}
+
+    def test_poison_evaluate_payload_fails_job_and_drains_siblings(self, db_user):
+        sync_watches_from_config(db_user, _watch_config())
+        poison_id = enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "tick_id": "poison"},  # missing price
+            max_attempts=1,
+        )
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "price": 150.0, "tick_id": "ok"},
+        )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 1
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 1
+        assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
+        with get_connection() as conn:
+            poison = conn.execute(
+                "SELECT status, last_error FROM alert_jobs WHERE id = ?",
+                (poison_id,),
+            ).fetchone()
+        assert poison["status"] == STATUS_FAILED
+        assert poison["last_error"]
+
+    def test_process_job_queue_stops_after_max_batches(self, db_user, caplog):
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        forever_job = {
+            "id": "synthetic-eval",
+            "payload": {"symbol": "AAPL", "price": 150.0},
+        }
+        claim_calls = {"n": 0}
+
+        def _claim(job_types, worker_id, limit=50):
+            claim_calls["n"] += 1
+            if JOB_EVALUATE_SYMBOL in job_types:
+                return [forever_job]
+            return []
+
+        with (
+            patch("src.alerts.job_processor.claim_jobs", side_effect=_claim),
+            patch("src.alerts.job_processor.complete_job"),
+            patch("src.alerts.job_processor._process_evaluate_symbol"),
+            caplog.at_level("WARNING"),
+        ):
+            stats = process_job_queue("batch-worker", max_batches=2)
+
+        assert stats["evaluated"] == 2
+        assert stats["failed"] == 0
+        assert claim_calls["n"] == 4  # eval + deliver per batch, twice
+        assert any("after 2 batches" in msg for msg in caplog.messages)

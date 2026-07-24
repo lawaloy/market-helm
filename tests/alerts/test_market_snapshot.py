@@ -50,3 +50,32 @@ def test_load_market_snapshot_backfills_watch_quotes_when_saved_data_missing():
     assert prices == {"NVDA": 900.5}
     assert stocks == [{"symbol": "NVDA", "price": "900.50"}]
     fetch_missing.assert_called_once_with([], ["NVDA"])
+
+
+def test_load_market_snapshot_skips_blank_symbols_and_non_numeric_closes():
+    loader = MagicMock()
+    loader.get_latest_date.return_value = "2026-06-09"
+    loader.load_daily_data.side_effect = ValueError("No daily data files found")
+
+    mixed_rows = [
+        {"symbol": "", "close": 10.0},
+        {"symbol": "AAPL", "close": None},
+        {"symbol": "MSFT", "price": "n/a"},
+        {"symbol": "googl", "price": "175.5"},
+    ]
+
+    with (
+        patch("src.alerts.market_snapshot._load_env"),
+        patch("dashboard.backend.services.data_loader.get_data_loader", return_value=loader),
+        patch(
+            "src.alerts.market_snapshot._fetch_missing_watch_quotes",
+            return_value=mixed_rows,
+        ) as fetch_missing,
+    ):
+        last_date, prices, stocks = load_market_snapshot(["", "  ", "googl"])
+
+    assert last_date == "2026-06-09"
+    assert prices == {"GOOGL": 175.5}
+    assert stocks == mixed_rows
+    # Blank / whitespace watch symbols are dropped before quote backfill.
+    fetch_missing.assert_called_once_with([], ["GOOGL"])
