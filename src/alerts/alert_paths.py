@@ -68,14 +68,23 @@ def _is_placeholder_webhook(url: str) -> bool:
     return host == "example.com" or host.endswith(".example.com")
 
 
-def polish_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
-    """Remove bundled placeholders and seed defaults from environment when available."""
+def polish_alerts_config(
+    config: Dict[str, Any],
+    *,
+    seed_env_email: bool = True,
+) -> Dict[str, Any]:
+    """Remove bundled placeholders and optionally seed defaults from environment.
+
+    Hosted multi-user saves must pass ``seed_env_email=False`` so a process-wide
+    ``ALERT_EMAIL_TO`` is never written into another tenant's config.
+    """
     polished = dict(config)
     defaults = dict(polished.get("defaults") or {})
 
-    env_email = (os.environ.get("ALERT_EMAIL_TO") or "").strip()
-    if env_email and not defaults.get("email_to"):
-        defaults["email_to"] = env_email
+    if seed_env_email:
+        env_email = (os.environ.get("ALERT_EMAIL_TO") or "").strip()
+        if env_email and not defaults.get("email_to"):
+            defaults["email_to"] = env_email
 
     polished["defaults"] = defaults
     alerts: list[Dict[str, Any]] = []
