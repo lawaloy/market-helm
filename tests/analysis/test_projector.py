@@ -4,6 +4,7 @@ Unit tests for Stock Projector module.
 Tests the projection generation, recommendation logic, and confidence scoring.
 """
 
+import math
 import pytest
 from datetime import datetime, timedelta
 
@@ -417,6 +418,44 @@ class TestStockProjector:
         assert len(sells) == 5
         assert [row["symbol"] for row in sells] == ["SELL5", "SELL4", "SELL3", "SELL2", "SELL1"]
         assert summary["total_projections"] == 13
+
+    def test_projection_summary_ignores_non_finite_confidence_and_change(self, projector):
+        """NaN/inf confidence or expected_change must not poison averages or rankings."""
+        projections = {
+            "OK": {
+                "symbol": "OK",
+                "target_mid": 110.0,
+                "confidence": 70.0,
+                "expected_change_percent": 2.5,
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+            "NANCONF": {
+                "symbol": "NANCONF",
+                "target_mid": 999.0,
+                "confidence": float("nan"),
+                "expected_change_percent": 50.0,
+                "recommendation": "STRONG BUY",
+                "trend": "up",
+            },
+            "INFCHG": {
+                "symbol": "INFCHG",
+                "target_mid": 120.0,
+                "confidence": 90.0,
+                "expected_change_percent": float("inf"),
+                "recommendation": "STRONG SELL",
+                "trend": "down",
+            },
+        }
+
+        summary = projector.generate_projection_summary(projections)
+
+        assert summary["average_confidence"] == 80.0  # (70 + 90) / 2
+        assert summary["average_expected_change"] == 2.5  # only finite expected change
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_buys"]] == ["OK"]
+        assert [row["symbol"] for row in summary["top_opportunities"]["strong_sells"]] == ["INFCHG"]
+        assert math.isfinite(summary["average_confidence"])
+        assert math.isfinite(summary["average_expected_change"])
 
     # ========== Date and Timestamp Tests ==========
 
