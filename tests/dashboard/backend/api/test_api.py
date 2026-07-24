@@ -195,6 +195,78 @@ class TestHistoryAccuracyAPI:
         assert len(data["samples"]) == 1
         assert data["samples"][0]["symbol"] == "AAPL"
 
+    def test_dates_and_symbols_endpoints(self, client, mock_data_loader, temp_data_dir):
+        """GET /api/history/dates and /symbols return catalog data."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL", "ZZZZ"],
+                "name": ["Apple Inc.", "Custom Co"],
+                "confidence": [50, 60],
+                "expected_change_percent": [0.5, -0.2],
+                "recommendation": ["HOLD", "BUY"],
+                "target_mid": [100.0, 10.0],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history.load_index_symbol_names",
+            return_value={"MSFT": "Microsoft"},
+        ):
+            dates = client.get("/api/history/dates")
+            symbols = client.get("/api/history/symbols")
+
+        assert dates.status_code == 200
+        assert "2026-01-15" in dates.json()["dates"]
+        assert symbols.status_code == 200
+        body = symbols.json()
+        assert body["date"] == "2026-01-15"
+        assert "MSFT" in body["symbols"]
+        assert "ZZZZ" in body["symbols"]
+        assert body["names"]["ZZZZ"] == "Custom Co"
+
+    def test_summary_skips_bad_dates_and_sets_sentiment(self, client, mock_data_loader, temp_data_dir):
+        """Historical summary skips unloadable dates and classifies sentiment bands."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "name": ["Apple"],
+                "confidence": [80],
+                "expected_change_percent": [2.5],
+                "recommendation": ["BUY"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "confidence": [40],
+                "expected_change_percent": [-1.5],
+                "recommendation": ["SELL"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        (temp_data_dir / "projections_2026-01-14.csv").write_text("broken")
+        # Daily files so get_available_dates includes these days
+        for d in ("2026-01-16", "2026-01-15", "2026-01-14"):
+            pd.DataFrame(
+                {"symbol": ["AAPL"], "close": [1.0], "change_percent": [0.0]}
+            ).to_csv(temp_data_dir / f"daily_data_{d}.csv", index=False)
+
+        with patch(
+            "dashboard.backend.api.history._resolve_company_names",
+            side_effect=lambda syms: {s: s for s in syms},
+        ):
+            r = client.get("/api/history/summary", params={"days": 10})
+
+        assert r.status_code == 200
+        body = r.json()
+        assert body["lastDate"] == "2026-01-16"
+        assert body["firstDate"] == "2026-01-14"
+        sentiments = {p["date"]: p["sentiment"] for p in body["data"]}
+        assert sentiments["2026-01-16"] == "Bullish"
+        assert sentiments["2026-01-15"] == "Bearish"
+        assert "2026-01-14" not in sentiments
+        assert "AAPL" in body["symbols"]
+
+
 
 class TestMarketAPIErrors:
     """Test API error handling."""
