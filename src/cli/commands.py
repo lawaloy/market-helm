@@ -2,13 +2,49 @@
 MarketHelm CLI — command-line interface for the daily tracker workflow.
 """
 
+from __future__ import annotations
+
+from datetime import datetime
+import math
+import sys
+from typing import Any
+
 from ..workflows.tracker import StockTrackerWorkflow
 from ..core.logger import setup_logger
-from datetime import datetime
-import sys
 
 # Set up logger
 logger = setup_logger()
+
+_MISSING = "—"
+
+
+def _fmt_number(
+    value: Any,
+    precision: int = 2,
+    *,
+    signed: bool = False,
+    default: str = _MISSING,
+) -> str:
+    """Format a numeric cell; None/NaN/Inf must not raise on :.Nf."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    if signed:
+        return f"{number:+.{precision}f}"
+    return f"{number:.{precision}f}"
+
+
+def _fmt_pct(value: Any, precision: int = 2, *, signed: bool = False) -> str:
+    formatted = _fmt_number(value, precision, signed=signed)
+    return f"{formatted}%" if formatted != _MISSING else _MISSING
+
+
+def _fmt_money(value: Any) -> str:
+    formatted = _fmt_number(value, 2)
+    return f"${formatted}" if formatted != _MISSING else _MISSING
 
 
 def display_results(result: dict):
@@ -50,23 +86,31 @@ def display_results(result: dict):
         logger.info(f"Gainers: {summary.get('gainers', 0)}")
         logger.info(f"Losers: {summary.get('losers', 0)}")
         logger.info(f"Unchanged: {summary.get('unchanged', 0)}")
-        logger.info(f"Average Change: {summary.get('average_change_percent', 0):.2f}%")
+        logger.info(
+            f"Average Change: {_fmt_pct(summary.get('average_change_percent', 0))}"
+        )
         logger.info("")
     
     # Top gainers
     if "top_gainers" in analysis and analysis["top_gainers"]:
         logger.info("Top 5 Gainers:")
         for i, stock in enumerate(analysis["top_gainers"], 1):
-            logger.info(f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
-                  f"+{stock['change_percent']:.2f}% @ ${stock['close']:.2f}")
+            logger.info(
+                f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
+                f"{_fmt_pct(stock.get('change_percent'), signed=True)} @ "
+                f"{_fmt_money(stock.get('close'))}"
+            )
         logger.info("")
     
     # Top losers
     if "top_losers" in analysis and analysis["top_losers"]:
         logger.info("Top 5 Losers:")
         for i, stock in enumerate(analysis["top_losers"], 1):
-            logger.info(f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
-                  f"{stock['change_percent']:.2f}% @ ${stock['close']:.2f}")
+            logger.info(
+                f"  {i}. {stock['symbol']} ({stock.get('name', 'N/A')}): "
+                f"{_fmt_pct(stock.get('change_percent'))} @ "
+                f"{_fmt_money(stock.get('close'))}"
+            )
         logger.info("")
     
     # Index comparison
@@ -75,7 +119,9 @@ def display_results(result: dict):
         for index_name, stats in index_comparison.items():
             logger.info(f"  {index_name}:")
             logger.info(f"    Stocks: {stats['stock_count']}")
-            logger.info(f"    Avg Change: {stats['average_change_percent']:.2f}%")
+            logger.info(
+                f"    Avg Change: {_fmt_pct(stats.get('average_change_percent'))}"
+            )
             logger.info(f"    Gainers: {stats['gainers']} | Losers: {stats['losers']}")
         logger.info("")
     
@@ -87,8 +133,14 @@ def display_results(result: dict):
         
         # Overall projection stats
         logger.info(f"Total Projections: {projection_summary.get('total_projections', 0)}")
-        logger.info(f"Average Confidence: {projection_summary.get('average_confidence', 0):.1f}%")
-        logger.info(f"Expected Market Move: {projection_summary.get('average_expected_change', 0):+.2f}%")
+        logger.info(
+            f"Average Confidence: "
+            f"{_fmt_pct(projection_summary.get('average_confidence', 0), precision=1)}"
+        )
+        logger.info(
+            f"Expected Market Move: "
+            f"{_fmt_pct(projection_summary.get('average_expected_change', 0), signed=True)}"
+        )
         logger.info("")
         
         # Recommendation breakdown
@@ -107,10 +159,13 @@ def display_results(result: dict):
             for i, stock in enumerate(opportunities['strong_buys'][:5], 1):
                 proj = projections.get(stock['symbol'])
                 if proj:
-                    logger.info(f"  {i}. {proj['symbol']} - Target: ${proj['target_mid']:.2f} "
-                          f"({proj['expected_change_percent']:+.1f}%) | "
-                          f"Confidence: {proj['confidence']}%")
-                    logger.info(f"     Reason: {proj['reason']}")
+                    logger.info(
+                        f"  {i}. {proj['symbol']} - Target: "
+                        f"{_fmt_money(proj.get('target_mid'))} "
+                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"Confidence: {proj.get('confidence', _MISSING)}%"
+                    )
+                    logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
         
         if opportunities.get('strong_sells'):
@@ -118,10 +173,13 @@ def display_results(result: dict):
             for i, stock in enumerate(opportunities['strong_sells'][:5], 1):
                 proj = projections.get(stock['symbol'])
                 if proj:
-                    logger.info(f"  {i}. {proj['symbol']} - Target: ${proj['target_mid']:.2f} "
-                          f"({proj['expected_change_percent']:+.1f}%) | "
-                          f"Confidence: {proj['confidence']}%")
-                    logger.info(f"     Reason: {proj['reason']}")
+                    logger.info(
+                        f"  {i}. {proj['symbol']} - Target: "
+                        f"{_fmt_money(proj.get('target_mid'))} "
+                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"Confidence: {proj.get('confidence', _MISSING)}%"
+                    )
+                    logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
         
         logger.info(f"Full projections available in summary file")
