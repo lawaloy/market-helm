@@ -132,9 +132,19 @@ def _platform_from_address(alert: Optional[Dict[str, Any]] = None) -> Optional[s
 
 
 def _resolve_recipients(alert: Dict[str, Any]) -> List[str]:
-    return parse_recipients(alert.get("email_to")) or parse_recipients(
-        os.environ.get("ALERT_EMAIL_TO")
+    """Resolve To: addresses, preferring per-alert recipients.
+
+    Hosted multi-user mode must not fall back to process-wide ``ALERT_EMAIL_TO``
+    (mirrors webhook ``_allow_env_webhook`` isolation). Opt in with
+    ``_allow_env_email=True`` when intentionally using the shared env mailbox.
+    """
+    from src.storage.database import database_enabled
+
+    allow_env_email = alert.get("_allow_env_email", not database_enabled()) is not False
+    env_recipients = (
+        parse_recipients(os.environ.get("ALERT_EMAIL_TO")) if allow_env_email else []
     )
+    return parse_recipients(alert.get("email_to")) or env_recipients
 
 
 class EmailDeliveryBackend(ABC):
@@ -380,7 +390,11 @@ class MailgunEmailBackend(EmailDeliveryBackend):
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
     host = alert.get("smtp_host") or os.environ.get("SMTP_HOST")
-    port_raw = alert.get("smtp_port") or os.environ.get("SMTP_PORT", "587")
+    # Do not use `or` for port — 0 is falsy but must be rejected as invalid,
+    # not silently replaced by the SMTP_PORT default.
+    port_raw = alert.get("smtp_port")
+    if port_raw is None or (isinstance(port_raw, str) and not str(port_raw).strip()):
+        port_raw = os.environ.get("SMTP_PORT", "587")
     username = alert.get("smtp_user") or os.environ.get("SMTP_USER")
     password = alert.get("smtp_password") or os.environ.get("SMTP_PASSWORD")
 
@@ -399,8 +413,11 @@ def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
 
     try:
         port = int(port_raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         logger.warning("Invalid SMTP port %r; expected an integer.", port_raw)
+        return None
+    if port < 1 or port > 65535:
+        logger.warning("Invalid SMTP port %r; expected 1..65535.", port_raw)
         return None
 
     use_ssl = env_bool("SMTP_USE_SSL") or port == 465
