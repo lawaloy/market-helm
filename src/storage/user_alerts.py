@@ -35,8 +35,12 @@ def _merge_existing_webhook_secrets(
         return config
 
     merged = dict(config)
-    defaults = dict(merged.get("defaults") or {})
-    _copy_webhook_secret_if_missing(defaults, existing.get("defaults") or {})
+    raw_defaults = merged.get("defaults")
+    defaults = dict(raw_defaults) if isinstance(raw_defaults, dict) else {}
+    existing_defaults = existing.get("defaults")
+    if not isinstance(existing_defaults, dict):
+        existing_defaults = {}
+    _copy_webhook_secret_if_missing(defaults, existing_defaults)
     merged["defaults"] = defaults
 
     existing_alerts = {
@@ -59,7 +63,11 @@ def _merge_existing_webhook_secrets(
 
 
 def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
-    """Return (exists, config). config is None when the user has no row yet."""
+    """Return (exists, config). config is None when the user has no row yet.
+
+    Corrupt / non-object JSON soft-fails to (True, None) so Settings GET can
+    recover instead of 500ing — mirrors file-mode load_alerts_config.
+    """
     with get_connection() as conn:
         row = conn.execute(
             "SELECT config_json FROM user_alert_configs WHERE user_id = ?",
@@ -67,7 +75,13 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
         ).fetchone()
     if not row:
         return False, None
-    return True, json.loads(row["config_json"])
+    try:
+        data = json.loads(row["config_json"])
+    except (TypeError, json.JSONDecodeError):
+        return True, None
+    if not isinstance(data, dict):
+        return True, None
+    return True, data
 
 
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
