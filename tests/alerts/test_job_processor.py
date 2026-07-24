@@ -524,3 +524,40 @@ class TestJobProcessor:
         assert {(row["user_id"], row["alert_id"]) for row in rows} == {
             (db_user, "aapl-low"),
         }
+
+    def test_poison_evaluate_payload_skips_and_drains_siblings(self, db_user):
+        """Missing price soft-skips; sibling evaluate jobs still process."""
+        sync_watches_from_config(db_user, _watch_config())
+        poison_id = enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "tick_id": "poison"},  # missing price
+            max_attempts=1,
+        )
+        enqueue_job(
+            JOB_EVALUATE_SYMBOL,
+            {"symbol": "AAPL", "price": 150.0, "tick_id": "ok"},
+        )
+
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+            stats = process_job_queue("test-worker")
+
+        assert stats["evaluated"] == 2
+        assert stats["delivered"] == 1
+        assert stats["failed"] == 0
+        assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
+        with get_connection() as conn:
+            poison = conn.execute(
+                "SELECT status FROM alert_jobs WHERE id = ?",
+                (poison_id,),
+            ).fetchone()
+        assert poison["status"] == "completed"
+
+    def test_process_job_queue_stops_after_max_batches(self, db_user, caplog):
+        sync_watches_from_config(db_user, _watch_config())
+        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+
+        forever_job = {
+            "id": "synthetic-eval",
+            "payload": {"symbol": "AAPL", "price": 150.0},
+        }
+        claim_calls = {"n": 0}
