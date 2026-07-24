@@ -152,6 +152,18 @@ class TestDataStorage(unittest.TestCase):
     def test_save_projections_empty_returns_none(self):
         self.assertIsNone(self.storage.save_projections({}))
 
+    def test_load_daily_data_missing_file_returns_none(self):
+        """Absent daily CSV soft-fails to None instead of raising."""
+        self.assertIsNone(self.storage.load_daily_data(date=date(2099, 1, 1)))
+
+    def test_load_daily_data_corrupt_csv_returns_none(self):
+        """Unreadable daily CSV soft-fails to None so callers can skip the day."""
+        bad_path = Path(self.test_data_dir) / "daily_data_2099-01-02.csv"
+        bad_path.write_bytes(b"\xff\xfe not,valid,csv\n\x00\x01")
+        with unittest.mock.patch("builtins.print"):
+            loaded = self.storage.load_daily_data(date=date(2099, 1, 2))
+        self.assertIsNone(loaded)
+
 
 if __name__ == '__main__':
     unittest.main()
