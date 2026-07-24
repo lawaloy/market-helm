@@ -17,8 +17,15 @@ from src.utils.tickers import normalize_ticker
         ("   ", None),
         (None, None),
         (float("nan"), None),
+        (float("inf"), None),
+        (float("-inf"), None),
         ("nan", None),
         ("NaN", None),
+        ("inf", None),
+        ("INF", None),
+        ("-inf", None),
+        ("Infinity", None),
+        ("-INFINITY", None),
         ("none", None),
         ("NULL", None),
         ("<NA>", None),
@@ -32,3 +39,9 @@ def test_normalize_ticker(raw, expected):
 def test_normalize_ticker_rejects_nan_float_via_math():
     assert math.isnan(float("nan"))
     assert normalize_ticker(float("nan")) is None
+
+
+def test_normalize_ticker_rejects_inf_float_via_math():
+    assert math.isinf(float("inf"))
+    assert normalize_ticker(float("inf")) is None
+    assert normalize_ticker(float("-inf")) is None
