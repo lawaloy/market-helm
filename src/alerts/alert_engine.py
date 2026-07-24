@@ -184,7 +184,11 @@ class AlertEngine:
             elif condition_type == "screening_match":
                 for stock in stocks:
                     if evaluate_screening_match(condition, stock):
-                        triggered_symbols.append(stock.get("symbol"))
+                        # Mirror price_threshold: drop None/NaN/padded sentinels
+                        # so events never carry raw CSV junk into notifications.
+                        symbol = normalize_ticker(stock.get("symbol"))
+                        if symbol:
+                            triggered_symbols.append(symbol)
             else:
                 logger.warning(f"Unsupported alert condition: {condition_type}")
                 continue
