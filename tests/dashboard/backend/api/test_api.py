@@ -613,6 +613,31 @@ class TestHistoryAccuracyAPI:
         assert len(data["samples"]) == 1
         assert data["samples"][0]["symbol"] == "AAPL"
 
+    def test_accuracy_valueerror_maps_to_404(self, client, mock_data_loader):
+        """GET /api/history/accuracy maps loader ValueError to 404 (not 500)."""
+        mock_data_loader.compute_projection_accuracy = MagicMock(
+            side_effect=ValueError("No projection files found")
+        )
+        r = client.get("/api/history/accuracy", params={"days": 30})
+        assert r.status_code == 404
+        assert r.json()["detail"] == "No data available."
+
+    def test_history_dates_and_symbols_valueerror_maps_to_404(self, client, mock_data_loader):
+        """GET /api/history/dates and /symbols map loader ValueError to 404."""
+        mock_data_loader.get_available_dates = MagicMock(
+            side_effect=ValueError("Data directory not found")
+        )
+        dates = client.get("/api/history/dates")
+        assert dates.status_code == 404
+        assert dates.json()["detail"] == "No data available."
+
+        mock_data_loader.get_latest_date = MagicMock(
+            side_effect=ValueError("No projection files found")
+        )
+        symbols = client.get("/api/history/symbols")
+        assert symbols.status_code == 404
+        assert symbols.json()["detail"] == "No data available."
+
 
 class TestMarketAPIErrors:
     """Test API error handling."""

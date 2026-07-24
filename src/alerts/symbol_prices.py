@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
@@ -38,9 +39,13 @@ def prices_from_saved_daily_data() -> Dict[str, float]:
         if not symbol or close is None:
             continue
         try:
-            prices[symbol] = float(close)
+            value = float(close)
         except (TypeError, ValueError):
             continue
+        # float("nan") succeeds; skip so alert quotes stay JSON-safe.
+        if not math.isfinite(value):
+            continue
+        prices[symbol] = value
     return prices
 
 
@@ -97,6 +102,9 @@ def _fetch_one_quote(fetcher, symbol: str) -> tuple[str, float | None]:
     if close is None:
         return symbol, None
     try:
-        return symbol, float(close)
+        value = float(close)
     except (TypeError, ValueError):
         return symbol, None
+    if not math.isfinite(value):
+        return symbol, None
+    return symbol, value
