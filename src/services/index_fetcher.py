@@ -117,17 +117,9 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback to static list or Wikipedia
-        logger.info("Falling back to alternative source...")
-        updated = self._update_from_wikipedia("S&P 500")
-        if updated and len(updated) > 400:
-            self._save_to_cache("S&P 500", updated)
-            return updated
-        
-        # Last resort: minimal fallback list
-        logger.warning("Using minimal fallback list - package and Wikipedia both failed")
-        fallback_list = self._get_minimal_fallback("S&P 500")
-        return fallback_list
+        # Last resort: minimal fallback (Wikipedia scraping was removed)
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("S&P 500")
     
     def get_nasdaq100_symbols(self) -> List[str]:
         """Get all NASDAQ-100 stock symbols using pytickersymbols package."""
@@ -149,14 +141,8 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback
-        updated = self._update_from_wikipedia("NASDAQ-100")
-        if updated and len(updated) > 90:
-            self._save_to_cache("NASDAQ-100", updated)
-            return updated
-        
-        fallback_list = self._get_minimal_fallback("NASDAQ-100")
-        return fallback_list
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("NASDAQ-100")
     
     def get_dow30_symbols(self) -> List[str]:
         """Get all Dow Jones Industrial Average (30 stocks) symbols using pytickersymbols package."""
@@ -169,13 +155,14 @@ class IndexFetcher:
             try:
                 logger.info("Fetching Dow 30 symbols from pytickersymbols package...")
                 # Try different index name variations
+                symbols: List[str] = []
                 for index_name_variant in ['DOW JONES', 'Dow Jones', 'DJIA']:
                     try:
                         stocks = list(self.ticker_symbols.get_stocks_by_index(index_name_variant))
                         symbols = [stock.get('symbol') for stock in stocks if stock.get('symbol')]
                         if symbols and len(symbols) >= 30:
                             break
-                    except:
+                    except Exception:
                         continue
                 
                 if symbols and len(symbols) >= 30:
@@ -185,14 +172,8 @@ class IndexFetcher:
             except Exception as e:
                 logger.warning(f"Failed to fetch from package: {e}")
         
-        # Fallback
-        updated = self._update_from_wikipedia("Dow Jones")
-        if updated and len(updated) >= 30:
-            self._save_to_cache("Dow Jones", updated)
-            return updated
-        
-        fallback_list = self._get_minimal_fallback("Dow Jones")
-        return fallback_list
+        logger.warning("Using minimal fallback list - package unavailable or returned bad data")
+        return self._get_minimal_fallback("Dow Jones")
     
     def get_index_symbols(self, index_name: str) -> List[str]:
         """
