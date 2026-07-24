@@ -260,11 +260,18 @@ class TestAlertsConfigAPI:
         assert r.status_code == 200
         assert r.json()["triggered"] == 0
 
-    def test_put_config_rejects_non_list_alerts(self, client, alerts_config_dir):
-        r = client.put(
-            "/api/alerts/config",
-            json={"defaults": {}, "alerts": {"id": "not-a-list"}},
+    def test_normalize_config_rejects_non_list_alerts_and_normalizes_format(self):
+        from fastapi import HTTPException
+
+        from dashboard.backend.api.alerts import _normalize_config
+
+        with pytest.raises(HTTPException) as exc_info:
+            _normalize_config({"defaults": {}, "alerts": {"id": "not-a-list"}})
+        assert exc_info.value.status_code == 400
+        assert "alerts" in str(exc_info.value.detail).lower()
+
+        normalized = _normalize_config(
+            {"defaults": {"webhook_format": " Discord "}, "alerts": []}
         )
-        assert r.status_code == 400
-        assert "alerts" in r.json()["detail"].lower()
-        assert not (alerts_config_dir / "alerts.json").exists()
+        assert normalized["defaults"]["webhook_format"] == "discord"
+        assert _normalize_config(None) == {"defaults": {}, "alerts": []}
