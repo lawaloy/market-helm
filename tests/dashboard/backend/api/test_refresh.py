@@ -49,6 +49,8 @@ class FakeProcess:
     def kill(self) -> None:
         self.killed = True
         self._running = False
+        # After kill, a subsequent wait() should succeed.
+        self._hang_on_wait = False
 
 
 def reset_refresh_state() -> None:
@@ -150,6 +152,103 @@ def test_trigger_refresh_reports_already_running() -> None:
     assert response.status == "already_running"
     assert response.is_running is True
     assert "already in progress" in response.message
+
+
+def test_trigger_refresh_rejects_without_api_key_or_env_file(monkeypatch) -> None:
+    """Hosted refresh must fail closed when Finnhub credentials are missing."""
+    reset_refresh_state()
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+
+    response = asyncio.run(refresh.trigger_refresh(BackgroundTasks()))
+
+    assert response.status == "error"
+    assert response.is_running is False
+    assert "API key" in response.message
+    assert refresh.refresh_status["last_status"] == "error"
+    assert refresh.refresh_status["is_running"] is False
+
+
+def test_run_daily_tracker_timeout_terminates_without_alert_check(monkeypatch) -> None:
+    """Wall-clock timeout must stop a hung child and skip post-refresh alerts."""
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0, running=True)
+    alert_check = MagicMock(return_value={"triggered": 0})
+    clock = {"t": 1_000.0}
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(return_value=fake_process))
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "5")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", alert_check)
+    monkeypatch.setattr(refresh.time, "time", lambda: clock["t"])
+    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 10))
+
+    refresh.run_daily_tracker()
+
+    assert fake_process.terminated is True
+    assert fake_process.wait_timeouts == [30]
+    assert refresh.refresh_status["last_status"] == "timeout"
+    assert "timed out" in refresh.refresh_status["progress"].lower()
+    assert refresh.refresh_status["is_running"] is False
+    alert_check.assert_not_called()
+
+
+def test_run_daily_tracker_kills_child_when_wait_hangs_after_timeout(monkeypatch) -> None:
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0, running=True, hang_on_wait=True)
+    clock = {"t": 1_000.0}
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(return_value=fake_process))
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "1")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+    monkeypatch.setattr(refresh.time, "time", lambda: clock["t"])
+    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 5))
+
+    refresh.run_daily_tracker()
+
+    assert fake_process.terminated is True
+    assert fake_process.killed is True
+    assert fake_process.wait_timeouts == [30, 10]
+    assert refresh.refresh_status["last_status"] == "timeout"
+    assert refresh.refresh_status["is_running"] is False
+
+
+def test_run_daily_tracker_marks_error_on_nonzero_returncode(monkeypatch) -> None:
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=2)
+    alert_check = MagicMock(return_value={"triggered": 0})
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(return_value=fake_process))
+    monkeypatch.setenv("REFRESH_TOP_N", "0")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", alert_check)
+
+    refresh.run_daily_tracker()
+
+    assert refresh.refresh_status["last_status"] == "error"
+    assert refresh.refresh_status["is_running"] is False
+    alert_check.assert_not_called()
+
+
+def test_run_daily_tracker_clamps_small_and_invalid_top_n(monkeypatch) -> None:
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=0)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "3")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+    command = popen.call_args.args[0]
+    assert "--top-n" in command
+    assert command[command.index("--top-n") + 1] == "10"
+
+    reset_refresh_state()
+    popen.reset_mock()
+    monkeypatch.setenv("REFRESH_TOP_N", "not-a-number")
+    refresh.run_daily_tracker()
+    command = popen.call_args.args[0]
+    assert command[command.index("--top-n") + 1] == "10"
 
 
 def test_cancel_refresh_terminates_running_process() -> None:
