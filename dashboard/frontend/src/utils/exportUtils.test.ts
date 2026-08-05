@@ -45,7 +45,7 @@ describe('escapeCsvCell', () => {
 });
 
 describe('exportToCsv', () => {
-  const createObjectURL = vi.fn(() => 'blob:mock');
+  const createObjectURL = vi.fn();
   const revokeObjectURL = vi.fn();
   let click: ReturnType<typeof vi.fn>;
   let lastHref: string | undefined;
@@ -57,16 +57,16 @@ describe('exportToCsv', () => {
     lastHref = undefined;
     lastDownload = undefined;
     lastBlob = undefined;
-    createObjectURL.mockClear();
-    revokeObjectURL.mockClear();
+    createObjectURL.mockReset();
+    revokeObjectURL.mockReset();
     createObjectURL.mockImplementation((blob: Blob) => {
       lastBlob = blob;
       return 'blob:mock';
     });
 
     vi.stubGlobal('URL', {
-      createObjectURL,
-      revokeObjectURL,
+      createObjectURL: createObjectURL as never,
+      revokeObjectURL: revokeObjectURL as never,
     });
 
     const originalCreateElement = document.createElement.bind(document);
