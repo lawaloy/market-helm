@@ -88,6 +88,41 @@ class TestProjectionAccuracyInvalidDates:
         assert sample["absErrorPct"] == 10.0
 
 
+class TestProjectionAccuracyRecommendationSentinels:
+    def test_nan_recommendation_becomes_unknown(self, loader, temp_data_dir):
+        """NaN recommendation cells must not create a \"nan\" accuracy bucket."""
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [100.0],
+                "change_percent": [0.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-01.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "close": [110.0],
+                "change_percent": [1.0],
+            }
+        ).to_csv(temp_data_dir / "daily_data_2026-01-06.csv", index=False)
+        pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "target_mid": [100.0],
+                "recommendation": [float("nan")],
+                "projection_date": ["2026-01-06"],
+            }
+        ).to_csv(temp_data_dir / "projections_2026-01-01.csv", index=False)
+
+        out = loader.compute_projection_accuracy(days=90)
+
+        assert out["summary"]["sampleCount"] == 1
+        assert out["samples"][0]["recommendation"] == "UNKNOWN"
+        assert "nan" not in {k.lower() for k in out["summary"]["byRecommendation"]}
+        assert "UNKNOWN" in out["summary"]["byRecommendation"]
+        assert out["summary"]["byRecommendation"]["UNKNOWN"]["count"] == 1
+
+
 class TestHistoricalCorruptProjections:
     def test_load_historical_data_keeps_daily_when_projections_unreadable(
         self, loader, temp_data_dir
