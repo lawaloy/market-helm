@@ -19,6 +19,8 @@ from src.storage.alert_jobs import (
     fail_job,
     new_worker_id,
 )
+from src.storage.alert_watches import get_last_triggered as get_raw_triggered
+from src.storage.alert_watches import get_watch
 from src.storage.alert_watches import list_watches_for_symbol
 from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
@@ -49,8 +51,7 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
     last = storage.get_last_triggered(alert_id)
     if not last:
         return False
-    if last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)
+    last = _as_utc(last)
     return datetime.now(timezone.utc) - last < timedelta(minutes=cooldown_minutes)
 
 
@@ -153,12 +154,17 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
 
     # A worker can die after the notification and trigger marker commit but before
     # completing the queue job. Stale-job recovery must not resend that event.
+    # Missing/invalid event timestamps — or unparseable stored markers — must still
+    # skip when a prior successful attempt left a trigger row.
     if job["attempts"] > 1:
         event_at = _event_timestamp(event)
-        last_triggered = storage.get_last_triggered(alert_id)
-        if event_at is not None and last_triggered is not None:
-            last_triggered = _as_utc(last_triggered)
-            if last_triggered >= event_at:
+        raw_triggered = get_raw_triggered(user_id, alert_id)
+        if raw_triggered:
+            last_triggered = storage.get_last_triggered(alert_id)
+            skip = event_at is None or last_triggered is None
+            if not skip and last_triggered is not None:
+                skip = _as_utc(last_triggered) >= event_at
+            if skip:
                 logger.info(
                     "Skipping already-delivered retry for alert %s (job %s, attempt %s)",
                     alert_id,
@@ -166,8 +172,6 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
                     job["attempts"],
                 )
                 return False
-
-    from src.storage.alert_watches import get_watch
 
     watch = get_watch(user_id, alert_id)
     if not watch:

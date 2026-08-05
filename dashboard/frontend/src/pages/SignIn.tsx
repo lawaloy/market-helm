@@ -6,6 +6,14 @@ import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
+/** Only same-app relative paths; reject protocol-relative and external URLs. */
+export function safeReturnPath(raw: string | null): string {
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+    return '/alerts';
+  }
+  return raw;
+}
+
 const SignIn: React.FC = () => {
   const { login, register, multiUserEnabled, loading } = useAuth();
   const navigate = useNavigate();
@@ -16,7 +24,7 @@ const SignIn: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const returnTo = searchParams.get('return') || '/alerts';
+  const returnTo = safeReturnPath(searchParams.get('return'));
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

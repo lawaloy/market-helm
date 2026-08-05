@@ -43,6 +43,56 @@ describe('AuthProvider', () => {
     expect(me).toHaveBeenCalledTimes(1);
   });
 
+  it('treats a 500 /me probe as single-user mode (fail-closed)', async () => {
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(500));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+    });
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a network /me probe failure as single-user mode (fail-closed)', async () => {
+    const networkErr = {
+      isAxiosError: true,
+      message: 'Network Error',
+      response: undefined,
+    };
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(networkErr);
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+    });
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a non-axios probe failure as single-user mode (fail-closed)', async () => {
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(new Error('boom'));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+    });
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
   it('clears an invalid stored token and keeps hosted mode enabled after a 401 probe', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, 'stale-token');
     const me = vi

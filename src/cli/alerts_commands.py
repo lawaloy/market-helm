@@ -20,6 +20,7 @@ from ..alerts.alert_paths import (
     resolve_alerts_config_path,
 )
 from ..core.logger import setup_logger
+from ..storage.database import database_enabled
 
 logger = setup_logger()
 
@@ -148,13 +149,18 @@ def run_alert_test(
     storage: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Send or preview a test notification; returns a structured result for API/CLI."""
+    # Hosted multi-user must not copy process-wide ALERT_EMAIL_TO into in-memory
+    # defaults (then apply_alert_defaults → notifier). File-mode CLI still seeds.
+    seed_env_email = not database_enabled()
     if config is not None:
-        polished = polish_alerts_config(config)
+        polished = polish_alerts_config(config, seed_env_email=seed_env_email)
     else:
         path = resolve_alerts_config_path(config_path)
         if not path.exists():
             raise FileNotFoundError(f"No alerts config at {path}")
-        polished = polish_alerts_config(_load_config(path))
+        polished = polish_alerts_config(
+            _load_config(path), seed_env_email=seed_env_email
+        )
 
     alert = _find_alert(polished.get("alerts", []), alert_id)
     if alert is None:
