@@ -64,29 +64,40 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
   const [selectedStock, setSelectedStock] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
+  /** Bumped on each load / unmount so late phase-1/phase-2 responses are ignored. */
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
-    fetchDashboardData(false);
+    return () => {
+      loadGenerationRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
+    void fetchDashboardData(false);
   }, []);
 
   useEffect(() => {
     if (isInitialMount.current) return;
-    fetchDashboardData(true);
+    void fetchDashboardData(true);
   }, [refreshKey]);
 
   const fetchDashboardData = async (silent = false) => {
+    const generation = ++loadGenerationRef.current;
     if (!silent) {
       setLoading(true);
     }
     setError(null);
     setSecondaryError(null);
-    
+
     try {
       // Phase 1: core data for fast initial render
       const [marketRes, projectionsRes] = await Promise.all([
         marketApi.getOverview(),
         projectionsApi.getSummary(),
       ]);
+
+      if (generation !== loadGenerationRef.current) return;
 
       setMarketOverview(marketRes.data);
       setProjectionsSummary(projectionsRes.data);
@@ -117,6 +128,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
           projectionsApi.getOpportunities('STRONG_SELL', 50),
         ]);
 
+        if (generation !== loadGenerationRef.current) return;
+
         setGainers(gainersRes.data.data);
         setLosers(losersRes.data.data);
         setStrongBuyOpps(strongBuyRes.data.opportunities);
@@ -131,16 +144,21 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
         ];
         setAllOpportunities(combined);
       } catch (secondaryErr) {
+        if (generation !== loadGenerationRef.current) return;
         console.error('Error fetching secondary data:', secondaryErr);
         if (!silent) setSecondaryError('Some sections failed to load. You can retry.');
       } finally {
-        if (!silent) setSecondaryLoading(false);
+        if (generation === loadGenerationRef.current && !silent) {
+          setSecondaryLoading(false);
+        }
       }
 
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       console.error('Error fetching dashboard data:', err);
       setError(dashboardLoadErrorMessage(err));
     } finally {
+      if (generation !== loadGenerationRef.current) return;
       setLoading(false);
       if (!silent) isInitialMount.current = false;
     }
