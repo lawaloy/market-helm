@@ -13,9 +13,9 @@
 | **1 — Storage** | SQLite (dev) / PostgreSQL (prod later); `users` + per-user alert config JSON | Done |
 | **2 — Auth API** | Register, login, session token; `GET /api/auth/me` | Done |
 | **3 — Alerts API** | When multi-user enabled, `/api/alerts/*` scoped to authenticated user | Done |
-| **4 — Helmtower UI** | Sign-in / sign-up screens; attach token to API calls | Done (PR pending) |
-| **5 — Worker** | Evaluate all users' enabled watches on schedule | Planned |
-| **6 — Production** | Postgres, password reset, rate limits, SMS/push | Planned |
+| **4 — Helmtower UI** | Sign-in / sign-up screens; attach token to API calls | Done |
+| **5 — Worker** | Evaluate all users' enabled watches on schedule | Done |
+| **6 — Production** | Migrations, Postgres, password reset, rate limits, SMS/push | In progress |
 
 Market **data** (CSV/JSON under `DATA_DIR`) stays shared platform data. Only **user preferences and alert rules** move to the database.
 
@@ -31,6 +31,14 @@ export MARKET_HELM_AUTH_SECRET=change-me-in-production-min-16-chars
 ```
 
 When `MARKET_HELM_DATABASE_URL` is **unset**, behavior is unchanged (file-backed alerts).
+
+### Schema upgrades
+
+`init_database()` applies pending schema migrations in version order at startup.
+Existing SQLite installations created before migration tracking are adopted safely:
+the idempotent initial schema is applied and recorded without deleting user data.
+The application fails closed when it encounters an unknown newer schema version,
+which prevents an older release from silently corrupting an upgraded database.
 
 ### Auth flow
 
@@ -59,10 +67,10 @@ curl http://localhost:8000/api/alerts/config \
 
 ---
 
-## Next (after this foundation PR)
+## Next
 
 | Priority | Work |
 |----------|------|
-| 1 | **Multi-user worker** — loop over all users with enabled watches; evaluate + deliver per user |
-| 2 | **Per-user delivery log** — scope delivery status to authenticated user in DB mode |
-| 3 | **Production** — Postgres driver, password reset, rate limits, hosted deploy docs |
+| 1 | **PostgreSQL storage** — add a production database adapter using the versioned schema boundary |
+| 2 | **Auth lifecycle** — password reset, email verification, and session invalidation |
+| 3 | **Production controls** — rate limits, account controls, observability, hosted deploy docs |
