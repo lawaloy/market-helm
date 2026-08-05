@@ -230,8 +230,22 @@ def main():
         alerts_main(sys.argv[2:])
         return
 
+    def _positive_top_n(value: str) -> int:
+        """Reject non-positive --top-n before negative slices invert ranking."""
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:
+            raise argparse.ArgumentTypeError(
+                f"--top-n must be a positive integer, got {value!r}"
+            ) from exc
+        if number <= 0:
+            raise argparse.ArgumentTypeError(
+                f"--top-n must be a positive integer, got {number}"
+            )
+        return number
+
     parser = argparse.ArgumentParser(description='MarketHelm — daily market run (day-trading oriented)')
-    parser.add_argument('--top-n', type=int, default=None, 
+    parser.add_argument('--top-n', type=_positive_top_n, default=None, 
                        help='Limit to top N stocks by volume (e.g. --top-n 50 for day trading)')
     parser.add_argument('--no-screener', action='store_true',
                        help='Disable stock screener')
