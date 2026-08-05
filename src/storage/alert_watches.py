@@ -70,6 +70,12 @@ def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
         raise InvalidAlertWatchConfig(
             f"Alert '{alert_id}' has an invalid cooldown_minutes value."
         )
+    if as_float < 0:
+        # Negative cooldown is treated as "no cooldown" by evaluators; reject
+        # at save so Settings cannot silently disable rate limiting.
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        )
     try:
         return int(as_float)
     except (TypeError, ValueError, OverflowError) as exc:

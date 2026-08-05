@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   buildNotifications,
   buildSymbolOptions,
@@ -6,10 +6,22 @@ import {
   dedupeAlerts,
   emptyConfig,
   findDuplicatePriceRule,
+  loadSymbolCatalog,
   parseSymbolCatalog,
   priceAlertKey,
 } from './alertsUtils';
 import type { AlertRule, AlertsConfig, ChannelStatus } from '../../types';
+
+vi.mock('../../services/api', () => ({
+  alertsApi: {
+    getSymbols: vi.fn(),
+  },
+  historyApi: {
+    getSymbols: vi.fn(),
+  },
+}));
+
+import { alertsApi, historyApi } from '../../services/api';
 
 function priceRule(
   id: string,
@@ -200,5 +212,71 @@ describe('buildSymbolOptions', () => {
       'AAA',
       'Zebra (ZZZ)',
     ]);
+  });
+});
+
+describe('loadSymbolCatalog', () => {
+  beforeEach(() => {
+    vi.mocked(alertsApi.getSymbols).mockReset();
+    vi.mocked(historyApi.getSymbols).mockReset();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      }),
+    );
+  });
+
+  it('prefers the longest catalog and merges prices across sources', async () => {
+    vi.mocked(alertsApi.getSymbols).mockResolvedValue({
+      data: { symbols: ['AAPL'], prices: { AAPL: 100 } },
+    } as never);
+    vi.mocked(historyApi.getSymbols).mockResolvedValue({
+      data: {
+        symbols: ['AAPL', 'MSFT'],
+        names: { MSFT: 'Microsoft' },
+        prices: { MSFT: 200 },
+      },
+    } as never);
+
+    const result = await loadSymbolCatalog();
+
+    expect(result.options.map((o) => o.value).sort()).toEqual(['AAPL', 'MSFT']);
+    expect(result.prices).toEqual({ AAPL: 100, MSFT: 200 });
+  });
+
+  it('falls through to static JSON when APIs fail', async () => {
+    vi.mocked(alertsApi.getSymbols).mockRejectedValue(new Error('down'));
+    vi.mocked(historyApi.getSymbols).mockRejectedValue(new Error('down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ symbols: ['GOOG'], names: { GOOG: 'Alphabet' } }),
+      }),
+    );
+
+    const result = await loadSymbolCatalog();
+
+    expect(result.options).toHaveLength(1);
+    expect(result.options[0]).toMatchObject({
+      value: 'GOOG',
+      label: 'Alphabet (GOOG)',
+    });
+  });
+
+  it('throws when every catalog source is empty or unavailable', async () => {
+    vi.mocked(alertsApi.getSymbols).mockResolvedValue({ data: { symbols: [] } } as never);
+    vi.mocked(historyApi.getSymbols).mockRejectedValue(new Error('down'));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ symbols: 'not-an-array' }),
+      }),
+    );
+
+    await expect(loadSymbolCatalog()).rejects.toThrow('Company list unavailable');
   });
 });
