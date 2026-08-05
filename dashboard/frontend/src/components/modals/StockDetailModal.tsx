@@ -143,15 +143,21 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3">
-                          <p className="text-sm text-slate-600 dark:text-slate-400">Confidence: {stockDetail.projection.confidence}%</p>
-                          <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
-                            <div
-                              className="bg-blue-500 h-2 rounded-full"
-                              style={{ width: `${stockDetail.projection.confidence}%` }}
-                            />
+                        {Number.isFinite(stockDetail.projection.confidence) && (
+                          <div className="mt-3">
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                              Confidence: {stockDetail.projection.confidence}%
+                            </p>
+                            <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{
+                                  width: `${Math.min(100, Math.max(0, stockDetail.projection.confidence))}%`,
+                                }}
+                              />
+                            </div>
                           </div>
-                        </div>
+                        )}
                         <div className="mt-3 flex items-center space-x-2">
                           <span className="text-2xl">{getTrendIcon(stockDetail.projection.trend)}</span>
                           <span className="text-sm font-medium">{stockDetail.projection.trend}</span>
@@ -173,16 +179,20 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                             <p className="text-lg font-semibold dark:text-slate-100">{formatVolume(stockDetail.currentData.marketCap)}</p>
                           </div>
                         )}
-                        {stockDetail.technical?.momentum !== undefined && (
+                        {Number.isFinite(stockDetail.technical?.momentum) && (
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Momentum</p>
-                            <p className="text-lg font-semibold dark:text-slate-100">{stockDetail.technical.momentum.toFixed(1)}</p>
+                            <p className="text-lg font-semibold dark:text-slate-100">
+                              {(stockDetail.technical?.momentum as number).toFixed(1)}
+                            </p>
                           </div>
                         )}
-                        {stockDetail.technical?.volatility !== undefined && (
+                        {Number.isFinite(stockDetail.technical?.volatility) && (
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Volatility</p>
-                            <p className="text-lg font-semibold dark:text-slate-100">{stockDetail.technical.volatility.toFixed(1)}%</p>
+                            <p className="text-lg font-semibold dark:text-slate-100">
+                              {(stockDetail.technical?.volatility as number).toFixed(1)}%
+                            </p>
                           </div>
                         )}
                       </div>

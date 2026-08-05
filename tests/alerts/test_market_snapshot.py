@@ -52,6 +52,49 @@ def test_load_market_snapshot_backfills_watch_quotes_when_saved_data_missing():
     fetch_missing.assert_called_once_with([], ["NVDA"])
 
 
+def test_load_market_snapshot_soft_fails_loader_oserror():
+    """Unreadable storage must not crash alert checks; fall back to live quotes."""
+    with (
+        patch("src.alerts.market_snapshot._load_env"),
+        patch(
+            "dashboard.backend.services.data_loader.get_data_loader",
+            side_effect=OSError("permission denied"),
+        ),
+        patch(
+            "src.alerts.market_snapshot._fetch_missing_watch_quotes",
+            return_value=[{"symbol": "AAPL", "close": 190.0}],
+        ) as fetch_missing,
+    ):
+        last_date, prices, stocks = load_market_snapshot(["aapl"])
+
+    assert last_date is None
+    assert prices == {"AAPL": 190.0}
+    assert stocks == [{"symbol": "AAPL", "close": 190.0}]
+    fetch_missing.assert_called_once_with([], ["AAPL"])
+
+
+def test_load_market_snapshot_soft_fails_latest_date_runtime_error():
+    loader = MagicMock()
+    loader.get_latest_date.side_effect = RuntimeError("catalog corrupt")
+
+    with (
+        patch("src.alerts.market_snapshot._load_env"),
+        patch("dashboard.backend.services.data_loader.get_data_loader", return_value=loader),
+        patch(
+            "src.alerts.market_snapshot._fetch_missing_watch_quotes",
+            return_value=[],
+        ) as fetch_missing,
+    ):
+        last_date, prices, stocks = load_market_snapshot(
+            ["MSFT"], fetch_missing_quotes=True
+        )
+
+    assert last_date is None
+    assert prices == {}
+    assert stocks == []
+    fetch_missing.assert_called_once_with([], ["MSFT"])
+
+
 def test_load_market_snapshot_skips_non_finite_prices_in_map():
     """Non-finite closes must not enter the snapshot price map for alert jobs."""
     loader = MagicMock()
