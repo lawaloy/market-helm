@@ -127,7 +127,16 @@ class AlertEngine:
         if not delivered:
             return False
 
-        self.storage.record_event(event)
+        # Notifiers already succeeded — a history write failure must not raise
+        # and cause job retries / duplicate sends, or abort sibling watches.
+        try:
+            self.storage.record_event(event)
+        except Exception as exc:
+            logger.warning(
+                "Alert %s delivered but event history write failed: %s",
+                alert.get("id"),
+                exc,
+            )
         return True
 
     def _within_cooldown(self, alert: Dict) -> bool:

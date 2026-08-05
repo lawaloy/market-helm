@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ..core.logger import setup_logger
 from .alert_storage import AlertStorage
+
+logger = setup_logger("alerts.delivery_status")
 
 _CHANNEL_BY_NOTIFIER = {
     "EmailNotifier": "email",
@@ -29,13 +32,23 @@ def record_notifier_delivery(
     channel = notifier_channel_name(notifier)
     if not channel:
         return
-    storage.record_delivery(
-        alert_id=alert_id,
-        channel=channel,
-        success=success,
-        test=test,
-        error=error,
-    )
+    # Delivery already happened (or failed) upstream; a status-write OSError
+    # must not abort remaining notifiers or flip a successful send into a retry.
+    try:
+        storage.record_delivery(
+            alert_id=alert_id,
+            channel=channel,
+            success=success,
+            test=test,
+            error=error,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to record %s delivery for alert %s: %s",
+            channel,
+            alert_id,
+            exc,
+        )
 
 
 def latest_deliveries_by_channel(storage: Optional[AlertStorage] = None) -> List[Dict[str, Any]]:
