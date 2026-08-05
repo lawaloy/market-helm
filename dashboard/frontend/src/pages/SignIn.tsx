@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { fieldClass } from '../components/alerts/alertsUtils';
@@ -27,6 +27,14 @@ const SignIn: React.FC = () => {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const returnTo = safeReturnPath(searchParams.get('return'));
 
@@ -40,14 +48,18 @@ const SignIn: React.FC = () => {
       } else {
         await register(email.trim(), password);
       }
+      if (!mountedRef.current) return;
       navigate(returnTo, { replace: true });
     } catch (err) {
+      if (!mountedRef.current) return;
       const detail =
         axios.isAxiosError(err) &&
         (err.response?.data as { detail?: string } | undefined)?.detail;
       setError(typeof detail === 'string' ? detail : 'Authentication failed. Please try again.');
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
