@@ -22,12 +22,13 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
       stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
       displayName.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesFilter = 
-      filterRec === 'All' || 
-      (filterRec === 'BUY' && (stock.trend === 'STRONG BUY' || stock.trend === 'BUY')) ||
-      (filterRec === 'HOLD' && stock.trend === 'HOLD') ||
-      (filterRec === 'SELL' && (stock.trend === 'STRONG SELL' || stock.trend === 'SELL'));
-    
+    const rating = stock.recommendation || '';
+    const matchesFilter =
+      filterRec === 'All' ||
+      (filterRec === 'BUY' && (rating === 'STRONG BUY' || rating === 'BUY')) ||
+      (filterRec === 'HOLD' && rating === 'HOLD') ||
+      (filterRec === 'SELL' && (rating === 'STRONG SELL' || rating === 'SELL'));
+
     return matchesSearch && matchesFilter;
   });
 
@@ -74,7 +75,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Change</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Conf</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Risk</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Trend</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Rec</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-600">
@@ -116,8 +117,8 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`badge ${getRecommendationColor(stock.trend)}`}>
-                    {stock.trend}
+                  <span className={`badge ${getRecommendationColor(stock.recommendation)}`}>
+                    {stock.recommendation}
                   </span>
                 </td>
               </tr>
