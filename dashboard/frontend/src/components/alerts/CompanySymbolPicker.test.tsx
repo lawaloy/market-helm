@@ -12,6 +12,13 @@ const OPTIONS: SymbolOption[] = [
 describe('CompanySymbolPicker quote fan-out', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    if (typeof globalThis.ResizeObserver === 'undefined') {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+    }
   });
 
   afterEach(() => {

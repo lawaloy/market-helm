@@ -52,11 +52,12 @@ describe('SentimentPieChart dirty recommendation counts', () => {
       />,
     );
 
-    expect(screen.getByText('STRONG BUY:3')).toBeTruthy();
-    expect(screen.getByText('BUY:2')).toBeTruthy();
-    expect(screen.getByText('SELL:1')).toBeTruthy();
-    expect(screen.queryByText(/HOLD:/)).toBeNull();
-    expect(screen.queryByText(/STRONG SELL:/)).toBeNull();
+    const slices = screen.getByTestId('pie-slices').textContent ?? '';
+    expect(slices).toContain('STRONG BUY:3');
+    expect(slices).toContain('BUY:2');
+    expect(slices).toContain('SELL:1');
+    expect(slices).not.toContain('HOLD:');
+    expect(slices).not.toContain('STRONG SELL:');
   });
 
   it('omits NaN / ±Infinity / non-positive counts without throwing', () => {
@@ -74,10 +75,7 @@ describe('SentimentPieChart dirty recommendation counts', () => {
       ),
     ).not.toThrow();
 
-    expect(screen.getByText('STRONG BUY:4')).toBeTruthy();
-    expect(screen.queryByText(/BUY:/)).toBeNull();
-    expect(screen.queryByText(/HOLD:/)).toBeNull();
-    expect(screen.queryByText(/SELL:/)).toBeNull();
-    expect(screen.queryByText(/STRONG SELL:/)).toBeNull();
+    const slices = screen.getByTestId('pie-slices').textContent ?? '';
+    expect(slices).toBe('STRONG BUY:4');
   });
 });
