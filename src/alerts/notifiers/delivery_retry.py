@@ -16,6 +16,11 @@ DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_BASE_SECONDS = 1.0
 DEFAULT_MAX_SECONDS = 8.0
 
+# Hard ceilings so a poisoned env cannot monopolize an alert worker.
+MAX_ATTEMPTS_CEILING = 10
+MAX_BASE_SECONDS_CEILING = 60.0
+MAX_SECONDS_CEILING = 300.0
+
 
 @dataclass(frozen=True)
 class DeliveryAttempt:
@@ -63,9 +68,9 @@ def resolve_delivery_retry_settings() -> DeliveryRetrySettings:
     base_seconds = _float_env("ALERT_DELIVERY_RETRY_BASE_SECONDS", DEFAULT_BASE_SECONDS)
     max_seconds = _float_env("ALERT_DELIVERY_RETRY_MAX_SECONDS", DEFAULT_MAX_SECONDS)
     return DeliveryRetrySettings(
-        max_attempts=max(1, max_attempts),
-        base_seconds=max(0.0, base_seconds),
-        max_seconds=max(0.0, max_seconds),
+        max_attempts=min(MAX_ATTEMPTS_CEILING, max(1, max_attempts)),
+        base_seconds=min(MAX_BASE_SECONDS_CEILING, max(0.0, base_seconds)),
+        max_seconds=min(MAX_SECONDS_CEILING, max(0.0, max_seconds)),
     )
 
 

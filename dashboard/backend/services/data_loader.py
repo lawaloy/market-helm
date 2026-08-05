@@ -28,6 +28,15 @@ def _default_data_dir() -> Path:
     return project_root / "data"
 
 
+def _is_iso_date(date_str: str) -> bool:
+    """True when date_str is a strict YYYY-MM-DD calendar date."""
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
+
+
 def _is_weekday(date_str: str) -> bool:
     """True if date (YYYY-MM-DD) is Mon–Fri (stock market open)."""
     try:
@@ -68,19 +77,22 @@ class DataLoader:
         if not files:
             return None
         if sort_by_date:
-            # Extract date from filename (e.g. daily_data_2026-02-14.csv) and pick latest
+            # Extract date from filename (e.g. daily_data_2026-02-14.csv) and pick latest.
+            # Non-ISO suffixes (tmp/partial/garbage) must not win lexicographic sort.
             def parse_date(f: Path) -> str:
                 stem = f.stem
                 if "daily_data_" in stem:
-                    return stem.replace("daily_data_", "")
-                if "projections_" in stem:
-                    return stem.replace("projections_", "")
-                if "summary_" in stem:
-                    return stem.replace("summary_", "")
-                return ""
+                    candidate = stem.replace("daily_data_", "", 1)
+                elif "projections_" in stem:
+                    candidate = stem.replace("projections_", "", 1)
+                elif "summary_" in stem:
+                    candidate = stem.replace("summary_", "", 1)
+                else:
+                    return ""
+                return candidate if _is_iso_date(candidate) else ""
             dated = [(f, parse_date(f)) for f in files if parse_date(f)]
             if not dated:
-                return max(files, key=lambda f: f.stat().st_mtime)
+                return None
             dated.sort(key=lambda x: x[1], reverse=True)
             # Prefer most recent trading day (weekday); market closed Sat/Sun
             for f, d in dated:
@@ -160,9 +172,14 @@ class DataLoader:
         return data
     
     def get_available_dates(self) -> List[str]:
-        """Get list of all available dates"""
+        """Get list of all available dates (strict YYYY-MM-DD filenames only)."""
         files = list(self.data_dir.glob("daily_data_*.csv"))
-        dates = [f.stem.replace("daily_data_", "") for f in files]
+        dates = [
+            date
+            for f in files
+            for date in [f.stem.replace("daily_data_", "", 1)]
+            if _is_iso_date(date)
+        ]
         return sorted(dates, reverse=True)
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
