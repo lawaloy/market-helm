@@ -19,12 +19,17 @@ async function probeMultiUserMode(): Promise<boolean> {
     await authApi.me();
     return true;
   } catch (err) {
+    // Only an explicit 501 means single-user / auth disabled.
     if (axios.isAxiosError(err) && err.response?.status === 501) {
       return false;
     }
-    if (axios.isAxiosError(err) && err.response?.status === 401) {
+    // Any other HTTP response (401, 5xx, …) means the multi-user API is
+    // present — keep RequireAuth gated so a transient backend error cannot
+    // open hosted routes while the API still requires a bearer token.
+    if (axios.isAxiosError(err) && err.response) {
       return true;
     }
+    // Network / non-HTTP failures: prefer local single-user UX.
     return false;
   }
 }

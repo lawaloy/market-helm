@@ -43,7 +43,7 @@ describe('AuthProvider', () => {
     expect(me).toHaveBeenCalledTimes(1);
   });
 
-  it('treats a 500 /me probe as single-user mode (fail-closed)', async () => {
+  it('treats a 500 /me probe as multi-user mode so RequireAuth stays gated', async () => {
     const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(500));
 
     render(
@@ -53,7 +53,22 @@ describe('AuthProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a 503 /me probe as multi-user mode so RequireAuth stays gated', async () => {
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(503));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
     });
     expect(me).toHaveBeenCalledTimes(1);
   });
@@ -221,5 +236,57 @@ describe('AuthProvider', () => {
     });
     expect(login).toHaveBeenCalledWith({ email: 'new@example.com', password: 'secret' });
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('new-token');
+  });
+
+  it('register enables multi-user mode and stores the session user', async () => {
+    vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(501));
+    const register = vi.spyOn(authApi, 'register').mockResolvedValueOnce({
+      data: {
+        access_token: 'reg-token',
+        user: { id: 'u3', email: 'reg@example.com' },
+      },
+    } as never);
+
+    function RegisterProbe() {
+      const { loading, multiUserEnabled, user, register: doRegister } = useAuth();
+      return (
+        <div>
+          <span data-testid="auth-state">
+            {loading
+              ? 'loading'
+              : `${multiUserEnabled ? 'multi-user' : 'single-user'}:${user?.email ?? 'anonymous'}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void doRegister('reg@example.com', 'secret');
+            }}
+          >
+            register
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <RegisterProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'register' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:reg@example.com');
+    });
+    expect(register).toHaveBeenCalledWith({
+      email: 'reg@example.com',
+      password: 'secret',
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('reg-token');
   });
 });
