@@ -86,4 +86,37 @@ describe('GainersLosersChart dirty changePercent', () => {
     expect(screen.queryByText('NAN')).toBeNull();
     expect(screen.queryByText('INF')).toBeNull();
   });
+
+  it('backfills top-5 after dropping non-finite early movers', () => {
+    const gainers = [
+      { ...mover('POISON', 0), changePercent: Number.NaN },
+      mover('G1', 5),
+      mover('G2', 4),
+      mover('G3', 3),
+      mover('G4', 2),
+      mover('G5', 1),
+      mover('G6', 0.5),
+    ];
+    const losers = [
+      { ...mover('INF', 0), changePercent: Number.POSITIVE_INFINITY },
+      mover('L1', -5),
+      mover('L2', -4),
+      mover('L3', -3),
+      mover('L4', -2),
+      mover('L5', -1),
+      mover('L6', -0.5),
+    ];
+
+    render(<GainersLosersChart gainers={gainers} losers={losers} />);
+
+    expect(screen.getByText('G5')).toBeTruthy();
+    expect(screen.getByText('+1.00%')).toBeTruthy();
+    expect(screen.queryByText('G6')).toBeNull();
+    expect(screen.getByText('L5')).toBeTruthy();
+    expect(screen.getByText('-1.00%')).toBeTruthy();
+    expect(screen.queryByText('L6')).toBeNull();
+    expect(screen.queryByText('POISON')).toBeNull();
+    expect(screen.queryByText('INF')).toBeNull();
+  });
 });
+
