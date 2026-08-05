@@ -12,6 +12,10 @@ from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
 
+# Match Settings / resolve_symbol_prices live-fetch budget so a large watch
+# list cannot burn the shared Finnhub quota on every evaluate tick.
+_MAX_LIVE_WATCH_FETCH = 15
+
 
 def _load_env() -> None:
     try:
@@ -64,6 +68,13 @@ def _fetch_missing_watch_quotes(
     missing = list(dict.fromkeys(missing))
     if not missing:
         return stocks
+    if len(missing) > _MAX_LIVE_WATCH_FETCH:
+        logger.warning(
+            "Capping live watch quote fetches from %d to %d",
+            len(missing),
+            _MAX_LIVE_WATCH_FETCH,
+        )
+        missing = missing[:_MAX_LIVE_WATCH_FETCH]
 
     try:
         from src.services.data_fetcher import StockDataFetcher
