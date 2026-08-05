@@ -260,10 +260,11 @@ async def get_market_summary():
     except Exception:
         raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
 
-    ai_summary: Optional[str] = summary_data.get("ai_summary")
+    ai_summary = summary_data.get("ai_summary")
     date_str: str = summary_data.get("date", "")
 
-    if ai_summary and ai_summary.strip():
+    # Non-string truthy ai_summary (e.g. number) must not AttributeError on .strip().
+    if isinstance(ai_summary, str) and ai_summary.strip():
         return {
             "date": date_str,
             "summary": ai_summary.strip(),

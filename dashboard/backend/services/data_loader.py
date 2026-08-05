@@ -31,6 +31,11 @@ def _default_data_dir() -> Path:
     return project_root / "data"
 
 
+def _reject_nonfinite_json_constant(constant: str) -> None:
+    """Fail closed on NaN/Infinity JSON constants (not strict JSON)."""
+    raise ValueError(f"non-finite JSON constant: {constant}")
+
+
 def _is_iso_date(date_str: str) -> bool:
     """True when date_str is a strict YYYY-MM-DD calendar date."""
     if not _ISO_DATE_RE.fullmatch(date_str or ""):
@@ -169,8 +174,10 @@ class DataLoader:
         
         try:
             with open(file_path, 'r') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError) as exc:
+                # Default json.load accepts NaN/Infinity constants; those become
+                # floats that later AttributeError on ai_summary.strip() → 500.
+                data = json.load(f, parse_constant=_reject_nonfinite_json_constant)
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
             # Corrupt JSON must map to ValueError → API 404, not generic 500.
             raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
         # Valid JSON that is not an object (null/[]/"x") would AttributeError

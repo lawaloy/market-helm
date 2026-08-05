@@ -9,7 +9,11 @@ from typing import Any, Dict, Optional, Tuple
 from src.alerts.alert_paths import polish_alerts_config
 
 from .database import get_connection
-from .alert_watches import sync_watches_from_config, validate_watches_config
+from .alert_watches import (
+    ensure_alerts_within_limit,
+    sync_watches_from_config,
+    validate_watches_config,
+)
 
 _EMPTY_CONFIG: Dict[str, Any] = {"defaults": {}, "alerts": []}
 
@@ -87,6 +91,9 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
     # In hosted DB mode webhook URLs are per-user secrets. They are stripped only
     # from API responses, not from persisted user records used for delivery.
+    # Cap the raw payload before polish/dedupe — otherwise duplicate
+    # price-threshold keys collapse and silently overwrite prior configs.
+    ensure_alerts_within_limit(config)
     payload = polish_alerts_config(
         _merge_existing_webhook_secrets(user_id, config),
         seed_env_email=False,
