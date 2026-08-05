@@ -23,12 +23,30 @@ logger = setup_logger("alerts.email.delivery")
 SUPPORTED_PROVIDERS = frozenset({"smtp", "sendgrid", "mailgun"})
 
 
+def _sanitize_header_text(value: Any) -> str:
+    """Strip CR/LF so alert names cannot split email headers or spoof fields."""
+    return str(value or "").replace("\r", " ").replace("\n", " ").strip()
+
+
+def _is_safe_email_address(addr: str) -> bool:
+    """Reject addresses that carry control chars usable for header injection."""
+    if not addr or any(ch in addr for ch in ("\r", "\n", "\0")):
+        return False
+    # Extremely loose shape check: local@domain with no spaces.
+    if " " in addr or addr.count("@") != 1:
+        return False
+    local, _, domain = addr.partition("@")
+    return bool(local) and bool(domain)
+
+
 def parse_recipients(value: Union[str, List[str], None]) -> List[str]:
     if not value:
         return []
     if isinstance(value, list):
-        return [str(item).strip() for item in value if str(item).strip()]
-    return [part.strip() for part in str(value).split(",") if part.strip()]
+        raw_parts = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        raw_parts = [part.strip() for part in str(value).split(",") if part.strip()]
+    return [part for part in raw_parts if _is_safe_email_address(part)]
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -97,14 +115,17 @@ def _format_symbols(raw: Any) -> str:
 
 def format_alert_email(event: Dict[str, Any]) -> tuple[str, str]:
     symbols = _format_symbols(event.get("symbols"))
-    subject = f"MarketHelm alert: {event.get('alert_name', event.get('alert_id', 'alert'))}"
+    alert_name = _sanitize_header_text(
+        event.get("alert_name", event.get("alert_id", "alert"))
+    ) or "alert"
+    subject = f"MarketHelm alert: {alert_name}"
     body = "\n".join(
         [
-            f"Alert: {event.get('alert_name', event.get('alert_id', 'alert'))}",
-            f"ID: {event.get('alert_id', '')}",
+            f"Alert: {alert_name}",
+            f"ID: {_sanitize_header_text(event.get('alert_id', ''))}",
             f"Symbols: {symbols}",
-            f"Condition: {event.get('condition_type', '')}",
-            f"Time (UTC): {event.get('timestamp', '')}",
+            f"Condition: {_sanitize_header_text(event.get('condition_type', ''))}",
+            f"Time (UTC): {_sanitize_header_text(event.get('timestamp', ''))}",
             "",
             "— MarketHelm",
         ]
