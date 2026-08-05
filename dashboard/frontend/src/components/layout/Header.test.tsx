@@ -133,4 +133,87 @@ describe('Header refresh controls', () => {
     expect(onQuickRefresh).toHaveBeenCalledTimes(1);
     expect(onRefreshComplete).not.toHaveBeenCalled();
   });
+
+  it('cancels an in-flight refresh and stops polling without notifying', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Still working' },
+    });
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return { data: { message: 'cancelled' } };
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+    const onRefreshComplete = vi.fn();
+
+    render(
+      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(apiMocks.get).toHaveBeenCalledWith('/api/refresh/status');
+    const pollsBeforeCancel = apiMocks.get.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh/cancel');
+    expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(apiMocks.get.mock.calls.length).toBe(pollsBeforeCancel);
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+  });
+
+  it('stops polling after max wait without calling onRefreshComplete', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Still fetching' },
+    });
+    const onRefreshComplete = vi.fn();
+
+    render(
+      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 2000);
+    });
+
+    expect(
+      screen.getByText('Refresh is taking too long. Check server logs or try Cancel.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+
+    const pollsAtTimeout = apiMocks.get.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(apiMocks.get.mock.calls.length).toBe(pollsAtTimeout);
+  });
 });

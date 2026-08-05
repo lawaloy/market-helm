@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowPathIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -20,6 +20,15 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   const [refreshMessage, setRefreshMessage] = useState('');
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageRef = useRef<string>('');
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const updateMessage = (message: string) => {
     if (lastMessageRef.current === message) return;
