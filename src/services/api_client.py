@@ -72,8 +72,10 @@ class RateLimiter:
         
         try:
             now = time.time()
-            # Enforce rolling budget
-            while self.call_times and now - self.call_times[0] > self.budget_window_sec:
+            # Enforce rolling budget. Use >= so an exact window-aged entry is
+            # dropped after sleep(wait_budget); `>` left it in and allowed
+            # budget_max_calls + 1 recorded calls.
+            while self.call_times and now - self.call_times[0] >= self.budget_window_sec:
                 self.call_times.popleft()
             if len(self.call_times) >= self.budget_max_calls:
                 wait_budget = self.budget_window_sec - (now - self.call_times[0])
@@ -81,7 +83,7 @@ class RateLimiter:
                     time.sleep(wait_budget)
                 # After sleeping, purge again
                 now = time.time()
-                while self.call_times and now - self.call_times[0] > self.budget_window_sec:
+                while self.call_times and now - self.call_times[0] >= self.budget_window_sec:
                     self.call_times.popleft()
             
             current_time = time.time()
