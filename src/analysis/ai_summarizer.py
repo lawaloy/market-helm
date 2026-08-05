@@ -51,26 +51,28 @@ class AISummarizer:
             Generated summary text
         """
         summary_data = analysis.get("summary", {})
-        top_gainers = analysis.get("top_gainers", [])[:2]
-        top_losers = analysis.get("top_losers", [])[:2]
-        
+        # Over-fetch a few rows so non-dict / blank-symbol sentinels cannot
+        # hide the first usable mover from the demo highlight lines.
+        top_gainers = analysis.get("top_gainers", [])[:6]
+        top_losers = analysis.get("top_losers", [])[:6]
+
         # Build a simple summary
         summary_parts = []
-        
+
         # Overall market sentiment
         gainers = summary_data.get('gainers', 0)
         losers = summary_data.get('losers', 0)
         avg_change = _finite_float(summary_data.get('average_change_percent', 0))
-        
+
         if gainers > losers:
             sentiment = "positive"
         elif losers > gainers:
             sentiment = "negative"
         else:
             sentiment = "mixed"
-        
+
         summary_parts.append(f"Today's market showed {sentiment} sentiment with {gainers} gainers and {losers} losers, averaging {avg_change:.2f}% change overall.")
-        
+
         # Highlight top movers (skip non-dict / blank symbols — same soft-fail
         # posture as generate_summary's OpenAI prompt path).
         for top_gainer in top_gainers:
