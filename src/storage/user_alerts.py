@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
@@ -26,11 +27,21 @@ def _copy_webhook_secret_if_missing(
         target["webhook_url"] = existing_url
 
 
+def _parse_config_json(raw: Any) -> Optional[Dict[str, Any]]:
+    """Decode a stored config blob; corrupt / non-object → None (soft-fail)."""
+    try:
+        data = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
 def _merge_existing_webhook_secrets(
-    user_id: str,
     config: Dict[str, Any],
+    existing: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    _, existing = load_user_alerts_config(user_id)
     if not existing:
         return config
 
@@ -62,6 +73,18 @@ def _merge_existing_webhook_secrets(
     return merged
 
 
+def _load_config_row(
+    conn: sqlite3.Connection, user_id: str
+) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    row = conn.execute(
+        "SELECT config_json FROM user_alert_configs WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        return False, None
+    return True, _parse_config_json(row["config_json"])
+
+
 def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
     """Return (exists, config). config is None when the user has no row yet.
 
@@ -69,32 +92,24 @@ def load_user_alerts_config(user_id: str) -> Tuple[bool, Optional[Dict[str, Any]
     recover instead of 500ing — mirrors file-mode load_alerts_config.
     """
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT config_json FROM user_alert_configs WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()
-    if not row:
-        return False, None
-    try:
-        data = json.loads(row["config_json"])
-    except (TypeError, json.JSONDecodeError):
-        return True, None
-    if not isinstance(data, dict):
-        return True, None
-    return True, data
+        return _load_config_row(conn, user_id)
 
 
 def save_user_alerts_config(user_id: str, config: Dict[str, Any]) -> None:
     # In hosted DB mode webhook URLs are per-user secrets. They are stripped only
     # from API responses, not from persisted user records used for delivery.
-    payload = polish_alerts_config(
-        _merge_existing_webhook_secrets(user_id, config),
-        seed_env_email=False,
-    )
-    validate_watches_config(user_id, payload)
-    updated_at = datetime.now(timezone.utc).isoformat()
-    blob = json.dumps(payload, indent=2)
+    # BEGIN IMMEDIATE serializes load→merge→write so a blank-secret preserve
+    # cannot clobber a concurrent non-blank webhook rotation (lost secret).
     with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        _, existing = _load_config_row(conn, user_id)
+        payload = polish_alerts_config(
+            _merge_existing_webhook_secrets(config, existing),
+            seed_env_email=False,
+        )
+        validate_watches_config(user_id, payload)
+        updated_at = datetime.now(timezone.utc).isoformat()
+        blob = json.dumps(payload, indent=2)
         conn.execute(
             """
             INSERT INTO user_alert_configs (user_id, config_json, updated_at)
