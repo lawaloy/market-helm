@@ -248,9 +248,17 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
     )
 
 
-@router.get("/refresh/status", response_model=RefreshStatusResponse)
+@router.get(
+    "/refresh/status",
+    response_model=RefreshStatusResponse,
+    dependencies=[Depends(require_user_id)],
+)
 async def get_refresh_status():
-    """Get the current status of data refresh"""
+    """Get the current status of data refresh.
+
+    Hosted mode requires auth so anonymous clients cannot observe global refresh
+    progress. File mode (``require_user_id`` → ``None``) stays open.
+    """
     if not refresh_status.get("is_running") and not refresh_status.get("last_status"):
         refresh_status["last_status"] = "idle"
         refresh_status["progress"] = "Idle."
