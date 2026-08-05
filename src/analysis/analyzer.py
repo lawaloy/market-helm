@@ -6,8 +6,10 @@ Analyzes stock market data and generates summaries.
 
 import math
 import pandas as pd
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from datetime import datetime
+
+from src.utils.tickers import normalize_ticker
 
 
 def _finite_float(value: Any, default: float = 0.0) -> float:
@@ -21,6 +23,47 @@ def _finite_float(value: Any, default: float = 0.0) -> float:
         return result
     except (TypeError, ValueError):
         return default
+
+
+def _display_name(raw: Any, symbol: str) -> str:
+    """Return a JSON-safe display name; fall back to symbol when missing/dirty."""
+    if raw is None:
+        return symbol
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return symbol
+    try:
+        if pd.isna(raw):
+            return symbol
+    except (TypeError, ValueError):
+        pass
+    try:
+        text = str(raw).strip()
+    except Exception:
+        return symbol
+    if not text or text.lower() in {"nan", "none", "<na>", "null"}:
+        return symbol
+    return text
+
+
+def _leaderboard_rows(frame: pd.DataFrame, sort_col: str, *, ascending: bool = False, limit: int = 5):
+    """Yield ranked rows, over-fetching so blank/sentinel symbols can be skipped."""
+    if frame.empty or sort_col not in frame.columns:
+        return
+    take = min(len(frame), max(limit * 5, limit))
+    ordered = (
+        frame.nsmallest(take, sort_col) if ascending else frame.nlargest(take, sort_col)
+    )
+    for _, row in ordered.iterrows():
+        yield row
+
+
+def _leaderboard_identity(row: Any) -> Optional[tuple[str, str]]:
+    """Return (symbol, name) for a leaderboard row, or None when symbol is unusable."""
+    symbol = normalize_ticker(row.get("symbol") if hasattr(row, "get") else None)
+    if not symbol:
+        return None
+    name = _display_name(row.get("name") if hasattr(row, "get") else None, symbol)
+    return symbol, name
 
 
 class StockAnalyzer:
@@ -75,37 +118,60 @@ class StockAnalyzer:
         losers = int((scored['_change'] < 0).sum())
         unchanged = int((scored['_change'] == 0).sum())
         
-        # Top gainers and losers (finite change_percent only)
-        top_gainers = [
-            {
-                'symbol': row['symbol'],
-                'name': row['name'],
-                'change_percent': float(row['_change']),
-                'close': float(row['_close']),
-            }
-            for _, row in scored.nlargest(5, '_change').iterrows()
-        ]
-        
-        top_losers = [
-            {
-                'symbol': row['symbol'],
-                'name': row['name'],
-                'change_percent': float(row['_change']),
-                'close': float(row['_close']),
-            }
-            for _, row in scored.nsmallest(5, '_change').iterrows()
-        ]
-        
+        # Top gainers and losers (finite change_percent only).
+        # Missing name/symbol columns previously KeyError'd the whole day analysis;
+        # NaN names also poison summary JSON (allow_nan=False on save).
+        top_gainers = []
+        for row in _leaderboard_rows(scored, "_change", limit=5):
+            identity = _leaderboard_identity(row)
+            if identity is None:
+                continue
+            symbol, name = identity
+            top_gainers.append(
+                {
+                    "symbol": symbol,
+                    "name": name,
+                    "change_percent": float(row["_change"]),
+                    "close": float(row["_close"]),
+                }
+            )
+            if len(top_gainers) >= 5:
+                break
+
+        top_losers = []
+        for row in _leaderboard_rows(scored, "_change", ascending=True, limit=5):
+            identity = _leaderboard_identity(row)
+            if identity is None:
+                continue
+            symbol, name = identity
+            top_losers.append(
+                {
+                    "symbol": symbol,
+                    "name": name,
+                    "change_percent": float(row["_change"]),
+                    "close": float(row["_close"]),
+                }
+            )
+            if len(top_losers) >= 5:
+                break
+
         # Highest volume (finite volume only)
-        top_volume = [
-            {
-                'symbol': row['symbol'],
-                'name': row['name'],
-                'volume': int(row['_volume']),
-                'change_percent': float(row['_change']),
-            }
-            for _, row in volume_ranked.nlargest(5, '_volume').iterrows()
-        ]
+        top_volume = []
+        for row in _leaderboard_rows(volume_ranked, "_volume", limit=5):
+            identity = _leaderboard_identity(row)
+            if identity is None:
+                continue
+            symbol, name = identity
+            top_volume.append(
+                {
+                    "symbol": symbol,
+                    "name": name,
+                    "volume": int(row["_volume"]),
+                    "change_percent": float(row["_change"]),
+                }
+            )
+            if len(top_volume) >= 5:
+                break
         
         # Exchange breakdown
         if 'exchange_code' in df.columns:
