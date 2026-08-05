@@ -13,7 +13,7 @@ def fetch_workflow(monkeypatch):
         lambda: ["INDEX"],
     )
     monkeypatch.setattr(
-        "src.workflows.tracker.get_enabled_watch_symbols",
+        "src.alerts.alert_paths.get_enabled_watch_symbols",
         lambda: [],
     )
 
