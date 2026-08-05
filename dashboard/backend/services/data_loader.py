@@ -3,6 +3,7 @@ Data loading service for reading CSV and JSON files
 """
 import math
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
@@ -11,6 +12,8 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 from src.utils.tickers import normalize_ticker
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _default_data_dir() -> Path:
@@ -30,8 +33,13 @@ def _default_data_dir() -> Path:
 
 def _is_iso_date(date_str: str) -> bool:
     """True when date_str is a strict YYYY-MM-DD calendar date."""
+    if not _ISO_DATE_RE.fullmatch(date_str or ""):
+        return False
+    # Local import: some tests replace module-level ``datetime`` with a now()-only stub.
+    from datetime import datetime as _datetime
+
     try:
-        datetime.strptime(date_str, "%Y-%m-%d")
+        _datetime.strptime(date_str, "%Y-%m-%d")
     except ValueError:
         return False
     return True
