@@ -30,6 +30,8 @@ See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 
 ### Opening pull requests
 
+Open PRs **ready for review by default**. Use `--draft` only when the user explicitly requests a draft or the work is intentionally incomplete.
+
 When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
