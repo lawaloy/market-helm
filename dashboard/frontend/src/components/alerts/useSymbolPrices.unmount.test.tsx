@@ -51,12 +51,12 @@ describe('useSymbolPrices unmount and dirty quotes', () => {
   });
 
   it('ignores a late getQuotes response after unmount', async () => {
-    let resolveQuotes: ((value: unknown) => void) | undefined;
+    let resolveQuotes: ((value: { data: { prices: Record<string, number> } }) => void) | undefined;
     vi.mocked(alertsApi.getQuotes).mockImplementation(
       () =>
-        new Promise((resolve) => {
+        new Promise<{ data: { prices: Record<string, number> } }>((resolve) => {
           resolveQuotes = resolve;
-        }),
+        }) as never,
     );
 
     render(<Harness />);
@@ -93,9 +93,10 @@ describe('useSymbolPrices unmount and dirty quotes', () => {
   });
 
   it('drops non-finite quote prices and cools the symbol down', async () => {
+    // Partial AxiosResponse is enough for this hook; cast like other API mocks.
     vi.mocked(alertsApi.getQuotes).mockResolvedValue({
       data: { prices: { AAPL: Number.POSITIVE_INFINITY, MSFT: 400 } },
-    });
+    } as never);
 
     render(<Harness symbols={['AAPL', 'MSFT']} />);
 
