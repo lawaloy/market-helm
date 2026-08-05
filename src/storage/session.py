@@ -27,6 +27,15 @@ def _auth_secret() -> bytes:
     return secret.encode("utf-8")
 
 
+def ensure_auth_secret() -> None:
+    """Raise AuthError when MARKET_HELM_AUTH_SECRET is missing or too short.
+
+    Call before side effects (e.g. create_user) so a misconfigured host does not
+    leave orphan accounts after token signing fails.
+    """
+    _auth_secret()
+
+
 def _b64url_encode(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).decode().rstrip("=")
 

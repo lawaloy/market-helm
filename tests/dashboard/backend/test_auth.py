@@ -49,7 +49,27 @@ def test_require_user_id_401_when_db_on_and_auth_missing(db_on) -> None:
 
 
 def test_require_user_id_accepts_valid_bearer_case_insensitive(db_on) -> None:
-    token = create_access_token("user-abc")
-    assert asyncio.run(require_user_id(authorization=f"Bearer {token}")) == "user-abc"
-    assert asyncio.run(require_user_id(authorization=f"BEARER {token}")) == "user-abc"
-    assert asyncio.run(optional_user_id(authorization=f"bearer {token}")) == "user-abc"
+    from src.storage.users import create_user
+
+    user = create_user("case@example.com", "password123")
+    token = create_access_token(user["id"])
+    assert asyncio.run(require_user_id(authorization=f"Bearer {token}")) == user["id"]
+    assert asyncio.run(require_user_id(authorization=f"BEARER {token}")) == user["id"]
+    assert asyncio.run(optional_user_id(authorization=f"bearer {token}")) == user["id"]
+
+
+def test_require_user_id_401_when_user_deleted(db_on) -> None:
+    from src.storage.database import get_connection
+    from src.storage.users import create_user
+
+    user = create_user("deleted-helper@example.com", "password123")
+    token = create_access_token(user["id"])
+    with get_connection() as conn:
+        conn.execute("DELETE FROM users WHERE id = ?", (user["id"],))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(require_user_id(authorization=f"Bearer {token}"))
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "User not found."
+
+    assert asyncio.run(optional_user_id(authorization=f"Bearer {token}")) is None
