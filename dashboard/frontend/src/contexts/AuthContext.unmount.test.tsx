@@ -23,7 +23,7 @@ describe('AuthProvider init cancel', () => {
 
   it('ignores a late /me session restore after unmount', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
-    let resolveMe: ((value: unknown) => void) | undefined;
+    let resolveMe: ((value: Awaited<ReturnType<typeof authApi.me>>) => void) | undefined;
     vi.spyOn(authApi, 'me').mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -46,7 +46,7 @@ describe('AuthProvider init cancel', () => {
     await act(async () => {
       resolveMe?.({
         data: { id: 'u1', email: 'stale@example.com' },
-      });
+      } as Awaited<ReturnType<typeof authApi.me>>);
       await Promise.resolve();
       await Promise.resolve();
     });
