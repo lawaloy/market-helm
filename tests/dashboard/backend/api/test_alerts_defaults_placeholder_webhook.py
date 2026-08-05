@@ -59,5 +59,7 @@ def test_hosted_put_strips_placeholder_defaults_webhook(client, multi_user_env):
 
     fetched = client.get("/api/alerts/config", headers=headers)
     assert fetched.status_code == 200
-    assert "webhook_url" not in (fetched.json()["config"].get("defaults") or {})
+    # Public schema may still expose webhook_url as null; readiness must stay false.
+    defaults = fetched.json()["config"].get("defaults") or {}
+    assert not defaults.get("webhook_url")
     assert fetched.json()["channels"]["webhook_url"] is False

@@ -1,6 +1,6 @@
 """PUT /api/alerts/config must reject Inf/NaN cooldown_minutes with HTTP 400."""
 
-import math
+import json
 
 import pytest
 
@@ -54,29 +54,34 @@ def _payload(cooldown_minutes):
 
 
 @pytest.mark.parametrize(
-    ("cooldown", "email"),
+    ("raw_token", "email"),
     [
-        (math.inf, "cooldown-inf@example.com"),
-        (-math.inf, "cooldown-ninf@example.com"),
-        (math.nan, "cooldown-nan@example.com"),
+        ("Infinity", "cooldown-inf@example.com"),
+        ("-Infinity", "cooldown-ninf@example.com"),
+        ("NaN", "cooldown-nan@example.com"),
     ],
 )
 def test_hosted_put_rejects_nonfinite_cooldown(
-    client, multi_user_env, cooldown, email
+    client, multi_user_env, raw_token, email
 ):
     token = _register(client, email)
-    headers = {"Authorization": f"Bearer {token}"}
-
-    response = client.put(
-        "/api/alerts/config",
-        json=_payload(cooldown),
-        headers=headers,
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    # httpx refuses to serialize Inf/NaN; send Python-json non-finite literals
+    # the way a permissive client / proxy might.
+    body = json.dumps(_payload(0)).replace(
+        '"cooldown_minutes": 0',
+        f'"cooldown_minutes": {raw_token}',
     )
+
+    response = client.put("/api/alerts/config", content=body, headers=headers)
 
     assert response.status_code == 400
     assert "cooldown_minutes" in response.json()["detail"]
 
-    saved = client.get("/api/alerts/config", headers=headers)
+    saved = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token}"})
     assert saved.status_code == 200
     assert saved.json()["exists"] is False
     assert saved.json()["config"]["alerts"] == []
