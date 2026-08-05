@@ -25,6 +25,9 @@ def _finite_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+_INVALID_EXCHANGE_SENTINELS = frozenset({"nan", "none", "<na>", "null"})
+
+
 def _display_name(raw: Any, symbol: str) -> str:
     """Return a JSON-safe display name; fall back to symbol when missing/dirty."""
     if raw is None:
@@ -42,6 +45,27 @@ def _display_name(raw: Any, symbol: str) -> str:
         return symbol
     if not text or text.lower() in {"nan", "none", "<na>", "null"}:
         return symbol
+    return text
+
+
+def _exchange_stat_key(raw: Any) -> Optional[str]:
+    """Return a JSON-safe exchange_statistics key, or None when the label is unusable."""
+    if raw is None:
+        return None
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return None
+    try:
+        if pd.isna(raw):
+            return None
+    except (TypeError, ValueError):
+        pass
+    try:
+        text = str(raw)
+    except Exception:
+        return None
+    # Keep "" (schema drift) but drop sentinel labels that stringify to "nan"/etc.
+    if text.strip().lower() in _INVALID_EXCHANGE_SENTINELS:
+        return None
     return text
 
 
@@ -189,7 +213,10 @@ class StockAnalyzer:
             # Convert MultiIndex columns to JSON-serializable format
             exchange_stats = {}
             for exchange_code in exchange_grouped.index:
-                exchange_stats[exchange_code] = {
+                label = _exchange_stat_key(exchange_code)
+                if label is None:
+                    continue
+                exchange_stats[label] = {
                     'avg_change_percent': _finite_float(
                         exchange_grouped.loc[exchange_code, ('_change', 'mean')]
                     ),
@@ -243,15 +270,36 @@ class StockAnalyzer:
                 continue
             
             df = pd.DataFrame(data)
-            avg_change = df['change_percent'].mean()
-            total_volume = df['volume'].sum()
-            
+            # Partial / dirty exchange batches must soft-return zeros instead of
+            # KeyError (missing columns) or OverflowError (Inf volume → int()).
+            for column in ("change_percent", "volume"):
+                if column not in df.columns:
+                    df[column] = float("nan")
+
+            change = pd.to_numeric(df["change_percent"], errors="coerce")
+            volume = pd.to_numeric(df["volume"], errors="coerce")
+            finite_change = change.map(
+                lambda value: bool(math.isfinite(value)) if pd.notna(value) else False
+            )
+            finite_volume = volume.map(
+                lambda value: bool(math.isfinite(value)) if pd.notna(value) else False
+            )
+            usable_change = change[finite_change]
+            usable_volume = volume[finite_volume]
+
+            avg_change = _finite_float(
+                usable_change.mean() if len(usable_change) else 0.0
+            )
+            total_volume = _finite_float(
+                usable_volume.sum() if len(usable_volume) else 0.0
+            )
+
             comparison[exchange_code] = {
                 'stock_count': len(df),
                 'average_change_percent': round(avg_change, 2),
                 'total_volume': int(total_volume),
-                'gainers': len(df[df['change_percent'] > 0]),
-                'losers': len(df[df['change_percent'] < 0]),
+                'gainers': int((usable_change > 0).sum()) if len(usable_change) else 0,
+                'losers': int((usable_change < 0).sum()) if len(usable_change) else 0,
             }
         
         return comparison
