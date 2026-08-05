@@ -6,6 +6,9 @@ import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'sign-in' | 'sign-up';
 
+/** Matches backend `MAX_PASSWORD_LENGTH` (src/storage/users.py). */
+export const MAX_PASSWORD_LENGTH = 128;
+
 /** Only same-app relative paths; reject protocol-relative and external URLs. */
 export function safeReturnPath(raw: string | null): string {
   // Backslashes can be treated as separators in some browsers (open-redirect).
@@ -149,6 +152,7 @@ const SignIn: React.FC = () => {
               autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
               required
               minLength={8}
+              maxLength={MAX_PASSWORD_LENGTH}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className={fieldClass}

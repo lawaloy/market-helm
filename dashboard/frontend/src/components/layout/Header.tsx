@@ -136,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   const handleCancelRefresh = async () => {
     // Invalidate any in-flight /api/refresh/status before awaiting cancel so a late
     // success cannot call onRefreshComplete after the user cancelled.
-    pollGenerationRef.current += 1;
+    const generation = ++pollGenerationRef.current;
     updateMessage('Cancelling refresh...');
     try {
       await api.post('/api/refresh/cancel');
@@ -146,11 +146,15 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
       }
       setIsRefreshing(false);
       updateMessage('Refresh cancelled.');
-      setTimeout(() => updateMessage(''), 3000);
+      setTimeout(() => {
+        if (generation === pollGenerationRef.current) updateMessage('');
+      }, 3000);
     } catch (error) {
       console.error('Cancel refresh error:', error);
       updateMessage('Failed to cancel refresh.');
-      setTimeout(() => updateMessage(''), 5000);
+      setTimeout(() => {
+        if (generation === pollGenerationRef.current) updateMessage('');
+      }, 5000);
     }
   };
 
