@@ -34,11 +34,6 @@ def _notifier_label(class_name: str) -> Optional[str]:
     return labels.get(class_name, class_name.replace("Notifier", "").lower())
 
 
-def _load_config(path: Path) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
-
-
 def _format_condition(condition: Any) -> str:
     # Hand-edited alerts.json may store null / strings where objects are expected.
     if not isinstance(condition, dict):
@@ -78,15 +73,22 @@ def _load_env() -> None:
 
 
 def cmd_list(config_path: Optional[Path] = None) -> int:
-    path = resolve_alerts_config_path(config_path)
-    if not path.exists():
-        logger.error(
-            "No alerts config at %s. Run: market-helm alerts init",
-            path,
-        )
+    path, raw = load_alerts_config(config_path)
+    if raw is None:
+        if path.exists():
+            logger.error(
+                "Corrupt or invalid alerts config at %s. Fix JSON or run: "
+                "market-helm alerts init --force",
+                path,
+            )
+        else:
+            logger.error(
+                "No alerts config at %s. Run: market-helm alerts init",
+                path,
+            )
         return 1
 
-    config = polish_alerts_config(_load_config(path))
+    config = polish_alerts_config(raw)
     alerts = config.get("alerts", [])
     if not alerts:
         logger.info("No alert rules in %s", path)
@@ -155,12 +157,14 @@ def run_alert_test(
     if config is not None:
         polished = polish_alerts_config(config, seed_env_email=seed_env_email)
     else:
-        path = resolve_alerts_config_path(config_path)
-        if not path.exists():
+        path, raw = load_alerts_config(config_path)
+        if raw is None:
+            if path.exists():
+                raise FileNotFoundError(
+                    f"Corrupt or invalid alerts config at {path}"
+                )
             raise FileNotFoundError(f"No alerts config at {path}")
-        polished = polish_alerts_config(
-            _load_config(path), seed_env_email=seed_env_email
-        )
+        polished = polish_alerts_config(raw, seed_env_email=seed_env_email)
 
     alert = _find_alert(polished.get("alerts", []), alert_id)
     if alert is None:
