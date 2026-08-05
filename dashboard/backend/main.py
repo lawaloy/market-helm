@@ -50,6 +50,7 @@ from starlette.responses import Response
 from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
 from dashboard.backend.api.market import get_market_summary
 from dashboard.backend.auth import require_user_id
+from dashboard.backend.rate_limit import RateLimitMiddleware
 
 
 def _coerce_startup_triggered(raw) -> int:
@@ -153,6 +154,7 @@ def parse_cors_origins(
 
 origins = parse_cors_origins(os.getenv("CORS_ORIGINS", ""))
 
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
