@@ -29,6 +29,25 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parseable_trigger_timestamp(raw: Optional[str]) -> Optional[str]:
+    """Return a storeable ISO timestamp, or None when missing/unparseable.
+
+    Corrupt event timestamps must not be persisted: unparseable markers make
+    ``get_last_triggered`` fail open (no cooldown) and break stale-delivery
+    comparisons that rely on parseable trigger state.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return text
+
+
 def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
     """Return a storeable ISO timestamp, or None when missing/unparseable.
 
@@ -341,7 +360,7 @@ def get_last_triggered(user_id: str, alert_id: str) -> Optional[str]:
 
 
 def record_trigger(user_id: str, alert_id: str, timestamp: Optional[str] = None) -> None:
-    ts = timestamp or _utc_now()
+    ts = _parseable_trigger_timestamp(timestamp) or _utc_now()
     with get_connection() as conn:
         conn.execute(
             """
