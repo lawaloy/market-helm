@@ -361,9 +361,10 @@ def test_cancel_refresh_terminates_running_process() -> None:
     assert fake_process.terminated is True
     assert fake_process.killed is False
     assert fake_process.wait_timeouts == [10]
-    assert response.is_running is False
+    # Single-flight stays held until the worker finally clears it.
+    assert response.is_running is True
     assert response.last_status == "cancelled"
-    assert refresh.refresh_status["is_running"] is False
+    assert refresh.refresh_status["is_running"] is True
     assert refresh.refresh_status["progress"] == "Cancelling refresh..."
 
 
@@ -378,8 +379,9 @@ def test_cancel_refresh_kills_process_when_terminate_hangs() -> None:
     assert fake_process.terminated is True
     assert fake_process.killed is True
     assert fake_process.wait_timeouts == [10]
-    assert response.is_running is False
+    assert response.is_running is True
     assert response.last_status == "cancelled"
+    assert refresh.refresh_status["is_running"] is True
 
 
 def test_cancel_refresh_rejects_when_idle() -> None:

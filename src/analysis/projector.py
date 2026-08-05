@@ -54,6 +54,10 @@ class StockProjector:
         projections = {}
         
         for stock in current_data:
+            # Dirty fetch/watch merges can inject None/str rows; skip them so
+            # one bad entry cannot AttributeError the whole daily projection run.
+            if not isinstance(stock, dict):
+                continue
             symbol = stock.get('symbol')
             if not symbol:
                 continue
