@@ -101,9 +101,16 @@ def cmd_list(config_path: Optional[Path] = None) -> int:
         status = "enabled" if enabled else "disabled"
         raw_notifications = alert.get("notifications")
         # Non-list notifications are not channel names (and strings join by char).
-        notifications = ", ".join(
-            raw_notifications if isinstance(raw_notifications, list) else ["log"]
-        )
+        # Mixed-type lists (hand-edited JSON) must not TypeError on join.
+        if isinstance(raw_notifications, list):
+            channels = [
+                ch.strip()
+                for ch in raw_notifications
+                if isinstance(ch, str) and ch.strip()
+            ]
+        else:
+            channels = ["log"]
+        notifications = ", ".join(channels) if channels else "log"
         condition = _format_condition(alert.get("condition"))
         logger.info(
             "%s  [%s]  %s",

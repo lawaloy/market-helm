@@ -6,6 +6,7 @@ import math
 from fastapi import APIRouter, HTTPException, Query
 from typing import Any, List, Optional
 
+import pandas as pd
 from pydantic import BaseModel
 
 from dashboard.backend.services.data_loader import get_data_loader
@@ -26,6 +27,19 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
         return result
     except (TypeError, ValueError):
         return default
+
+
+def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> float:
+    """Mean of finite numeric cells only so Inf/NaN cannot poison day averages."""
+    if column not in df.columns:
+        return default
+    series = pd.to_numeric(df[column], errors="coerce")
+    finite = series.map(
+        lambda value: isinstance(value, (int, float)) and math.isfinite(value)
+    )
+    if not bool(finite.any()):
+        return default
+    return _safe_float(series[finite].mean(), default)
 
 
 def load_index_symbol_names() -> dict:
@@ -217,14 +231,9 @@ async def get_historical_summary(
                     continue
 
                 total = len(df)
-                avg_confidence = (
-                    _safe_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
-                )
-                avg_expected = (
-                    _safe_float(df['expected_change_percent'].mean())
-                    if 'expected_change_percent' in df.columns
-                    else 0.0
-                )
+                # Finite-only means: pandas .mean() treats Inf as poison (→ Inf → 0.0).
+                avg_confidence = _finite_column_mean(df, "confidence")
+                avg_expected = _finite_column_mean(df, "expected_change_percent")
 
                 if avg_expected > 1.0:
                     sentiment = "Bullish"

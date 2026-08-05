@@ -143,11 +143,13 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
     // Invalidate in-flight status / success paths before awaiting cancel so a
     // late success cannot wipe the cancelled note or reload summary.
     refreshActiveRef.current = false;
-    loadGenerationRef.current += 1;
+    const generation = ++loadGenerationRef.current;
     try {
       await api.post('/api/refresh/cancel');
+      if (generation !== loadGenerationRef.current) return;
       stopRefresh('Refresh cancelled.');
     } catch {
+      if (generation !== loadGenerationRef.current) return;
       stopRefresh('Failed to cancel refresh.');
     }
   };

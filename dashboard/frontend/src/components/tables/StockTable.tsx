@@ -17,10 +17,15 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
 
   // Filter stocks (names come from API - saved at write time)
   const filteredStocks = stocks.filter(stock => {
+    // Dirty rows can omit symbol; calling toLowerCase on non-strings blanks the table.
+    if (typeof stock.symbol !== 'string' || !stock.symbol.trim()) {
+      return false;
+    }
     const displayName = getCompanyName(stock.symbol, stock.name);
-    const matchesSearch = 
-      stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      displayName.toLowerCase().includes(searchTerm.toLowerCase());
+    const needle = searchTerm.toLowerCase();
+    const matchesSearch =
+      stock.symbol.toLowerCase().includes(needle) ||
+      displayName.toLowerCase().includes(needle);
     
     const rating = stock.recommendation || '';
     const matchesFilter =
@@ -99,10 +104,10 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   {getCompanyName(stock.symbol, stock.name)}
                 </td>
                 <td className="px-4 py-3 text-sm text-right">
-                  {formatPrice(stock.currentPrice)}
+                  {Number.isFinite(stock.currentPrice) ? formatPrice(stock.currentPrice) : '—'}
                 </td>
                 <td className="px-4 py-3 text-sm text-right">
-                  {formatPrice(stock.targetPrice)}
+                  {Number.isFinite(stock.targetPrice) ? formatPrice(stock.targetPrice) : '—'}
                 </td>
                 <td className={`px-4 py-3 text-sm text-right font-medium ${
                   Number.isFinite(stock.expectedChange) && stock.expectedChange >= 0
