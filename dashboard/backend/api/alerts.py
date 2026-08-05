@@ -33,7 +33,7 @@ from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
 from src.utils.tickers import normalize_ticker
-from src.storage.alert_watches import InvalidAlertWatchConfig
+from src.storage.alert_watches import InvalidAlertWatchConfig, validate_watches_config
 
 router = APIRouter()
 
@@ -195,6 +195,13 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
         except InvalidAlertWatchConfig as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
+    # File mode previously skipped watch validation — negative / huge cooldown
+    # (and other InvalidAlertWatchConfig rules) could persist and fire every tick
+    # or OverflowError the evaluator. Reuse the same coerce path as hosted.
+    try:
+        validate_watches_config("file-mode", config)
+    except InvalidAlertWatchConfig as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     save_alerts_config(config)
 
 

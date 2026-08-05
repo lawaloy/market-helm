@@ -13,6 +13,9 @@ from src.utils.tickers import normalize_ticker
 from .database import get_connection
 
 MAX_DELIVERY_LOG = 100
+# Cap cooldown so timedelta(minutes=…) cannot OverflowError and abort a
+# per-symbol watch loop (one tenant's poison value skipping sibling tenants).
+MAX_COOLDOWN_MINUTES = 60 * 24 * 365  # one year
 
 
 class InvalidAlertWatchConfig(ValueError):
@@ -73,6 +76,12 @@ def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
     if as_float < 0:
         # Negative cooldown is treated as "no cooldown" by evaluators; reject
         # at save so Settings cannot silently disable rate limiting.
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        )
+    if as_float > MAX_COOLDOWN_MINUTES:
+        # Huge finite values (e.g. 1e15) pass isfinite but OverflowError
+        # timedelta at evaluate time — reject at save.
         raise InvalidAlertWatchConfig(
             f"Alert '{alert_id}' has an invalid cooldown_minutes value."
         )
@@ -246,12 +255,15 @@ def _safe_cooldown_minutes(raw_value: Any) -> int:
         as_float = float(raw_value or 0)
     except (TypeError, ValueError):
         return 0
-    if not math.isfinite(as_float):
+    if not math.isfinite(as_float) or as_float < 0:
         return 0
     try:
-        return int(as_float)
+        minutes = int(as_float)
     except (TypeError, ValueError, OverflowError):
         return 0
+    if minutes > MAX_COOLDOWN_MINUTES:
+        return MAX_COOLDOWN_MINUTES
+    return minutes
 
 
 def get_watch(user_id: str, alert_id: str) -> Optional[Dict[str, Any]]:
