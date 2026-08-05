@@ -15,16 +15,19 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = 300
 MIN_INTERVAL_SECONDS = 60
+# Hard ceiling so a poisoned interval cannot sleep the worker loop "forever"
+# (e.g. 1e18) and silently stop alert evaluation after the first tick.
+MAX_INTERVAL_SECONDS = 86400
 
 
 def resolve_interval_seconds(explicit: Optional[int] = None) -> int:
     """Seconds between checks when running in loop mode."""
     if explicit is not None:
-        return max(MIN_INTERVAL_SECONDS, explicit)
+        return min(MAX_INTERVAL_SECONDS, max(MIN_INTERVAL_SECONDS, explicit))
     raw = os.environ.get("ALERT_CHECK_INTERVAL_SECONDS", "").strip()
     if raw:
         try:
-            return max(MIN_INTERVAL_SECONDS, int(raw))
+            return min(MAX_INTERVAL_SECONDS, max(MIN_INTERVAL_SECONDS, int(raw)))
         except ValueError:
             logger.warning(
                 "Invalid ALERT_CHECK_INTERVAL_SECONDS=%r; using default %ss",

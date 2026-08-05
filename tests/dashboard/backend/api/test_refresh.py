@@ -425,7 +425,8 @@ def test_run_daily_tracker_omits_no_screener_when_disabled(monkeypatch) -> None:
     args, kwargs = popen.call_args
     command = args[0]
     assert "--no-screener" not in command
-    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "8"
+    # REFRESH_MAX_WORKERS=8 must clamp to data_fetcher's 1..4 band before spawn.
+    assert kwargs["env"]["STOCK_FETCH_MAX_WORKERS"] == "4"
     assert refresh.refresh_status["last_status"] == "success"
 
 
