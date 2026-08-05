@@ -51,7 +51,7 @@ def _bounded_env(name: str, default: int, *, maximum: int) -> int:
     try:
         return max(1, min(int(raw), maximum))
     except ValueError:
-        logger.warning("Invalid %s=%r; using %s", name, raw, default)
+        logger.warning("Invalid %s; using %s", name, default)
         return default
 
 
@@ -63,8 +63,7 @@ def rate_limiting_enabled() -> bool:
         return False
     if raw:
         logger.warning(
-            "Invalid MARKET_HELM_RATE_LIMIT_ENABLED=%r; using database-mode default",
-            raw,
+            "Invalid MARKET_HELM_RATE_LIMIT_ENABLED; using database-mode default",
         )
     return database_enabled()
 
@@ -115,7 +114,7 @@ def _trusted_proxy_networks() -> Tuple[ipaddress._BaseNetwork, ...]:
         try:
             networks.append(ipaddress.ip_network(value, strict=False))
         except ValueError:
-            logger.warning("Ignoring invalid trusted proxy CIDR %r", value)
+            logger.warning("Ignoring invalid trusted proxy CIDR entry")
     return tuple(networks)
 
 
