@@ -37,10 +37,12 @@ def evaluate_price_threshold(condition: Dict, stock: Dict) -> bool:
     try:
         threshold = _finite_float(condition.get("value", 0))
         price = _finite_float(stock.get("close", 0))
+        # Soft-fail unsupported operators too: AlertEngine.evaluate has no
+        # per-alert try/except, so a raised ValueError would abort siblings.
+        return _compare(price, operator, threshold)
     except (TypeError, ValueError):
         # Inf closes would otherwise compare True for greater_than and fire alerts.
         return False
-    return _compare(price, operator, threshold)
 
 
 def evaluate_screening_match(condition: Dict, stock: Dict) -> bool:
