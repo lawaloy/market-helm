@@ -268,11 +268,15 @@ describe('Header refresh controls', () => {
     expect(screen.getByText('Refresh started in background')).toBeTruthy();
 
     await act(async () => {
+      // Cancel clear is 3s; status poll is 2s and may replace the start message.
       await vi.advanceTimersByTimeAsync(3000);
     });
 
-    expect(screen.getByText('Refresh started in background')).toBeTruthy();
+    // Prior cancel timer must not wipe the newer refresh generation's status.
     expect(screen.queryByText('Refresh cancelled.')).toBeNull();
+    expect(
+      screen.getByText(/Refresh started in background|Fetching quotes/),
+    ).toBeTruthy();
   });
 
   it('stops polling after max wait without calling onRefreshComplete', async () => {
