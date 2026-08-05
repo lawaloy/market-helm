@@ -260,7 +260,7 @@ async def get_opportunities(
         
         return OpportunitiesResponse(
             type=type,
-            count=len(filtered_df),
+            count=len(opportunities),
             opportunities=opportunities
         )
     
