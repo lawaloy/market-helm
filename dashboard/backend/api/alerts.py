@@ -243,11 +243,19 @@ async def put_alerts_config(
         _persist_webhook_secret(body.defaults)
     _load_env()
     config = _normalize_config(body.model_dump())
+    seen_ids: set[str] = set()
     for alert in config["alerts"]:
         # Watch sync strips ids; reject whitespace-only before a silent drop.
         alert_id = str(alert.get("id") or "").strip()
         if not alert_id:
             raise HTTPException(status_code=400, detail="Each alert must have an id.")
+        # Hosted sync PK is (user_id, alert_id); catch dupes before IntegrityError 500.
+        if alert_id in seen_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate alert id '{alert_id}'.",
+            )
+        seen_ids.add(alert_id)
         alert["id"] = alert_id
     _save_raw_config(user_id, config)
     status_source = config

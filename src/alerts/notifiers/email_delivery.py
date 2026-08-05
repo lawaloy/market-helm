@@ -112,8 +112,22 @@ def format_alert_email(event: Dict[str, Any]) -> tuple[str, str]:
     return subject, body
 
 
+def _allow_alert_smtp_overrides(alert: Optional[Dict[str, Any]]) -> bool:
+    """Whether per-alert SMTP/from fields may override platform env.
+
+    Hosted multi-user mode must not let tenants redirect SMTP transport or
+    spoof From (mirrors webhook/recipient ``_allow_env_*`` isolation). Opt in
+    with ``_allow_alert_smtp=True`` for intentional self-host style overrides.
+    """
+    from src.storage.database import database_enabled
+
+    if not alert:
+        return True
+    return alert.get("_allow_alert_smtp", not database_enabled()) is not False
+
+
 def _platform_from_address(alert: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    if alert:
+    if alert and _allow_alert_smtp_overrides(alert):
         from_alert = alert.get("email_from")
         if from_alert and str(from_alert).strip():
             return str(from_alert).strip()
@@ -121,7 +135,7 @@ def _platform_from_address(alert: Optional[Dict[str, Any]] = None) -> Optional[s
     if from_env and from_env.strip():
         return from_env.strip()
     if resolve_email_provider() == "smtp":
-        if alert:
+        if alert and _allow_alert_smtp_overrides(alert):
             smtp_user = alert.get("smtp_user")
             if smtp_user and str(smtp_user).strip():
                 return str(smtp_user).strip()
@@ -389,14 +403,21 @@ class MailgunEmailBackend(EmailDeliveryBackend):
 
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
-    host = alert.get("smtp_host") or os.environ.get("SMTP_HOST")
+    use_overrides = _allow_alert_smtp_overrides(alert)
+    host = (alert.get("smtp_host") if use_overrides else None) or os.environ.get(
+        "SMTP_HOST"
+    )
     # Do not use `or` for port — 0 is falsy but must be rejected as invalid,
     # not silently replaced by the SMTP_PORT default.
-    port_raw = alert.get("smtp_port")
+    port_raw = alert.get("smtp_port") if use_overrides else None
     if port_raw is None or (isinstance(port_raw, str) and not str(port_raw).strip()):
         port_raw = os.environ.get("SMTP_PORT", "587")
-    username = alert.get("smtp_user") or os.environ.get("SMTP_USER")
-    password = alert.get("smtp_password") or os.environ.get("SMTP_PASSWORD")
+    username = (alert.get("smtp_user") if use_overrides else None) or os.environ.get(
+        "SMTP_USER"
+    )
+    password = (
+        alert.get("smtp_password") if use_overrides else None
+    ) or os.environ.get("SMTP_PASSWORD")
 
     if not host or not str(host).strip():
         logger.warning(

@@ -180,6 +180,17 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
     if not watch:
         raise RuntimeError(f"Watch {alert_id!r} not found for user {user_id}")
 
+    # Evaluate jobs claimed in the same batch both pass the pre-enqueue cooldown
+    # check before either deliver records a trigger. Re-check here so overlapping
+    # ticks cannot double-notify under a positive cooldown.
+    if _within_cooldown(user_id, alert_id, watch["cooldown_minutes"]):
+        logger.info(
+            "Skipping deliver within cooldown for alert %s (job %s)",
+            alert_id,
+            job["id"],
+        )
+        return False
+
     alert = watch["alert"]
     defaults = watch["defaults"]
     engine = AlertEngine([alert], storage=storage, defaults=defaults)
