@@ -16,12 +16,19 @@ vi.mock('../../utils/exportUtils', () => ({
   exportToPdf: exportMocks.exportToPdf,
 }));
 
-const sampleStock = {
+const sampleStock: Opportunity = {
   symbol: 'AAPL',
   name: 'Apple',
-  close: 190,
-  changePercent: 1.2,
-} as Opportunity;
+  currentPrice: 190,
+  targetPrice: 210,
+  expectedChange: 10.5,
+  confidence: 80,
+  risk: 'Medium',
+  recommendation: 'BUY',
+  trend: 'Bullish',
+  reason: 'Strong momentum',
+  volume: 1_000_000,
+};
 
 function captureRefWithHost(): RefObject<HTMLElement | null> {
   return { current: document.createElement('div') };
