@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Summary from './Summary';
 
@@ -22,13 +22,17 @@ vi.mock('../components/common/ExportButton', () => ({
   default: () => <button type="button">Export</button>,
 }));
 
+function notFoundError() {
+  return {
+    isAxiosError: true,
+    response: { status: 404 },
+    message: 'Not Found',
+  };
+}
+
 describe('Summary refresh controls', () => {
   beforeEach(() => {
-    apiMocks.getSummary.mockRejectedValue({
-      isAxiosError: true,
-      response: { status: 404 },
-      message: 'Not Found',
-    });
+    apiMocks.getSummary.mockRejectedValue(notFoundError());
     apiMocks.post.mockResolvedValue({ data: { message: 'Refresh started' } });
     apiMocks.get.mockResolvedValue({
       data: { is_running: false, last_status: 'success' },
@@ -43,9 +47,11 @@ describe('Summary refresh controls', () => {
 
   async function renderEmptySummary() {
     render(<Summary />);
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
     });
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
   }
 
   it('polls until success then reloads the summary', async () => {
@@ -58,11 +64,7 @@ describe('Summary refresh controls', () => {
         data: { is_running: false, last_status: 'success' },
       });
     apiMocks.getSummary
-      .mockRejectedValueOnce({
-        isAxiosError: true,
-        response: { status: 404 },
-        message: 'Not Found',
-      })
+      .mockRejectedValueOnce(notFoundError())
       .mockResolvedValueOnce({
         data: {
           summary: 'Markets firmed into the close.',
@@ -71,18 +73,7 @@ describe('Summary refresh controls', () => {
         },
       });
 
-    // axios.isAxiosError is used in fetchSummary — stub via mock shape + spy
-    const axios = await import('axios');
-    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
-
-    render(<Summary />);
-
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+    await renderEmptySummary();
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -111,9 +102,6 @@ describe('Summary refresh controls', () => {
 
   it('cancels an in-flight refresh and stops further status polls', async () => {
     vi.useFakeTimers();
-    const axios = await import('axios');
-    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
-
     apiMocks.get.mockResolvedValue({
       data: { is_running: true, last_status: 'running' },
     });
@@ -156,9 +144,6 @@ describe('Summary refresh controls', () => {
 
   it('stops polling after max wait without loading a summary', async () => {
     vi.useFakeTimers();
-    const axios = await import('axios');
-    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
-
     apiMocks.get.mockResolvedValue({
       data: { is_running: true, last_status: 'running' },
     });
@@ -191,8 +176,6 @@ describe('Summary refresh controls', () => {
 
   it('stops polling after unmount so late status responses are ignored', async () => {
     vi.useFakeTimers();
-    const axios = await import('axios');
-    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
 
     let resolveStatus: ((value: unknown) => void) | undefined;
     apiMocks.get.mockImplementation(
