@@ -145,7 +145,16 @@ class AlertEngine:
             if last_triggered.tzinfo
             else datetime.utcnow()
         )
-        return now - last_triggered < timedelta(minutes=cooldown_minutes)
+        try:
+            window = timedelta(minutes=cooldown_minutes)
+        except OverflowError:
+            # Huge finite cooldown (e.g. 1e15) must not abort sibling watches.
+            logger.warning(
+                "Overflow cooldown_minutes on alert %s; treating as in cooldown",
+                alert.get("id"),
+            )
+            return True
+        return now - last_triggered < window
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
         alert = apply_alert_defaults(alert, self.defaults)

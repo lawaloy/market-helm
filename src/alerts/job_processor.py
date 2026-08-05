@@ -52,7 +52,13 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
     if not last:
         return False
     last = _as_utc(last)
-    return datetime.now(timezone.utc) - last < timedelta(minutes=cooldown_minutes)
+    try:
+        window = timedelta(minutes=cooldown_minutes)
+    except OverflowError:
+        # Poisoned huge cooldown must not abort the per-symbol watch loop.
+        # Treat as still cooling down so sibling tenants keep evaluating.
+        return True
+    return datetime.now(timezone.utc) - last < window
 
 
 def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
