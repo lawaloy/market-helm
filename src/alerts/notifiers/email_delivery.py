@@ -23,6 +23,16 @@ logger = setup_logger("alerts.email.delivery")
 SUPPORTED_PROVIDERS = frozenset({"smtp", "sendgrid", "mailgun"})
 
 
+def _safe_from_address(value: Any) -> Optional[str]:
+    """Return a From address only when it cannot inject CR/LF into headers."""
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    if not cleaned or any(ch in cleaned for ch in ("\r", "\n", "\0")):
+        return None
+    return cleaned
+
+
 def parse_recipients(value: Union[str, List[str], None]) -> List[str]:
     if not value:
         return []
@@ -128,20 +138,20 @@ def _allow_alert_smtp_overrides(alert: Optional[Dict[str, Any]]) -> bool:
 
 def _platform_from_address(alert: Optional[Dict[str, Any]] = None) -> Optional[str]:
     if alert and _allow_alert_smtp_overrides(alert):
-        from_alert = alert.get("email_from")
-        if from_alert and str(from_alert).strip():
-            return str(from_alert).strip()
-    from_env = os.environ.get("ALERT_EMAIL_FROM")
-    if from_env and from_env.strip():
-        return from_env.strip()
+        from_alert = _safe_from_address(alert.get("email_from"))
+        if from_alert:
+            return from_alert
+    from_env = _safe_from_address(os.environ.get("ALERT_EMAIL_FROM"))
+    if from_env:
+        return from_env
     if resolve_email_provider() == "smtp":
         if alert and _allow_alert_smtp_overrides(alert):
-            smtp_user = alert.get("smtp_user")
-            if smtp_user and str(smtp_user).strip():
-                return str(smtp_user).strip()
-        username = os.environ.get("SMTP_USER")
-        if username and str(username).strip():
-            return str(username).strip()
+            smtp_user = _safe_from_address(alert.get("smtp_user"))
+            if smtp_user:
+                return smtp_user
+        username = _safe_from_address(os.environ.get("SMTP_USER"))
+        if username:
+            return username
     return None
 
 

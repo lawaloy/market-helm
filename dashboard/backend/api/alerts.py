@@ -162,16 +162,34 @@ def _public_config(config: Dict[str, Any]) -> Dict[str, Any]:
     return strip_webhook_secrets_from_config(config)
 
 
+def _reject_env_control_chars(label: str, value: str) -> str:
+    """Strip is not enough — CR/LF in webhook secrets would inject .env lines."""
+    cleaned = value.strip()
+    if any(ch in cleaned for ch in ("\r", "\n", "\0")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} contains invalid control characters.",
+        )
+    return cleaned
+
+
 def _persist_webhook_secret(defaults: Optional[AlertDefaults]) -> None:
     if defaults is None:
         return
     updates: Dict[str, str] = {}
     if defaults.webhook_url and defaults.webhook_url.strip():
-        updates["DISCORD_WEBHOOK_URL"] = defaults.webhook_url.strip()
+        updates["DISCORD_WEBHOOK_URL"] = _reject_env_control_chars(
+            "Webhook URL", defaults.webhook_url
+        )
     if defaults.webhook_format and defaults.webhook_format.strip():
-        updates["ALERT_WEBHOOK_FORMAT"] = defaults.webhook_format.strip().lower()
+        updates["ALERT_WEBHOOK_FORMAT"] = _reject_env_control_chars(
+            "Webhook format", defaults.webhook_format
+        ).lower()
     if updates:
-        update_user_env_vars(updates)
+        try:
+            update_user_env_vars(updates)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _load_raw_config(user_id: Optional[str]) -> tuple[bool, Optional[Dict[str, Any]]]:
