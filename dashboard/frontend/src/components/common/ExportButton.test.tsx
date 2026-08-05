@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { createRef } from 'react';
+import type { RefObject } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ExportButton from './ExportButton';
 import type { Opportunity } from '../../types';
@@ -23,6 +23,10 @@ const sampleStock = {
   changePercent: 1.2,
 } as Opportunity;
 
+function captureRefWithHost(): RefObject<HTMLElement | null> {
+  return { current: document.createElement('div') };
+}
+
 describe('ExportButton', () => {
   afterEach(() => {
     cleanup();
@@ -38,17 +42,9 @@ describe('ExportButton', () => {
         }),
     );
 
-    const captureRef = createRef<HTMLDivElement>();
-    // Attach a real element so the PNG branch is enabled.
-    const host = document.createElement('div');
-    Object.defineProperty(captureRef, 'current', {
-      configurable: true,
-      get: () => host,
-    });
-
     render(
       <ExportButton
-        captureRef={captureRef}
+        captureRef={captureRefWithHost()}
         formats={['png']}
         label="Summary"
       />,
@@ -77,16 +73,9 @@ describe('ExportButton', () => {
         }),
     );
 
-    const captureRef = createRef<HTMLDivElement>();
-    const host = document.createElement('div');
-    Object.defineProperty(captureRef, 'current', {
-      configurable: true,
-      get: () => host,
-    });
-
     render(
       <ExportButton
-        captureRef={captureRef}
+        captureRef={captureRefWithHost()}
         formats={['png']}
         label="Dashboard"
       />,
