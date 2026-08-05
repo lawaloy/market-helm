@@ -71,16 +71,29 @@ class AISummarizer:
         
         summary_parts.append(f"Today's market showed {sentiment} sentiment with {gainers} gainers and {losers} losers, averaging {avg_change:.2f}% change overall.")
         
-        # Highlight top movers
-        if top_gainers:
-            top_gainer = top_gainers[0]
-            change = _finite_float(top_gainer.get('change_percent'))
-            summary_parts.append(f"{top_gainer['symbol']} led gains with a {change:.2f}% increase.")
-        
-        if top_losers:
-            top_loser = top_losers[0]
-            change = _finite_float(top_loser.get('change_percent'))
-            summary_parts.append(f"{top_loser['symbol']} declined {abs(change):.2f}%, marking the largest drop.")
+        # Highlight top movers (skip non-dict / blank symbols — same soft-fail
+        # posture as generate_summary's OpenAI prompt path).
+        for top_gainer in top_gainers:
+            if not isinstance(top_gainer, dict):
+                continue
+            symbol = str(top_gainer.get("symbol") or "").strip()
+            if not symbol:
+                continue
+            change = _finite_float(top_gainer.get("change_percent"))
+            summary_parts.append(f"{symbol} led gains with a {change:.2f}% increase.")
+            break
+
+        for top_loser in top_losers:
+            if not isinstance(top_loser, dict):
+                continue
+            symbol = str(top_loser.get("symbol") or "").strip()
+            if not symbol:
+                continue
+            change = _finite_float(top_loser.get("change_percent"))
+            summary_parts.append(
+                f"{symbol} declined {abs(change):.2f}%, marking the largest drop."
+            )
+            break
         
         # Exchange performance (skip non-finite averages when ranking)
         def _exchange_avg(item):
