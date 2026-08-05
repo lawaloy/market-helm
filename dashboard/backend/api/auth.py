@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from src.storage.database import database_enabled, init_database
-from src.storage.session import AuthError, create_access_token
+from src.storage.session import AuthError, create_access_token, ensure_auth_secret
 from src.storage.users import UserError, authenticate_user, create_user, get_user_by_id
 
 router = APIRouter()
@@ -48,6 +48,12 @@ def _require_multi_user() -> None:
 async def register(body: RegisterRequest) -> AuthResponse:
     _require_multi_user()
     init_database()
+    # Fail before create_user so a missing/short AUTH_SECRET cannot orphan an account
+    # that then blocks retry with "email already exists".
+    try:
+        ensure_auth_secret()
+    except AuthError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     try:
         user = create_user(body.email, body.password)
     except UserError as exc:
