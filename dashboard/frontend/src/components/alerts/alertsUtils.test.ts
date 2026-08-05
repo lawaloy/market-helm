@@ -8,10 +8,13 @@ import {
   findDuplicatePriceRule,
   formatCondition,
   formatDeliveryStatusLine,
+  formatPrice,
+  formatQuotePrice,
   formatTestSuccess,
   isSampleRule,
   loadSymbolCatalog,
   loadTrackedSymbols,
+  parseFinitePrice,
   parseSymbolCatalog,
   priceAlertKey,
   slugify,
@@ -139,6 +142,42 @@ describe('priceAlertKey', () => {
     expect(
       priceAlertKey({ type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: Number.NaN }),
     ).toBeNull();
+    expect(
+      priceAlertKey({
+        type: 'price_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe('formatPrice / formatQuotePrice non-finite', () => {
+  it('does not locale-format Infinity or NaN thresholds', () => {
+    expect(formatPrice(Number.POSITIVE_INFINITY)).toBe('Infinity');
+    expect(formatPrice(Number.NaN)).toBe('NaN');
+    expect(formatQuotePrice(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(formatQuotePrice(Number.NaN)).toBeNull();
+    expect(formatQuotePrice(150)).toBe('$150.00');
+  });
+});
+
+describe('parseFinitePrice', () => {
+  it('accepts finite numeric strings', () => {
+    expect(parseFinitePrice('150')).toBe(150);
+    expect(parseFinitePrice(' 175.5 ')).toBe(175.5);
+    expect(parseFinitePrice('0')).toBe(0);
+  });
+
+  it('rejects blank, NaN, and ±Infinity (including overflow literals)', () => {
+    expect(parseFinitePrice('')).toBeNull();
+    expect(parseFinitePrice('   ')).toBeNull();
+    expect(parseFinitePrice('NaN')).toBeNull();
+    expect(parseFinitePrice('Infinity')).toBeNull();
+    expect(parseFinitePrice('-Infinity')).toBeNull();
+    expect(parseFinitePrice('1e999')).toBeNull();
+    expect(parseFinitePrice('not-a-number')).toBeNull();
   });
 });
 

@@ -13,6 +13,7 @@ import {
   formatCondition,
   formatPrice,
   formatQuotePrice,
+  parseFinitePrice,
   ruleTitle,
   slugify,
   symbolGradient,
@@ -58,8 +59,11 @@ export function RuleCard({
 
   const saveEdit = () => {
     if (!isPrice) return;
-    const value = Number(editValue);
-    if (Number.isNaN(value)) {
+    // Blank / NaN / ±Infinity must not become watch thresholds (JSON nullifies Inf;
+    // Inf also breaks comparisons / locale formatting). type=number inputs may
+    // sanitize Inf to "" — parseFinitePrice rejects that too.
+    const value = parseFinitePrice(editValue);
+    if (value === null) {
       onEditError('Enter a valid price.');
       return;
     }
