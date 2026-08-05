@@ -91,11 +91,13 @@ export const historyApi = {
     api.get<{ symbols: string[]; names: Record<string, string>; date: string }>('/api/history/symbols'),
 };
 
-// Stocks endpoints
+// Stocks endpoints — encode path segments so class-share tickers like BRK/B
+// cannot split the route or inject query/fragment characters.
 export const stocksApi = {
-  getDetail: (symbol: string) => api.get<StockDetail>(`/api/stocks/${symbol}`),
+  getDetail: (symbol: string) =>
+    api.get<StockDetail>(`/api/stocks/${encodeURIComponent(symbol)}`),
   getHistorical: (symbol: string, days: number = 30) =>
-    api.get<HistoricalData>(`/api/stocks/${symbol}/historical`, {
+    api.get<HistoricalData>(`/api/stocks/${encodeURIComponent(symbol)}/historical`, {
       params: { days },
     }),
 };

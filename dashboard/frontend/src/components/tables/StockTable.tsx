@@ -17,23 +17,30 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
 
   // Filter stocks (names come from API - saved at write time)
   const filteredStocks = stocks.filter(stock => {
+    // Dirty rows can omit symbol; calling toLowerCase on non-strings blanks the table.
+    if (typeof stock.symbol !== 'string' || !stock.symbol.trim()) {
+      return false;
+    }
     const displayName = getCompanyName(stock.symbol, stock.name);
-    const matchesSearch = 
-      stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      displayName.toLowerCase().includes(searchTerm.toLowerCase());
+    const needle = searchTerm.toLowerCase();
+    const matchesSearch =
+      stock.symbol.toLowerCase().includes(needle) ||
+      displayName.toLowerCase().includes(needle);
     
-    const matchesFilter = 
-      filterRec === 'All' || 
-      (filterRec === 'BUY' && (stock.trend === 'STRONG BUY' || stock.trend === 'BUY')) ||
-      (filterRec === 'HOLD' && stock.trend === 'HOLD') ||
-      (filterRec === 'SELL' && (stock.trend === 'STRONG SELL' || stock.trend === 'SELL'));
-    
+    const rating = stock.recommendation || '';
+    const matchesFilter =
+      filterRec === 'All' ||
+      (filterRec === 'BUY' && (rating === 'STRONG BUY' || rating === 'BUY')) ||
+      (filterRec === 'HOLD' && rating === 'HOLD') ||
+      (filterRec === 'SELL' && (rating === 'STRONG SELL' || rating === 'SELL'));
+
     return matchesSearch && matchesFilter;
   });
 
-  // Paginate
-  const totalPages = Math.ceil(filteredStocks.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  // Paginate — clamp so search/filter cannot leave an empty page with no pager.
+  const totalPages = Math.max(1, Math.ceil(filteredStocks.length / itemsPerPage));
+  const page = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (page - 1) * itemsPerPage;
   const paginatedStocks = filteredStocks.slice(startIndex, startIndex + itemsPerPage);
 
   return (
@@ -74,7 +81,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
               <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Change</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Conf</th>
               <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Risk</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Trend</th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Rec</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-600">
@@ -97,18 +104,22 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   {getCompanyName(stock.symbol, stock.name)}
                 </td>
                 <td className="px-4 py-3 text-sm text-right">
-                  {formatPrice(stock.currentPrice)}
+                  {Number.isFinite(stock.currentPrice) ? formatPrice(stock.currentPrice) : '—'}
                 </td>
                 <td className="px-4 py-3 text-sm text-right">
-                  {formatPrice(stock.targetPrice)}
+                  {Number.isFinite(stock.targetPrice) ? formatPrice(stock.targetPrice) : '—'}
                 </td>
                 <td className={`px-4 py-3 text-sm text-right font-medium ${
-                  stock.expectedChange >= 0 ? 'text-green-600' : 'text-red-600'
+                  Number.isFinite(stock.expectedChange) && stock.expectedChange >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
                 } dark:text-green-400 dark:text-red-400`}>
-                  {formatPercentage(stock.expectedChange)}
+                  {Number.isFinite(stock.expectedChange)
+                    ? formatPercentage(stock.expectedChange)
+                    : '—'}
                 </td>
                 <td className="px-4 py-3 text-sm text-center">
-                  {stock.confidence}%
+                  {Number.isFinite(stock.confidence) ? `${stock.confidence}%` : '—'}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`badge ${getRiskColor(stock.risk)}`}>
@@ -116,8 +127,8 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`badge ${getRecommendationColor(stock.trend)}`}>
-                    {stock.trend}
+                  <span className={`badge ${getRecommendationColor(stock.recommendation)}`}>
+                    {stock.recommendation}
                   </span>
                 </td>
               </tr>
@@ -130,18 +141,18 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
         <div className="mt-4 flex items-center justify-center gap-2">
           <button
             className="px-3 py-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded disabled:opacity-50"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
+            disabled={page === 1}
+            onClick={() => setCurrentPage(page - 1)}
           >
             Previous
           </button>
           <span className="text-sm text-slate-600 dark:text-slate-400">
-            Page {currentPage} of {totalPages}
+            Page {page} of {totalPages}
           </span>
           <button
             className="px-3 py-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded disabled:opacity-50"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
+            disabled={page === totalPages}
+            onClick={() => setCurrentPage(page + 1)}
           >
             Next
           </button>

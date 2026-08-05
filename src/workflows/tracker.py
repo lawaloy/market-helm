@@ -224,10 +224,14 @@ class StockTrackerWorkflow:
             if watch_symbols:
                 # Normalize so padded index symbols match stripped watch keys;
                 # drop None/NaN sentinels that would otherwise become "NONE"/"NAN".
+                # Non-dict fetch rows must not AttributeError the whole refresh
+                # when top-N filtering is off (or when dirty rows remain).
                 existing = {
                     key
                     for key in (
-                        normalize_ticker(stock.get("symbol")) for stock in all_data
+                        normalize_ticker(stock.get("symbol"))
+                        for stock in all_data
+                        if isinstance(stock, dict)
                     )
                     if key
                 }

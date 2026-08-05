@@ -14,6 +14,7 @@ import math
 import pandas as pd
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
+from ..utils.tickers import normalize_ticker
 
 logger = setup_logger("projector")
 
@@ -54,9 +55,16 @@ class StockProjector:
         projections = {}
         
         for stock in current_data:
-            symbol = stock.get('symbol')
+            # Dirty fetch/watch merges can inject None/str rows; skip them so
+            # one bad entry cannot AttributeError the whole daily projection run.
+            if not isinstance(stock, dict):
+                continue
+            # NaN/NONE/blank symbols are truthy or collapse under one key — skip
+            # and canonicalize so projection maps never store float("nan").
+            symbol = normalize_ticker(stock.get('symbol'))
             if not symbol:
                 continue
+            stock = {**stock, 'symbol': symbol}
             
             projection = self._project_stock(stock, historical_data)
             if projection:

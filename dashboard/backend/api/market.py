@@ -3,11 +3,19 @@ Market API endpoints
 """
 import math
 from typing import Any, Dict, Optional
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.market import MarketOverview, MoversResponse, StockMover, IndexData
 from dashboard.backend.services.data_loader import get_data_loader
 
 router = APIRouter()
+
+
+def _numeric_change_percent(df: pd.DataFrame) -> pd.Series:
+    """Coerce change_percent so dirty CSV cells cannot TypeError overview/movers."""
+    change = pd.to_numeric(df["change_percent"], errors="coerce")
+    return change.where(change.map(lambda value: pd.notna(value) and math.isfinite(float(value))))
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -153,17 +161,21 @@ async def get_market_overview():
         df = loader.load_daily_data()
         if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
             raise HTTPException(status_code=404, detail="No data available.")
-        
+
+        # Dirty cells ("bad"/mixed types) promote object dtype and TypeError
+        # comparisons / mean / nlargest — coerce once for all overview stats.
+        change = _numeric_change_percent(df)
+
         # Calculate overall statistics
         total_stocks = len(df)
-        gainers = len(df[df['change_percent'] > 0])
-        losers = len(df[df['change_percent'] < 0])
-        unchanged = len(df[df['change_percent'] == 0])
-        
-        avg_change = _safe_float(df['change_percent'].mean())
-        max_change = _safe_float(df['change_percent'].max())
-        min_change = _safe_float(df['change_percent'].min())
-        
+        gainers = int((change > 0).sum())
+        losers = int((change < 0).sum())
+        unchanged = int((change == 0).sum())
+
+        avg_change = _safe_float(change.mean())
+        max_change = _safe_float(change.max())
+        min_change = _safe_float(change.min())
+
         # Calculate per-index statistics
         indices = {}
         if 'index_name' in df.columns:
@@ -173,12 +185,13 @@ async def get_market_overview():
                     # Corrupt/missing index labels previously AttributeError'd on
                     # .replace and 500'd the whole overview payload.
                     continue
-                index_df = df[df['index_name'] == index_name]
+                index_mask = df['index_name'] == index_name
+                index_change = change[index_mask]
                 indices[key] = IndexData(
-                    stocks=len(index_df),
-                    avgChange=round(_safe_float(index_df['change_percent'].mean()), 2),
-                    gainers=len(index_df[index_df['change_percent'] > 0]),
-                    losers=len(index_df[index_df['change_percent'] < 0])
+                    stocks=int(index_mask.sum()),
+                    avgChange=round(_safe_float(index_change.mean()), 2),
+                    gainers=int((index_change > 0).sum()),
+                    losers=int((index_change < 0).sum()),
                 )
         
         return MarketOverview(
@@ -213,25 +226,40 @@ async def get_top_movers(
         if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
             raise HTTPException(status_code=404, detail="No data available.")
 
+        # Coerce before nlargest — object-dtype change_percent TypeErrors ranking.
+        ranked = df.copy()
+        ranked["_change_percent"] = _numeric_change_percent(ranked)
+        ranked = ranked[ranked["_change_percent"].notna()]
+
         # Filter by sign first so a large limit cannot mix gainers into losers
         # (or vice versa) when fewer matching movers exist than `limit`.
         if type == "gainers":
-            sorted_df = df[df['change_percent'] > 0].nlargest(limit, 'change_percent')
+            sorted_df = ranked[ranked["_change_percent"] > 0].nlargest(
+                limit, "_change_percent"
+            )
         else:
-            sorted_df = df[df['change_percent'] < 0].nsmallest(limit, 'change_percent')
-        
+            sorted_df = ranked[ranked["_change_percent"] < 0].nsmallest(
+                limit, "_change_percent"
+            )
+
         movers = []
         for _, row in sorted_df.iterrows():
             # Skip non-finite price fields so one corrupt CSV row cannot null the payload
             # or abort the whole movers card via int(float('nan')).
             price = _finite_float(row.get('close'))
             change = _finite_float(row.get('change'))
-            change_percent = _finite_float(row.get('change_percent'))
+            change_percent = _finite_float(row.get('_change_percent'))
             if price is None or change is None or change_percent is None:
                 continue
+            symbol = row.get("symbol")
+            if symbol is None or (isinstance(symbol, float) and not math.isfinite(symbol)):
+                continue
+            symbol_text = str(symbol).strip()
+            if not symbol_text:
+                continue
             movers.append(StockMover(
-                symbol=row['symbol'],
-                name=row.get('name', row['symbol']),
+                symbol=symbol_text,
+                name=row.get('name', symbol_text),
                 price=price,
                 change=change,
                 changePercent=change_percent,

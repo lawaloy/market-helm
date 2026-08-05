@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import signal
 import time
@@ -131,8 +132,20 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
+def _coerce_triggered_count(raw: Any) -> int:
+    """Coerce triggered count for logging; Inf/NaN must not abort the worker loop."""
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return 0
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def log_check_result(result: Dict[str, Any]) -> None:
-    triggered = int(result.get("triggered") or 0)
+    triggered = _coerce_triggered_count(result.get("triggered"))
     last_date = result.get("last_data_date")
     message = result.get("message")
     jobs = result.get("jobs")
