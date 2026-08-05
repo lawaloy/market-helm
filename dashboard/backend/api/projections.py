@@ -240,6 +240,9 @@ async def get_opportunities(
                 expectedChange=expected_change,
                 confidence=int(confidence_f),
                 risk=_safe_label(row.get("risk_level"), "Unknown"),
+                # Echo the filter bucket so the dashboard table can filter/badge
+                # by BUY/HOLD/SELL without conflating it with Bullish/Bearish trend.
+                recommendation=rec_map[type],
                 trend=_safe_label(row.get("trend"), "Neutral"),
                 reason=_safe_label(row.get('reason'), ''),
                 volume=volume,

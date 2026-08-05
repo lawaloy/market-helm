@@ -9,11 +9,12 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from typing import List, Optional
 import sys
 import os
 
@@ -48,6 +49,21 @@ from starlette.responses import Response
 
 from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
 from dashboard.backend.api.market import get_market_summary
+from dashboard.backend.auth import require_user_id
+
+
+def _coerce_startup_triggered(raw) -> int:
+    """Coerce startup triggered count; Inf/NaN must not log as a real trigger."""
+    import math
+
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return 0
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
 
 
 def _startup_alert_check() -> None:
@@ -55,7 +71,7 @@ def _startup_alert_check() -> None:
         from src.alerts.alert_worker import run_check_once
 
         result = run_check_once()
-        triggered = result.get("triggered", 0)
+        triggered = _coerce_startup_triggered(result.get("triggered", 0))
         if triggered:
             logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
     except Exception as exc:
@@ -82,7 +98,7 @@ app = FastAPI(
 )
 
 # CORS configuration for local development
-default_origins = [
+DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
@@ -93,9 +109,49 @@ default_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-cors_env = os.getenv("CORS_ORIGINS", "")
-env_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
-origins = env_origins or default_origins
+
+
+def parse_cors_origins(
+    raw: str,
+    defaults: Optional[List[str]] = None,
+) -> List[str]:
+    """Parse CORS_ORIGINS for credentialed middleware.
+
+    Wildcards, non-http(s) schemes, and control/whitespace-tainted values are
+    rejected so a bad deploy env cannot broaden browser credential access.
+    Falls back to defaults when nothing valid remains.
+    """
+    fallback = list(defaults) if defaults is not None else list(DEFAULT_CORS_ORIGINS)
+    accepted: List[str] = []
+    for part in str(raw or "").split(","):
+        origin = part.strip()
+        if not origin:
+            continue
+        if origin == "*":
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin %r — wildcard is incompatible with "
+                "allow_credentials=True",
+                origin,
+            )
+            continue
+        if any(ch.isspace() or ord(ch) < 32 for ch in origin):
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin with whitespace/control characters: %r",
+                origin,
+            )
+            continue
+        lower = origin.lower()
+        if not (lower.startswith("http://") or lower.startswith("https://")):
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin %r — only http(s) origins are allowed",
+                origin,
+            )
+            continue
+        accepted.append(origin)
+    return accepted or fallback
+
+
+origins = parse_cors_origins(os.getenv("CORS_ORIGINS", ""))
 
 app.add_middleware(
     CORSMiddleware,
@@ -122,21 +178,27 @@ async def health():
 
 
 @app.get("/api/data-info")
-async def data_info():
-    """Data status: path, latest date, and whether we need to fetch for the most recent trading day."""
+async def data_info(_user_id: Optional[str] = Depends(require_user_id)):
+    """Data status: path, latest date, and whether we need to fetch for the most recent trading day.
+
+    Hosted mode requires auth so anonymous clients cannot read data_dir / fetch
+    readiness. File mode (``require_user_id`` → ``None``) stays open.
+    """
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
     try:
         loader = get_data_loader()
-    except ValueError:
+        target_trading_day = get_most_recent_trading_day()
+        return {
+            "data_dir": str(loader.data_dir),
+            "latest_date": loader.get_latest_date(),
+            "target_trading_day": target_trading_day,
+            "needs_fetch": loader.needs_fetch_for_latest_trading_day(),
+            "available_dates": loader.get_available_dates()[:5],
+        }
+    except (ValueError, OSError):
+        # Unreadable data dirs / glob failures during status probes must map to
+        # 404 so App autofetch does not treat them as hard 500 boot failures.
         raise HTTPException(status_code=404, detail="No data available.")
-    target_trading_day = get_most_recent_trading_day()
-    return {
-        "data_dir": str(loader.data_dir),
-        "latest_date": loader.get_latest_date(),
-        "target_trading_day": target_trading_day,
-        "needs_fetch": loader.needs_fetch_for_latest_trading_day(),
-        "available_dates": loader.get_available_dates()[:5],
-    }
 
 
 @app.get("/api/summary")

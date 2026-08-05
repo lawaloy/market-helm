@@ -1,5 +1,7 @@
 """Tests for alert delivery status recording."""
 
+from unittest.mock import MagicMock
+
 from src.alerts.alert_storage import AlertStorage
 from src.alerts.delivery_status import latest_deliveries_by_channel, record_notifier_delivery
 
@@ -41,3 +43,15 @@ def test_record_notifier_delivery_skips_log_notifier(tmp_path):
     storage = AlertStorage(data_dir=tmp_path)
     record_notifier_delivery(storage, alert_id="a1", notifier=LogNotifier(), success=True)
     assert latest_deliveries_by_channel(storage) == []
+
+
+def test_record_notifier_delivery_soft_fails_storage_errors():
+    """Disk / DB write failures must not raise after a notifier already ran."""
+    storage = MagicMock()
+    storage.record_delivery.side_effect = OSError("disk full")
+
+    record_notifier_delivery(
+        storage, alert_id="a1", notifier=EmailNotifier(), success=True
+    )
+
+    storage.record_delivery.assert_called_once()

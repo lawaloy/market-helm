@@ -11,7 +11,8 @@ function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
     expectedChange: 6.67,
     confidence: 80,
     risk: 'medium',
-    trend: 'up',
+    recommendation: 'BUY',
+    trend: 'Bullish',
     reason: 'demo',
     volume: 1_000_000,
     ...overrides,
@@ -119,10 +120,11 @@ describe('exportToCsv', () => {
 
     const text = await lastBlob!.text();
     expect(text.split('\n')[0]).toBe(
-      'Symbol,Name,Price,Target,Expected %,Confidence,Risk,Trend',
+      'Symbol,Name,Price,Target,Expected %,Confidence,Risk,Recommendation,Trend',
     );
     expect(text).toContain("'=cmd");
     expect(text).toContain('"Evil, Corp"');
     expect(text).toContain(',-2.50,');
+    expect(text).toContain(',BUY,Bullish');
   });
 });

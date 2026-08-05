@@ -98,10 +98,33 @@ class StockDataFetcher:
             if len(symbols) > 100:
                 logger.info(f"  Capping symbols for {index_name} to first 100 (of {len(symbols)})")
                 symbols = symbols[:100]
-            
-            if max_symbols_per_index and len(symbols) > max_symbols_per_index:
-                logger.info(f"  Limiting symbols for {index_name} to first {max_symbols_per_index}")
-                symbols = symbols[:max_symbols_per_index]
+
+            # Truthiness used to treat 0 as "no limit" (full-index Fanout) and
+            # negative values as reverse slices (symbols[:-n]). Require an
+            # explicit positive int; non-positive skips the index fetch.
+            if max_symbols_per_index is not None:
+                try:
+                    symbol_limit = int(max_symbols_per_index)
+                except (TypeError, ValueError, OverflowError):
+                    logger.warning(
+                        "Invalid max_symbols_per_index=%r; skipping %s",
+                        max_symbols_per_index,
+                        index_name,
+                    )
+                    symbols = []
+                else:
+                    if symbol_limit <= 0:
+                        logger.warning(
+                            "Non-positive max_symbols_per_index=%r; skipping %s",
+                            max_symbols_per_index,
+                            index_name,
+                        )
+                        symbols = []
+                    elif len(symbols) > symbol_limit:
+                        logger.info(
+                            f"  Limiting symbols for {index_name} to first {symbol_limit}"
+                        )
+                        symbols = symbols[:symbol_limit]
             
             if not symbols:
                 logger.warning(f"Could not fetch symbols for {index_name}")
@@ -123,12 +146,29 @@ class StockDataFetcher:
                     except:
                         pass
                 
-                # Share API client to avoid creating multiple instances
-                screener = StockScreener(filters, api_client=self.api_client)
-                logger.info(f"  Screening {len(symbols)} stocks from {index_name} (parallel processing)...")
-                qualified_symbols = screener.get_qualified_symbols(symbols, max_workers=2)
-                logger.info(f"  Selected {len(qualified_symbols)} qualified stocks for tracking")
-                symbols = qualified_symbols
+                try:
+                    # Share API client to avoid creating multiple instances
+                    screener = StockScreener(filters, api_client=self.api_client)
+                    logger.info(
+                        f"  Screening {len(symbols)} stocks from {index_name} "
+                        f"(parallel processing)..."
+                    )
+                    qualified_symbols = screener.get_qualified_symbols(
+                        symbols, max_workers=2
+                    )
+                    logger.info(
+                        f"  Selected {len(qualified_symbols)} qualified stocks "
+                        f"for tracking"
+                    )
+                    symbols = qualified_symbols
+                except Exception as e:
+                    # Screener/API edges must not abort the whole index fetch;
+                    # keep the already-capped unscreened symbol list.
+                    logger.warning(
+                        "  Screener failed for %s; using unscreened symbols: %s",
+                        index_name,
+                        e,
+                    )
             
             # Fetch data for each symbol using parallel processing
             # Rate limiter is thread-safe and handles 60 calls/min limit automatically
