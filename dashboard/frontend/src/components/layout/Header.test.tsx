@@ -236,6 +236,45 @@ describe('Header refresh controls', () => {
     expect(screen.queryByText('Data refreshed successfully!')).toBeNull();
   });
 
+  it('does not clear a newer refresh message when a prior cancel timer fires', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Fetching quotes' },
+    });
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return { data: { message: 'cancelled' } };
+      }
+      return { data: { message: 'Refresh started in background' } };
+    });
+
+    render(<Header dataDate="2026-06-07" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Refresh started in background')).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+
+    expect(screen.getByText('Refresh started in background')).toBeTruthy();
+    expect(screen.queryByText('Refresh cancelled.')).toBeNull();
+  });
+
   it('stops polling after max wait without calling onRefreshComplete', async () => {
     vi.useFakeTimers();
     apiMocks.get.mockResolvedValue({
