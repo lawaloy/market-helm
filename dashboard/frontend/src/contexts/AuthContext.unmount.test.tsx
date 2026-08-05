@@ -27,8 +27,8 @@ describe('AuthProvider init cancel', () => {
     vi.spyOn(authApi, 'me').mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveMe = resolve;
-        }),
+          resolveMe = resolve as (value: unknown) => void;
+        }) as never,
     );
 
     render(
@@ -61,7 +61,7 @@ describe('AuthProvider init cancel', () => {
       () =>
         new Promise((_resolve, reject) => {
           rejectMe = reject;
-        }),
+        }) as never,
     );
 
     render(
