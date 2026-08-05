@@ -30,7 +30,7 @@ vi.mock('recharts', () => {
           ))}
         </ul>
         <ul data-testid="pie-labels">
-          {(data ?? []).map((entry, index, all) => {
+          {(data ?? []).map((entry, _index, all) => {
             const total = all.reduce((sum, row) => sum + row.value, 0);
             const percent = total > 0 ? entry.value / total : Number.NaN;
             return (
