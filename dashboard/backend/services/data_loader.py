@@ -3,6 +3,7 @@ Data loading service for reading CSV and JSON files
 """
 import math
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
@@ -11,6 +12,8 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 from src.utils.tickers import normalize_ticker
+
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _default_data_dir() -> Path:
@@ -26,6 +29,20 @@ def _default_data_dir() -> Path:
     # Project root is 4 levels up (dashboard/backend/services/data_loader.py)
     project_root = here.parent.parent.parent.parent
     return project_root / "data"
+
+
+def _is_iso_date(date_str: str) -> bool:
+    """True when date_str is a strict YYYY-MM-DD calendar date."""
+    if not _ISO_DATE_RE.fullmatch(date_str or ""):
+        return False
+    # Local import: some tests replace module-level ``datetime`` with a now()-only stub.
+    from datetime import datetime as _datetime
+
+    try:
+        _datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        return False
+    return True
 
 
 def _is_weekday(date_str: str) -> bool:
@@ -68,19 +85,22 @@ class DataLoader:
         if not files:
             return None
         if sort_by_date:
-            # Extract date from filename (e.g. daily_data_2026-02-14.csv) and pick latest
+            # Extract date from filename (e.g. daily_data_2026-02-14.csv) and pick latest.
+            # Non-ISO suffixes (tmp/partial/garbage) must not win lexicographic sort.
             def parse_date(f: Path) -> str:
                 stem = f.stem
                 if "daily_data_" in stem:
-                    return stem.replace("daily_data_", "")
-                if "projections_" in stem:
-                    return stem.replace("projections_", "")
-                if "summary_" in stem:
-                    return stem.replace("summary_", "")
-                return ""
+                    candidate = stem.replace("daily_data_", "", 1)
+                elif "projections_" in stem:
+                    candidate = stem.replace("projections_", "", 1)
+                elif "summary_" in stem:
+                    candidate = stem.replace("summary_", "", 1)
+                else:
+                    return ""
+                return candidate if _is_iso_date(candidate) else ""
             dated = [(f, parse_date(f)) for f in files if parse_date(f)]
             if not dated:
-                return max(files, key=lambda f: f.stat().st_mtime)
+                return None
             dated.sort(key=lambda x: x[1], reverse=True)
             # Prefer most recent trading day (weekday); market closed Sat/Sun
             for f, d in dated:
@@ -160,9 +180,14 @@ class DataLoader:
         return data
     
     def get_available_dates(self) -> List[str]:
-        """Get list of all available dates"""
+        """Get list of all available dates (strict YYYY-MM-DD filenames only)."""
         files = list(self.data_dir.glob("daily_data_*.csv"))
-        dates = [f.stem.replace("daily_data_", "") for f in files]
+        dates = [
+            date
+            for f in files
+            for date in [f.stem.replace("daily_data_", "", 1)]
+            if _is_iso_date(date)
+        ]
         return sorted(dates, reverse=True)
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
