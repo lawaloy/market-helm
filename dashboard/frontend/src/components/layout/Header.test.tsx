@@ -183,6 +183,59 @@ describe('Header refresh controls', () => {
     expect(onRefreshComplete).not.toHaveBeenCalled();
   });
 
+  it('ignores a late successful status response after cancel', async () => {
+    vi.useFakeTimers();
+    let resolveStatus: ((value: { data: Record<string, unknown> }) => void) | undefined;
+    apiMocks.get.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        }),
+    );
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return { data: { message: 'cancelled' } };
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+    const onRefreshComplete = vi.fn();
+
+    render(
+      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(apiMocks.get).toHaveBeenCalledWith('/api/refresh/status');
+    expect(resolveStatus).toBeTypeOf('function');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
+
+    await act(async () => {
+      resolveStatus?.({
+        data: { is_running: false, last_status: 'success', progress: 'Complete' },
+      });
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+    expect(screen.queryByText('Data refreshed successfully!')).toBeNull();
+  });
+
   it('stops polling after max wait without calling onRefreshComplete', async () => {
     vi.useFakeTimers();
     apiMocks.get.mockResolvedValue({
