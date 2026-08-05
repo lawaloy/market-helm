@@ -107,13 +107,10 @@ describe('AlertsSettings non-finite thresholds', () => {
     fireEvent.change(screen.getByLabelText('Target price'), {
       target: { value: '' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Set watch|Add to list/ }));
+    const addButton = screen.getByRole('button', { name: /Set watch|Add to list/ });
+    expect((addButton as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(addButton);
 
-    await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toContain(
-        'Enter a valid symbol and price.',
-      );
-    });
     expect(apiMocks.saveConfig).not.toHaveBeenCalled();
     expect(screen.queryByText('Active watches')).toBeNull();
   });
