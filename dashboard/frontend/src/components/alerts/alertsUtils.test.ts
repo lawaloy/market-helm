@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildNotifications,
+  buildSymbolOptions,
   canPersistConfig,
   dedupeAlerts,
   emptyConfig,
   findDuplicatePriceRule,
+  parseSymbolCatalog,
   priceAlertKey,
 } from './alertsUtils';
 import type { AlertRule, AlertsConfig, ChannelStatus } from '../../types';
@@ -161,5 +163,42 @@ describe('findDuplicatePriceRule', () => {
   it('returns undefined for invalid lookup inputs', () => {
     expect(findDuplicatePriceRule(alerts, '   ', 'less_than', 100)).toBeUndefined();
     expect(findDuplicatePriceRule(alerts, 'AAPL', 'less_than', Number.NaN)).toBeUndefined();
+  });
+});
+
+describe('parseSymbolCatalog', () => {
+  it('returns null for missing, empty, or non-array symbol payloads', () => {
+    expect(parseSymbolCatalog(null)).toBeNull();
+    expect(parseSymbolCatalog(undefined)).toBeNull();
+    expect(parseSymbolCatalog('AAPL')).toBeNull();
+    expect(parseSymbolCatalog({})).toBeNull();
+    expect(parseSymbolCatalog({ symbols: [] })).toBeNull();
+    expect(parseSymbolCatalog({ symbols: 'AAPL' })).toBeNull();
+  });
+
+  it('builds searchable options from symbols and optional names', () => {
+    const options = parseSymbolCatalog({
+      symbols: ['msft', 'AAPL'],
+      names: { AAPL: 'Apple Inc.' },
+    });
+    expect(options).not.toBeNull();
+    expect(options!.map((o) => o.value)).toEqual(['AAPL', 'msft']);
+    expect(options!.find((o) => o.value === 'AAPL')).toMatchObject({
+      label: 'Apple Inc. (AAPL)',
+      searchText: 'aapl apple inc.',
+    });
+    expect(options!.find((o) => o.value === 'msft')).toMatchObject({
+      label: 'msft',
+      searchText: 'msft msft',
+    });
+  });
+});
+
+describe('buildSymbolOptions', () => {
+  it('sorts by label and falls back to the symbol when name is absent', () => {
+    expect(buildSymbolOptions(['ZZZ', 'AAA'], { ZZZ: 'Zebra' }).map((o) => o.label)).toEqual([
+      'AAA',
+      'Zebra (ZZZ)',
+    ]);
   });
 });
