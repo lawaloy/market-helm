@@ -22,6 +22,7 @@ from src.storage.alert_jobs import (
 from src.storage.alert_watches import get_last_triggered as get_raw_triggered
 from src.storage.alert_watches import get_watch
 from src.storage.alert_watches import list_watches_for_symbol
+from src.storage.alert_watches import restore_trigger_claim, try_claim_trigger
 from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
 
@@ -191,13 +192,33 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
         )
         return False
 
+    # Claim the trigger row before send so concurrent workers that both passed
+    # the reads above cannot double-notify. Failed sends roll the claim back.
+    claimed, previous_trigger = try_claim_trigger(
+        user_id,
+        alert_id,
+        event.get("timestamp"),
+        cooldown_minutes=watch["cooldown_minutes"],
+    )
+    if not claimed:
+        logger.info(
+            "Skipping deliver; lost trigger claim for alert %s (job %s)",
+            alert_id,
+            job["id"],
+        )
+        return False
+
     alert = watch["alert"]
     defaults = watch["defaults"]
     engine = AlertEngine([alert], storage=storage, defaults=defaults)
 
-    if not engine.deliver_event(alert, event):
-        raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
-    return True
+    try:
+        if not engine.deliver_event(alert, event):
+            raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
+        return True
+    except Exception:
+        restore_trigger_claim(user_id, alert_id, previous_trigger)
+        raise
 
 
 def process_job_queue(
