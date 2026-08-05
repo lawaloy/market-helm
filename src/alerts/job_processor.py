@@ -204,24 +204,23 @@ def process_job_queue(
         for job in eval_jobs:
             try:
                 _process_evaluate_symbol(job)
-                complete_job(job["id"])
-                stats["evaluated"] += 1
+                if complete_job(job["id"], worker_id=wid):
+                    stats["evaluated"] += 1
             except Exception as exc:
                 logger.exception("evaluate_symbol job %s failed", job["id"])
-                fail_job(job["id"], str(exc))
-                stats["failed"] += 1
+                if fail_job(job["id"], str(exc), worker_id=wid):
+                    stats["failed"] += 1
 
         deliver_jobs = claim_jobs([JOB_DELIVER], wid, limit=limit)
         for job in deliver_jobs:
             try:
                 delivered = _process_deliver(job)
-                complete_job(job["id"])
-                if delivered:
+                if complete_job(job["id"], worker_id=wid) and delivered:
                     stats["delivered"] += 1
             except Exception as exc:
                 logger.exception("deliver job %s failed", job["id"])
-                fail_job(job["id"], str(exc))
-                stats["failed"] += 1
+                if fail_job(job["id"], str(exc), worker_id=wid):
+                    stats["failed"] += 1
 
         if not eval_jobs and not deliver_jobs:
             break
