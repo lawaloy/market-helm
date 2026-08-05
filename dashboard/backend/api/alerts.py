@@ -282,6 +282,25 @@ async def put_alerts_config(
             )
         seen_ids.add(alert_id)
         alert["id"] = alert_id
+        condition = alert.get("condition") or {}
+        if isinstance(condition, dict) and condition.get("type") == "price_threshold":
+            # File mode never hits InvalidAlertWatchConfig; reject blank/sentinel
+            # symbols and missing operators here so both modes fail closed.
+            symbol = normalize_ticker(condition.get("symbol"))
+            if not symbol:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Alert '{alert_id}' must have a valid symbol.",
+                )
+            condition["symbol"] = symbol
+            raw_operator = condition.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Alert '{alert_id}' must have an operator.",
+                )
+            condition["operator"] = str(raw_operator).strip()
+            alert["condition"] = condition
     _save_raw_config(user_id, config)
     status_source = config
     if database_enabled() and user_id:
