@@ -66,6 +66,31 @@ describe('RequireAuth', () => {
     );
   });
 
+  it('encodes pathname+search so decodeURIComponent restores a same-app relative path', () => {
+    renderProtectedRoute('/alerts?tab=delivery&focus=email');
+
+    const location = screen.getByTestId('location').textContent ?? '';
+    expect(location.startsWith('/sign-in?return=')).toBe(true);
+    const encoded = new URL(location, 'http://localhost').searchParams.get('return');
+    expect(encoded).toBeTruthy();
+    const decoded = decodeURIComponent(encoded as string);
+    expect(decoded).toBe('/alerts?tab=delivery&focus=email');
+    // Defense in depth with SignIn safeReturnPath: decoded value must stay app-relative.
+    expect(decoded.startsWith('/')).toBe(true);
+    expect(decoded.startsWith('//')).toBe(false);
+  });
+
+  it('does not produce a protocol-relative return value for normal app routes', () => {
+    renderProtectedRoute('/alerts');
+
+    const location = screen.getByTestId('location').textContent ?? '';
+    const encoded = new URL(location, 'http://localhost').searchParams.get('return');
+    const decoded = decodeURIComponent(encoded as string);
+    expect(decoded).toBe('/alerts');
+    expect(decoded.startsWith('//')).toBe(false);
+    expect(decoded.includes('://')).toBe(false);
+  });
+
   it('allows unauthenticated access when the server is in single-user mode', () => {
     authMocks.useAuthImpl.mockReturnValue({
       user: null,
