@@ -32,9 +32,10 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
     return matchesSearch && matchesFilter;
   });
 
-  // Paginate
-  const totalPages = Math.ceil(filteredStocks.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  // Paginate — clamp so search/filter cannot leave an empty page with no pager.
+  const totalPages = Math.max(1, Math.ceil(filteredStocks.length / itemsPerPage));
+  const page = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = (page - 1) * itemsPerPage;
   const paginatedStocks = filteredStocks.slice(startIndex, startIndex + itemsPerPage);
 
   return (
@@ -104,12 +105,16 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   {formatPrice(stock.targetPrice)}
                 </td>
                 <td className={`px-4 py-3 text-sm text-right font-medium ${
-                  stock.expectedChange >= 0 ? 'text-green-600' : 'text-red-600'
+                  Number.isFinite(stock.expectedChange) && stock.expectedChange >= 0
+                    ? 'text-green-600'
+                    : 'text-red-600'
                 } dark:text-green-400 dark:text-red-400`}>
-                  {formatPercentage(stock.expectedChange)}
+                  {Number.isFinite(stock.expectedChange)
+                    ? formatPercentage(stock.expectedChange)
+                    : '—'}
                 </td>
                 <td className="px-4 py-3 text-sm text-center">
-                  {stock.confidence}%
+                  {Number.isFinite(stock.confidence) ? `${stock.confidence}%` : '—'}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`badge ${getRiskColor(stock.risk)}`}>
@@ -131,18 +136,18 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
         <div className="mt-4 flex items-center justify-center gap-2">
           <button
             className="px-3 py-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded disabled:opacity-50"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(p => p - 1)}
+            disabled={page === 1}
+            onClick={() => setCurrentPage(page - 1)}
           >
             Previous
           </button>
           <span className="text-sm text-slate-600 dark:text-slate-400">
-            Page {currentPage} of {totalPages}
+            Page {page} of {totalPages}
           </span>
           <button
             className="px-3 py-1 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 rounded disabled:opacity-50"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(p => p + 1)}
+            disabled={page === totalPages}
+            onClick={() => setCurrentPage(page + 1)}
           >
             Next
           </button>
