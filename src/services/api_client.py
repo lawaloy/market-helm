@@ -23,6 +23,9 @@ load_dotenv()
 
 logger = setup_logger("api_client")
 
+# Cap Finnhub Retry-After so a huge/poisoned header cannot stall workers for days.
+MAX_RETRY_AFTER_SECONDS = 300
+
 
 def _finite_number(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
     """Coerce to a finite float; non-numeric / NaN / Inf → default (or None)."""
@@ -194,11 +197,13 @@ class FinnhubClient:
                     raw_retry_after = response.headers.get('Retry-After', 60)
                     try:
                         retry_after = int(raw_retry_after)
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError, OverflowError):
                         # HTTP-date or garbage headers must not abort the fetch path.
                         retry_after = 60
                     if retry_after < 0:
                         retry_after = 60
+                    if retry_after > MAX_RETRY_AFTER_SECONDS:
+                        retry_after = MAX_RETRY_AFTER_SECONDS
                     if attempt < max_retries - 1:
                         logger.warning(f"Rate limit exceeded (429). Waiting {retry_after} seconds...")
                         time.sleep(retry_after)

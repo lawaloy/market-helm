@@ -273,6 +273,15 @@ def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
     return cleaned
 
 
+def _is_safe_env_assignment(key: str, value: str) -> bool:
+    """Reject keys/values that would split .env lines or inject new assignments."""
+    if not key or any(ch in key for ch in ("\r", "\n", "\0", "=")):
+        return False
+    if any(ch in value for ch in ("\r", "\n", "\0")):
+        return False
+    return True
+
+
 def update_user_env_vars(updates: Dict[str, str]) -> None:
     """Update ~/.market-helm/.env without logging or returning secret values.
 
@@ -302,9 +311,14 @@ def update_user_env_vars(updates: Dict[str, str]) -> None:
                     if key in order:
                         order.remove(key)
                 continue
-            existing[key] = value
-            if key not in order:
-                order.append(key)
+            text = str(value)
+            if not _is_safe_env_assignment(str(key), text):
+                raise ValueError(
+                    "Environment updates cannot contain CR/LF/NUL or '=' in keys."
+                )
+            existing[str(key)] = text
+            if str(key) not in order:
+                order.append(str(key))
         content = "\n".join(f"{key}={existing[key]}" for key in order)
         tmp = env_path.with_suffix(".env.tmp")
         tmp.write_text(f"{content}\n" if content else "", encoding="utf-8")
