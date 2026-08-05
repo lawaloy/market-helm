@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
 from datetime import datetime, timedelta
+from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
 
@@ -168,7 +169,10 @@ async def get_opportunities(
         
         opportunities = []
         for _, row in sorted_df.iterrows():
-            symbol = row['symbol']
+            # Match padded / mixed-case CSV symbols the same way stock detail does.
+            symbol = normalize_ticker(row.get("symbol"))
+            if not symbol:
+                continue
 
             # Required projection numerics: skip the row instead of int(NaN)→500
             # or Pydantic serializing NaN/Inf as JSON null.
@@ -182,8 +186,8 @@ async def get_opportunities(
             ):
                 continue
 
-            # Get current price from daily data
-            stock_daily = daily_df[daily_df['symbol'] == symbol]
+            # Get current price from daily data (normalize like stock detail)
+            stock_daily = daily_df[daily_df["symbol"].map(normalize_ticker) == symbol]
             if stock_daily.empty:
                 current_price = 0.0
                 volume = 0
