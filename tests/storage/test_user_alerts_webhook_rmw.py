@@ -72,8 +72,25 @@ def test_concurrent_blank_preserve_cannot_clobber_rotated_secret(db_user) -> Non
     assert raw is not None
     # Blank preserve must merge from the committed row under the write lock, so
     # once NEW is stored it cannot be rolled back to SECRET or cleared.
+    # Do not assert email_to from the concurrent phase: rotate may commit last
+    # without that field and legitimately replace non-secret defaults.
     assert raw["defaults"]["webhook_url"] == NEW
-    assert raw["defaults"]["email_to"] == f"ops{n - 1}@example.com"
+
+    save_user_alerts_config(
+        db_user,
+        {
+            "defaults": {
+                "webhook_url": "",
+                "notify_webhook": True,
+                "email_to": "ops-final@example.com",
+            },
+            "alerts": [],
+        },
+    )
+    _, raw = load_user_alerts_config(db_user)
+    assert raw is not None
+    assert raw["defaults"]["webhook_url"] == NEW
+    assert raw["defaults"]["email_to"] == "ops-final@example.com"
 
 
 def test_concurrent_distinct_default_updates_preserve_rotated_secret(db_user) -> None:
