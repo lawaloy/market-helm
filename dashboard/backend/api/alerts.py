@@ -344,8 +344,15 @@ async def get_alert_symbol_catalog():
 
 
 @router.get("/quotes", response_model=SymbolQuotesResponse)
-async def get_symbol_quotes(symbols: str = Query("", description="Comma-separated tickers")) -> SymbolQuotesResponse:
-    """Latest prices for up to 15 symbols (saved data, then live quotes)."""
+async def get_symbol_quotes(
+    symbols: str = Query("", description="Comma-separated tickers"),
+    _user_id: Optional[str] = Depends(require_user_id),
+) -> SymbolQuotesResponse:
+    """Latest prices for up to 15 symbols (saved data, then live quotes).
+
+    Hosted mode requires auth so anonymous clients cannot burn the shared
+    Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
+    """
     _load_env()
     parsed = [
         key for key in (normalize_ticker(symbol) for symbol in symbols.split(",")) if key
@@ -356,8 +363,15 @@ async def get_symbol_quotes(symbols: str = Query("", description="Comma-separate
 
 
 @router.post("/quotes", response_model=SymbolQuotesResponse)
-async def post_symbol_quotes(body: SymbolQuotesRequest) -> SymbolQuotesResponse:
-    """Latest prices for up to 15 symbols (saved data, then live quotes)."""
+async def post_symbol_quotes(
+    body: SymbolQuotesRequest,
+    _user_id: Optional[str] = Depends(require_user_id),
+) -> SymbolQuotesResponse:
+    """Latest prices for up to 15 symbols (saved data, then live quotes).
+
+    Hosted mode requires auth so anonymous clients cannot burn the shared
+    Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
+    """
     _load_env()
     symbols = [
         key for key in (normalize_ticker(symbol) for symbol in body.symbols) if key
