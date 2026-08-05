@@ -1,6 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { buildNotifications, canPersistConfig, emptyConfig } from './alertsUtils';
-import type { AlertsConfig, ChannelStatus } from '../../types';
+import {
+  buildNotifications,
+  canPersistConfig,
+  dedupeAlerts,
+  emptyConfig,
+  findDuplicatePriceRule,
+  priceAlertKey,
+} from './alertsUtils';
+import type { AlertRule, AlertsConfig, ChannelStatus } from '../../types';
+
+function priceRule(
+  id: string,
+  symbol: string,
+  operator: AlertRule['condition']['operator'],
+  value: number,
+): AlertRule {
+  return {
+    id,
+    name: id,
+    enabled: true,
+    condition: { type: 'price_threshold', symbol, operator, value },
+    notifications: ['log'],
+  };
+}
 
 describe('buildNotifications', () => {
   it('always includes log and appends enabled channels', () => {
@@ -71,5 +93,73 @@ describe('canPersistConfig', () => {
         '',
       ),
     ).toBeNull();
+  });
+});
+
+describe('priceAlertKey', () => {
+  it('builds a stable uppercase key for price thresholds', () => {
+    expect(
+      priceAlertKey({
+        type: 'price_threshold',
+        symbol: '  aapl ',
+        operator: 'less_than',
+        value: 150,
+      }),
+    ).toBe('AAPL|less_than|150');
+  });
+
+  it('returns null for screening rules and incomplete price rules', () => {
+    expect(priceAlertKey({ type: 'screening_match', filters: { min_volume: 1 } })).toBeNull();
+    expect(
+      priceAlertKey({ type: 'price_threshold', symbol: '   ', operator: 'less_than', value: 10 }),
+    ).toBeNull();
+    expect(
+      priceAlertKey({ type: 'price_threshold', symbol: 'AAPL', operator: undefined, value: 10 }),
+    ).toBeNull();
+    expect(
+      priceAlertKey({ type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: Number.NaN }),
+    ).toBeNull();
+  });
+});
+
+describe('dedupeAlerts', () => {
+  it('keeps the first price rule and drops later duplicates by key', () => {
+    const first = priceRule('a1', 'AAPL', 'less_than', 100);
+    const duplicate = priceRule('a2', 'aapl', 'less_than', 100);
+    const other = priceRule('a3', 'MSFT', 'greater_than', 200);
+    expect(dedupeAlerts([first, duplicate, other]).map((r) => r.id)).toEqual(['a1', 'a3']);
+  });
+
+  it('dedupes screening rules by id when price key is absent', () => {
+    const screening: AlertRule = {
+      id: 'screen-1',
+      name: 'Screen',
+      enabled: true,
+      condition: { type: 'screening_match', filters: { min_volume: 1e6 } },
+      notifications: ['log'],
+    };
+    const clone = { ...screening };
+    expect(dedupeAlerts([screening, clone]).map((r) => r.id)).toEqual(['screen-1']);
+  });
+});
+
+describe('findDuplicatePriceRule', () => {
+  const alerts = [
+    priceRule('keep', 'AAPL', 'less_than', 100),
+    priceRule('other', 'MSFT', 'greater_than', 200),
+  ];
+
+  it('matches regardless of symbol casing or surrounding whitespace', () => {
+    expect(findDuplicatePriceRule(alerts, ' aapl', 'less_than', 100)?.id).toBe('keep');
+  });
+
+  it('honors excludeId so editing a rule does not collide with itself', () => {
+    expect(findDuplicatePriceRule(alerts, 'AAPL', 'less_than', 100, 'keep')).toBeUndefined();
+    expect(findDuplicatePriceRule(alerts, 'AAPL', 'less_than', 100, 'other')?.id).toBe('keep');
+  });
+
+  it('returns undefined for invalid lookup inputs', () => {
+    expect(findDuplicatePriceRule(alerts, '   ', 'less_than', 100)).toBeUndefined();
+    expect(findDuplicatePriceRule(alerts, 'AAPL', 'less_than', Number.NaN)).toBeUndefined();
   });
 });
