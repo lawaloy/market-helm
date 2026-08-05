@@ -34,9 +34,34 @@ class StockScreener:
         # reach scoring paths that subscript filters by string key.
         if not isinstance(filters_config, dict):
             filters_config = None
-        self.filters = filters_config or self._get_default_filters()
-        if not isinstance(self.filters.get("weights"), dict):
-            self.filters = {**self.filters, "weights": self._get_default_filters()["weights"]}
+        defaults = self._get_default_filters()
+        # Copy so hand-edited caller dicts are not mutated in place.
+        self.filters = dict(filters_config) if filters_config is not None else defaults
+        # Coerce dirty scalar thresholds up-front so scoring never TypeErrors
+        # or silently zeros every symbol when filters.json is hand-edited.
+        for key in (
+            "volume_threshold",
+            "price_min",
+            "price_max",
+            "min_daily_change_pct",
+            "market_cap_min",
+        ):
+            self.filters[key] = self._finite_number(
+                self.filters.get(key, defaults[key]), default=float(defaults[key])
+            )
+        raw_weights = self.filters.get("weights")
+        default_weights = defaults["weights"]
+        if not isinstance(raw_weights, dict):
+            self.filters["weights"] = dict(default_weights)
+        else:
+            # Partial / non-numeric weight maps must not KeyError or TypeError.
+            merged = dict(default_weights)
+            for key, default_weight in default_weights.items():
+                if key in raw_weights:
+                    merged[key] = self._finite_number(
+                        raw_weights[key], default=float(default_weight)
+                    )
+            self.filters["weights"] = merged
         
         try:
             self.api_client = api_client or FinnhubClient()
@@ -89,7 +114,10 @@ class StockScreener:
     def _score_volume(self, volume: int) -> float:
         """Score based on volume (higher = better)."""
         volume = self._finite_number(volume, default=0.0)
-        threshold = self.filters["volume_threshold"]
+        threshold = self._finite_number(
+            self.filters.get("volume_threshold"),
+            default=float(self._get_default_filters()["volume_threshold"]),
+        )
         if volume < threshold:
             return 0.0
         
@@ -105,7 +133,10 @@ class StockScreener:
     def _score_price_change(self, change_pct: float) -> float:
         """Score based on price change (absolute value, higher = better)."""
         change_pct = self._finite_number(change_pct, default=0.0)
-        min_change = self.filters["min_daily_change_pct"]
+        min_change = self._finite_number(
+            self.filters.get("min_daily_change_pct"),
+            default=float(self._get_default_filters()["min_daily_change_pct"]),
+        )
         abs_change = abs(change_pct)
         
         if abs_change < min_change:
@@ -122,8 +153,13 @@ class StockScreener:
     def _score_price_range(self, price: float) -> float:
         """Score based on price being in optimal range."""
         price = self._finite_number(price, default=0.0)
-        min_price = self.filters["price_min"]
-        max_price = self.filters["price_max"]
+        defaults = self._get_default_filters()
+        min_price = self._finite_number(
+            self.filters.get("price_min"), default=float(defaults["price_min"])
+        )
+        max_price = self._finite_number(
+            self.filters.get("price_max"), default=float(defaults["price_max"])
+        )
         
         if min_price <= price <= max_price:
             return 100.0
@@ -140,7 +176,10 @@ class StockScreener:
     def _score_market_cap(self, market_cap: float) -> float:
         """Score based on market cap (larger = better, but with diminishing returns)."""
         market_cap = self._finite_number(market_cap, default=0.0)
-        min_cap = self.filters["market_cap_min"]
+        min_cap = self._finite_number(
+            self.filters.get("market_cap_min"),
+            default=float(self._get_default_filters()["market_cap_min"]),
+        )
         
         if market_cap < min_cap:
             return 0.0
@@ -164,7 +203,15 @@ class StockScreener:
         Returns:
             Total score (0-100)
         """
-        weights = self.filters["weights"]
+        default_weights = self._get_default_filters()["weights"]
+        raw_weights = self.filters.get("weights")
+        if not isinstance(raw_weights, dict):
+            weights = default_weights
+        else:
+            weights = {
+                key: self._finite_number(raw_weights.get(key), default=float(default))
+                for key, default in default_weights.items()
+            }
         
         volume = self._finite_number(stock_data.get("volume", 0), default=0.0)
         change_percent = self._finite_number(
