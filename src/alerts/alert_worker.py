@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import signal
 import time
@@ -15,16 +16,19 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_INTERVAL_SECONDS = 300
 MIN_INTERVAL_SECONDS = 60
+# Hard ceiling so a poisoned interval cannot sleep the worker loop "forever"
+# (e.g. 1e18) and silently stop alert evaluation after the first tick.
+MAX_INTERVAL_SECONDS = 86400
 
 
 def resolve_interval_seconds(explicit: Optional[int] = None) -> int:
     """Seconds between checks when running in loop mode."""
     if explicit is not None:
-        return max(MIN_INTERVAL_SECONDS, explicit)
+        return min(MAX_INTERVAL_SECONDS, max(MIN_INTERVAL_SECONDS, explicit))
     raw = os.environ.get("ALERT_CHECK_INTERVAL_SECONDS", "").strip()
     if raw:
         try:
-            return max(MIN_INTERVAL_SECONDS, int(raw))
+            return min(MAX_INTERVAL_SECONDS, max(MIN_INTERVAL_SECONDS, int(raw)))
         except ValueError:
             logger.warning(
                 "Invalid ALERT_CHECK_INTERVAL_SECONDS=%r; using default %ss",
@@ -128,8 +132,20 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     }
 
 
+def _coerce_triggered_count(raw: Any) -> int:
+    """Coerce triggered count for logging; Inf/NaN must not abort the worker loop."""
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return 0
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def log_check_result(result: Dict[str, Any]) -> None:
-    triggered = int(result.get("triggered") or 0)
+    triggered = _coerce_triggered_count(result.get("triggered"))
     last_date = result.get("last_data_date")
     message = result.get("message")
     jobs = result.get("jobs")

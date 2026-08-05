@@ -14,6 +14,22 @@ from functools import lru_cache
 from src.utils.tickers import normalize_ticker
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_INVALID_LABEL_SENTINELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
+
+
+def _safe_recommendation(value: Any, default: str = "UNKNOWN") -> str:
+    """Coerce blank/NaN recommendation cells to a stable label for accuracy rollups."""
+    if value is None:
+        return default
+    if isinstance(value, float) and not math.isfinite(value):
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in _INVALID_LABEL_SENTINELS:
+        return default
+    return text
 
 
 def _default_data_dir() -> Path:
@@ -29,6 +45,11 @@ def _default_data_dir() -> Path:
     # Project root is 4 levels up (dashboard/backend/services/data_loader.py)
     project_root = here.parent.parent.parent.parent
     return project_root / "data"
+
+
+def _reject_nonfinite_json_constant(constant: str) -> None:
+    """Fail closed on NaN/Infinity JSON constants (not strict JSON)."""
+    raise ValueError(f"non-finite JSON constant: {constant}")
 
 
 def _is_iso_date(date_str: str) -> bool:
@@ -169,8 +190,10 @@ class DataLoader:
         
         try:
             with open(file_path, 'r') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError) as exc:
+                # Default json.load accepts NaN/Infinity constants; those become
+                # floats that later AttributeError on ai_summary.strip() → 500.
+                data = json.load(f, parse_constant=_reject_nonfinite_json_constant)
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
             # Corrupt JSON must map to ValueError → API 404, not generic 500.
             raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
         # Valid JSON that is not an object (null/[]/"x") would AttributeError
@@ -329,7 +352,7 @@ class DataLoader:
                     continue
                 actual_date, actual_close = actual
                 abs_err_pct = abs(actual_close - predicted) / predicted * 100.0
-                rec = str(row_dict.get("recommendation", "UNKNOWN") or "UNKNOWN")
+                rec = _safe_recommendation(row_dict.get("recommendation", "UNKNOWN"))
 
                 samples.append(
                     {

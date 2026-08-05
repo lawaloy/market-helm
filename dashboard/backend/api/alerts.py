@@ -33,7 +33,7 @@ from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
 from src.utils.tickers import normalize_ticker
-from src.storage.alert_watches import InvalidAlertWatchConfig
+from src.storage.alert_watches import InvalidAlertWatchConfig, validate_watches_config
 
 router = APIRouter()
 
@@ -213,6 +213,13 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
         except InvalidAlertWatchConfig as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
+    # File mode previously skipped watch validation — negative / huge cooldown
+    # (and other InvalidAlertWatchConfig rules) could persist and fire every tick
+    # or OverflowError the evaluator. Reuse the same coerce path as hosted.
+    try:
+        validate_watches_config("file-mode", config)
+    except InvalidAlertWatchConfig as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     save_alerts_config(config)
 
 
@@ -334,9 +341,16 @@ async def alerts_health() -> Dict[str, bool]:
 
 
 @router.get("/symbols")
-async def get_alert_symbol_catalog():
-    """Searchable company list for alert setup (major US indices + tracked symbols)."""
+async def get_alert_symbol_catalog(
+    _user_id: Optional[str] = Depends(require_user_id),
+):
+    """Searchable company list for alert setup (major US indices + tracked symbols).
+
+    Hosted mode requires auth so anonymous clients cannot scrape the catalog /
+    tracked-symbol metadata. File mode (``require_user_id`` → ``None``) stays open.
+    """
     symbols, names = build_symbol_catalog()
+
     tracked: List[str] = []
     saved_prices = prices_from_saved_daily_data()
     try:
@@ -362,8 +376,15 @@ async def get_alert_symbol_catalog():
 
 
 @router.get("/quotes", response_model=SymbolQuotesResponse)
-async def get_symbol_quotes(symbols: str = Query("", description="Comma-separated tickers")) -> SymbolQuotesResponse:
-    """Latest prices for up to 15 symbols (saved data, then live quotes)."""
+async def get_symbol_quotes(
+    symbols: str = Query("", description="Comma-separated tickers"),
+    _user_id: Optional[str] = Depends(require_user_id),
+) -> SymbolQuotesResponse:
+    """Latest prices for up to 15 symbols (saved data, then live quotes).
+
+    Hosted mode requires auth so anonymous clients cannot burn the shared
+    Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
+    """
     _load_env()
     parsed = [
         key for key in (normalize_ticker(symbol) for symbol in symbols.split(",")) if key
@@ -374,8 +395,15 @@ async def get_symbol_quotes(symbols: str = Query("", description="Comma-separate
 
 
 @router.post("/quotes", response_model=SymbolQuotesResponse)
-async def post_symbol_quotes(body: SymbolQuotesRequest) -> SymbolQuotesResponse:
-    """Latest prices for up to 15 symbols (saved data, then live quotes)."""
+async def post_symbol_quotes(
+    body: SymbolQuotesRequest,
+    _user_id: Optional[str] = Depends(require_user_id),
+) -> SymbolQuotesResponse:
+    """Latest prices for up to 15 symbols (saved data, then live quotes).
+
+    Hosted mode requires auth so anonymous clients cannot burn the shared
+    Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
+    """
     _load_env()
     symbols = [
         key for key in (normalize_ticker(symbol) for symbol in body.symbols) if key
