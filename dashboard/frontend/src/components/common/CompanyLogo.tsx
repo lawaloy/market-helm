@@ -21,7 +21,7 @@ const CompanyLogo: React.FC<CompanyLogoProps> = ({ symbol, name, size = 24, clas
       aria-label={label}
       title={label}
     >
-      {!hasError ? (
+      {!hasError && logoUrl ? (
         <img
           src={logoUrl}
           alt={`${symbol} logo`}
