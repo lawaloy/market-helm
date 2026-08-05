@@ -12,6 +12,7 @@ import smtplib
 from abc import ABC, abstractmethod
 from email.message import EmailMessage
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 import requests
 
@@ -21,6 +22,28 @@ from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_ht
 logger = setup_logger("alerts.email.delivery")
 
 SUPPORTED_PROVIDERS = frozenset({"smtp", "sendgrid", "mailgun"})
+# Official Mailgun API origins only — never send Basic Auth API keys to arbitrary hosts.
+ALLOWED_MAILGUN_API_HOSTS = frozenset({"api.mailgun.net", "api.eu.mailgun.net"})
+
+
+def normalize_mailgun_api_base(raw: str) -> Optional[str]:
+    """Return a canonical https Mailgun API origin, or None if unsafe/invalid."""
+    text = str(raw).strip()
+    if not text:
+        return None
+    parsed = urlparse(text)
+    if parsed.scheme.lower() != "https":
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in ALLOWED_MAILGUN_API_HOSTS:
+        return None
+    if parsed.port not in (None, 443):
+        return None
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        return None
+    return f"https://{host}"
 
 
 def parse_recipients(value: Union[str, List[str], None]) -> List[str]:
@@ -477,11 +500,19 @@ def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
             "Mailgun email requested but MAILGUN_DOMAIN is missing."
         )
         return None
-    api_base = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    api_base_raw = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    api_base = normalize_mailgun_api_base(str(api_base_raw))
+    if api_base is None:
+        logger.warning(
+            "MAILGUN_API_BASE %r is not an allowed Mailgun HTTPS API origin "
+            "(expected https://api.mailgun.net or https://api.eu.mailgun.net).",
+            api_base_raw,
+        )
+        return None
     return MailgunEmailBackend(
         api_key=str(api_key).strip(),
         domain=str(domain).strip(),
-        api_base=str(api_base).strip(),
+        api_base=api_base,
     )
 
 
