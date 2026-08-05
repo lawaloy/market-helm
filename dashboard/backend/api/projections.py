@@ -2,8 +2,8 @@
 Projections API endpoints
 """
 import math
-from typing import Any, Optional
 from datetime import datetime, timedelta
+from typing import Any, Optional
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
@@ -186,9 +186,15 @@ async def get_opportunities(
         
         # Filter by recommendation
         filtered_df = proj_df[proj_df['recommendation'] == rec_map[type]]
-        
-        # Sort by confidence score
-        sorted_df = filtered_df.nlargest(limit, 'confidence')
+
+        # Dirty CSV confidence (strings / object dtype) makes nlargest TypeError → 500.
+        # Coerce to numeric and drop non-finite before ranking; row loop still re-checks.
+        ranking_df = filtered_df.copy()
+        ranking_df["confidence"] = pd.to_numeric(ranking_df["confidence"], errors="coerce")
+        ranking_df = ranking_df[
+            ranking_df["confidence"].map(lambda value: _finite_float(value) is not None)
+        ]
+        sorted_df = ranking_df.nlargest(limit, "confidence")
         
         opportunities = []
         for _, row in sorted_df.iterrows():
@@ -262,7 +268,7 @@ async def get_opportunities(
         
         return OpportunitiesResponse(
             type=type,
-            count=len(filtered_df),
+            count=len(opportunities),
             opportunities=opportunities
         )
     
