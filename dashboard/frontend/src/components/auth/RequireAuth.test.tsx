@@ -67,14 +67,14 @@ describe('RequireAuth', () => {
   });
 
   it('encodes pathname+search so decodeURIComponent restores a same-app relative path', () => {
-    renderProtectedRoute('/settings?tab=alerts&focus=email');
+    renderProtectedRoute('/alerts?tab=delivery&focus=email');
 
     const location = screen.getByTestId('location').textContent ?? '';
     expect(location.startsWith('/sign-in?return=')).toBe(true);
     const encoded = new URL(location, 'http://localhost').searchParams.get('return');
     expect(encoded).toBeTruthy();
     const decoded = decodeURIComponent(encoded as string);
-    expect(decoded).toBe('/settings?tab=alerts&focus=email');
+    expect(decoded).toBe('/alerts?tab=delivery&focus=email');
     // Defense in depth with SignIn safeReturnPath: decoded value must stay app-relative.
     expect(decoded.startsWith('/')).toBe(true);
     expect(decoded.startsWith('//')).toBe(false);
