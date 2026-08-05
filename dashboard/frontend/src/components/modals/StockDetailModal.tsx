@@ -18,24 +18,35 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen && symbol) {
-      fetchStockDetail();
+    if (!isOpen || !symbol) {
+      return;
     }
-  }, [isOpen, symbol]);
 
-  const fetchStockDetail = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await stocksApi.getDetail(symbol);
-      setStockDetail(response.data);
-    } catch (err) {
-      setError('Failed to load stock details');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    let cancelled = false;
+
+    const fetchStockDetail = async () => {
+      setLoading(true);
+      setError(null);
+      setStockDetail(null);
+      try {
+        const response = await stocksApi.getDetail(symbol);
+        if (cancelled) return;
+        setStockDetail(response.data);
+      } catch (err) {
+        if (cancelled) return;
+        setError('Failed to load stock details');
+        console.error(err);
+      } finally {
+        if (cancelled) return;
+        setLoading(false);
+      }
+    };
+
+    void fetchStockDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, symbol]);
 
   return (
     <Transition appear show={isOpen} as={Fragment}>

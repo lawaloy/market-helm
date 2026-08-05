@@ -53,6 +53,9 @@ export interface Opportunity {
   expectedChange: number;
   confidence: number;
   risk: string;
+  /** Analyst rating (STRONG BUY / BUY / HOLD / SELL / STRONG SELL). */
+  recommendation: string;
+  /** Directional bias (Bullish / Bearish / Neutral) — not the rating filter. */
   trend: string;
   reason: string;
   volume: number;

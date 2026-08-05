@@ -52,7 +52,13 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
     if not last:
         return False
     last = _as_utc(last)
-    return datetime.now(timezone.utc) - last < timedelta(minutes=cooldown_minutes)
+    try:
+        window = timedelta(minutes=cooldown_minutes)
+    except OverflowError:
+        # Poisoned huge cooldown must not abort the per-symbol watch loop.
+        # Treat as still cooling down so sibling tenants keep evaluating.
+        return True
+    return datetime.now(timezone.utc) - last < window
 
 
 def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
@@ -147,9 +153,24 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
 
 def _process_deliver(job: Dict[str, Any]) -> bool:
     payload = job["payload"]
-    user_id = payload["user_id"]
-    alert_id = payload["alert_id"]
-    event = dict(payload["event"])
+    if not isinstance(payload, dict):
+        logger.warning(
+            "Skipping deliver job %s with non-object payload",
+            job.get("id"),
+        )
+        return False
+    user_id = payload.get("user_id")
+    alert_id = payload.get("alert_id")
+    event_raw = payload.get("event")
+    # Malformed internal/poison rows must drain (complete) like evaluate soft-skips —
+    # KeyError here previously retried up to max_attempts and churned the queue.
+    if not user_id or not alert_id or not isinstance(event_raw, dict):
+        logger.warning(
+            "Skipping deliver job %s with invalid payload keys/event",
+            job.get("id"),
+        )
+        return False
+    event = dict(event_raw)
     storage = UserAlertStorage(user_id)
 
     # A worker can die after the notification and trigger marker commit but before

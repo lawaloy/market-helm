@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { fieldClass } from '../components/alerts/alertsUtils';
 import { useAuth } from '../contexts/AuthContext';
 
 type AuthMode = 'sign-in' | 'sign-up';
+
+/** Matches backend `MAX_PASSWORD_LENGTH` (src/storage/users.py). */
+export const MAX_PASSWORD_LENGTH = 128;
 
 /** Only same-app relative paths; reject protocol-relative and external URLs. */
 export function safeReturnPath(raw: string | null): string {
@@ -24,6 +27,14 @@ const SignIn: React.FC = () => {
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const returnTo = safeReturnPath(searchParams.get('return'));
 
@@ -37,14 +48,18 @@ const SignIn: React.FC = () => {
       } else {
         await register(email.trim(), password);
       }
+      if (!mountedRef.current) return;
       navigate(returnTo, { replace: true });
     } catch (err) {
+      if (!mountedRef.current) return;
       const detail =
         axios.isAxiosError(err) &&
         (err.response?.data as { detail?: string } | undefined)?.detail;
       setError(typeof detail === 'string' ? detail : 'Authentication failed. Please try again.');
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -149,6 +164,7 @@ const SignIn: React.FC = () => {
               autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
               required
               minLength={8}
+              maxLength={MAX_PASSWORD_LENGTH}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className={fieldClass}
