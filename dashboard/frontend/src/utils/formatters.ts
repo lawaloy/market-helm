@@ -1,6 +1,14 @@
 // Formatting utilities
 
+/** Placeholder when a display formatter receives null/undefined/NaN/Inf. */
+export const NON_FINITE_PLACEHOLDER = '—';
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export const formatPrice = (price: number): string => {
+  if (!isFiniteNumber(price)) return NON_FINITE_PLACEHOLDER;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
@@ -10,15 +18,18 @@ export const formatPrice = (price: number): string => {
 };
 
 export const formatNumber = (num: number): string => {
+  if (!isFiniteNumber(num)) return NON_FINITE_PLACEHOLDER;
   return new Intl.NumberFormat('en-US').format(num);
 };
 
 export const formatPercentage = (percent: number, decimals: number = 2): string => {
+  if (!isFiniteNumber(percent)) return NON_FINITE_PLACEHOLDER;
   const sign = percent >= 0 ? '+' : '';
   return `${sign}${percent.toFixed(decimals)}%`;
 };
 
 export const formatVolume = (volume: number): string => {
+  if (!isFiniteNumber(volume)) return NON_FINITE_PLACEHOLDER;
   if (volume >= 1000000000) {
     return `${(volume / 1000000000).toFixed(2)}B`;
   } else if (volume >= 1000000) {
@@ -30,6 +41,7 @@ export const formatVolume = (volume: number): string => {
 };
 
 export const formatMarketCap = (marketCap: number): string => {
+  if (!isFiniteNumber(marketCap)) return NON_FINITE_PLACEHOLDER;
   if (marketCap >= 1000000000000) {
     return `$${(marketCap / 1000000000000).toFixed(2)}T`;
   } else if (marketCap >= 1000000000) {

@@ -50,56 +50,12 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
     };
   });
 
-  useEffect(() => {
-    fetchData(false);
-  }, [days]);
-
-  useEffect(() => {
-    const loadAccuracy = async () => {
-      setAccuracyLoading(true);
-      try {
-        const res = await historyApi.getAccuracy(days);
-        setAccuracy(res.data);
-      } catch {
-        setAccuracy(null);
-      } finally {
-        setAccuracyLoading(false);
-      }
-    };
-    loadAccuracy();
-  }, [days, refreshKey]);
-
-  useEffect(() => {
-    if (isInitialMount.current) return;
-    fetchData(true);
-  }, [refreshKey]);
-
-  useEffect(() => {
-    if (selectedSymbol) {
-      fetchStockHistory();
-    } else {
-      setStockHistory([]);
-    }
-  }, [selectedSymbol, days]);
-
-  const fetchStockHistory = async () => {
-    if (!selectedSymbol) return;
-    setStockLoading(true);
-    try {
-      const res = await stocksApi.getHistorical(selectedSymbol, days);
-      setStockHistory(res.data?.data ?? []);
-    } catch {
-      setStockHistory([]);
-    } finally {
-      setStockLoading(false);
-    }
-  };
-
-  const fetchData = async (silent = false) => {
+  const fetchData = async (silent = false, cancelled?: () => boolean) => {
     if (!silent) setLoading(true);
     setError(null);
     try {
       const response = await historyApi.getSummary(days);
+      if (cancelled?.()) return;
       const summaryData = response.data?.data ?? [];
       const first = response.data?.firstDate ?? '';
       const last = response.data?.lastDate ?? '';
@@ -112,15 +68,80 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
         setSelectedSymbol(syms[0]);
       }
     } catch (err) {
+      if (cancelled?.()) return;
       console.error('Error fetching historical data:', err);
       if (!silent) setError('Unable to load historical data. Please try again later.');
       setData([]);
       setDateRange(null);
     } finally {
+      if (cancelled?.()) return;
       setLoading(false);
       if (!silent) isInitialMount.current = false;
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchData(false, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when days change
+  }, [days]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAccuracy = async () => {
+      setAccuracyLoading(true);
+      try {
+        const res = await historyApi.getAccuracy(days);
+        if (cancelled) return;
+        setAccuracy(res.data);
+      } catch {
+        if (!cancelled) setAccuracy(null);
+      } finally {
+        if (!cancelled) setAccuracyLoading(false);
+      }
+    };
+    void loadAccuracy();
+    return () => {
+      cancelled = true;
+    };
+  }, [days, refreshKey]);
+
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    let cancelled = false;
+    void fetchData(true, () => cancelled);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- silent refetch on parent refresh
+  }, [refreshKey]);
+
+  useEffect(() => {
+    if (!selectedSymbol) {
+      setStockHistory([]);
+      return;
+    }
+    let cancelled = false;
+    const fetchStockHistory = async () => {
+      setStockLoading(true);
+      try {
+        const res = await stocksApi.getHistorical(selectedSymbol, days);
+        if (cancelled) return;
+        setStockHistory(res.data?.data ?? []);
+      } catch {
+        if (!cancelled) setStockHistory([]);
+      } finally {
+        if (!cancelled) setStockLoading(false);
+      }
+    };
+    void fetchStockHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedSymbol, days]);
 
   if (loading) {
     return (
