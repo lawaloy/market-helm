@@ -27,7 +27,17 @@ export function escapeCsvCell(value: string | number): string {
 
 /** Export opportunities/stocks to CSV */
 export function exportToCsv(stocks: Opportunity[], filename?: string): void {
-  const headers = ['Symbol', 'Name', 'Price', 'Target', 'Expected %', 'Confidence', 'Risk', 'Trend'];
+  const headers = [
+    'Symbol',
+    'Name',
+    'Price',
+    'Target',
+    'Expected %',
+    'Confidence',
+    'Risk',
+    'Recommendation',
+    'Trend',
+  ];
   const rows = stocks.map((s) => [
     s.symbol,
     s.name || s.symbol,
@@ -36,6 +46,7 @@ export function exportToCsv(stocks: Opportunity[], filename?: string): void {
     s.expectedChange.toFixed(2),
     `${s.confidence}%`,
     s.risk,
+    s.recommendation,
     s.trend,
   ]);
   const csvContent = [

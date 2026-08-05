@@ -12,6 +12,7 @@ import smtplib
 from abc import ABC, abstractmethod
 from email.message import EmailMessage
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 import requests
 
@@ -21,6 +22,51 @@ from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_ht
 logger = setup_logger("alerts.email.delivery")
 
 SUPPORTED_PROVIDERS = frozenset({"smtp", "sendgrid", "mailgun"})
+# Official Mailgun API origins only — never send Basic Auth API keys to arbitrary hosts.
+ALLOWED_MAILGUN_API_HOSTS = frozenset({"api.mailgun.net", "api.eu.mailgun.net"})
+
+
+def normalize_mailgun_api_base(raw: str) -> Optional[str]:
+    """Return a canonical https Mailgun API origin, or None if unsafe/invalid."""
+    text = str(raw).strip()
+    if not text:
+        return None
+    parsed = urlparse(text)
+    if parsed.scheme.lower() != "https":
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in ALLOWED_MAILGUN_API_HOSTS:
+        return None
+    if parsed.port not in (None, 443):
+        return None
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        return None
+    return f"https://{host}"
+
+
+def normalize_mailgun_domain(raw: str) -> Optional[str]:
+    """Return a hostname-like Mailgun sending domain, or None if unsafe/invalid.
+
+    The domain is interpolated into ``{api_base}/v3/{domain}/messages``. Values with
+    ``/``, ``@``, whitespace, or control characters reshape the request path and
+    must be rejected before authenticated Mailgun calls are made.
+    """
+    text = str(raw).strip()
+    if not text:
+        return None
+    if any(ch in text for ch in ("/", "\\", "@", " ", "\t", "\r", "\n", "\0")):
+        return None
+    # Hostname labels: letters, digits, dots, hyphens only (Mailgun sandbox/custom).
+    if text.startswith(".") or text.endswith(".") or ".." in text:
+        return None
+    for label in text.split("."):
+        if not label or label.startswith("-") or label.endswith("-"):
+            return None
+        if not all(ch.isalnum() or ch == "-" for ch in label):
+            return None
+    return text.lower()
 
 
 def _sanitize_header_text(value: Any) -> str:
@@ -487,22 +533,37 @@ def build_sendgrid_backend() -> Optional[SendGridEmailBackend]:
 
 def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
     api_key = os.environ.get("MAILGUN_API_KEY")
-    domain = os.environ.get("MAILGUN_DOMAIN")
+    domain_raw = os.environ.get("MAILGUN_DOMAIN")
     if not api_key or not str(api_key).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_API_KEY is missing."
         )
         return None
-    if not domain or not str(domain).strip():
+    if not domain_raw or not str(domain_raw).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_DOMAIN is missing."
         )
         return None
-    api_base = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    domain = normalize_mailgun_domain(str(domain_raw))
+    if domain is None:
+        logger.warning(
+            "MAILGUN_DOMAIN %r is not a valid hostname-like sending domain.",
+            domain_raw,
+        )
+        return None
+    api_base_raw = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    api_base = normalize_mailgun_api_base(str(api_base_raw))
+    if api_base is None:
+        logger.warning(
+            "MAILGUN_API_BASE %r is not an allowed Mailgun HTTPS API origin "
+            "(expected https://api.mailgun.net or https://api.eu.mailgun.net).",
+            api_base_raw,
+        )
+        return None
     return MailgunEmailBackend(
         api_key=str(api_key).strip(),
-        domain=str(domain).strip(),
-        api_base=str(api_base).strip(),
+        domain=domain,
+        api_base=api_base,
     )
 
 

@@ -98,19 +98,30 @@ class IndexFetcher:
         return None
     
     def _save_to_cache(self, index_name: str, symbols: List[str]):
-        """Save index symbols to cache."""
+        """Save index symbols to cache (atomic replace so crashes cannot truncate)."""
         cache_file = self.cache_dir / f"{index_name.replace(' ', '_').replace('&', '').replace('-', '_')}_symbols.json"
-        
+        tmp_file = cache_file.with_suffix(cache_file.suffix + ".tmp")
+
         try:
             cache_data = {
                 'date': datetime.now().isoformat(),
                 'symbols': self._normalize_symbol_list(symbols)
             }
-            with open(cache_file, 'w') as f:
+            # Write to a sibling temp file first. Opening cache_file with "w"
+            # would truncate a valid cache before json.dump finishes — a crash
+            # or serialize error would then force tiny fallback symbol lists.
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f)
+                f.flush()
+            tmp_file.replace(cache_file)
             logger.debug(f"Cached {index_name} symbols ({len(cache_data['symbols'])} symbols)")
         except Exception as e:
             logger.warning(f"Failed to save cache: {e}")
+            try:
+                if tmp_file.exists():
+                    tmp_file.unlink()
+            except OSError:
+                pass
     
     # Wikipedia scraping removed - we use pytickersymbols package only
     

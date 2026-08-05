@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -12,6 +13,21 @@ from urllib.parse import urlparse
 from src.utils.tickers import normalize_ticker
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Path-keyed locks so concurrent update_user_env_vars callers (distinct
+# settings saves) cannot drop keys via unlocked load-mutate-save.
+_ENV_PATH_LOCKS: Dict[str, threading.Lock] = {}
+_ENV_PATH_LOCKS_GUARD = threading.Lock()
+
+
+def _env_lock_for(path: Path) -> threading.Lock:
+    key = str(path.resolve())
+    with _ENV_PATH_LOCKS_GUARD:
+        lock = _ENV_PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _ENV_PATH_LOCKS[key] = lock
+        return lock
 
 
 def user_config_dir() -> Path:
@@ -258,30 +274,38 @@ def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def update_user_env_vars(updates: Dict[str, str]) -> None:
-    """Update ~/.market-helm/.env without logging or returning secret values."""
+    """Update ~/.market-helm/.env without logging or returning secret values.
+
+    Serialized per path and written via temp+replace so concurrent settings
+    saves cannot drop keys or leave a truncated .env on crash mid-write.
+    """
     env_path = user_config_dir() / ".env"
     user_config_dir().mkdir(parents=True, exist_ok=True)
-    existing: Dict[str, str] = {}
-    order: list[str] = []
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#") or "=" not in stripped:
+    lock = _env_lock_for(env_path)
+    with lock:
+        existing: Dict[str, str] = {}
+        order: list[str] = []
+        if env_path.exists():
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    continue
+                key, _, value = stripped.partition("=")
+                key = key.strip()
+                existing[key] = value.strip()
+                if key not in order:
+                    order.append(key)
+        for key, value in updates.items():
+            if not value:
+                if key in existing:
+                    del existing[key]
+                    if key in order:
+                        order.remove(key)
                 continue
-            key, _, value = stripped.partition("=")
-            key = key.strip()
-            existing[key] = value.strip()
+            existing[key] = value
             if key not in order:
                 order.append(key)
-    for key, value in updates.items():
-        if not value:
-            if key in existing:
-                del existing[key]
-                if key in order:
-                    order.remove(key)
-            continue
-        existing[key] = value
-        if key not in order:
-            order.append(key)
-    content = "\n".join(f"{key}={existing[key]}" for key in order)
-    env_path.write_text(f"{content}\n" if content else "", encoding="utf-8")
+        content = "\n".join(f"{key}={existing[key]}" for key in order)
+        tmp = env_path.with_suffix(".env.tmp")
+        tmp.write_text(f"{content}\n" if content else "", encoding="utf-8")
+        tmp.replace(env_path)

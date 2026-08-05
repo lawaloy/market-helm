@@ -28,6 +28,9 @@ class Opportunity(BaseModel):
     trend: str
     reason: str
     volume: int
+    # Default keeps concurrent Opportunity(...) constructors valid until callers
+    # start passing recommendation explicitly (dashboard table filters need it).
+    recommendation: str = ""
     momentum: Optional[float] = None
     volatility: Optional[float] = None
 

@@ -13,6 +13,8 @@ from .database import get_connection
 _SCRYPT_N = 2**14
 _SCRYPT_R = 8
 _SCRYPT_P = 1
+# Bound plaintext length so register/login cannot feed multi-MB strings into scrypt.
+MAX_PASSWORD_LENGTH = 128
 
 
 class UserError(ValueError):
@@ -22,6 +24,10 @@ class UserError(ValueError):
 def _hash_password(password: str) -> str:
     if len(password) < 8:
         raise UserError("Password must be at least 8 characters.")
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise UserError(
+            f"Password must be at most {MAX_PASSWORD_LENGTH} characters."
+        )
     salt = secrets.token_bytes(16)
     digest = hashlib.scrypt(
         password.encode("utf-8"),
@@ -35,6 +41,9 @@ def _hash_password(password: str) -> str:
 
 
 def _verify_password(password: str, stored: str) -> bool:
+    # Reject oversized plaintext before scrypt so login cannot be CPU-DoS'd.
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return False
     try:
         scheme, n_raw, r_raw, p_raw, salt_hex, digest_hex = stored.split("$", 5)
         if scheme != "scrypt":

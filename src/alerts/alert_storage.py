@@ -5,9 +5,16 @@ Alert history storage.
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
+from contextlib import contextmanager
 import json
+import threading
 
 MAX_DELIVERY_LOG = 100
+
+# Path-keyed locks so concurrent record_* on distinct AlertStorage instances
+# (same history file) cannot lose rows via unlocked load-mutate-save.
+_PATH_LOCKS: Dict[str, threading.Lock] = {}
+_PATH_LOCKS_GUARD = threading.Lock()
 
 
 def _empty_history() -> Dict[str, Any]:
@@ -16,6 +23,16 @@ def _empty_history() -> Dict[str, Any]:
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _lock_for(path: Path) -> threading.Lock:
+    key = str(path.resolve())
+    with _PATH_LOCKS_GUARD:
+        lock = _PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _PATH_LOCKS[key] = lock
+        return lock
 
 
 def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
@@ -46,6 +63,15 @@ class AlertStorage:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.history_path = self.data_dir / "alerts_history.json"
 
+    @contextmanager
+    def _history_lock(self):
+        lock = _lock_for(self.history_path)
+        lock.acquire()
+        try:
+            yield
+        finally:
+            lock.release()
+
     def _load(self) -> Dict:
         if not self.history_path.exists():
             return _empty_history()
@@ -72,8 +98,12 @@ class AlertStorage:
         }
 
     def _save(self, history: Dict) -> None:
-        with open(self.history_path, "w") as f:
+        # Atomic replace so readers never observe a truncated write.
+        tmp = self.history_path.with_suffix(".json.tmp")
+        with open(tmp, "w") as f:
             json.dump(history, f, indent=2)
+            f.write("\n")
+        tmp.replace(self.history_path)
 
     def get_last_triggered(self, alert_id: str) -> Optional[datetime]:
         history = self._load()
@@ -95,21 +125,22 @@ class AlertStorage:
         error: Optional[str] = None,
         timestamp: Optional[str] = None,
     ) -> None:
-        history = self._load()
-        entry: Dict[str, Any] = {
-            "alert_id": alert_id,
-            "channel": channel,
-            "success": success,
-            "test": test,
-            "timestamp": _parseable_iso_timestamp(timestamp) or _utc_now_iso(),
-        }
-        if error:
-            entry["error"] = error[:500]
-        delivery_log = history.setdefault("delivery_log", [])
-        delivery_log.append(entry)
-        if len(delivery_log) > MAX_DELIVERY_LOG:
-            history["delivery_log"] = delivery_log[-MAX_DELIVERY_LOG:]
-        self._save(history)
+        with self._history_lock():
+            history = self._load()
+            entry: Dict[str, Any] = {
+                "alert_id": alert_id,
+                "channel": channel,
+                "success": success,
+                "test": test,
+                "timestamp": _parseable_iso_timestamp(timestamp) or _utc_now_iso(),
+            }
+            if error:
+                entry["error"] = error[:500]
+            delivery_log = history.setdefault("delivery_log", [])
+            delivery_log.append(entry)
+            if len(delivery_log) > MAX_DELIVERY_LOG:
+                history["delivery_log"] = delivery_log[-MAX_DELIVERY_LOG:]
+            self._save(history)
 
     def latest_delivery_by_channel(self) -> List[Dict[str, Any]]:
         """Most recent delivery attempt per channel (email, webhook)."""
@@ -126,13 +157,14 @@ class AlertStorage:
         return [latest[key] for key in sorted(latest.keys())]
 
     def record_event(self, event: Dict) -> None:
-        history = self._load()
-        cleaned = dict(event)
-        ts = _parseable_iso_timestamp(cleaned.get("timestamp")) or _utc_now_iso()
-        cleaned["timestamp"] = ts
-        history.setdefault("events", []).append(cleaned)
-        history.setdefault("last_triggered", {})[cleaned["alert_id"]] = ts
-        self._save(history)
+        with self._history_lock():
+            history = self._load()
+            cleaned = dict(event)
+            ts = _parseable_iso_timestamp(cleaned.get("timestamp")) or _utc_now_iso()
+            cleaned["timestamp"] = ts
+            history.setdefault("events", []).append(cleaned)
+            history.setdefault("last_triggered", {})[cleaned["alert_id"]] = ts
+            self._save(history)
 
     def latest_event_timestamp(self) -> Optional[str]:
         history = self._load()
