@@ -6,9 +6,15 @@ import {
   dedupeAlerts,
   emptyConfig,
   findDuplicatePriceRule,
+  formatCondition,
+  formatDeliveryStatusLine,
+  formatTestSuccess,
+  isSampleRule,
   loadSymbolCatalog,
+  loadTrackedSymbols,
   parseSymbolCatalog,
   priceAlertKey,
+  slugify,
 } from './alertsUtils';
 import type { AlertRule, AlertsConfig, ChannelStatus } from '../../types';
 
@@ -278,5 +284,127 @@ describe('loadSymbolCatalog', () => {
     );
 
     await expect(loadSymbolCatalog()).rejects.toThrow('Company list unavailable');
+  });
+});
+
+describe('loadTrackedSymbols', () => {
+  beforeEach(() => {
+    vi.mocked(alertsApi.getSymbols).mockReset();
+    vi.mocked(historyApi.getSymbols).mockReset();
+  });
+
+  it('prefers tracked_symbols from the alerts catalog', async () => {
+    vi.mocked(alertsApi.getSymbols).mockResolvedValue({
+      data: { symbols: ['ZZZ'], tracked_symbols: ['aapl', 'Msft'] },
+    } as never);
+
+    await expect(loadTrackedSymbols()).resolves.toEqual(new Set(['AAPL', 'MSFT']));
+    expect(historyApi.getSymbols).not.toHaveBeenCalled();
+  });
+
+  it('falls back to history symbols when tracked_symbols is unavailable', async () => {
+    vi.mocked(alertsApi.getSymbols).mockRejectedValue(new Error('down'));
+    vi.mocked(historyApi.getSymbols).mockResolvedValue({
+      data: { symbols: ['goog'] },
+    } as never);
+
+    await expect(loadTrackedSymbols()).resolves.toEqual(new Set(['GOOG']));
+  });
+
+  it('returns an empty set when every source fails', async () => {
+    vi.mocked(alertsApi.getSymbols).mockRejectedValue(new Error('down'));
+    vi.mocked(historyApi.getSymbols).mockRejectedValue(new Error('down'));
+
+    await expect(loadTrackedSymbols()).resolves.toEqual(new Set());
+  });
+});
+
+describe('isSampleRule', () => {
+  it('detects known sample ids and example: name prefixes', () => {
+    expect(
+      isSampleRule({
+        id: 'alert_aapl_drop',
+        name: 'Real looking name',
+        enabled: true,
+        condition: { type: 'screening_match' },
+        notifications: ['log'],
+      }),
+    ).toBe(true);
+    expect(
+      isSampleRule({
+        id: 'custom',
+        name: 'example: Discord demo',
+        enabled: true,
+        condition: { type: 'screening_match' },
+        notifications: ['log'],
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false for user rules', () => {
+    expect(
+      isSampleRule({
+        id: 'alert_user_1',
+        name: 'My AAPL alert',
+        enabled: true,
+        condition: { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 100 },
+        notifications: ['log'],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('slugify', () => {
+  it('lowercases, strips junk, and caps length at 40', () => {
+    expect(slugify('  Hello World!! ')).toBe('hello_world');
+    expect(slugify('a'.repeat(50))).toHaveLength(40);
+  });
+});
+
+describe('formatTestSuccess', () => {
+  it('formats zero, one, and many notifiers', () => {
+    expect(formatTestSuccess([])).toBe('Test notification sent.');
+    expect(formatTestSuccess(['email'])).toBe('Test sent via email.');
+    expect(formatTestSuccess(['email', 'webhook'])).toBe('Test sent via email and webhook.');
+    expect(formatTestSuccess(['email', 'webhook', 'log'])).toBe(
+      'Test sent via email, webhook and log.',
+    );
+  });
+});
+
+describe('formatDeliveryStatusLine', () => {
+  it('labels channel outcome and test/live kind', () => {
+    const line = formatDeliveryStatusLine({
+      channel: 'webhook',
+      success: false,
+      test: true,
+      timestamp: '2026-08-05T12:00:00.000Z',
+    });
+    expect(line).toContain('Discord/Slack');
+    expect(line).toContain('Failed');
+    expect(line).toContain('(test)');
+  });
+});
+
+describe('formatCondition', () => {
+  it('describes price thresholds and screening matches', () => {
+    expect(
+      formatCondition({
+        id: '1',
+        name: 'drop',
+        enabled: true,
+        condition: { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 100 },
+        notifications: ['log'],
+      }),
+    ).toBe('AAPL falls below $100.00');
+    expect(
+      formatCondition({
+        id: '2',
+        name: 'screen',
+        enabled: true,
+        condition: { type: 'screening_match' },
+        notifications: ['log'],
+      }),
+    ).toBe('Matches your screening filters');
   });
 });
