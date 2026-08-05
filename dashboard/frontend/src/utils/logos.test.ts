@@ -17,6 +17,22 @@ describe('getCompanyLogoUrl', () => {
     expect(getCompanyLogoUrl(undefined as unknown as string)).toBe('');
   });
 
+  it('returns empty for non-string symbols instead of throwing', () => {
+    expect(getCompanyLogoUrl(42 as unknown as string)).toBe('');
+    expect(getCompanyLogoUrl(Number.NaN as unknown as string)).toBe('');
+    expect(getCompanyLogoUrl(null as unknown as string)).toBe('');
+  });
+
+  it('returns empty for sentinel symbol strings', () => {
+    expect(getCompanyLogoUrl('nan')).toBe('');
+    expect(getCompanyLogoUrl('NaN')).toBe('');
+    expect(getCompanyLogoUrl('inf')).toBe('');
+    expect(getCompanyLogoUrl('Infinity')).toBe('');
+    expect(getCompanyLogoUrl('-INF')).toBe('');
+    expect(getCompanyLogoUrl('null')).toBe('');
+    expect(getCompanyLogoUrl('NONE')).toBe('');
+  });
+
   it('percent-encodes path-sensitive ticker characters', () => {
     expect(getCompanyLogoUrl('BRK/B')).toBe(
       'https://assets.parqet.com/logos/symbol/BRK%2FB?format=png',

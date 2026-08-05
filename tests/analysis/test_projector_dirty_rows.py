@@ -36,3 +36,22 @@ def test_generate_projections_skips_non_dict_rows():
 def test_generate_projections_all_non_dict_returns_empty():
     projector = StockProjector()
     assert projector.generate_projections([None, "x", 1]) == {}
+
+
+def test_generate_projections_skips_nan_and_sentinel_symbols():
+    """float('nan') is truthy and would collapse under one bad map key."""
+    projector = StockProjector()
+    rows = [
+        _good("OK1"),
+        {**_good("BAD"), "symbol": float("nan")},
+        {**_good("BAD2"), "symbol": "NONE"},
+        {**_good("BAD3"), "symbol": ""},
+        {**_good(" ok2 "), "symbol": " ok2 "},
+        _good("OK3"),
+    ]
+
+    projections = projector.generate_projections(rows)
+
+    assert set(projections) == {"OK1", "OK2", "OK3"}
+    assert all(isinstance(sym, str) for sym in projections)
+    assert projections["OK2"]["symbol"] == "OK2"

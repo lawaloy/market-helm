@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 import sys
 import os
 
@@ -84,7 +84,7 @@ app = FastAPI(
 )
 
 # CORS configuration for local development
-default_origins = [
+DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:3001",
@@ -95,9 +95,49 @@ default_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
-cors_env = os.getenv("CORS_ORIGINS", "")
-env_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
-origins = env_origins or default_origins
+
+
+def parse_cors_origins(
+    raw: str,
+    defaults: Optional[List[str]] = None,
+) -> List[str]:
+    """Parse CORS_ORIGINS for credentialed middleware.
+
+    Wildcards, non-http(s) schemes, and control/whitespace-tainted values are
+    rejected so a bad deploy env cannot broaden browser credential access.
+    Falls back to defaults when nothing valid remains.
+    """
+    fallback = list(defaults) if defaults is not None else list(DEFAULT_CORS_ORIGINS)
+    accepted: List[str] = []
+    for part in str(raw or "").split(","):
+        origin = part.strip()
+        if not origin:
+            continue
+        if origin == "*":
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin %r — wildcard is incompatible with "
+                "allow_credentials=True",
+                origin,
+            )
+            continue
+        if any(ch.isspace() or ord(ch) < 32 for ch in origin):
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin with whitespace/control characters: %r",
+                origin,
+            )
+            continue
+        lower = origin.lower()
+        if not (lower.startswith("http://") or lower.startswith("https://")):
+            logging.getLogger(__name__).warning(
+                "Ignoring CORS origin %r — only http(s) origins are allowed",
+                origin,
+            )
+            continue
+        accepted.append(origin)
+    return accepted or fallback
+
+
+origins = parse_cors_origins(os.getenv("CORS_ORIGINS", ""))
 
 app.add_middleware(
     CORSMiddleware,
