@@ -15,7 +15,8 @@ function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [dataDate, setDataDate] = useState<string>('');
   const [backgroundFetching, setBackgroundFetching] = useState(false);
-  const hasAutoFetched = useRef(false);
+  /** Bumped on unmount so StrictMode remount / navigation cannot apply late setState. */
+  const autofetchGenerationRef = useRef(0);
 
   const runBackgroundAlertCheck = async () => {
     try {
@@ -39,8 +40,8 @@ function App() {
 
   // On first load: fetch latest trading day data if missing, then check watches.
   useEffect(() => {
-    if (hasAutoFetched.current) return;
-    hasAutoFetched.current = true;
+    const generation = ++autofetchGenerationRef.current;
+    const isActive = () => generation === autofetchGenerationRef.current;
 
     void runBackgroundAlertCheck();
 
@@ -48,15 +49,18 @@ function App() {
       let refreshSucceeded = false;
       try {
         const { data } = await api.get<{ needs_fetch: boolean }>('/api/data-info');
-        if (!data.needs_fetch) return;
+        if (!isActive() || !data.needs_fetch) return;
 
         setBackgroundFetching(true);
         await api.post('/api/refresh');
+        if (!isActive()) return;
+
         const pollIntervalMs = 2000;
         const maxWaitMs = 15 * 60 * 1000;
         const started = Date.now();
 
         const poll = async (): Promise<void> => {
+          if (!isActive()) return;
           if (Date.now() - started > maxWaitMs) {
             setBackgroundFetching(false);
             return;
@@ -64,6 +68,7 @@ function App() {
           const { data: status } = await api.get<{ is_running: boolean; last_status: string }>(
             '/api/refresh/status',
           );
+          if (!isActive()) return;
           if (status.is_running) {
             await new Promise((r) => setTimeout(r, pollIntervalMs));
             return poll();
@@ -76,14 +81,18 @@ function App() {
         };
         await poll();
       } catch {
-        setBackgroundFetching(false);
+        if (isActive()) setBackgroundFetching(false);
       } finally {
-        if (!refreshSucceeded) {
+        if (isActive() && !refreshSucceeded) {
           await runBackgroundAlertCheck();
         }
       }
     };
-    fetchIfNeeded();
+    void fetchIfNeeded();
+
+    return () => {
+      autofetchGenerationRef.current += 1;
+    };
   }, []);
 
   return (

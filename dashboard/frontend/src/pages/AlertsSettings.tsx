@@ -216,7 +216,9 @@ const AlertsSettings: React.FC = () => {
           webhook_format: source.defaults?.webhook_format,
           notify_email: emailOn,
           notify_webhook: webhookOn,
-          ...(webhookDraft.trim() ? { webhook_url: webhookDraft.trim() } : {}),
+          // Only persist a draft URL while Discord/Slack is on — a hidden draft must not
+          // rewrite .env / hosted webhook secrets after the channel is turned off.
+          ...(webhookOn && webhookDraft.trim() ? { webhook_url: webhookDraft.trim() } : {}),
         },
         alerts: dedupeAlerts(
           source.alerts
