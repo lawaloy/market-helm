@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SignIn from './SignIn';
+import SignIn, { MAX_PASSWORD_LENGTH } from './SignIn';
 
 const authMocks = vi.hoisted(() => ({
   login: vi.fn(),
@@ -67,4 +67,17 @@ describe('SignIn', () => {
 
     expect(screen.getByText('Sign-in not required')).toBeTruthy();
   });
+
+  it('caps password input length to match backend MAX_PASSWORD_LENGTH', () => {
+    render(
+      <MemoryRouter>
+        <SignIn />
+      </MemoryRouter>,
+    );
+
+    const password = screen.getByLabelText('Password');
+    expect(password.getAttribute('maxLength')).toBe(String(MAX_PASSWORD_LENGTH));
+    expect(MAX_PASSWORD_LENGTH).toBe(128);
+  });
 });
+

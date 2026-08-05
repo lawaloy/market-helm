@@ -3,10 +3,14 @@ Projections API endpoints
 """
 import math
 from typing import Any, Optional
+from datetime import datetime, timedelta
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
+
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
-from datetime import datetime, timedelta
+from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
 
@@ -24,6 +28,19 @@ def _finite_float(value: Any) -> Optional[float]:
         return None
 
 
+def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> float:
+    """Mean of finite numeric cells only so Inf/NaN cannot poison summary averages."""
+    if column not in df.columns:
+        return default
+    series = pd.to_numeric(df[column], errors="coerce")
+    finite = series.map(
+        lambda value: isinstance(value, (int, float)) and math.isfinite(value)
+    )
+    if not bool(finite.any()):
+        return default
+    return _finite_float(series[finite].mean()) or default
+
+
 def _safe_volume(value: Any) -> int:
     """Coerce volume to a finite int; bad/missing cells become 0 (never abort the list)."""
     try:
@@ -35,6 +52,19 @@ def _safe_volume(value: Any) -> int:
         return int(result)
     except (TypeError, ValueError):
         return 0
+
+
+def _safe_label(value: Any, default: str) -> str:
+    """Return a display label; blank/NaN sentinels fall back instead of crashing."""
+    if value is None:
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return default
+    return text
 
 
 @router.get("/summary", response_model=ProjectionsSummary)
@@ -56,14 +86,8 @@ async def get_projections_summary():
         
         # Calculate statistics
         total_projections = len(df)
-        avg_confidence = (
-            _finite_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
-        ) or 0.0
-        avg_expected_change = (
-            _finite_float(df['expected_change_percent'].mean())
-            if 'expected_change_percent' in df.columns
-            else 0.0
-        ) or 0.0
+        avg_confidence = _finite_column_mean(df, "confidence")
+        avg_expected_change = _finite_column_mean(df, "expected_change_percent")
         
         # Determine sentiment
         if avg_expected_change > 1.0:
@@ -168,7 +192,10 @@ async def get_opportunities(
         
         opportunities = []
         for _, row in sorted_df.iterrows():
-            symbol = row['symbol']
+            # Match padded / mixed-case CSV symbols the same way stock detail does.
+            symbol = normalize_ticker(row.get("symbol"))
+            if not symbol:
+                continue
 
             # Required projection numerics: skip the row instead of int(NaN)→500
             # or Pydantic serializing NaN/Inf as JSON null.
@@ -182,15 +209,26 @@ async def get_opportunities(
             ):
                 continue
 
-            # Get current price from daily data
-            stock_daily = daily_df[daily_df['symbol'] == symbol]
-            if stock_daily.empty:
+            # Get current price from daily data (normalize like stock detail).
+            # Missing daily schema must soft-fail to zeros — not KeyError→500.
+            if (
+                daily_df is None
+                or getattr(daily_df, "empty", True)
+                or "symbol" not in getattr(daily_df, "columns", [])
+            ):
                 current_price = 0.0
                 volume = 0
             else:
-                daily_row = stock_daily.iloc[0]
-                current_price = _finite_float(daily_row.get('close')) or 0.0
-                volume = _safe_volume(daily_row.get('volume', 0))
+                stock_daily = daily_df[
+                    daily_df["symbol"].map(normalize_ticker) == symbol
+                ]
+                if stock_daily.empty:
+                    current_price = 0.0
+                    volume = 0
+                else:
+                    daily_row = stock_daily.iloc[0]
+                    current_price = _finite_float(daily_row.get('close')) or 0.0
+                    volume = _safe_volume(daily_row.get('volume', 0))
 
             momentum = (
                 _finite_float(row.get('momentum_score'))
@@ -210,9 +248,12 @@ async def get_opportunities(
                 targetPrice=target_price,
                 expectedChange=expected_change,
                 confidence=int(confidence_f),
-                risk=row['risk_level'],
-                trend=row['trend'],
-                reason=row.get('reason', ''),
+                risk=_safe_label(row.get("risk_level"), "Unknown"),
+                # Echo the filter bucket so the dashboard table can filter/badge
+                # by BUY/HOLD/SELL without conflating it with Bullish/Bearish trend.
+                recommendation=rec_map[type],
+                trend=_safe_label(row.get("trend"), "Neutral"),
+                reason=row.get('reason', '') or '',
                 volume=volume,
                 momentum=momentum,
                 volatility=volatility,

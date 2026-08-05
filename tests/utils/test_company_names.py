@@ -79,6 +79,20 @@ def test_resolve_normalizes_padded_symbol_and_skips_sentinels():
     assert company_names._name_cache == {}
 
 
+def test_resolve_skips_nan_fallback_and_uses_catalog():
+    """Corrupt Finnhub/CSV names must not stringify to display \"nan\"."""
+    mock_data = MagicMock()
+    mock_data.get_stocks_by_index.side_effect = lambda index: (
+        [{"symbol": "AAPL", "name": "Apple Inc."}] if index == "S&P 500" else []
+    )
+    with patch("pytickersymbols.PyTickerSymbols", return_value=mock_data):
+        assert company_names.resolve_company_name("AAPL", float("nan")) == "Apple Inc."
+        assert company_names.resolve_company_name("AAPL", "nan") == "Apple Inc."
+        assert company_names.resolve_company_name("AAPL", float("inf")) == "Apple Inc."
+
+    assert company_names.resolve_company_name("AAPL", "nan") != "nan"
+
+
 def test_enrich_canonicalizes_padded_symbols_and_skips_sentinels():
     rows = [
         {"symbol": " aapl ", "name": " aapl "},
@@ -100,3 +114,23 @@ def test_enrich_canonicalizes_padded_symbols_and_skips_sentinels():
     assert rows[3]["symbol"] == "MSFT"
     assert rows[3]["name"] == "Microsoft Corporation"
     assert mock_resolve.call_count == 1
+
+
+def test_enrich_replaces_nan_names_instead_of_leaving_poison():
+    rows = [
+        {"symbol": "AAPL", "name": float("nan")},
+        {"symbol": "MSFT", "name": "nan"},
+        {"symbol": "GOOG", "name": "NONE"},
+    ]
+    with patch.object(
+        company_names,
+        "resolve_company_name",
+        side_effect=lambda symbol, fallback="": f"Resolved-{symbol}",
+    ) as mock_resolve:
+        company_names.enrich_stock_data_with_names(rows)
+
+    assert rows[0]["name"] == "Resolved-AAPL"
+    assert rows[1]["name"] == "Resolved-MSFT"
+    assert rows[2]["name"] == "Resolved-GOOG"
+    assert mock_resolve.call_count == 3
+    assert all(isinstance(row["name"], str) and row["name"].lower() != "nan" for row in rows)
