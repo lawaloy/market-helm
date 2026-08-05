@@ -124,3 +124,17 @@ def test_save_to_cache_replaces_via_temp_sibling(tmp_path: Path) -> None:
 
     assert fetcher._load_from_cache("S&P 500") == ["MSFT", "NVDA"]
     assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_init_soft_fails_when_cache_mkdir_raises(tmp_path: Path, monkeypatch) -> None:
+    """Unwritable cache roots must not abort IndexFetcher construction."""
+    blocked = tmp_path / "blocked-cache"
+
+    def boom(self, *args, **kwargs):
+        raise OSError("read-only filesystem")
+
+    monkeypatch.setattr(Path, "mkdir", boom)
+    fetcher = IndexFetcher(cache_dir=blocked)
+    assert fetcher.cache_dir == blocked
+    # Construction succeeded; package flag is independent of cache mkdir.
+    assert isinstance(fetcher.package_available, bool)

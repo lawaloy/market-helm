@@ -32,7 +32,8 @@ def prices_from_saved_daily_data() -> Dict[str, float]:
     try:
         loader = get_data_loader()
         df = loader.load_daily_data()
-    except ValueError:
+    except (ValueError, OSError, RuntimeError):
+        # Unreadable data dirs / loader boot failures must not crash quote pickers.
         return prices
 
     for _, row in df.iterrows():

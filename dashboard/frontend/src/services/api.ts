@@ -24,15 +24,28 @@ export const AUTH_TOKEN_KEY = 'market-helm-token';
 
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    // Quota / private-mode / blocked storage must not crash auth init.
+    return null;
+  }
 }
 
 export function setAuthToken(token: string): void {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  try {
+    localStorage.setItem(AUTH_TOKEN_KEY, token);
+  } catch {
+    // Persist best-effort; login can still proceed with in-memory interceptor reads.
+  }
 }
 
 export function clearAuthToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+  try {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // Ignore storage failures on logout/clear.
+  }
 }
 
 const api = axios.create({

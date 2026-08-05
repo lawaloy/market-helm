@@ -204,7 +204,11 @@ class DataLoader:
     
     def get_available_dates(self) -> List[str]:
         """Get list of all available dates (strict YYYY-MM-DD filenames only)."""
-        files = list(self.data_dir.glob("daily_data_*.csv"))
+        try:
+            files = list(self.data_dir.glob("daily_data_*.csv"))
+        except OSError as exc:
+            # Unreadable data/ must map to ValueError → API 404, not generic 500.
+            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
         dates = [
             date
             for f in files
