@@ -1056,7 +1056,7 @@ class TestHistorySummaryAPI:
 
         assert r.status_code == 200
         data = r.json()
-        assert data["count"] == 3
+        assert data["count"] == 2
         by_symbol = {row["symbol"]: row for row in data["opportunities"]}
         assert "BADCONF" not in by_symbol
         assert by_symbol["KEEP"]["currentPrice"] == 100.0

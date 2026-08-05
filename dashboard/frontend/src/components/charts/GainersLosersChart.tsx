@@ -25,15 +25,19 @@ function toMoverRow(
 }
 
 const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers }) => {
-  // Take top 5 gainers and top 5 losers; drop non-finite changePercent so
-  // list toFixed / bar fills cannot throw on API drift.
-  const topGainers = gainers.slice(0, 5);
-  const topLosers = losers.slice(0, 5);
+  // Drop non-finite changePercent first, then take top 5 so a poisoned early
+  // row cannot hide a valid sixth mover from the Top Movers chart.
+  const topGainers = gainers
+    .map((g) => toMoverRow(g, 'gainer'))
+    .filter((row): row is MoverRow => row != null)
+    .slice(0, 5);
+  const topLosers = losers
+    .map((l) => toMoverRow(l, 'loser'))
+    .filter((row): row is MoverRow => row != null)
+    .slice(0, 5);
 
-  const data: MoverRow[] = [
-    ...topGainers.map((g) => toMoverRow(g, 'gainer')),
-    ...topLosers.map((l) => toMoverRow(l, 'loser')),
-  ].filter((row): row is MoverRow => row != null);
+  const data: MoverRow[] = [...topGainers, ...topLosers];
+
 
   return (
     <div className="card p-6">

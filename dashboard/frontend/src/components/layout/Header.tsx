@@ -16,12 +16,19 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRefresh, backgroundFetching }) => {
   const { theme, toggleTheme } = useTheme();
   const { user, multiUserEnabled, logout } = useAuth();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRefreshing, setIsRefreshingState] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** Bumped on cancel / new fetch so in-flight status responses cannot finish after leave. */
   const pollGenerationRef = useRef(0);
+  /** Mirrors isRefreshing for Quick Reload timeouts (state closures go stale). */
+  const isRefreshingRef = useRef(false);
   const lastMessageRef = useRef<string>('');
+
+  const setRefreshing = (value: boolean) => {
+    isRefreshingRef.current = value;
+    setIsRefreshingState(value);
+  };
 
   useEffect(() => {
     return () => {
@@ -40,10 +47,13 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   };
 
   const handleQuickRefresh = () => {
+    const generation = pollGenerationRef.current;
     updateMessage('Reloading data...');
     onQuickRefresh?.();
     setTimeout(() => {
-      if (!isRefreshing) {
+      // Generation guards unmount / newer Full refresh; ref avoids stale isRefreshing.
+      if (generation !== pollGenerationRef.current) return;
+      if (!isRefreshingRef.current) {
         updateMessage('');
       }
     }, 1000);
@@ -51,7 +61,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
 
   const handleFullRefresh = async () => {
     const generation = ++pollGenerationRef.current;
-    setIsRefreshing(true);
+    setRefreshing(true);
     updateMessage('Reloading latest saved data...');
     onQuickRefresh?.();
 
@@ -81,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
           }
           if (Date.now() - pollStarted > maxWaitMs) {
             finishPolling();
-            setIsRefreshing(false);
+            setRefreshing(false);
             updateMessage('Refresh is taking too long. Check server logs or try Cancel.');
             setTimeout(() => {
               if (generation === pollGenerationRef.current) updateMessage('');
@@ -99,7 +109,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
 
           if (!status.is_running) {
             finishPolling();
-            setIsRefreshing(false);
+            setRefreshing(false);
 
             if (status.last_status === 'success') {
               updateMessage('Data refreshed successfully!');
@@ -126,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
       console.error('Refresh error:', error);
       if (generation !== pollGenerationRef.current) return;
       updateMessage('Failed to start refresh');
-      setIsRefreshing(false);
+      setRefreshing(false);
       setTimeout(() => {
         if (generation === pollGenerationRef.current) updateMessage('');
       }, 5000);
@@ -145,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-      setIsRefreshing(false);
+      setRefreshing(false);
       updateMessage('Refresh cancelled.');
       setTimeout(() => {
         if (generation === pollGenerationRef.current) updateMessage('');

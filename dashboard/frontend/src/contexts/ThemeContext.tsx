@@ -11,12 +11,34 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'market-helm-theme';
 
+function readStoredTheme(): Theme | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'dark' || stored === 'light') return stored;
+  } catch {
+    // Quota / private-mode / blocked storage must not crash theme boot.
+  }
+  return null;
+}
+
+function writeStoredTheme(theme: Theme): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // Persist best-effort; DOM class still updates for the session.
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light';
-    const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored === 'dark' || stored === 'light') return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    const stored = readStoredTheme();
+    if (stored) return stored;
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch {
+      return 'light';
+    }
   });
 
   useEffect(() => {
@@ -26,7 +48,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem(STORAGE_KEY, theme);
+    writeStoredTheme(theme);
   }, [theme]);
 
   const toggleTheme = () => {

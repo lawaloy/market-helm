@@ -77,3 +77,14 @@ def test_get_latest_file_returns_none_when_only_malformed_dates(
     assert loader._get_latest_file("daily_data_*.csv", sort_by_date=True) is None
     assert loader.get_available_dates() == []
     assert loader.get_latest_date() is None
+
+
+def test_get_available_dates_maps_glob_oserror_to_valueerror(loader: DataLoader) -> None:
+    """Unreadable data/ must become ValueError so history/overview APIs return 404."""
+    from unittest.mock import MagicMock
+
+    fake_dir = MagicMock()
+    fake_dir.glob.side_effect = OSError("permission denied")
+    loader.data_dir = fake_dir
+    with pytest.raises(ValueError, match="unreadable"):
+        loader.get_available_dates()

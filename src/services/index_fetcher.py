@@ -36,7 +36,12 @@ class IndexFetcher:
             cache_dir: Directory to store cached index lists
         """
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            # Read-only / permission failures must not abort IndexFetcher construction;
+            # cache load/save already soft-fail when the directory is unusable.
+            logger.warning("Index cache directory unavailable (%s): %s", self.cache_dir, exc)
         self.cache_duration = timedelta(days=7)  # Cache for 7 days
         
         # Initialize pytickersymbols package

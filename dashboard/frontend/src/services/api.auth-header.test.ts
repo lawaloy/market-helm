@@ -53,4 +53,32 @@ describe('api auth header interceptor', () => {
     const config = await runAuthInterceptor();
     expect(config.headers.Authorization).toBeUndefined();
   });
+
+  it('soft-fails when localStorage throws on get/set/clear', async () => {
+    const original = {
+      getItem: Storage.prototype.getItem,
+      setItem: Storage.prototype.setItem,
+      removeItem: Storage.prototype.removeItem,
+    };
+    Storage.prototype.getItem = () => {
+      throw new DOMException('SecurityError');
+    };
+    Storage.prototype.setItem = () => {
+      throw new DOMException('QuotaExceededError');
+    };
+    Storage.prototype.removeItem = () => {
+      throw new DOMException('SecurityError');
+    };
+    try {
+      expect(getAuthToken()).toBeNull();
+      expect(() => setAuthToken('tok')).not.toThrow();
+      expect(() => clearAuthToken()).not.toThrow();
+      const config = await runAuthInterceptor();
+      expect(config.headers.Authorization).toBeUndefined();
+    } finally {
+      Storage.prototype.getItem = original.getItem;
+      Storage.prototype.setItem = original.setItem;
+      Storage.prototype.removeItem = original.removeItem;
+    }
+  });
 });

@@ -26,6 +26,19 @@ def _finite_float(value: Any) -> Optional[float]:
         return None
 
 
+def _safe_label(value: Any, default: str) -> str:
+    """Return a display label; blank/NaN sentinels fall back instead of crashing."""
+    if value is None:
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return default
+    return text
+
+
 @router.get("/{symbol}", response_model=StockDetail)
 async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
     """Get detailed information for a specific stock"""
@@ -112,9 +125,13 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
                         targetPrice=target_price,
                         expectedChange=expected_change,
                         confidence=int(confidence_f),
-                        recommendation=proj_row["recommendation"],
-                        risk=proj_row["risk_level"],
-                        trend=proj_row["trend"],
+                        # Legacy CSVs may omit label columns; keep the card
+                        # instead of KeyError→bare except dropping projection.
+                        recommendation=_safe_label(
+                            proj_row.get("recommendation"), "HOLD"
+                        ),
+                        risk=_safe_label(proj_row.get("risk_level"), "Unknown"),
+                        trend=_safe_label(proj_row.get("trend"), "Neutral"),
                     )
 
                     technical_data = TechnicalData(
@@ -137,7 +154,8 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
         
         return StockDetail(
             symbol=sym,
-            name=stock_row.get("name", sym),
+            # Dirty CSV name cells (NaN/None) fail Pydantic str → 500 the detail.
+            name=_safe_label(stock_row.get("name"), sym),
             currentData=current_data,
             projection=projection_data,
             technical=technical_data

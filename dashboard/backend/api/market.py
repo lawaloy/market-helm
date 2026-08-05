@@ -69,6 +69,19 @@ def _finite_float(value: Any) -> Optional[float]:
         return None
 
 
+def _safe_label(value: Any, default: str) -> str:
+    """Return a display label; blank/NaN sentinels fall back instead of crashing."""
+    if value is None:
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return default
+    return text
+
+
 def _safe_volume(value: Any) -> int:
     """Coerce volume to a finite int; bad/missing cells become 0 (never abort the list)."""
     try:
@@ -259,7 +272,8 @@ async def get_top_movers(
                 continue
             movers.append(StockMover(
                 symbol=symbol_text,
-                name=row.get('name', symbol_text),
+                # Dirty CSV name cells (NaN/None) fail Pydantic str → 500 the card.
+                name=_safe_label(row.get('name'), symbol_text),
                 price=price,
                 change=change,
                 changePercent=change_percent,

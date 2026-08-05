@@ -103,6 +103,20 @@ def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_soft_fails_loader_oserror(mock_get_loader):
+    """Unreadable data dirs must not crash alert quote pickers."""
+    mock_get_loader.side_effect = OSError("permission denied")
+    assert prices_from_saved_daily_data() == {}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_soft_fails_loader_runtime_error(mock_get_loader):
+    """Loader boot / runtime failures must degrade to empty saved prices."""
+    mock_get_loader.side_effect = RuntimeError("data loader unavailable")
+    assert prices_from_saved_daily_data() == {}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
 def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
     """NaN/inf closes must not enter the quote map as JSON-null floats."""
     loader = MagicMock()

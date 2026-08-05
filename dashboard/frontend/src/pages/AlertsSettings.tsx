@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   BellAlertIcon,
@@ -23,6 +23,7 @@ import {
   formSnapshot,
   isSampleRule,
   loadSymbolCatalog,
+  parseFinitePrice,
   ruleTitle,
   slugify,
   webhookInputClass,
@@ -53,6 +54,8 @@ const AlertsSettings: React.FC = () => {
   const [newValue, setNewValue] = useState('150');
   const [symbolOptions, setSymbolOptions] = useState<SymbolOption[]>([]);
   const [symbolsLoading, setSymbolsLoading] = useState(true);
+  /** Bumped on unmount / superseded loadConfig so late config/status responses are ignored. */
+  const loadGenerationRef = useRef(0);
   const { symbolPrices, mergePrices, pricingPending, quotesUnavailable, apiReady, fetchPricesFor } =
     useSymbolPrices();
 
@@ -88,37 +91,54 @@ const AlertsSettings: React.FC = () => {
   }, []);
 
   const refreshStatus = useCallback(async () => {
+    const generation = loadGenerationRef.current;
     try {
       const { data } = await alertsApi.getStatus();
+      if (generation !== loadGenerationRef.current) return;
       setAlertStatus(data);
     } catch {
+      if (generation !== loadGenerationRef.current) return;
       setAlertStatus(null);
     }
   }, []);
 
   const loadConfig = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     setLoading(true);
     setError(null);
     try {
       const { data } = await alertsApi.getConfig();
+      if (generation !== loadGenerationRef.current) return;
       setExists(data.exists);
       setChannels(data.channels);
       if (data.exists) applyServerConfig(data.config, data.channels);
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return;
       if (axios.isAxiosError(err) && err.response?.status === 401) {
         setError('Sign in required to access your Helmtower settings.');
       } else {
         setError(axios.isAxiosError(err) ? err.message : 'Failed to load alerts.');
       }
     } finally {
+      if (generation !== loadGenerationRef.current) return;
       setLoading(false);
     }
   }, [applyServerConfig]);
 
   useEffect(() => {
+    let cancelled = false;
     void loadConfig();
     void refreshStatus();
-    void alertsApi.runCheck().then(() => refreshStatus()).catch(() => {});
+    void alertsApi
+      .runCheck()
+      .then(() => {
+        if (!cancelled) void refreshStatus();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      loadGenerationRef.current += 1;
+    };
   }, [loadConfig, refreshStatus]);
 
   useEffect(() => {
@@ -363,8 +383,11 @@ const AlertsSettings: React.FC = () => {
 
   const handleAddRule = async () => {
     const symbol = newSymbol.trim().toUpperCase();
-    const value = Number(newValue);
-    if (!symbol || Number.isNaN(value)) {
+    // Reject blank / NaN / ±Infinity — Inf survives Number.isNaN and would persist as
+    // null over the wire (JSON.stringify) or poison file-mode watch state. type=number
+    // inputs may sanitize Inf to "" which Number("") treats as 0.
+    const value = parseFinitePrice(newValue);
+    if (!symbol || value === null) {
       setError('Enter a valid symbol and price.');
       return;
     }

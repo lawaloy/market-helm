@@ -50,12 +50,20 @@ export function buildNotifications(
 
 export function formatPrice(value: number | string | undefined): string {
   const n = Number(value);
-  if (Number.isNaN(n)) return String(value ?? '?');
+  if (!Number.isFinite(n)) return String(value ?? '?');
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** Parse a user-entered price; blank / NaN / ±Infinity → null. */
+export function parseFinitePrice(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : null;
+}
+
 export function formatQuotePrice(value: number | undefined | null): string | null {
-  if (value == null || Number.isNaN(Number(value))) return null;
+  if (value == null || !Number.isFinite(Number(value))) return null;
   return `$${formatPrice(value)}`;
 }
 
@@ -88,7 +96,7 @@ export function priceAlertKey(condition: AlertRule['condition']): string | null 
   const symbol = condition.symbol?.trim().toUpperCase();
   const operator = condition.operator;
   const value = condition.value;
-  if (!symbol || !operator || value === undefined || Number.isNaN(Number(value))) return null;
+  if (!symbol || !operator || value === undefined || !Number.isFinite(Number(value))) return null;
   return `${symbol}|${operator}|${value}`;
 }
 
