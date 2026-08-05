@@ -47,7 +47,7 @@ class WebhookNotifier:
         payload_format = (
             alert.get("webhook_format")
             or alert.get("payload_format")
-            or os.environ.get("ALERT_WEBHOOK_FORMAT")
+            or (os.environ.get("ALERT_WEBHOOK_FORMAT") if allow_env_webhook else None)
             or "json"
         )
         return cls(url=str(url).strip(), payload_format=str(payload_format).strip().lower())
