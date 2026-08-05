@@ -33,7 +33,7 @@ from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
 from src.utils.tickers import normalize_ticker
-from src.storage.alert_watches import InvalidAlertWatchConfig
+from src.storage.alert_watches import InvalidAlertWatchConfig, validate_watches_config
 
 router = APIRouter()
 
@@ -162,16 +162,34 @@ def _public_config(config: Dict[str, Any]) -> Dict[str, Any]:
     return strip_webhook_secrets_from_config(config)
 
 
+def _reject_env_control_chars(label: str, value: str) -> str:
+    """Strip is not enough — CR/LF in webhook secrets would inject .env lines."""
+    cleaned = value.strip()
+    if any(ch in cleaned for ch in ("\r", "\n", "\0")):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{label} contains invalid control characters.",
+        )
+    return cleaned
+
+
 def _persist_webhook_secret(defaults: Optional[AlertDefaults]) -> None:
     if defaults is None:
         return
     updates: Dict[str, str] = {}
     if defaults.webhook_url and defaults.webhook_url.strip():
-        updates["DISCORD_WEBHOOK_URL"] = defaults.webhook_url.strip()
+        updates["DISCORD_WEBHOOK_URL"] = _reject_env_control_chars(
+            "Webhook URL", defaults.webhook_url
+        )
     if defaults.webhook_format and defaults.webhook_format.strip():
-        updates["ALERT_WEBHOOK_FORMAT"] = defaults.webhook_format.strip().lower()
+        updates["ALERT_WEBHOOK_FORMAT"] = _reject_env_control_chars(
+            "Webhook format", defaults.webhook_format
+        ).lower()
     if updates:
-        update_user_env_vars(updates)
+        try:
+            update_user_env_vars(updates)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 def _load_raw_config(user_id: Optional[str]) -> tuple[bool, Optional[Dict[str, Any]]]:
@@ -195,6 +213,13 @@ def _save_raw_config(user_id: Optional[str], config: Dict[str, Any]) -> None:
         except InvalidAlertWatchConfig as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return
+    # File mode previously skipped watch validation — negative / huge cooldown
+    # (and other InvalidAlertWatchConfig rules) could persist and fire every tick
+    # or OverflowError the evaluator. Reuse the same coerce path as hosted.
+    try:
+        validate_watches_config("file-mode", config)
+    except InvalidAlertWatchConfig as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     save_alerts_config(config)
 
 
@@ -257,6 +282,25 @@ async def put_alerts_config(
             )
         seen_ids.add(alert_id)
         alert["id"] = alert_id
+        condition = alert.get("condition") or {}
+        if isinstance(condition, dict) and condition.get("type") == "price_threshold":
+            # File mode never hits InvalidAlertWatchConfig; reject blank/sentinel
+            # symbols and missing operators here so both modes fail closed.
+            symbol = normalize_ticker(condition.get("symbol"))
+            if not symbol:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Alert '{alert_id}' must have a valid symbol.",
+                )
+            condition["symbol"] = symbol
+            raw_operator = condition.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Alert '{alert_id}' must have an operator.",
+                )
+            condition["operator"] = str(raw_operator).strip()
+            alert["condition"] = condition
     _save_raw_config(user_id, config)
     status_source = config
     if database_enabled() and user_id:
@@ -316,9 +360,16 @@ async def alerts_health() -> Dict[str, bool]:
 
 
 @router.get("/symbols")
-async def get_alert_symbol_catalog():
-    """Searchable company list for alert setup (major US indices + tracked symbols)."""
+async def get_alert_symbol_catalog(
+    _user_id: Optional[str] = Depends(require_user_id),
+):
+    """Searchable company list for alert setup (major US indices + tracked symbols).
+
+    Hosted mode requires auth so anonymous clients cannot scrape the catalog /
+    tracked-symbol metadata. File mode (``require_user_id`` → ``None``) stays open.
+    """
     symbols, names = build_symbol_catalog()
+
     tracked: List[str] = []
     saved_prices = prices_from_saved_daily_data()
     try:

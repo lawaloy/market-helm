@@ -63,6 +63,70 @@ class TestCoreLogger(unittest.TestCase):
         self.assertTrue((log_dir / f"market_helm_errors_{today}.log").exists())
         self.assertIn("old main", (log_dir / f"market_helm_{today}.log").read_text(encoding="utf-8"))
 
+    def test_skips_legacy_rename_when_destination_already_exists(self):
+        """Existing market_helm_*.log must not be overwritten by legacy rename."""
+        from datetime import datetime
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_dir = Path(self.test_log_dir)
+        legacy = log_dir / f"stock_tracker_{today}.log"
+        dest = log_dir / f"market_helm_{today}.log"
+        legacy.write_text("legacy only\n", encoding="utf-8")
+        dest.write_text("already migrated\n", encoding="utf-8")
+
+        logger = setup_logger(log_dir=self.test_log_dir)
+
+        self.assertTrue(legacy.exists())
+        self.assertEqual(dest.read_text(encoding="utf-8"), "already migrated\n")
+        self.assertIsInstance(logger, logging.Logger)
+
+    def test_soft_fails_when_legacy_rename_raises_oserror(self):
+        """Boot must still return a usable logger if legacy rename races."""
+        from datetime import datetime
+        from unittest.mock import patch
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        log_dir = Path(self.test_log_dir)
+        legacy = log_dir / f"stock_tracker_{today}.log"
+        legacy.write_text("legacy\n", encoding="utf-8")
+
+        with patch.object(Path, "rename", side_effect=OSError("busy")):
+            logger = setup_logger(name="logger_rename_soft_fail", log_dir=self.test_log_dir)
+
+        self.assertIsInstance(logger, logging.Logger)
+        self.assertGreaterEqual(len(logger.handlers), 3)
+        self.assertTrue(legacy.exists())
+
+    def test_soft_fails_when_log_dir_mkdir_raises_oserror(self):
+        """Unwritable log dir must not abort imports that call setup_logger."""
+        from unittest.mock import patch
+
+        with patch.object(Path, "mkdir", side_effect=OSError("read-only")):
+            logger = setup_logger(
+                name="logger_mkdir_soft_fail", log_dir="/unwritable/logs"
+            )
+
+        self.assertIsInstance(logger, logging.Logger)
+        self.assertEqual(len(logger.handlers), 1)
+        self.assertIsInstance(logger.handlers[0], logging.StreamHandler)
+        logger.info("console-only still works")
+
+    def test_soft_fails_when_file_handler_raises_oserror(self):
+        """Disk-full / permissioned FileHandler must keep console logging."""
+        from unittest.mock import patch
+
+        with patch(
+            "src.core.logger.logging.FileHandler",
+            side_effect=OSError("disk full"),
+        ):
+            logger = setup_logger(
+                name="logger_filehandler_soft_fail", log_dir=self.test_log_dir
+            )
+
+        self.assertIsInstance(logger, logging.Logger)
+        self.assertEqual(len(logger.handlers), 1)
+        self.assertIsInstance(logger.handlers[0], logging.StreamHandler)
+
 
 if __name__ == '__main__':
     unittest.main()

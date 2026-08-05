@@ -9,19 +9,26 @@ from pydantic import BaseModel, Field
 
 from src.storage.database import database_enabled, init_database
 from src.storage.session import AuthError, create_access_token, ensure_auth_secret
-from src.storage.users import UserError, authenticate_user, create_user, get_user_by_id
+from src.storage.users import (
+    MAX_EMAIL_LENGTH,
+    MAX_PASSWORD_LENGTH,
+    UserError,
+    authenticate_user,
+    create_user,
+    get_user_by_id,
+)
 
 router = APIRouter()
 
 
 class RegisterRequest(BaseModel):
-    email: str = Field(..., min_length=3)
-    password: str = Field(..., min_length=8)
+    email: str = Field(..., min_length=3, max_length=MAX_EMAIL_LENGTH)
+    password: str = Field(..., min_length=8, max_length=MAX_PASSWORD_LENGTH)
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=MAX_EMAIL_LENGTH)
+    password: str = Field(..., max_length=MAX_PASSWORD_LENGTH)
 
 
 class AuthResponse(BaseModel):

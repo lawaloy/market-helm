@@ -119,26 +119,49 @@ class AISummarizer:
             top_gainers = analysis.get("top_gainers", [])[:3]  # Top 3
             top_losers = analysis.get("top_losers", [])[:3]  # Top 3
             
+            # Coerce non-finite rollups so prompt formatting cannot throw into
+            # the bare except and return None when OPENAI_API_KEY is set.
+            avg_change = _finite_float(summary_data.get("average_change_percent"))
             # Build prompt
             prompt = f"""Write a brief, professional market summary (2-3 sentences) based on this stock market data:
 
 Date: {analysis.get('date', 'Today')}
 Total Stocks: {summary_data.get('total_stocks', 0)}
 Gainers: {summary_data.get('gainers', 0)}, Losers: {summary_data.get('losers', 0)}
-Average Change: {summary_data.get('average_change_percent', 0):.2f}%
+Average Change: {avg_change:.2f}%
 
 Top Gainers:
 """
             for stock in top_gainers:
-                prompt += f"- {stock['symbol']} ({stock.get('name', 'N/A')}): +{stock['change_percent']:.2f}%\n"
+                if not isinstance(stock, dict):
+                    continue
+                change = _finite_float(stock.get("change_percent"))
+                prompt += (
+                    f"- {stock.get('symbol', 'N/A')} "
+                    f"({stock.get('name', 'N/A')}): +{change:.2f}%\n"
+                )
             
             prompt += "\nTop Losers:\n"
             for stock in top_losers:
-                prompt += f"- {stock['symbol']} ({stock.get('name', 'N/A')}): {stock['change_percent']:.2f}%\n"
+                if not isinstance(stock, dict):
+                    continue
+                change = _finite_float(stock.get("change_percent"))
+                prompt += (
+                    f"- {stock.get('symbol', 'N/A')} "
+                    f"({stock.get('name', 'N/A')}): {change:.2f}%\n"
+                )
             
             prompt += "\nExchange Performance:\n"
             for exchange, stats in list(exchange_comparison.items())[:3]:
-                prompt += f"- {exchange}: Avg {stats['average_change_percent']:.2f}% ({stats['gainers']} gainers, {stats['losers']} losers)\n"
+                if not isinstance(stats, dict):
+                    continue
+                exchange_avg = _finite_float(stats.get("average_change_percent"))
+                gainers = stats.get("gainers", 0)
+                losers = stats.get("losers", 0)
+                prompt += (
+                    f"- {exchange}: Avg {exchange_avg:.2f}% "
+                    f"({gainers} gainers, {losers} losers)\n"
+                )
             
             prompt += "\nWrite a concise, informative summary in a professional tone."
             

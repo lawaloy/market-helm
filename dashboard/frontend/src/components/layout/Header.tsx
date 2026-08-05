@@ -19,10 +19,13 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  /** Bumped on cancel / new fetch so in-flight status responses cannot finish after leave. */
+  const pollGenerationRef = useRef(0);
   const lastMessageRef = useRef<string>('');
 
   useEffect(() => {
     return () => {
+      pollGenerationRef.current += 1;
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -47,6 +50,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   };
 
   const handleFullRefresh = async () => {
+    const generation = ++pollGenerationRef.current;
     setIsRefreshing(true);
     updateMessage('Reloading latest saved data...');
     onQuickRefresh?.();
@@ -54,6 +58,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
     try {
       // Trigger refresh
       const response = await api.post('/api/refresh');
+      if (generation !== pollGenerationRef.current) return;
       updateMessage(response.data.message);
 
       const pollMs = 2000;
@@ -70,15 +75,22 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
       // Poll for status
       pollIntervalRef.current = setInterval(async () => {
         try {
+          if (generation !== pollGenerationRef.current) {
+            finishPolling();
+            return;
+          }
           if (Date.now() - pollStarted > maxWaitMs) {
             finishPolling();
             setIsRefreshing(false);
             updateMessage('Refresh is taking too long. Check server logs or try Cancel.');
-            setTimeout(() => updateMessage(''), 8000);
+            setTimeout(() => {
+              if (generation === pollGenerationRef.current) updateMessage('');
+            }, 8000);
             return;
           }
 
           const statusRes = await api.get('/api/refresh/status');
+          if (generation !== pollGenerationRef.current) return;
           const status = statusRes.data;
 
           if (status.progress) {
@@ -92,6 +104,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
             if (status.last_status === 'success') {
               updateMessage('Data refreshed successfully!');
               setTimeout(() => {
+                if (generation !== pollGenerationRef.current) return;
                 updateMessage('');
                 onRefreshComplete?.();
               }, 2000);
@@ -99,7 +112,9 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
               updateMessage('');
             } else {
               updateMessage('Refresh failed. Please try again.');
-              setTimeout(() => updateMessage(''), 5000);
+              setTimeout(() => {
+                if (generation === pollGenerationRef.current) updateMessage('');
+              }, 5000);
             }
           }
         } catch (err) {
@@ -109,27 +124,39 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
 
     } catch (error) {
       console.error('Refresh error:', error);
+      if (generation !== pollGenerationRef.current) return;
       updateMessage('Failed to start refresh');
       setIsRefreshing(false);
-      setTimeout(() => updateMessage(''), 5000);
+      setTimeout(() => {
+        if (generation === pollGenerationRef.current) updateMessage('');
+      }, 5000);
     }
   };
 
   const handleCancelRefresh = async () => {
+    // Invalidate any in-flight /api/refresh/status before awaiting cancel so a late
+    // success cannot call onRefreshComplete after the user cancelled.
+    const generation = ++pollGenerationRef.current;
     updateMessage('Cancelling refresh...');
     try {
       await api.post('/api/refresh/cancel');
+      if (generation !== pollGenerationRef.current) return;
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
       setIsRefreshing(false);
       updateMessage('Refresh cancelled.');
-      setTimeout(() => updateMessage(''), 3000);
+      setTimeout(() => {
+        if (generation === pollGenerationRef.current) updateMessage('');
+      }, 3000);
     } catch (error) {
+      if (generation !== pollGenerationRef.current) return;
       console.error('Cancel refresh error:', error);
       updateMessage('Failed to cancel refresh.');
-      setTimeout(() => updateMessage(''), 5000);
+      setTimeout(() => {
+        if (generation === pollGenerationRef.current) updateMessage('');
+      }, 5000);
     }
   };
 

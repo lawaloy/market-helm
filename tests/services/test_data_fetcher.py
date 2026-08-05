@@ -247,6 +247,39 @@ def test_fetch_all_indices_screens_when_more_than_20_symbols(
     assert [row["symbol"] for row in result["S&P 500"]] == ["S0", "S1"]
     assert all(row["index_name"] == "S&P 500" for row in result["S&P 500"])
 
+
+@patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
+@patch("src.services.data_fetcher.IndexFetcher")
+@patch("src.services.stock_screener.StockScreener")
+def test_fetch_all_indices_falls_back_when_screener_raises(
+    mock_screener_cls, mock_index_fetcher_cls, _mock_indices, monkeypatch
+):
+    """Screener boom must not abort the index; keep capped unscreened symbols."""
+    symbols = [f"S{i}" for i in range(25)]
+    index_fetcher = MagicMock()
+    index_fetcher.get_index_symbols.return_value = symbols
+    mock_index_fetcher_cls.return_value = index_fetcher
+
+    screener = MagicMock()
+    screener.get_qualified_symbols.side_effect = RuntimeError("screener API down")
+    mock_screener_cls.return_value = screener
+
+    fetched: list[str] = []
+    fetcher = StockDataFetcher(api_client=MagicMock(), include_profile=False)
+
+    def fake_fetch(symbol: str, **_kwargs):
+        fetched.append(symbol)
+        return {"symbol": symbol, "close": 1.0}
+
+    monkeypatch.setattr(fetcher, "fetch_symbol_data", fake_fetch)
+    monkeypatch.setenv("STOCK_FETCH_MAX_WORKERS", "1")
+    monkeypatch.setattr("src.services.data_fetcher.time.sleep", lambda _seconds: None)
+
+    result = fetcher.fetch_all_indices(use_screener=True, max_symbols_per_index=5)
+
+    assert fetched == ["S0", "S1", "S2", "S3", "S4"]
+    assert [row["symbol"] for row in result["S&P 500"]] == fetched
+
 @patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
 @patch("src.services.data_fetcher.IndexFetcher")
 @patch("src.services.stock_screener.StockScreener")

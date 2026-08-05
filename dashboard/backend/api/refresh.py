@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Hard ceilings so a poisoned REFRESH_* env cannot monopolize Finnhub/CPU
+# or hold the global refresh lock indefinitely.
+MAX_REFRESH_TOP_N = 500
+MAX_REFRESH_TIMEOUT_SECONDS = 3600
+MAX_REFRESH_WORKERS = 4
+DEFAULT_REFRESH_TOP_N = 10
+DEFAULT_REFRESH_TIMEOUT_SECONDS = 600
+DEFAULT_REFRESH_WORKERS = 4
+
 # Track refresh status
 refresh_status = {
     "is_running": False,
@@ -28,11 +37,88 @@ refresh_status = {
 
 _refresh_process: subprocess.Popen | None = None
 _refresh_cancel_event = threading.Event()
+# Serializes the already-running check + flag set + thread spawn so two
+# overlapping POSTs cannot each start a Finnhub-burning child.
+_refresh_start_lock = threading.Lock()
+
+
+def _resolve_refresh_top_n() -> int:
+    """Parse REFRESH_TOP_N with lower floor (when >0) and hard upper ceiling.
+
+    ``0`` remains the explicit unlimited opt-in. Negative / unparseable values
+    must not collapse into unlimited via ``max(0, n)`` — that silently drops
+    ``--top-n`` and fans out across the full index.
+    """
+    top_n_value = os.getenv("REFRESH_TOP_N", str(DEFAULT_REFRESH_TOP_N))
+    try:
+        top_n = int(top_n_value)
+    except (TypeError, ValueError):
+        top_n = DEFAULT_REFRESH_TOP_N
+    if top_n < 0:
+        top_n = DEFAULT_REFRESH_TOP_N
+    elif top_n > 0:
+        top_n = max(DEFAULT_REFRESH_TOP_N, top_n)  # At least 10 stocks when using limit
+    return min(MAX_REFRESH_TOP_N, top_n)
+
+
+def _resolve_refresh_timeout_seconds() -> int:
+    """Parse REFRESH_TIMEOUT_SECONDS with min 1s and hard upper ceiling."""
+    timeout_raw = os.getenv("REFRESH_TIMEOUT_SECONDS", str(DEFAULT_REFRESH_TIMEOUT_SECONDS))
+    try:
+        max_seconds = max(1, int(timeout_raw))
+    except (TypeError, ValueError):
+        max_seconds = DEFAULT_REFRESH_TIMEOUT_SECONDS
+    return min(MAX_REFRESH_TIMEOUT_SECONDS, max_seconds)
+
+
+def _resolve_refresh_max_workers() -> int:
+    """Parse REFRESH_MAX_WORKERS clamped to data_fetcher's 1..4 worker band."""
+    raw = os.getenv("REFRESH_MAX_WORKERS", str(DEFAULT_REFRESH_WORKERS))
+    try:
+        workers = int(raw)
+    except (TypeError, ValueError):
+        workers = DEFAULT_REFRESH_WORKERS
+    return max(1, min(MAX_REFRESH_WORKERS, workers))
+
+
+def _finnhub_key_from_dotenv(project_root: Path) -> str | None:
+    """Return a non-empty FINNHUB_API_KEY from project .env, if present.
+
+    Presence of an unrelated/empty ``.env`` must not count as credentials —
+    that false-starts refresh, holds the global lock, then fails in the child.
+    """
+    env_path = project_root / ".env"
+    if not env_path.is_file():
+        return None
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].strip()
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        if key.strip() != "FINNHUB_API_KEY":
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        value = value.strip()
+        return value or None
+    return None
 
 
 def _has_refresh_credentials(project_root: Path) -> bool:
-    """True when Finnhub can be configured via env var or a project .env file."""
-    return bool(os.getenv("FINNHUB_API_KEY")) or (project_root / ".env").exists()
+    """True when a non-empty Finnhub key is available via env or project .env."""
+    env_key = (os.getenv("FINNHUB_API_KEY") or "").strip()
+    if env_key:
+        return True
+    return bool(_finnhub_key_from_dotenv(project_root))
 
 
 class RefreshResponse(BaseModel):
@@ -66,17 +152,10 @@ def run_daily_tracker():
         else:
             command = [sys.executable, "-m", "src.cli.commands"]
 
-        # Run market-helm (default to top 10 for faster refresh, minimum 10)
-        top_n_value = os.getenv("REFRESH_TOP_N", "10")
-        try:
-            top_n = max(0, int(top_n_value))
-        except ValueError:
-            top_n = 10
-        if top_n > 0:
-            top_n = max(10, top_n)  # At least 10 stocks when using limit
+        # Run market-helm (default to top 10 for faster refresh; hard-capped).
+        top_n = _resolve_refresh_top_n()
         if top_n:
             command.extend(["--top-n", str(top_n)])
-
 
         no_screener = os.getenv("REFRESH_NO_SCREENER", "1").lower() in {"1", "true", "yes"}
         if no_screener:
@@ -85,15 +164,11 @@ def run_daily_tracker():
         refresh_status["progress"] = "Refreshing..."
 
         env = os.environ.copy()
-        env["STOCK_FETCH_MAX_WORKERS"] = os.getenv("REFRESH_MAX_WORKERS", "4")
+        env["STOCK_FETCH_MAX_WORKERS"] = str(_resolve_refresh_max_workers())
 
         # Parse timeout before spawn so a bad env var cannot orphan a running child
         # (ValueError used to trip the outer except after Popen and clear _refresh_process).
-        timeout_raw = os.getenv("REFRESH_TIMEOUT_SECONDS", "600")
-        try:
-            max_seconds = max(1, int(timeout_raw))
-        except (TypeError, ValueError):
-            max_seconds = 600
+        max_seconds = _resolve_refresh_timeout_seconds()
 
         # Do not use PIPE for stdout/stderr: the tracker logs heavily to the console.
         # Unread PIPE buffers deadlock the child once full (parent only drains in communicate()).
@@ -183,33 +258,36 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
     4. Save updated CSV/JSON files
     5. Dashboard will automatically show new data
     """
-    if refresh_status["is_running"]:
-        return RefreshResponse(
-            status="already_running",
-            message="Data refresh is already in progress. Please wait.",
-            last_refresh=refresh_status.get("last_refresh"),
-            is_running=True
-        )
-
     project_root = Path(__file__).parent.parent.parent.parent
-    if not _has_refresh_credentials(project_root):
-        refresh_status["last_status"] = "error"
-        refresh_status["progress"] = "Refresh failed. Please check your API key configuration."
-        return RefreshResponse(
-            status="error",
-            message="Refresh failed. Please check your API key configuration.",
-            last_refresh=refresh_status.get("last_refresh"),
-            is_running=False
-        )
+    with _refresh_start_lock:
+        if refresh_status["is_running"]:
+            return RefreshResponse(
+                status="already_running",
+                message="Data refresh is already in progress. Please wait.",
+                last_refresh=refresh_status.get("last_refresh"),
+                is_running=True
+            )
 
-    refresh_status["last_status"] = "running"
-    refresh_status["progress"] = "Starting market-helm..."
-    refresh_status["is_running"] = True
+        if not _has_refresh_credentials(project_root):
+            refresh_status["last_status"] = "error"
+            refresh_status["progress"] = (
+                "Refresh failed. Please check your API key configuration."
+            )
+            return RefreshResponse(
+                status="error",
+                message="Refresh failed. Please check your API key configuration.",
+                last_refresh=refresh_status.get("last_refresh"),
+                is_running=False
+            )
 
-    # Start refresh in background
-    thread = threading.Thread(target=run_daily_tracker, daemon=True)
-    thread.start()
-    
+        refresh_status["last_status"] = "running"
+        refresh_status["progress"] = "Starting market-helm..."
+        refresh_status["is_running"] = True
+
+        # Start refresh in background
+        thread = threading.Thread(target=run_daily_tracker, daemon=True)
+        thread.start()
+
     return RefreshResponse(
         status="started",
         message="Latest data will load when ready.",
@@ -218,9 +296,17 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
     )
 
 
-@router.get("/refresh/status", response_model=RefreshStatusResponse)
+@router.get(
+    "/refresh/status",
+    response_model=RefreshStatusResponse,
+    dependencies=[Depends(require_user_id)],
+)
 async def get_refresh_status():
-    """Get the current status of data refresh"""
+    """Get the current status of data refresh.
+
+    Hosted mode requires auth so anonymous clients cannot observe global refresh
+    progress. File mode (``require_user_id`` → ``None``) stays open.
+    """
     if not refresh_status.get("is_running") and not refresh_status.get("last_status"):
         refresh_status["last_status"] = "idle"
         refresh_status["progress"] = "Idle."
@@ -253,8 +339,9 @@ async def cancel_refresh():
         except subprocess.TimeoutExpired:
             _refresh_process.kill()
 
-    refresh_status["is_running"] = False
-
+    # Leave is_running True until run_daily_tracker's finally clears it.
+    # Clearing here opens a window where POST /refresh can spawn a second
+    # Finnhub-burning child while the cancelled worker is still tearing down.
     return RefreshStatusResponse(
         is_running=refresh_status["is_running"],
         last_refresh=refresh_status.get("last_refresh"),
