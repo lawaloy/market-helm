@@ -23,6 +23,9 @@ load_dotenv()
 
 logger = setup_logger("api_client")
 
+# Cap Finnhub Retry-After so a huge/poisoned header cannot stall workers for days.
+MAX_RETRY_AFTER_SECONDS = 300
+
 
 def _finite_number(value: Any, default: Optional[float] = 0.0) -> Optional[float]:
     """Coerce to a finite float; non-numeric / NaN / Inf → default (or None)."""
@@ -72,8 +75,10 @@ class RateLimiter:
         
         try:
             now = time.time()
-            # Enforce rolling budget
-            while self.call_times and now - self.call_times[0] > self.budget_window_sec:
+            # Enforce rolling budget. Use >= so an exact window-aged entry is
+            # dropped after sleep(wait_budget); `>` left it in and allowed
+            # budget_max_calls + 1 recorded calls.
+            while self.call_times and now - self.call_times[0] >= self.budget_window_sec:
                 self.call_times.popleft()
             if len(self.call_times) >= self.budget_max_calls:
                 wait_budget = self.budget_window_sec - (now - self.call_times[0])
@@ -81,7 +86,7 @@ class RateLimiter:
                     time.sleep(wait_budget)
                 # After sleeping, purge again
                 now = time.time()
-                while self.call_times and now - self.call_times[0] > self.budget_window_sec:
+                while self.call_times and now - self.call_times[0] >= self.budget_window_sec:
                     self.call_times.popleft()
             
             current_time = time.time()
@@ -192,11 +197,13 @@ class FinnhubClient:
                     raw_retry_after = response.headers.get('Retry-After', 60)
                     try:
                         retry_after = int(raw_retry_after)
-                    except (TypeError, ValueError):
+                    except (TypeError, ValueError, OverflowError):
                         # HTTP-date or garbage headers must not abort the fetch path.
                         retry_after = 60
                     if retry_after < 0:
                         retry_after = 60
+                    if retry_after > MAX_RETRY_AFTER_SECONDS:
+                        retry_after = MAX_RETRY_AFTER_SECONDS
                     if attempt < max_retries - 1:
                         logger.warning(f"Rate limit exceeded (429). Waiting {retry_after} seconds...")
                         time.sleep(retry_after)

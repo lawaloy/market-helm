@@ -14,6 +14,7 @@ from .alert_rules import evaluate_price_threshold, evaluate_screening_match
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
+from src.utils.company_names import _clean_display_name
 from src.utils.tickers import normalize_ticker
 
 logger = setup_logger("alerts")
@@ -59,11 +60,17 @@ class AlertEngine:
         alerts = config.get("alerts", [])
         if not isinstance(alerts, list):
             return None
-        enabled = [
-            alert
-            for alert in alerts
-            if isinstance(alert, dict) and alert.get("enabled", False)
-        ]
+        enabled = []
+        for alert in alerts:
+            if not isinstance(alert, dict) or not alert.get("enabled", False):
+                continue
+            # Hand-edited configs may omit id; drop them at load so evaluate
+            # never KeyError mid-run and abort sibling watches.
+            alert_id = alert.get("id")
+            if not isinstance(alert_id, str) or not alert_id.strip():
+                logger.warning("Skipping enabled alert with missing/blank id")
+                continue
+            enabled.append(alert)
         if not enabled:
             return None
         return AlertEngine(enabled, storage=storage, defaults=defaults)
@@ -121,7 +128,16 @@ class AlertEngine:
         if not delivered:
             return False
 
-        self.storage.record_event(event)
+        # Notifiers already succeeded — a history write failure must not raise
+        # and cause job retries / duplicate sends, or abort sibling watches.
+        try:
+            self.storage.record_event(event)
+        except Exception as exc:
+            logger.warning(
+                "Alert %s delivered but event history write failed: %s",
+                alert.get("id"),
+                exc,
+            )
         return True
 
     def _within_cooldown(self, alert: Dict) -> bool:
@@ -145,7 +161,16 @@ class AlertEngine:
             if last_triggered.tzinfo
             else datetime.utcnow()
         )
-        return now - last_triggered < timedelta(minutes=cooldown_minutes)
+        try:
+            window = timedelta(minutes=cooldown_minutes)
+        except OverflowError:
+            # Huge finite cooldown (e.g. 1e15) must not abort sibling watches.
+            logger.warning(
+                "Overflow cooldown_minutes on alert %s; treating as in cooldown",
+                alert.get("id"),
+            )
+            return True
+        return now - last_triggered < window
 
     def _build_notifiers(self, alert: Dict) -> List[Any]:
         alert = apply_alert_defaults(alert, self.defaults)
@@ -181,7 +206,19 @@ class AlertEngine:
 
     def evaluate(self, stocks: List[Dict]) -> List[Dict]:
         events: List[Dict] = []
+        # Hand-edited / corrupt runners can pass None/dict; iterating must not
+        # TypeError and abort the entire alert check cycle.
+        if not isinstance(stocks, list):
+            logger.warning("Alert evaluate received non-list stocks; skipping")
+            return events
         for alert in self.alerts:
+            alert_id = alert.get("id")
+            if not isinstance(alert_id, str) or not alert_id.strip():
+                # Direct construction / stale in-memory configs can still lack
+                # id; skip so a KeyError cannot abort later watches.
+                logger.warning("Alert missing id; skipping")
+                continue
+
             if self._within_cooldown(alert):
                 continue
 
@@ -189,7 +226,7 @@ class AlertEngine:
             if not isinstance(condition, dict):
                 logger.warning(
                     "Alert %s has non-object condition; skipping",
-                    alert.get("id"),
+                    alert_id,
                 )
                 continue
             condition_type = condition.get("type")
@@ -227,9 +264,11 @@ class AlertEngine:
             if not triggered_symbols:
                 continue
 
+            # Float NaN names stringify to "nan" and leak into email/webhook copy.
+            alert_name = _clean_display_name(alert.get("name")) or alert_id
             event = {
-                "alert_id": alert["id"],
-                "alert_name": alert.get("name", alert["id"]),
+                "alert_id": alert_id,
+                "alert_name": alert_name,
                 "symbols": triggered_symbols,
                 "timestamp": datetime.utcnow().isoformat(),
                 "condition_type": condition_type,
@@ -239,7 +278,7 @@ class AlertEngine:
                 logger.warning(
                     "Alert %s matched but no notifications were delivered; "
                     "leaving it eligible for retry.",
-                    alert["id"],
+                    alert_id,
                 )
                 continue
 

@@ -104,6 +104,14 @@ def resolve_database_path() -> Path:
             f"Only sqlite URLs are supported today (got {parsed.scheme!r}). "
             "Use sqlite:////absolute/path/to/markethelm.db"
         )
+    # sqlite://host/path silently ignored host before and wrote a local file —
+    # fail closed so misconfigured hosted URLs cannot point at the wrong DB.
+    if parsed.netloc:
+        raise ValueError(
+            f"SQLite URL must be a local file path without a host "
+            f"(got netloc {parsed.netloc!r}). "
+            "Use sqlite:////absolute/path/to/markethelm.db"
+        )
     if parsed.path:
         # sqlite:///C:/path or sqlite:////var/lib/db
         path = parsed.path
@@ -116,7 +124,15 @@ def resolve_database_path() -> Path:
 @contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
     path = resolve_database_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # Unwritable / blocked parents must surface as a clear RuntimeError so
+        # multi-user auth/alerts paths fail closed with an actionable message
+        # instead of an opaque PermissionError from pathlib.
+        raise RuntimeError(
+            f"Cannot create database directory {path.parent}: {exc}"
+        ) from exc
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

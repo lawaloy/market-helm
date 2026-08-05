@@ -29,6 +29,17 @@ class TestEvaluatePriceThreshold:
             {"close": 50},
         )
 
+    def test_unsupported_operator_does_not_match(self):
+        """Hand-edited operators must soft-fail instead of raising into AlertEngine."""
+        assert not evaluate_price_threshold(
+            {"operator": "below", "value": 100},
+            {"close": 50},
+        )
+        assert not evaluate_price_threshold(
+            {"operator": ">", "value": 100},
+            {"close": 150},
+        )
+
 
 class TestEvaluateScreeningMatch:
     def test_finite_filters_match(self):

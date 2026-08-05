@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List
 
@@ -43,12 +44,19 @@ def run_orchestrator_tick() -> Dict[str, Any]:
         price = prices.get(symbol)
         if price is None:
             continue
+        # Processor soft-skips Inf/NaN later — avoid enqueueing doomed jobs.
+        try:
+            price_f = float(price)
+        except (TypeError, ValueError):
+            continue
+        if not math.isfinite(price_f):
+            continue
         payloads.append(
             {
                 "tick_id": tick_id,
                 "dedupe_key": dedupe_key,
                 "symbol": symbol,
-                "price": price,
+                "price": price_f,
                 "last_data_date": last_date,
             }
         )

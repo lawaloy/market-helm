@@ -43,7 +43,7 @@ class TestAlertJobs:
     def test_complete_job(self, db):
         job_id = enqueue_job(JOB_DELIVER, {"user_id": "u1", "alert_id": "a1"})
         claim_jobs([JOB_DELIVER], "worker-b")
-        complete_job(job_id)
+        assert complete_job(job_id, worker_id="worker-b") is True
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status FROM alert_jobs WHERE id = ?",
@@ -58,7 +58,7 @@ class TestAlertJobs:
             max_attempts=2,
         )
         claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
-        fail_job(job_id, "transient error", retry_delay_seconds=0)
+        assert fail_job(job_id, "transient error", worker_id="worker-c", retry_delay_seconds=0) is True
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status, attempts FROM alert_jobs WHERE id = ?",
@@ -68,7 +68,7 @@ class TestAlertJobs:
         assert row["attempts"] == 1
 
         claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
-        fail_job(job_id, "permanent error", retry_delay_seconds=0)
+        assert fail_job(job_id, "permanent error", worker_id="worker-c", retry_delay_seconds=0) is True
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status FROM alert_jobs WHERE id = ?",
@@ -77,7 +77,7 @@ class TestAlertJobs:
         assert row["status"] == STATUS_FAILED
 
     def test_fail_job_missing_id_is_noop(self, db):
-        fail_job(99999, "gone")
+        assert fail_job(99999, "gone", worker_id="worker-x") is False
 
     def test_fail_job_truncates_error_to_500_chars(self, db):
         job_id = enqueue_job(
@@ -86,7 +86,7 @@ class TestAlertJobs:
             max_attempts=1,
         )
         claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
-        fail_job(job_id, "e" * 600, retry_delay_seconds=0)
+        assert fail_job(job_id, "e" * 600, worker_id="worker-c", retry_delay_seconds=0) is True
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status, last_error FROM alert_jobs WHERE id = ?",
@@ -160,7 +160,7 @@ class TestAlertJobs:
         )
         assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c") != []
 
-        fail_job(job_id, "transient error", retry_delay_seconds=3600)
+        fail_job(job_id, "transient error", worker_id="worker-c", retry_delay_seconds=3600)
 
         assert pending_job_count([JOB_EVALUATE_SYMBOL]) == 0
         assert claim_jobs([JOB_EVALUATE_SYMBOL], "worker-d") == []

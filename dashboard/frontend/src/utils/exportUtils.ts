@@ -3,9 +3,22 @@
  */
 import type { Opportunity } from '../types';
 
-/** Escape CSV cell (handle commas, quotes) */
-function escapeCsvCell(value: string | number): string {
-  const str = String(value);
+/** True for plain numeric cells (incl. negatives from toFixed). */
+function isPlainNumberCell(str: string): boolean {
+  return /^-?\d+(\.\d+)?$/.test(str);
+}
+
+/**
+ * Escape a CSV cell: neutralize spreadsheet formula prefixes, then quote
+ * commas/quotes/newlines. Exported for unit tests.
+ */
+export function escapeCsvCell(value: string | number): string {
+  let str = String(value);
+  // Formula / command injection when opened in Excel/Sheets/LibreOffice.
+  // Keep plain numeric strings (e.g. expectedChange "-1.23") untouched.
+  if (/^[=+\-@\t\r]/.test(str) && !isPlainNumberCell(str)) {
+    str = `'${str}`;
+  }
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -14,7 +27,17 @@ function escapeCsvCell(value: string | number): string {
 
 /** Export opportunities/stocks to CSV */
 export function exportToCsv(stocks: Opportunity[], filename?: string): void {
-  const headers = ['Symbol', 'Name', 'Price', 'Target', 'Expected %', 'Confidence', 'Risk', 'Trend'];
+  const headers = [
+    'Symbol',
+    'Name',
+    'Price',
+    'Target',
+    'Expected %',
+    'Confidence',
+    'Risk',
+    'Recommendation',
+    'Trend',
+  ];
   const rows = stocks.map((s) => [
     s.symbol,
     s.name || s.symbol,
@@ -23,6 +46,7 @@ export function exportToCsv(stocks: Opportunity[], filename?: string): void {
     s.expectedChange.toFixed(2),
     `${s.confidence}%`,
     s.risk,
+    s.recommendation,
     s.trend,
   ]);
   const csvContent = [

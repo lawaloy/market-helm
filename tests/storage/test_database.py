@@ -63,6 +63,23 @@ class TestResolveDatabasePath:
         with pytest.raises(ValueError, match="Invalid SQLite URL"):
             resolve_database_path()
 
+    def test_sqlite_url_with_host_rejected(self, monkeypatch):
+        """Hosted-looking sqlite://host/path must not silently become a local file."""
+        monkeypatch.setenv(
+            "MARKET_HELM_DATABASE_URL",
+            "sqlite://evilhost/tmp/markethelm.db",
+        )
+        with pytest.raises(ValueError, match="without a host"):
+            resolve_database_path()
+
+    def test_sqlite_url_with_localhost_netloc_rejected(self, monkeypatch):
+        monkeypatch.setenv(
+            "MARKET_HELM_DATABASE_URL",
+            "sqlite://localhost/tmp/markethelm.db",
+        )
+        with pytest.raises(ValueError, match="without a host"):
+            resolve_database_path()
+
 
 class TestInitDatabase:
     def test_init_noop_when_disabled(self, monkeypatch):
