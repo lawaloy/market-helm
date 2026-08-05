@@ -323,9 +323,16 @@ async def alerts_health() -> Dict[str, bool]:
 
 
 @router.get("/symbols")
-async def get_alert_symbol_catalog():
-    """Searchable company list for alert setup (major US indices + tracked symbols)."""
+async def get_alert_symbol_catalog(
+    _user_id: Optional[str] = Depends(require_user_id),
+):
+    """Searchable company list for alert setup (major US indices + tracked symbols).
+
+    Hosted mode requires auth so anonymous clients cannot scrape the catalog /
+    tracked-symbol metadata. File mode (``require_user_id`` → ``None``) stays open.
+    """
     symbols, names = build_symbol_catalog()
+
     tracked: List[str] = []
     saved_prices = prices_from_saved_daily_data()
     try:

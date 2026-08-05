@@ -9,11 +9,12 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from typing import Optional
 import sys
 import os
 
@@ -48,6 +49,7 @@ from starlette.responses import Response
 
 from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
 from dashboard.backend.api.market import get_market_summary
+from dashboard.backend.auth import require_user_id
 
 
 def _startup_alert_check() -> None:
@@ -122,8 +124,12 @@ async def health():
 
 
 @app.get("/api/data-info")
-async def data_info():
-    """Data status: path, latest date, and whether we need to fetch for the most recent trading day."""
+async def data_info(_user_id: Optional[str] = Depends(require_user_id)):
+    """Data status: path, latest date, and whether we need to fetch for the most recent trading day.
+
+    Hosted mode requires auth so anonymous clients cannot read data_dir / fetch
+    readiness. File mode (``require_user_id`` → ``None``) stays open.
+    """
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
     try:
         loader = get_data_loader()

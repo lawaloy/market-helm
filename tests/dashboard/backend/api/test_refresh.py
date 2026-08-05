@@ -408,6 +408,7 @@ def test_refresh_mutations_require_auth_in_database_mode(tmp_path, monkeypatch) 
 
     assert client.post("/api/refresh").status_code == 401
     assert client.post("/api/refresh/cancel").status_code == 401
+    assert client.get("/api/refresh/status").status_code == 401
 
 
 def test_run_daily_tracker_omits_no_screener_when_disabled(monkeypatch) -> None:
