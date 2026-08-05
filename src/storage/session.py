@@ -12,6 +12,8 @@ import time
 from typing import Any, Dict, Optional
 
 DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
+# Bound Bearer token size so decode cannot HMAC multi-MB attacker payloads.
+MAX_ACCESS_TOKEN_LENGTH = 4096
 
 
 class AuthError(ValueError):
@@ -57,6 +59,8 @@ def create_access_token(user_id: str, *, ttl_seconds: int = DEFAULT_TTL_SECONDS)
 
 def decode_access_token(token: str) -> Dict[str, Any]:
     try:
+        if not isinstance(token, str) or len(token) > MAX_ACCESS_TOKEN_LENGTH:
+            raise AuthError("Invalid access token.")
         body_segment, sig_segment = token.split(".", 1)
         expected_sig = hmac.new(
             _auth_secret(),

@@ -15,10 +15,34 @@ _SCRYPT_R = 8
 _SCRYPT_P = 1
 # Bound plaintext length so register/login cannot feed multi-MB strings into scrypt.
 MAX_PASSWORD_LENGTH = 128
+# RFC 5321 practical maximum; also reject control chars / junk local@domain shapes.
+MAX_EMAIL_LENGTH = 254
 
 
 class UserError(ValueError):
     pass
+
+
+def _normalize_email(email: str) -> str:
+    """Strip/lower-case and fail closed on length, control chars, or junk shapes."""
+    if not isinstance(email, str):
+        raise UserError("A valid email address is required.")
+    # Reject oversized input before strip so multi-MB payloads never hit the DB path.
+    if len(email) > MAX_EMAIL_LENGTH:
+        raise UserError(
+            f"Email must be at most {MAX_EMAIL_LENGTH} characters."
+        )
+    normalized = email.strip().lower()
+    if not normalized or len(normalized) > MAX_EMAIL_LENGTH:
+        raise UserError("A valid email address is required.")
+    if any(ch in normalized for ch in ("\n", "\r", "\0", " ", "\t", "\f", "\v")):
+        raise UserError("A valid email address is required.")
+    if normalized.count("@") != 1:
+        raise UserError("A valid email address is required.")
+    local, domain = normalized.split("@", 1)
+    if not local or not domain:
+        raise UserError("A valid email address is required.")
+    return normalized
 
 
 def _hash_password(password: str) -> str:
@@ -48,14 +72,21 @@ def _verify_password(password: str, stored: str) -> bool:
         scheme, n_raw, r_raw, p_raw, salt_hex, digest_hex = stored.split("$", 5)
         if scheme != "scrypt":
             return False
+        n = int(n_raw)
+        r = int(r_raw)
+        p = int(p_raw)
+        # Only accept the cost parameters we mint. A poisoned password_hash with
+        # huge N/r/p would otherwise turn /api/auth/login into a CPU DoS.
+        if n != _SCRYPT_N or r != _SCRYPT_R or p != _SCRYPT_P:
+            return False
         salt = bytes.fromhex(salt_hex)
         expected = bytes.fromhex(digest_hex)
         actual = hashlib.scrypt(
             password.encode("utf-8"),
             salt=salt,
-            n=int(n_raw),
-            r=int(r_raw),
-            p=int(p_raw),
+            n=n,
+            r=r,
+            p=p,
             dklen=len(expected),
         )
         return secrets.compare_digest(actual, expected)
@@ -64,9 +95,7 @@ def _verify_password(password: str, stored: str) -> bool:
 
 
 def create_user(email: str, password: str) -> Dict[str, Any]:
-    normalized = email.strip().lower()
-    if not normalized or "@" not in normalized:
-        raise UserError("A valid email address is required.")
+    normalized = _normalize_email(email)
 
     user_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
@@ -87,7 +116,10 @@ def create_user(email: str, password: str) -> Dict[str, Any]:
 
 
 def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
-    normalized = email.strip().lower()
+    try:
+        normalized = _normalize_email(email)
+    except UserError:
+        return None
     with get_connection() as conn:
         row = conn.execute(
             "SELECT id, email, password_hash, created_at FROM users WHERE email = ?",

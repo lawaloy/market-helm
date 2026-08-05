@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.alerts.alert_runner import _fetch_missing_watch_quotes, _load_env, _stocks_from_daily_df
 from src.utils.tickers import normalize_ticker
+
+logger = logging.getLogger(__name__)
 
 
 def load_market_snapshot(
@@ -28,7 +31,10 @@ def load_market_snapshot(
         loader = get_data_loader()
         last_date = loader.get_latest_date()
         stocks = _stocks_from_daily_df(loader.load_daily_data())
-    except ValueError:
+    except (ValueError, OSError, RuntimeError) as exc:
+        # Missing data is ValueError; unreadable/corrupt storage or loader boot
+        # must not crash scheduled/hosted alert checks.
+        logger.warning("Market snapshot loader unavailable: %s", exc)
         stocks = []
 
     # Strip/reject blank and sentinel tickers so " AAPL " matches saved AAPL

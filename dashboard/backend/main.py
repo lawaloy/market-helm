@@ -52,12 +52,26 @@ from dashboard.backend.api.market import get_market_summary
 from dashboard.backend.auth import require_user_id
 
 
+def _coerce_startup_triggered(raw) -> int:
+    """Coerce startup triggered count; Inf/NaN must not log as a real trigger."""
+    import math
+
+    if isinstance(raw, bool):
+        return int(raw)
+    if isinstance(raw, float) and not math.isfinite(raw):
+        return 0
+    try:
+        return int(raw or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
 def _startup_alert_check() -> None:
     try:
         from src.alerts.alert_worker import run_check_once
 
         result = run_check_once()
-        triggered = result.get("triggered", 0)
+        triggered = _coerce_startup_triggered(result.get("triggered", 0))
         if triggered:
             logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
     except Exception as exc:
@@ -173,16 +187,18 @@ async def data_info(_user_id: Optional[str] = Depends(require_user_id)):
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
     try:
         loader = get_data_loader()
-    except ValueError:
+        target_trading_day = get_most_recent_trading_day()
+        return {
+            "data_dir": str(loader.data_dir),
+            "latest_date": loader.get_latest_date(),
+            "target_trading_day": target_trading_day,
+            "needs_fetch": loader.needs_fetch_for_latest_trading_day(),
+            "available_dates": loader.get_available_dates()[:5],
+        }
+    except (ValueError, OSError):
+        # Unreadable data dirs / glob failures during status probes must map to
+        # 404 so App autofetch does not treat them as hard 500 boot failures.
         raise HTTPException(status_code=404, detail="No data available.")
-    target_trading_day = get_most_recent_trading_day()
-    return {
-        "data_dir": str(loader.data_dir),
-        "latest_date": loader.get_latest_date(),
-        "target_trading_day": target_trading_day,
-        "needs_fetch": loader.needs_fetch_for_latest_trading_day(),
-        "available_dates": loader.get_available_dates()[:5],
-    }
 
 
 @app.get("/api/summary")

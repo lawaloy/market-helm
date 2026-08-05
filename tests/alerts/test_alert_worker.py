@@ -281,8 +281,8 @@ def test_run_user_check_skips_non_dict_conditions(db_users) -> None:
     load_snapshot.assert_called_once_with(["AAPL"], fetch_missing_quotes=True)
 
 
-def test_run_user_check_strips_padded_and_skips_sentinel_symbols(db_users) -> None:
-    """User-scoped checks must strip watches and never fetch fake NAN/NONE tickers."""
+def test_run_user_check_strips_padded_symbols(db_users) -> None:
+    """User-scoped checks must strip padded watch symbols before quote fetch."""
     user_a, _user_b = db_users
     save_user_alerts_config(
         user_a,
@@ -300,28 +300,6 @@ def test_run_user_check_strips_padded_and_skips_sentinel_symbols(db_users) -> No
                     },
                     "notifications": ["log"],
                 },
-                {
-                    "id": "sentinel-nan",
-                    "enabled": True,
-                    "condition": {
-                        "type": "price_threshold",
-                        "symbol": "nan",
-                        "operator": "less_than",
-                        "value": 10,
-                    },
-                    "notifications": ["log"],
-                },
-                {
-                    "id": "sentinel-none",
-                    "enabled": True,
-                    "condition": {
-                        "type": "price_threshold",
-                        "symbol": None,
-                        "operator": "greater_than",
-                        "value": 1,
-                    },
-                    "notifications": ["log"],
-                },
             ],
         },
     )
@@ -333,6 +311,33 @@ def test_run_user_check_strips_padded_and_skips_sentinel_symbols(db_users) -> No
         alert_worker.run_user_check(user_a)
 
     load_snapshot.assert_called_once_with(["MSFT"], fetch_missing_quotes=True)
+
+
+def test_save_user_alerts_rejects_sentinel_symbols(db_users) -> None:
+    """Blank/sentinel symbols must fail closed at save, not become zombie watches."""
+    from src.storage.alert_watches import InvalidAlertWatchConfig
+
+    user_a, _user_b = db_users
+    with pytest.raises(InvalidAlertWatchConfig, match="valid symbol"):
+        save_user_alerts_config(
+            user_a,
+            {
+                "defaults": {},
+                "alerts": [
+                    {
+                        "id": "sentinel-nan",
+                        "enabled": True,
+                        "condition": {
+                            "type": "price_threshold",
+                            "symbol": "nan",
+                            "operator": "less_than",
+                            "value": 10,
+                        },
+                        "notifications": ["log"],
+                    },
+                ],
+            },
+        )
 
 
 def test_run_db_worker_cycle_evaluates_snapshot_and_delivers_per_user(db_users) -> None:

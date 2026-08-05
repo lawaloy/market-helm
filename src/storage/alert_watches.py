@@ -131,7 +131,18 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         if condition_type == "price_threshold":
             # Strip whitespace / reject None-NaN sentinels so watch index keys match quotes.
             symbol = normalize_ticker(condition.get("symbol"))
-            operator = condition.get("operator")
+            if not symbol:
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have a valid symbol."
+                )
+            raw_operator = condition.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                # Missing/blank operators never match at eval; reject at save so
+                # Settings cannot persist zombie enabled rules.
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have an operator."
+                )
+            operator = str(raw_operator).strip()
             threshold = _coerce_threshold(condition.get("value"), alert_id)
         cooldown_minutes = _coerce_cooldown(alert.get("cooldown_minutes"), alert_id)
         rows.append(
