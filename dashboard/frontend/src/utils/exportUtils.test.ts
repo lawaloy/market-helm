@@ -32,8 +32,10 @@ describe('escapeCsvCell', () => {
   });
 
   it('neutralizes spreadsheet formula prefixes without breaking quoting', () => {
-    expect(escapeCsvCell('=HYPERLINK("http://evil")')).toBe("'=HYPERLINK(\"http://evil\")");
-    expect(escapeCsvCell('+cmd|"/c calc"!A0')).toBe("'+cmd|\"/c calc\"!A0");
+    expect(escapeCsvCell('=HYPERLINK("http://evil")')).toBe(
+      "\"'=HYPERLINK(\"\"http://evil\"\")\"",
+    );
+    expect(escapeCsvCell('+cmd|"/c calc"!A0')).toBe("\"'+cmd|\"\"/c calc\"\"!A0\"");
     expect(escapeCsvCell('@SUM(A1:A10)')).toBe("'@SUM(A1:A10)");
     expect(escapeCsvCell('-2+3+cmd')).toBe("'-2+3+cmd");
     expect(escapeCsvCell('\t=cmd')).toBe("'\t=cmd");
@@ -67,6 +69,7 @@ describe('exportToCsv', () => {
       revokeObjectURL,
     });
 
+    const originalCreateElement = document.createElement.bind(document);
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
       if (tag === 'a') {
         return {
@@ -85,7 +88,7 @@ describe('exportToCsv', () => {
           click,
         } as unknown as HTMLAnchorElement;
       }
-      return document.createElement(tag);
+      return originalCreateElement(tag);
     });
   });
 
