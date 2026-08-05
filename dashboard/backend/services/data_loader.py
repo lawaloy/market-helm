@@ -14,6 +14,22 @@ from functools import lru_cache
 from src.utils.tickers import normalize_ticker
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_INVALID_LABEL_SENTINELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
+
+
+def _safe_recommendation(value: Any, default: str = "UNKNOWN") -> str:
+    """Coerce blank/NaN recommendation cells to a stable label for accuracy rollups."""
+    if value is None:
+        return default
+    if isinstance(value, float) and not math.isfinite(value):
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in _INVALID_LABEL_SENTINELS:
+        return default
+    return text
 
 
 def _default_data_dir() -> Path:
@@ -336,7 +352,7 @@ class DataLoader:
                     continue
                 actual_date, actual_close = actual
                 abs_err_pct = abs(actual_close - predicted) / predicted * 100.0
-                rec = str(row_dict.get("recommendation", "UNKNOWN") or "UNKNOWN")
+                rec = _safe_recommendation(row_dict.get("recommendation", "UNKNOWN"))
 
                 samples.append(
                     {
