@@ -157,4 +157,101 @@ describe('App background autofetch races', () => {
     expect(apiMocks.runCheck.mock.calls.length).toBe(runCheckBeforeUnmount);
     expect(apiMocks.fetchingLog.filter((v) => v === true).length).toBeGreaterThan(0);
   });
+
+  it('clears backgroundFetching after maxWait without bumping refreshKey', async () => {
+    vi.useFakeTimers();
+
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/api/data-info') {
+        return Promise.resolve({ data: { needs_fetch: true } });
+      }
+      if (url === '/api/refresh/status') {
+        return Promise.resolve({
+          data: { is_running: true, last_status: 'running' },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh');
+    expect(screen.getByTestId('background-fetching').textContent).toBe('fetching');
+    expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('0');
+
+    const runCheckAtStart = apiMocks.runCheck.mock.calls.length;
+
+    await act(async () => {
+      // First poll is immediate; subsequent polls are every 2s until 15m maxWait.
+      await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 2000);
+    });
+
+    expect(screen.getByTestId('background-fetching').textContent).toBe('idle');
+    expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('0');
+    // finally rechecks alerts when refresh never succeeded
+    expect(apiMocks.runCheck.mock.calls.length).toBeGreaterThan(runCheckAtStart);
+  });
+
+  it('soft-fails failed refresh status: idle UI, no refreshKey bump, still runs alert check', async () => {
+    vi.useFakeTimers();
+
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/api/data-info') {
+        return Promise.resolve({ data: { needs_fetch: true } });
+      }
+      if (url === '/api/refresh/status') {
+        return Promise.resolve({
+          data: { is_running: false, last_status: 'error' },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByTestId('background-fetching').textContent).toBe('idle');
+    expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('0');
+    // mount check + finally after unsuccessful refresh
+    expect(apiMocks.runCheck.mock.calls.length).toBe(2);
+  });
+
+  it('clears fetching and still runs alert check when data-info throws', async () => {
+    apiMocks.get.mockImplementation((url: string) => {
+      if (url === '/api/data-info') {
+        return Promise.reject(new Error('data-info unavailable'));
+      }
+      return Promise.reject(new Error(`Unexpected GET ${url}`));
+    });
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).not.toHaveBeenCalled();
+    expect(screen.getByTestId('background-fetching').textContent).toBe('idle');
+    expect(screen.getByTestId('dashboard-refresh-key').textContent).toBe('0');
+    expect(apiMocks.runCheck.mock.calls.length).toBe(2);
+  });
 });
