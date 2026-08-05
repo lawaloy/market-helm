@@ -88,6 +88,12 @@ def polish_alerts_config(
         if env_email and not defaults.get("email_to"):
             defaults["email_to"] = env_email
 
+    # Match per-alert polish: bundled / example placeholders must not survive
+    # in defaults or hosted channel readiness reports a false webhook_url ready.
+    default_webhook = str(defaults.get("webhook_url") or "").strip()
+    if default_webhook and _is_placeholder_webhook(default_webhook):
+        defaults.pop("webhook_url", None)
+
     polished["defaults"] = defaults
     alerts: list[Dict[str, Any]] = []
     for alert in polished.get("alerts") or []:
