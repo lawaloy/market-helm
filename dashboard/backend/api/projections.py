@@ -3,10 +3,13 @@ Projections API endpoints
 """
 import math
 from typing import Any, Optional
+from datetime import datetime, timedelta
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
+
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
-from datetime import datetime, timedelta
 from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
@@ -23,6 +26,19 @@ def _finite_float(value: Any) -> Optional[float]:
         return result
     except (TypeError, ValueError):
         return None
+
+
+def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> float:
+    """Mean of finite numeric cells only so Inf/NaN cannot poison summary averages."""
+    if column not in df.columns:
+        return default
+    series = pd.to_numeric(df[column], errors="coerce")
+    finite = series.map(
+        lambda value: isinstance(value, (int, float)) and math.isfinite(value)
+    )
+    if not bool(finite.any()):
+        return default
+    return _finite_float(series[finite].mean()) or default
 
 
 def _safe_volume(value: Any) -> int:
@@ -70,14 +86,8 @@ async def get_projections_summary():
         
         # Calculate statistics
         total_projections = len(df)
-        avg_confidence = (
-            _finite_float(df['confidence'].mean()) if 'confidence' in df.columns else 0.0
-        ) or 0.0
-        avg_expected_change = (
-            _finite_float(df['expected_change_percent'].mean())
-            if 'expected_change_percent' in df.columns
-            else 0.0
-        ) or 0.0
+        avg_confidence = _finite_column_mean(df, "confidence")
+        avg_expected_change = _finite_column_mean(df, "expected_change_percent")
         
         # Determine sentiment
         if avg_expected_change > 1.0:
