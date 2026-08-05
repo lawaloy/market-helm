@@ -283,8 +283,9 @@ async def cancel_refresh():
         except subprocess.TimeoutExpired:
             _refresh_process.kill()
 
-    refresh_status["is_running"] = False
-
+    # Leave is_running True until run_daily_tracker's finally clears it.
+    # Clearing here opens a window where POST /refresh can spawn a second
+    # Finnhub-burning child while the cancelled worker is still tearing down.
     return RefreshStatusResponse(
         is_running=refresh_status["is_running"],
         last_refresh=refresh_status.get("last_refresh"),

@@ -41,6 +41,12 @@ class StockAnalyzer:
         
         df = pd.DataFrame(data)
 
+        # Partial fetch rows / schema drift can omit ranking columns entirely.
+        # Ensure them before subscript so analyze soft-returns zeros instead of KeyError.
+        for column in ("change_percent", "volume", "close"):
+            if column not in df.columns:
+                df[column] = float("nan")
+
         # Coerce ranking/count columns so NaN/inf Finnhub or CSV cells cannot
         # inflate leaderboards or leave gainer/loser/unchanged counts inconsistent.
         change = pd.to_numeric(df['change_percent'], errors='coerce')
