@@ -13,6 +13,9 @@ from src.utils.tickers import normalize_ticker
 from .database import get_connection
 
 MAX_DELIVERY_LOG = 100
+# Cap alerts per config so one tenant cannot fan out unbounded watch rows /
+# SQLite sync payloads on every Settings save or evaluate tick.
+MAX_ALERTS_PER_CONFIG = 100
 # Cap cooldown so timedelta(minutes=…) cannot OverflowError and abort a
 # per-symbol watch loop (one tenant's poison value skipping sibling tenants).
 MAX_COOLDOWN_MINUTES = 60 * 24 * 365  # one year
@@ -44,9 +47,14 @@ def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
     return text
 
 
-def _coerce_threshold(raw_value: Any, alert_id: str) -> Optional[float]:
+def _coerce_threshold(raw_value: Any, alert_id: str) -> float:
+    # Missing/null thresholds previously persisted as SQL NULL watches that can
+    # never evaluate usefully — reject at save so Infinity→JSON-null clients
+    # and incomplete Settings payloads fail closed.
     if raw_value is None:
-        return None
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid price threshold value."
+        )
     try:
         threshold = float(raw_value)
     except (TypeError, ValueError) as exc:
@@ -98,7 +106,15 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         raise InvalidAlertWatchConfig("Alerts config must be an object.")
     raw_defaults = config.get("defaults")
     defaults = raw_defaults if isinstance(raw_defaults, dict) else {}
-    alerts = config.get("alerts") or []
+    alerts = config.get("alerts", [])
+    if alerts is None:
+        alerts = []
+    if not isinstance(alerts, list):
+        raise InvalidAlertWatchConfig("Alerts config must include an 'alerts' array.")
+    if len(alerts) > MAX_ALERTS_PER_CONFIG:
+        raise InvalidAlertWatchConfig(
+            f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts."
+        )
     rows: List[tuple] = []
     seen_ids: set[str] = set()
 
