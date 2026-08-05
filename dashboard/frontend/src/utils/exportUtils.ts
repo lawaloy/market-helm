@@ -25,6 +25,11 @@ export function escapeCsvCell(value: string | number): string {
   return str;
 }
 
+/** Format a numeric CSV cell; non-finite values become empty so toFixed never throws. */
+function formatCsvNumber(value: number, decimals = 2): string {
+  return Number.isFinite(value) ? value.toFixed(decimals) : '';
+}
+
 /** Export opportunities/stocks to CSV */
 export function exportToCsv(stocks: Opportunity[], filename?: string): void {
   const headers = [
@@ -41,10 +46,10 @@ export function exportToCsv(stocks: Opportunity[], filename?: string): void {
   const rows = stocks.map((s) => [
     s.symbol,
     s.name || s.symbol,
-    s.currentPrice.toFixed(2),
-    s.targetPrice.toFixed(2),
-    s.expectedChange.toFixed(2),
-    `${s.confidence}%`,
+    formatCsvNumber(s.currentPrice),
+    formatCsvNumber(s.targetPrice),
+    formatCsvNumber(s.expectedChange),
+    Number.isFinite(s.confidence) ? `${s.confidence}%` : '',
     s.risk,
     s.recommendation,
     s.trend,
