@@ -140,6 +140,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
     updateMessage('Cancelling refresh...');
     try {
       await api.post('/api/refresh/cancel');
+      if (generation !== pollGenerationRef.current) return;
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -150,6 +151,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
         if (generation === pollGenerationRef.current) updateMessage('');
       }, 3000);
     } catch (error) {
+      if (generation !== pollGenerationRef.current) return;
       console.error('Cancel refresh error:', error);
       updateMessage('Failed to cancel refresh.');
       setTimeout(() => {
