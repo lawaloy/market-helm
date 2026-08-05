@@ -30,6 +30,16 @@ from src.utils.tickers import normalize_ticker
         ("NULL", None),
         ("<NA>", None),
         ("BRK.B", "BRK.B"),
+        ("BF-B", "BF-B"),
+        ("A" * 16, "A" * 16),
+        ("A" * 17, None),
+        ("../ETC/PASSWD", None),
+        ("AAPL/MSFT", None),
+        ("AAPL MSFT", None),
+        ("$AAPL", None),
+        ("^GSPC", None),
+        ("AAPL\n", "AAPL"),  # strip then match
+        ("\tmsft\t", "MSFT"),
     ],
 )
 def test_normalize_ticker(raw, expected):
@@ -45,3 +55,9 @@ def test_normalize_ticker_rejects_inf_float_via_math():
     assert math.isinf(float("inf"))
     assert normalize_ticker(float("inf")) is None
     assert normalize_ticker(float("-inf")) is None
+
+
+def test_normalize_ticker_rejects_control_and_url_shapes():
+    assert normalize_ticker("https://evil.example/aapl") is None
+    assert normalize_ticker("AAPL%20") is None
+    assert normalize_ticker("AAPL;DROP") is None

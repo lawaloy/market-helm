@@ -19,6 +19,8 @@ from src.storage.alert_jobs import (
     fail_job,
     new_worker_id,
 )
+from src.storage.alert_watches import get_last_triggered as get_raw_triggered
+from src.storage.alert_watches import get_watch
 from src.storage.alert_watches import list_watches_for_symbol
 from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
@@ -49,9 +51,14 @@ def _within_cooldown(user_id: str, alert_id: str, cooldown_minutes: int) -> bool
     last = storage.get_last_triggered(alert_id)
     if not last:
         return False
-    if last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) - last < timedelta(minutes=cooldown_minutes)
+    last = _as_utc(last)
+    try:
+        window = timedelta(minutes=cooldown_minutes)
+    except OverflowError:
+        # Poisoned huge cooldown must not abort the per-symbol watch loop.
+        # Treat as still cooling down so sibling tenants keep evaluating.
+        return True
+    return datetime.now(timezone.utc) - last < window
 
 
 def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
@@ -146,32 +153,64 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
 
 def _process_deliver(job: Dict[str, Any]) -> bool:
     payload = job["payload"]
-    user_id = payload["user_id"]
-    alert_id = payload["alert_id"]
-    event = dict(payload["event"])
+    if not isinstance(payload, dict):
+        logger.warning(
+            "Skipping deliver job %s with non-object payload",
+            job.get("id"),
+        )
+        return False
+    user_id = payload.get("user_id")
+    alert_id = payload.get("alert_id")
+    event_raw = payload.get("event")
+    # Malformed internal/poison rows must drain (complete) like evaluate soft-skips —
+    # KeyError here previously retried up to max_attempts and churned the queue.
+    if not user_id or not alert_id or not isinstance(event_raw, dict):
+        logger.warning(
+            "Skipping deliver job %s with invalid payload keys/event",
+            job.get("id"),
+        )
+        return False
+    event = dict(event_raw)
     storage = UserAlertStorage(user_id)
 
     # A worker can die after the notification and trigger marker commit but before
     # completing the queue job. Stale-job recovery must not resend that event.
-    if job["attempts"] > 1:
-        event_at = _event_timestamp(event)
+    # Missing/invalid event timestamps — or unparseable stored markers — must still
+    # skip when a prior successful attempt left a trigger row.
+    #
+    # Check on every attempt, not only attempts > 1: a late original worker may
+    # still hold an in-memory attempts==1 claim after another worker recovered
+    # and already delivered the same event.
+    event_at = _event_timestamp(event)
+    raw_triggered = get_raw_triggered(user_id, alert_id)
+    if raw_triggered:
         last_triggered = storage.get_last_triggered(alert_id)
-        if event_at is not None and last_triggered is not None:
-            last_triggered = _as_utc(last_triggered)
-            if last_triggered >= event_at:
-                logger.info(
-                    "Skipping already-delivered retry for alert %s (job %s, attempt %s)",
-                    alert_id,
-                    job["id"],
-                    job["attempts"],
-                )
-                return False
-
-    from src.storage.alert_watches import get_watch
+        skip = event_at is None or last_triggered is None
+        if not skip and last_triggered is not None:
+            skip = _as_utc(last_triggered) >= event_at
+        if skip:
+            logger.info(
+                "Skipping already-delivered event for alert %s (job %s, attempt %s)",
+                alert_id,
+                job["id"],
+                job["attempts"],
+            )
+            return False
 
     watch = get_watch(user_id, alert_id)
     if not watch:
         raise RuntimeError(f"Watch {alert_id!r} not found for user {user_id}")
+
+    # Evaluate jobs claimed in the same batch both pass the pre-enqueue cooldown
+    # check before either deliver records a trigger. Re-check here so overlapping
+    # ticks cannot double-notify under a positive cooldown.
+    if _within_cooldown(user_id, alert_id, watch["cooldown_minutes"]):
+        logger.info(
+            "Skipping deliver within cooldown for alert %s (job %s)",
+            alert_id,
+            job["id"],
+        )
+        return False
 
     alert = watch["alert"]
     defaults = watch["defaults"]
@@ -197,24 +236,23 @@ def process_job_queue(
         for job in eval_jobs:
             try:
                 _process_evaluate_symbol(job)
-                complete_job(job["id"])
-                stats["evaluated"] += 1
+                if complete_job(job["id"], worker_id=wid):
+                    stats["evaluated"] += 1
             except Exception as exc:
                 logger.exception("evaluate_symbol job %s failed", job["id"])
-                fail_job(job["id"], str(exc))
-                stats["failed"] += 1
+                if fail_job(job["id"], str(exc), worker_id=wid):
+                    stats["failed"] += 1
 
         deliver_jobs = claim_jobs([JOB_DELIVER], wid, limit=limit)
         for job in deliver_jobs:
             try:
                 delivered = _process_deliver(job)
-                complete_job(job["id"])
-                if delivered:
+                if complete_job(job["id"], worker_id=wid) and delivered:
                     stats["delivered"] += 1
             except Exception as exc:
                 logger.exception("deliver job %s failed", job["id"])
-                fail_job(job["id"], str(exc))
-                stats["failed"] += 1
+                if fail_job(job["id"], str(exc), worker_id=wid):
+                    stats["failed"] += 1
 
         if not eval_jobs and not deliver_jobs:
             break

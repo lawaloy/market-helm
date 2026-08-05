@@ -12,6 +12,8 @@ import time
 from typing import Any, Dict, Optional
 
 DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
+# Bound Bearer token size so decode cannot HMAC multi-MB attacker payloads.
+MAX_ACCESS_TOKEN_LENGTH = 4096
 
 
 class AuthError(ValueError):
@@ -25,6 +27,15 @@ def _auth_secret() -> bytes:
             "MARKET_HELM_AUTH_SECRET must be set (min 16 characters) when multi-user mode is enabled."
         )
     return secret.encode("utf-8")
+
+
+def ensure_auth_secret() -> None:
+    """Raise AuthError when MARKET_HELM_AUTH_SECRET is missing or too short.
+
+    Call before side effects (e.g. create_user) so a misconfigured host does not
+    leave orphan accounts after token signing fails.
+    """
+    _auth_secret()
 
 
 def _b64url_encode(raw: bytes) -> str:
@@ -48,6 +59,8 @@ def create_access_token(user_id: str, *, ttl_seconds: int = DEFAULT_TTL_SECONDS)
 
 def decode_access_token(token: str) -> Dict[str, Any]:
     try:
+        if not isinstance(token, str) or len(token) > MAX_ACCESS_TOKEN_LENGTH:
+            raise AuthError("Invalid access token.")
         body_segment, sig_segment = token.split(".", 1)
         expected_sig = hmac.new(
             _auth_secret(),

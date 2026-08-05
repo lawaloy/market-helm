@@ -47,6 +47,22 @@ def test_validate_rejects_nonfinite_cooldown(db_user, bad) -> None:
         )
 
 
+@pytest.mark.parametrize("bad", [-1, -0.5, -15])
+def test_validate_rejects_negative_cooldown(db_user, bad) -> None:
+    with pytest.raises(InvalidAlertWatchConfig, match="invalid cooldown_minutes"):
+        validate_watches_config(
+            db_user,
+            {"defaults": {}, "alerts": [_price_alert(cooldown_minutes=bad)]},
+        )
+
+
+def test_validate_accepts_zero_cooldown(db_user) -> None:
+    validate_watches_config(
+        db_user,
+        {"defaults": {}, "alerts": [_price_alert(cooldown_minutes=0)]},
+    )
+
+
 def test_backfill_skips_inf_cooldown_without_crashing(db_user) -> None:
     """OverflowError used to escape InvalidAlertWatchConfig and abort init_database."""
     poison = {

@@ -12,6 +12,7 @@ import smtplib
 from abc import ABC, abstractmethod
 from email.message import EmailMessage
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 import requests
 
@@ -21,6 +22,61 @@ from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_ht
 logger = setup_logger("alerts.email.delivery")
 
 SUPPORTED_PROVIDERS = frozenset({"smtp", "sendgrid", "mailgun"})
+# Official Mailgun API origins only — never send Basic Auth API keys to arbitrary hosts.
+ALLOWED_MAILGUN_API_HOSTS = frozenset({"api.mailgun.net", "api.eu.mailgun.net"})
+
+
+def normalize_mailgun_api_base(raw: str) -> Optional[str]:
+    """Return a canonical https Mailgun API origin, or None if unsafe/invalid."""
+    text = str(raw).strip()
+    if not text:
+        return None
+    parsed = urlparse(text)
+    if parsed.scheme.lower() != "https":
+        return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
+    host = (parsed.hostname or "").lower()
+    if host not in ALLOWED_MAILGUN_API_HOSTS:
+        return None
+    if parsed.port not in (None, 443):
+        return None
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        return None
+    return f"https://{host}"
+
+
+def normalize_mailgun_domain(raw: str) -> Optional[str]:
+    """Return a hostname-like Mailgun sending domain, or None if unsafe/invalid.
+
+    The domain is interpolated into ``{api_base}/v3/{domain}/messages``. Values with
+    ``/``, ``@``, whitespace, or control characters reshape the request path and
+    must be rejected before authenticated Mailgun calls are made.
+    """
+    text = str(raw).strip()
+    if not text:
+        return None
+    if any(ch in text for ch in ("/", "\\", "@", " ", "\t", "\r", "\n", "\0")):
+        return None
+    # Hostname labels: letters, digits, dots, hyphens only (Mailgun sandbox/custom).
+    if text.startswith(".") or text.endswith(".") or ".." in text:
+        return None
+    for label in text.split("."):
+        if not label or label.startswith("-") or label.endswith("-"):
+            return None
+        if not all(ch.isalnum() or ch == "-" for ch in label):
+            return None
+    return text.lower()
+
+
+def _safe_from_address(value: Any) -> Optional[str]:
+    """Return a From address only when it cannot inject CR/LF into headers."""
+    if value is None:
+        return None
+    cleaned = str(value).strip()
+    if not cleaned or any(ch in cleaned for ch in ("\r", "\n", "\0")):
+        return None
+    return cleaned
 
 
 def parse_recipients(value: Union[str, List[str], None]) -> List[str]:
@@ -112,22 +168,36 @@ def format_alert_email(event: Dict[str, Any]) -> tuple[str, str]:
     return subject, body
 
 
+def _allow_alert_smtp_overrides(alert: Optional[Dict[str, Any]]) -> bool:
+    """Whether per-alert SMTP/from fields may override platform env.
+
+    Hosted multi-user mode must not let tenants redirect SMTP transport or
+    spoof From (mirrors webhook/recipient ``_allow_env_*`` isolation). Opt in
+    with ``_allow_alert_smtp=True`` for intentional self-host style overrides.
+    """
+    from src.storage.database import database_enabled
+
+    if not alert:
+        return True
+    return alert.get("_allow_alert_smtp", not database_enabled()) is not False
+
+
 def _platform_from_address(alert: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    if alert:
-        from_alert = alert.get("email_from")
-        if from_alert and str(from_alert).strip():
-            return str(from_alert).strip()
-    from_env = os.environ.get("ALERT_EMAIL_FROM")
-    if from_env and from_env.strip():
-        return from_env.strip()
+    if alert and _allow_alert_smtp_overrides(alert):
+        from_alert = _safe_from_address(alert.get("email_from"))
+        if from_alert:
+            return from_alert
+    from_env = _safe_from_address(os.environ.get("ALERT_EMAIL_FROM"))
+    if from_env:
+        return from_env
     if resolve_email_provider() == "smtp":
-        if alert:
-            smtp_user = alert.get("smtp_user")
-            if smtp_user and str(smtp_user).strip():
-                return str(smtp_user).strip()
-        username = os.environ.get("SMTP_USER")
-        if username and str(username).strip():
-            return str(username).strip()
+        if alert and _allow_alert_smtp_overrides(alert):
+            smtp_user = _safe_from_address(alert.get("smtp_user"))
+            if smtp_user:
+                return smtp_user
+        username = _safe_from_address(os.environ.get("SMTP_USER"))
+        if username:
+            return username
     return None
 
 
@@ -389,14 +459,21 @@ class MailgunEmailBackend(EmailDeliveryBackend):
 
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
-    host = alert.get("smtp_host") or os.environ.get("SMTP_HOST")
+    use_overrides = _allow_alert_smtp_overrides(alert)
+    host = (alert.get("smtp_host") if use_overrides else None) or os.environ.get(
+        "SMTP_HOST"
+    )
     # Do not use `or` for port — 0 is falsy but must be rejected as invalid,
     # not silently replaced by the SMTP_PORT default.
-    port_raw = alert.get("smtp_port")
+    port_raw = alert.get("smtp_port") if use_overrides else None
     if port_raw is None or (isinstance(port_raw, str) and not str(port_raw).strip()):
         port_raw = os.environ.get("SMTP_PORT", "587")
-    username = alert.get("smtp_user") or os.environ.get("SMTP_USER")
-    password = alert.get("smtp_password") or os.environ.get("SMTP_PASSWORD")
+    username = (alert.get("smtp_user") if use_overrides else None) or os.environ.get(
+        "SMTP_USER"
+    )
+    password = (
+        alert.get("smtp_password") if use_overrides else None
+    ) or os.environ.get("SMTP_PASSWORD")
 
     if not host or not str(host).strip():
         logger.warning(
@@ -445,22 +522,37 @@ def build_sendgrid_backend() -> Optional[SendGridEmailBackend]:
 
 def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
     api_key = os.environ.get("MAILGUN_API_KEY")
-    domain = os.environ.get("MAILGUN_DOMAIN")
+    domain_raw = os.environ.get("MAILGUN_DOMAIN")
     if not api_key or not str(api_key).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_API_KEY is missing."
         )
         return None
-    if not domain or not str(domain).strip():
+    if not domain_raw or not str(domain_raw).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_DOMAIN is missing."
         )
         return None
-    api_base = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    domain = normalize_mailgun_domain(str(domain_raw))
+    if domain is None:
+        logger.warning(
+            "MAILGUN_DOMAIN %r is not a valid hostname-like sending domain.",
+            domain_raw,
+        )
+        return None
+    api_base_raw = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
+    api_base = normalize_mailgun_api_base(str(api_base_raw))
+    if api_base is None:
+        logger.warning(
+            "MAILGUN_API_BASE %r is not an allowed Mailgun HTTPS API origin "
+            "(expected https://api.mailgun.net or https://api.eu.mailgun.net).",
+            api_base_raw,
+        )
+        return None
     return MailgunEmailBackend(
         api_key=str(api_key).strip(),
-        domain=str(domain).strip(),
-        api_base=str(api_base).strip(),
+        domain=domain,
+        api_base=api_base,
     )
 
 

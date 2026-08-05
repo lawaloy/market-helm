@@ -13,6 +13,12 @@ from src.utils.tickers import normalize_ticker
 from .database import get_connection
 
 MAX_DELIVERY_LOG = 100
+# Cap alerts per config so one tenant cannot fan out unbounded watch rows /
+# SQLite sync payloads on every Settings save or evaluate tick.
+MAX_ALERTS_PER_CONFIG = 100
+# Cap cooldown so timedelta(minutes=…) cannot OverflowError and abort a
+# per-symbol watch loop (one tenant's poison value skipping sibling tenants).
+MAX_COOLDOWN_MINUTES = 60 * 24 * 365  # one year
 
 
 class InvalidAlertWatchConfig(ValueError):
@@ -42,9 +48,32 @@ def _parseable_trigger_timestamp(raw: Optional[str]) -> Optional[str]:
     return text
 
 
-def _coerce_threshold(raw_value: Any, alert_id: str) -> Optional[float]:
-    if raw_value is None:
+def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
+    """Return a storeable ISO timestamp, or None when missing/unparseable.
+
+    Delivery log rows are ordered by timestamp text. Corrupt values like
+    ``"zzzz"`` can sort as newest forever and distort prune / status UI.
+    """
+    if raw is None:
         return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return text
+
+
+def _coerce_threshold(raw_value: Any, alert_id: str) -> float:
+    # Missing/null thresholds previously persisted as SQL NULL watches that can
+    # never evaluate usefully — reject at save so Infinity→JSON-null clients
+    # and incomplete Settings payloads fail closed.
+    if raw_value is None:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid price threshold value."
+        )
     try:
         threshold = float(raw_value)
     except (TypeError, ValueError) as exc:
@@ -71,6 +100,18 @@ def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
         raise InvalidAlertWatchConfig(
             f"Alert '{alert_id}' has an invalid cooldown_minutes value."
         )
+    if as_float < 0:
+        # Negative cooldown is treated as "no cooldown" by evaluators; reject
+        # at save so Settings cannot silently disable rate limiting.
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        )
+    if as_float > MAX_COOLDOWN_MINUTES:
+        # Huge finite values (e.g. 1e15) pass isfinite but OverflowError
+        # timedelta at evaluate time — reject at save.
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
+        )
     try:
         return int(as_float)
     except (TypeError, ValueError, OverflowError) as exc:
@@ -84,8 +125,10 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         raise InvalidAlertWatchConfig("Alerts config must be an object.")
     raw_defaults = config.get("defaults")
     defaults = raw_defaults if isinstance(raw_defaults, dict) else {}
+    ensure_alerts_within_limit(config)
     alerts = config.get("alerts") or []
     rows: List[tuple] = []
+    seen_ids: set[str] = set()
 
     for alert in alerts:
         if not isinstance(alert, dict):
@@ -93,6 +136,10 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         alert_id = str(alert.get("id") or "").strip()
         if not alert_id:
             continue
+        # Primary key is (user_id, alert_id); duplicates would IntegrityError → 500.
+        if alert_id in seen_ids:
+            raise InvalidAlertWatchConfig(f"Duplicate alert id '{alert_id}'.")
+        seen_ids.add(alert_id)
         condition = alert.get("condition") or {}
         if not isinstance(condition, dict):
             condition = {}
@@ -103,7 +150,18 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         if condition_type == "price_threshold":
             # Strip whitespace / reject None-NaN sentinels so watch index keys match quotes.
             symbol = normalize_ticker(condition.get("symbol"))
-            operator = condition.get("operator")
+            if not symbol:
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have a valid symbol."
+                )
+            raw_operator = condition.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                # Missing/blank operators never match at eval; reject at save so
+                # Settings cannot persist zombie enabled rules.
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have an operator."
+                )
+            operator = str(raw_operator).strip()
             threshold = _coerce_threshold(condition.get("value"), alert_id)
         cooldown_minutes = _coerce_cooldown(alert.get("cooldown_minutes"), alert_id)
         rows.append(
@@ -124,8 +182,29 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
     return rows
 
 
+def ensure_alerts_within_limit(config: Dict[str, Any]) -> None:
+    """Reject oversized raw ``alerts`` arrays before polish/dedupe can shrink them.
+
+    Hosted saves polish (and dedupe same price-threshold keys) before watch
+    validation — without this gate a 10k duplicate payload would silently
+    collapse to one rule and overwrite a prior config.
+    """
+    if not isinstance(config, dict):
+        raise InvalidAlertWatchConfig("Alerts config must be an object.")
+    alerts = config.get("alerts", [])
+    if alerts is None:
+        return
+    if not isinstance(alerts, list):
+        raise InvalidAlertWatchConfig("Alerts config must include an 'alerts' array.")
+    if len(alerts) > MAX_ALERTS_PER_CONFIG:
+        raise InvalidAlertWatchConfig(
+            f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts."
+        )
+
+
 def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
     """Validate that a config can be normalized without mutating watch rows."""
+    ensure_alerts_within_limit(config)
     _rows_from_config(user_id, config, _utc_now())
 
 
@@ -236,12 +315,15 @@ def _safe_cooldown_minutes(raw_value: Any) -> int:
         as_float = float(raw_value or 0)
     except (TypeError, ValueError):
         return 0
-    if not math.isfinite(as_float):
+    if not math.isfinite(as_float) or as_float < 0:
         return 0
     try:
-        return int(as_float)
+        minutes = int(as_float)
     except (TypeError, ValueError, OverflowError):
         return 0
+    if minutes > MAX_COOLDOWN_MINUTES:
+        return MAX_COOLDOWN_MINUTES
+    return minutes
 
 
 def get_watch(user_id: str, alert_id: str) -> Optional[Dict[str, Any]]:
@@ -300,7 +382,7 @@ def record_delivery(
     error: Optional[str] = None,
     timestamp: Optional[str] = None,
 ) -> None:
-    ts = timestamp or _utc_now()
+    ts = _parseable_iso_timestamp(timestamp) or _utc_now()
     with get_connection() as conn:
         conn.execute(
             """

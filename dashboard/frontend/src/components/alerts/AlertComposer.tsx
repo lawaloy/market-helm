@@ -41,9 +41,14 @@ export function AlertComposer({
 }) {
   const selectedCompany = symbolOptions.find((option) => option.value === newSymbol);
   const previewName = selectedCompany?.label ?? (newSymbol.trim().toUpperCase() || '—');
-  const previewPrice = newValue.trim() ? formatPrice(newValue) : '—';
+  const trimmedValue = newValue.trim();
+  const parsedValue = trimmedValue === '' ? Number.NaN : Number(trimmedValue);
+  const hasFinitePrice = Number.isFinite(parsedValue);
+  const previewPrice = hasFinitePrice ? formatPrice(parsedValue) : '—';
   const previewVerb = newOperator === 'greater_than' ? 'rises above' : 'falls below';
   const currentPrice = formatQuotePrice(prices[newSymbol.trim().toUpperCase()]);
+  const canSubmit =
+    !symbolsLoading && Boolean(newSymbol) && !submitting && hasFinitePrice;
 
   return (
     <div className="alerts-composer">
@@ -106,7 +111,7 @@ export function AlertComposer({
       <button
         type="button"
         onClick={onSubmit}
-        disabled={symbolsLoading || !newSymbol || submitting}
+        disabled={!canSubmit}
         className="alerts-cta mt-5 disabled:cursor-not-allowed"
       >
         <BellAlertIcon className="h-4 w-4" />

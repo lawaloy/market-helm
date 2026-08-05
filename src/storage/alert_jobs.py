@@ -172,54 +172,92 @@ def claim_jobs(
     return claimed
 
 
-def complete_job(job_id: int) -> None:
+def complete_job(job_id: int, *, worker_id: str) -> bool:
+    """Mark a job completed only while *worker_id* still owns the processing lock.
+
+    Returns True when the row was updated. A late worker whose lock was reclaimed
+    must not overwrite another worker's completed/failed/pending outcome.
+    """
     now = _utc_now()
     with get_connection() as conn:
-        conn.execute(
+        updated = conn.execute(
             """
             UPDATE alert_jobs
             SET status = ?, updated_at = ?, locked_at = NULL, locked_by = NULL, last_error = NULL
-            WHERE id = ?
+            WHERE id = ? AND status = ? AND locked_by = ?
             """,
-            (STATUS_COMPLETED, now, job_id),
+            (STATUS_COMPLETED, now, job_id, STATUS_PROCESSING, worker_id),
         )
+        return updated.rowcount == 1
 
 
-def fail_job(job_id: int, error: str, *, retry_delay_seconds: int = 60) -> None:
+def fail_job(
+    job_id: int,
+    error: str,
+    *,
+    worker_id: str,
+    retry_delay_seconds: int = 60,
+) -> bool:
+    """Fail or requeue a job only while *worker_id* still owns the processing lock.
+
+    Returns True when the row was updated. Prevents a stale worker from clobbering
+    a reclaimed job that another worker already completed or retried.
+    """
     now_dt = datetime.now(timezone.utc)
     now = now_dt.isoformat()
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT attempts, max_attempts FROM alert_jobs WHERE id = ?",
+            """
+            SELECT attempts, max_attempts, status, locked_by
+            FROM alert_jobs WHERE id = ?
+            """,
             (job_id,),
         ).fetchone()
         if not row:
-            return
+            return False
+        if row["status"] != STATUS_PROCESSING or row["locked_by"] != worker_id:
+            return False
         attempts = int(row["attempts"])
         max_attempts = int(row["max_attempts"])
         if attempts >= max_attempts:
-            conn.execute(
+            updated = conn.execute(
                 """
                 UPDATE alert_jobs
                 SET status = ?, last_error = ?, updated_at = ?, locked_at = NULL, locked_by = NULL
-                WHERE id = ?
+                WHERE id = ? AND status = ? AND locked_by = ?
                 """,
-                (STATUS_FAILED, error[:500], now, job_id),
+                (
+                    STATUS_FAILED,
+                    error[:500],
+                    now,
+                    job_id,
+                    STATUS_PROCESSING,
+                    worker_id,
+                ),
             )
-            return
+            return updated.rowcount == 1
         run_after = datetime.fromtimestamp(
             now_dt.timestamp() + retry_delay_seconds,
             tz=timezone.utc,
         ).isoformat()
-        conn.execute(
+        updated = conn.execute(
             """
             UPDATE alert_jobs
             SET status = ?, last_error = ?, updated_at = ?, run_after = ?,
                 locked_at = NULL, locked_by = NULL
-            WHERE id = ?
+            WHERE id = ? AND status = ? AND locked_by = ?
             """,
-            (STATUS_PENDING, error[:500], now, run_after, job_id),
+            (
+                STATUS_PENDING,
+                error[:500],
+                now,
+                run_after,
+                job_id,
+                STATUS_PROCESSING,
+                worker_id,
+            ),
         )
+        return updated.rowcount == 1
 
 
 def pending_job_count(job_types: Optional[List[str]] = None) -> int:

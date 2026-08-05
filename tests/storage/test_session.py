@@ -86,11 +86,19 @@ class TestSession:
             decode_access_token(missing)
 
     def test_short_secret_rejected(self, monkeypatch):
+        from src.storage.session import ensure_auth_secret
+
         monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "too-short")
         with pytest.raises(AuthError, match="MARKET_HELM_AUTH_SECRET"):
             create_access_token("user-123")
+        with pytest.raises(AuthError, match="MARKET_HELM_AUTH_SECRET"):
+            ensure_auth_secret()
 
     def test_missing_secret_raises(self, monkeypatch):
+        from src.storage.session import ensure_auth_secret
+
         monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
         with pytest.raises(AuthError, match="MARKET_HELM_AUTH_SECRET"):
             create_access_token("user-123")
+        with pytest.raises(AuthError, match="MARKET_HELM_AUTH_SECRET"):
+            ensure_auth_secret()
