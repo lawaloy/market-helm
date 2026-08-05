@@ -44,6 +44,21 @@ describe('OpportunityCard non-finite display', () => {
     expect(document.body.textContent).not.toMatch(/Infinity|NaN/);
   });
 
+  it('soft-fails Infinity / NaN current and target prices', () => {
+    render(
+      <OpportunityCard
+        opportunity={opportunity({
+          currentPrice: Number.POSITIVE_INFINITY,
+          targetPrice: Number.NaN,
+        })}
+      />,
+    );
+
+    // Price row renders "— → —" without Intl "$∞" / "$NaN".
+    expect(document.body.textContent).toMatch(/—\s*→\s*—/);
+    expect(document.body.textContent).not.toMatch(/\$∞|\$NaN|Infinity|NaN/);
+  });
+
   it('still shows finite confidence and signed change', () => {
     render(<OpportunityCard opportunity={opportunity()} />);
 

@@ -266,7 +266,10 @@ class StockAnalyzer:
         comparison = {}
         
         for exchange_code, data in exchange_data.items():
-            if not data:
+            # Mirror analyze_daily_data: NaN/sentinel keys poison JSON dumps
+            # (allow_nan=False) and downstream exchange maps.
+            label = _exchange_stat_key(exchange_code)
+            if label is None or not data:
                 continue
             
             df = pd.DataFrame(data)
@@ -294,7 +297,7 @@ class StockAnalyzer:
                 usable_volume.sum() if len(usable_volume) else 0.0
             )
 
-            comparison[exchange_code] = {
+            comparison[label] = {
                 'stock_count': len(df),
                 'average_change_percent': round(avg_change, 2),
                 'total_volume': int(total_volume),

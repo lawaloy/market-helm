@@ -146,12 +146,29 @@ class StockDataFetcher:
                     except:
                         pass
                 
-                # Share API client to avoid creating multiple instances
-                screener = StockScreener(filters, api_client=self.api_client)
-                logger.info(f"  Screening {len(symbols)} stocks from {index_name} (parallel processing)...")
-                qualified_symbols = screener.get_qualified_symbols(symbols, max_workers=2)
-                logger.info(f"  Selected {len(qualified_symbols)} qualified stocks for tracking")
-                symbols = qualified_symbols
+                try:
+                    # Share API client to avoid creating multiple instances
+                    screener = StockScreener(filters, api_client=self.api_client)
+                    logger.info(
+                        f"  Screening {len(symbols)} stocks from {index_name} "
+                        f"(parallel processing)..."
+                    )
+                    qualified_symbols = screener.get_qualified_symbols(
+                        symbols, max_workers=2
+                    )
+                    logger.info(
+                        f"  Selected {len(qualified_symbols)} qualified stocks "
+                        f"for tracking"
+                    )
+                    symbols = qualified_symbols
+                except Exception as e:
+                    # Screener/API edges must not abort the whole index fetch;
+                    # keep the already-capped unscreened symbol list.
+                    logger.warning(
+                        "  Screener failed for %s; using unscreened symbols: %s",
+                        index_name,
+                        e,
+                    )
             
             # Fetch data for each symbol using parallel processing
             # Rate limiter is thread-safe and handles 60 calls/min limit automatically
