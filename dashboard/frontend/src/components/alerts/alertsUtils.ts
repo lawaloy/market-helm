@@ -111,7 +111,14 @@ export function findDuplicatePriceRule(
   value: number,
   excludeId?: string,
 ): AlertRule | undefined {
-  const key = `${symbol}|${operator}|${value}`;
+  // Normalize via priceAlertKey so trim/case match stored rules.
+  const key = priceAlertKey({
+    type: 'price_threshold',
+    symbol,
+    operator,
+    value,
+  });
+  if (!key) return undefined;
   return alerts.find((rule) => {
     if (excludeId && rule.id === excludeId) return false;
     return priceAlertKey(rule.condition) === key;
