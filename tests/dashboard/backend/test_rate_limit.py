@@ -112,3 +112,10 @@ def test_invalid_enabled_value_falls_back_to_hosted_default(monkeypatch) -> None
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "maybe")
     assert rate_limit.rate_limiting_enabled() is True
+
+
+def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
+    secret_value = "invalid-secret-proxy-value"
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", secret_value)
+    assert client_ip(_request("203.0.113.5")) == "203.0.113.5"
+    assert secret_value not in caplog.text
