@@ -133,7 +133,9 @@ export function coerceTooltipNumber(value: unknown): number | undefined {
   if (value == null) return undefined;
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
   if (typeof value === 'string') {
-    const n = Number(value);
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const n = Number(trimmed);
     return Number.isFinite(n) ? n : undefined;
   }
   if (Array.isArray(value)) {
