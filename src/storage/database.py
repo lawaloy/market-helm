@@ -104,6 +104,14 @@ def resolve_database_path() -> Path:
             f"Only sqlite URLs are supported today (got {parsed.scheme!r}). "
             "Use sqlite:////absolute/path/to/markethelm.db"
         )
+    # sqlite://host/path silently ignored host before and wrote a local file —
+    # fail closed so misconfigured hosted URLs cannot point at the wrong DB.
+    if parsed.netloc:
+        raise ValueError(
+            f"SQLite URL must be a local file path without a host "
+            f"(got netloc {parsed.netloc!r}). "
+            "Use sqlite:////absolute/path/to/markethelm.db"
+        )
     if parsed.path:
         # sqlite:///C:/path or sqlite:////var/lib/db
         path = parsed.path

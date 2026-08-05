@@ -16,7 +16,8 @@ interface DashboardProps {
   refreshKey?: number;
 }
 
-function dashboardLoadErrorMessage(err: unknown): string {
+/** Map Axios/network failures to actionable dashboard empty-state copy. */
+export function dashboardLoadErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
     if (status === 404) {
