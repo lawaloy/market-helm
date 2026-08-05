@@ -55,9 +55,13 @@ def resolve_company_name(symbol: str, fallback: str = "") -> str:
         for index_name in ["S&P 500", "NASDAQ 100", "Dow Jones"]:
             try:
                 for s in data.get_stocks_by_index(index_name):
-                    if normalize_ticker(s.get("symbol")) == key and s.get("name"):
-                        _name_cache[key] = s["name"]
-                        return s["name"]
+                    if normalize_ticker(s.get("symbol")) != key:
+                        continue
+                    # Catalog NaN/Inf/"nan" is truthy in Python — clean before cache/return.
+                    cleaned = _clean_display_name(s.get("name"))
+                    if cleaned:
+                        _name_cache[key] = cleaned
+                        return cleaned
             except Exception:
                 continue
     except Exception:

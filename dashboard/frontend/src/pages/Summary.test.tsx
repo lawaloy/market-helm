@@ -269,6 +269,44 @@ describe('Summary refresh controls', () => {
     // Unmount cleared the active flag before the late success could reload summary.
     expect(apiMocks.getSummary).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores a late cancel response after unmount', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Fetching quotes' },
+    });
+    let resolveCancel: ((value: unknown) => void) | undefined;
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return new Promise((resolve) => {
+          resolveCancel = resolve;
+        });
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+
+    await renderEmptySummary();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    cleanup();
+
+    await act(async () => {
+      resolveCancel?.({ data: { message: 'cancelled' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Refresh cancelled.')).toBeNull();
+  });
 });
 
 describe('Summary load races', () => {
