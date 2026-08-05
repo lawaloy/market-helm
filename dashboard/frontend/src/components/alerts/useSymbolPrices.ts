@@ -23,8 +23,16 @@ export function useSymbolPrices() {
   const inflightRef = useRef<Set<string>>(new Set());
   const failedAtRef = useRef<Map<string, number>>(new Map());
   const lastBatchAtRef = useRef(0);
+  const mountedRef = useRef(true);
 
   pricesRef.current = symbolPrices;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,9 +83,12 @@ export function useSymbolPrices() {
       if (pending.length === 0) return;
 
       while (pending.length > 0) {
+        if (!mountedRef.current) return;
+
         const now = Date.now();
         const waitMs = BATCH_GAP_MS - (now - lastBatchAtRef.current);
         if (waitMs > 0) await sleep(waitMs);
+        if (!mountedRef.current) return;
 
         pending = pending.filter(
           (symbol) => pricesRef.current[symbol] === undefined && !isFetchBlocked(symbol),
@@ -93,25 +104,33 @@ export function useSymbolPrices() {
 
         try {
           const { data } = await alertsApi.getQuotes(batch);
+          if (!mountedRef.current) return;
           const returned = data.prices ?? {};
-          if (Object.keys(returned).length > 0) {
-            setSymbolPrices((prev) => ({ ...prev, ...returned }));
+          const finiteEntries = Object.entries(returned).filter(
+            (entry): entry is [string, number] =>
+              typeof entry[1] === 'number' && Number.isFinite(entry[1]),
+          );
+          if (finiteEntries.length > 0) {
+            setSymbolPrices((prev) => ({ ...prev, ...Object.fromEntries(finiteEntries) }));
             setQuotesUnavailable(false);
           }
           batch.forEach((symbol) => {
-            if (returned[symbol] === undefined) {
+            const price = returned[symbol];
+            if (typeof price !== 'number' || !Number.isFinite(price)) {
               failedAtRef.current.set(symbol, Date.now());
             } else {
               failedAtRef.current.delete(symbol);
             }
           });
         } catch (err) {
+          if (!mountedRef.current) return;
           if (axios.isAxiosError(err) && err.response?.status === 405) {
             setQuotesUnavailable(true);
             pending = [];
           }
         } finally {
           batch.forEach((symbol) => inflightRef.current.delete(symbol));
+          if (!mountedRef.current) return;
           setPricingPending((prev) => {
             const next = new Set(prev);
             batch.forEach((symbol) => next.delete(symbol));
