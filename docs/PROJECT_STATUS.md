@@ -86,15 +86,17 @@ We do **not** require each end user to create a Gmail app password or supply SMT
 
 ## Work in flight
 
-**Branch:** `feat/hosted-multi-user` — SQLite storage, auth API, per-user alerts API.
+The hosted multi-user foundation is on `main`: SQLite storage, auth/UI,
+per-user alerts, the database-backed worker queue, and delivery history.
 
 | Item | Status |
 |------|--------|
 | SQLite schema + user accounts | Done |
 | Auth API (`/api/auth/register`, `/login`, `/me`) | Done |
 | Per-user alerts API when `MARKET_HELM_DATABASE_URL` set | Done |
-| Helmtower sign-in / sign-up UI | Done (PR pending) |
-| Multi-user alert worker | Planned |
+| Helmtower sign-in / sign-up UI | Done |
+| Multi-user alert worker + delivery history | Done |
+| Versioned SQLite/PostgreSQL migrations + container integration gate | Done on `feat/hosted-beta-readiness` |
 
 See [MULTI_USER.md](MULTI_USER.md).
 
@@ -102,14 +104,16 @@ See [MULTI_USER.md](MULTI_USER.md).
 
 ## What’s next (recommended order)
 
-### 1. **Hosted multi-user — follow-ups** (after this PR merges)
+### 1. **Hosted beta — production readiness**
 
-Foundation (storage, auth API, per-user alerts API) ships in PR on `feat/hosted-multi-user`. Remaining work:
+The multi-user foundation is complete. Remaining work for a hosted beta:
 
 - [x] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
-- [ ] **Multi-user alert worker** — evaluate all users' enabled watches on schedule (not just one file config)
-- [ ] **Per-user delivery history** — move delivery log from shared file storage to DB when multi-user mode is on
-- [ ] **Production hardening** — PostgreSQL, password reset, rate limits, update [AGENTS.md](../AGENTS.md) (database optional today)
+- [x] **Multi-user worker and delivery history** — database-backed orchestration, jobs, cooldown state, and per-user outcomes
+- [x] **Production database foundation** — adapter, versioned migrations, and PostgreSQL 16 container integration gate
+- [ ] **Managed staging** — provision hosted PostgreSQL, verify backups/restore, pooling, TLS, and operational metrics
+- [ ] **Auth lifecycle** — password reset, email verification, session invalidation
+- [ ] **Production controls** — rate limits, account deletion/export, observability, hosted deploy docs
 
 See [MULTI_USER.md](MULTI_USER.md).
 
