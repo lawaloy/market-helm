@@ -174,6 +174,10 @@ class StockTrackerWorkflow:
     def _fetch_data(self, use_screener: bool, top_n_stocks: Optional[int] = None) -> Dict[str, Any]:
         """Fetch stock data from configured indices."""
         try:
+            # Non-positive limits are truthy for negatives and would slice from the
+            # tail (`[: -N]`), selecting lowest-volume names. Treat as unlimited.
+            if top_n_stocks is not None and top_n_stocks <= 0:
+                top_n_stocks = None
             indices_to_track = get_indices_to_track()
             logger.info(f"Fetching data from indices: {', '.join(indices_to_track)}")
             logger.info(f"Stock screener enabled: {use_screener}")

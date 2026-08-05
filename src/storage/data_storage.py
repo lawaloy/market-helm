@@ -64,6 +64,21 @@ def _md_pct(value: Any, precision: int = 1, signed: bool = True) -> str:
     return f"{number:.{precision}f}%"
 
 
+def _atomic_replace(path: Path, write) -> None:
+    """Write to a sibling temp file then replace, preserving prior contents on failure."""
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        write(tmp)
+        tmp.replace(path)
+    except Exception:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
+        raise
+
+
 def _data_date_for_filename() -> datetime.date:
     """Use most recent trading day for filenames. If today is weekend, use last Friday."""
     today = datetime.now().date()
@@ -113,7 +128,7 @@ class DataStorage:
         enrich_stock_data_with_names(data)
         df = pd.DataFrame(data)
         file_path = self._get_daily_file_path(date)
-        df.to_csv(file_path, index=False)
+        _atomic_replace(file_path, lambda tmp: df.to_csv(tmp, index=False))
         return str(file_path)
     
     def load_daily_data(self, date: datetime.date = None) -> Optional[pd.DataFrame]:
@@ -157,9 +172,13 @@ class DataStorage:
         # Default json.dump writes non-standard NaN/Infinity literals; coerce first
         # and refuse allow_nan so dashboard/CLI consumers always get strict JSON.
         payload = _json_safe_value(summary_data)
-        with open(summary_path, 'w') as f:
-            json.dump(payload, f, indent=2, allow_nan=False)
-        
+
+        def _write_summary(tmp: Path) -> None:
+            with open(tmp, "w") as f:
+                json.dump(payload, f, indent=2, allow_nan=False)
+
+        _atomic_replace(summary_path, _write_summary)
+
         return str(summary_path)
     
     def save_projections(self, projections: Dict, date: datetime.date = None) -> str:
@@ -198,7 +217,7 @@ class DataStorage:
         
         # Save CSV
         csv_path = self.data_dir / f"projections_{date.strftime('%Y-%m-%d')}.csv"
-        df.to_csv(csv_path, index=False)
+        _atomic_replace(csv_path, lambda tmp: df.to_csv(tmp, index=False))
         
         # Generate Markdown report
         try:

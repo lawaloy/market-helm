@@ -50,12 +50,15 @@ class TestUserAlertStorage:
         got = storage.get_last_triggered("aapl-drop")
         assert got == datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc)
 
-    def test_get_last_triggered_returns_none_for_corrupt_marker(self, db_user):
+    def test_record_event_sanitizes_corrupt_timestamp_to_utc_now(self, db_user):
         sync_watches_from_config(db_user, _config())
         storage = UserAlertStorage(db_user)
+        before = datetime.now(timezone.utc)
         storage.record_event({"alert_id": "aapl-drop", "timestamp": "not-a-timestamp"})
 
-        assert storage.get_last_triggered("aapl-drop") is None
+        got = storage.get_last_triggered("aapl-drop")
+        assert got is not None
+        assert abs((got - before).total_seconds()) < 5
 
     def test_get_last_triggered_returns_none_when_missing(self, db_user):
         sync_watches_from_config(db_user, _config())
