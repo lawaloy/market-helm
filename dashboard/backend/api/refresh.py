@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Hard ceilings so a poisoned REFRESH_* env cannot monopolize Finnhub/CPU
+# or hold the global refresh lock indefinitely.
+MAX_REFRESH_TOP_N = 500
+MAX_REFRESH_TIMEOUT_SECONDS = 3600
+MAX_REFRESH_WORKERS = 4
+DEFAULT_REFRESH_TOP_N = 10
+DEFAULT_REFRESH_TIMEOUT_SECONDS = 600
+DEFAULT_REFRESH_WORKERS = 4
+
 # Track refresh status
 refresh_status = {
     "is_running": False,
@@ -28,6 +37,38 @@ refresh_status = {
 
 _refresh_process: subprocess.Popen | None = None
 _refresh_cancel_event = threading.Event()
+
+
+def _resolve_refresh_top_n() -> int:
+    """Parse REFRESH_TOP_N with lower floor (when >0) and hard upper ceiling."""
+    top_n_value = os.getenv("REFRESH_TOP_N", str(DEFAULT_REFRESH_TOP_N))
+    try:
+        top_n = max(0, int(top_n_value))
+    except (TypeError, ValueError):
+        top_n = DEFAULT_REFRESH_TOP_N
+    if top_n > 0:
+        top_n = max(DEFAULT_REFRESH_TOP_N, top_n)  # At least 10 stocks when using limit
+    return min(MAX_REFRESH_TOP_N, top_n)
+
+
+def _resolve_refresh_timeout_seconds() -> int:
+    """Parse REFRESH_TIMEOUT_SECONDS with min 1s and hard upper ceiling."""
+    timeout_raw = os.getenv("REFRESH_TIMEOUT_SECONDS", str(DEFAULT_REFRESH_TIMEOUT_SECONDS))
+    try:
+        max_seconds = max(1, int(timeout_raw))
+    except (TypeError, ValueError):
+        max_seconds = DEFAULT_REFRESH_TIMEOUT_SECONDS
+    return min(MAX_REFRESH_TIMEOUT_SECONDS, max_seconds)
+
+
+def _resolve_refresh_max_workers() -> int:
+    """Parse REFRESH_MAX_WORKERS clamped to data_fetcher's 1..4 worker band."""
+    raw = os.getenv("REFRESH_MAX_WORKERS", str(DEFAULT_REFRESH_WORKERS))
+    try:
+        workers = int(raw)
+    except (TypeError, ValueError):
+        workers = DEFAULT_REFRESH_WORKERS
+    return max(1, min(MAX_REFRESH_WORKERS, workers))
 
 
 def _has_refresh_credentials(project_root: Path) -> bool:
@@ -66,17 +107,10 @@ def run_daily_tracker():
         else:
             command = [sys.executable, "-m", "src.cli.commands"]
 
-        # Run market-helm (default to top 10 for faster refresh, minimum 10)
-        top_n_value = os.getenv("REFRESH_TOP_N", "10")
-        try:
-            top_n = max(0, int(top_n_value))
-        except ValueError:
-            top_n = 10
-        if top_n > 0:
-            top_n = max(10, top_n)  # At least 10 stocks when using limit
+        # Run market-helm (default to top 10 for faster refresh; hard-capped).
+        top_n = _resolve_refresh_top_n()
         if top_n:
             command.extend(["--top-n", str(top_n)])
-
 
         no_screener = os.getenv("REFRESH_NO_SCREENER", "1").lower() in {"1", "true", "yes"}
         if no_screener:
@@ -85,15 +119,11 @@ def run_daily_tracker():
         refresh_status["progress"] = "Refreshing..."
 
         env = os.environ.copy()
-        env["STOCK_FETCH_MAX_WORKERS"] = os.getenv("REFRESH_MAX_WORKERS", "4")
+        env["STOCK_FETCH_MAX_WORKERS"] = str(_resolve_refresh_max_workers())
 
         # Parse timeout before spawn so a bad env var cannot orphan a running child
         # (ValueError used to trip the outer except after Popen and clear _refresh_process).
-        timeout_raw = os.getenv("REFRESH_TIMEOUT_SECONDS", "600")
-        try:
-            max_seconds = max(1, int(timeout_raw))
-        except (TypeError, ValueError):
-            max_seconds = 600
+        max_seconds = _resolve_refresh_timeout_seconds()
 
         # Do not use PIPE for stdout/stderr: the tracker logs heavily to the console.
         # Unread PIPE buffers deadlock the child once full (parent only drains in communicate()).
