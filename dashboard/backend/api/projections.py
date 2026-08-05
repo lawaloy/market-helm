@@ -2,11 +2,14 @@
 Projections API endpoints
 """
 import math
+from datetime import datetime, timedelta
 from typing import Any, Optional
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
+
 from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
 from dashboard.backend.services.data_loader import get_data_loader
-from datetime import datetime, timedelta
 from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
@@ -176,9 +179,15 @@ async def get_opportunities(
         
         # Filter by recommendation
         filtered_df = proj_df[proj_df['recommendation'] == rec_map[type]]
-        
-        # Sort by confidence score
-        sorted_df = filtered_df.nlargest(limit, 'confidence')
+
+        # Dirty CSV confidence (strings / object dtype) makes nlargest TypeError → 500.
+        # Coerce to numeric and drop non-finite before ranking; row loop still re-checks.
+        ranking_df = filtered_df.copy()
+        ranking_df["confidence"] = pd.to_numeric(ranking_df["confidence"], errors="coerce")
+        ranking_df = ranking_df[
+            ranking_df["confidence"].map(lambda value: _finite_float(value) is not None)
+        ]
+        sorted_df = ranking_df.nlargest(limit, "confidence")
         
         opportunities = []
         for _, row in sorted_df.iterrows():
