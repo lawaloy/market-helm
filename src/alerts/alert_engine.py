@@ -59,11 +59,17 @@ class AlertEngine:
         alerts = config.get("alerts", [])
         if not isinstance(alerts, list):
             return None
-        enabled = [
-            alert
-            for alert in alerts
-            if isinstance(alert, dict) and alert.get("enabled", False)
-        ]
+        enabled = []
+        for alert in alerts:
+            if not isinstance(alert, dict) or not alert.get("enabled", False):
+                continue
+            # Hand-edited configs may omit id; drop them at load so evaluate
+            # never KeyError mid-run and abort sibling watches.
+            alert_id = alert.get("id")
+            if not isinstance(alert_id, str) or not alert_id.strip():
+                logger.warning("Skipping enabled alert with missing/blank id")
+                continue
+            enabled.append(alert)
         if not enabled:
             return None
         return AlertEngine(enabled, storage=storage, defaults=defaults)
@@ -191,6 +197,13 @@ class AlertEngine:
     def evaluate(self, stocks: List[Dict]) -> List[Dict]:
         events: List[Dict] = []
         for alert in self.alerts:
+            alert_id = alert.get("id")
+            if not isinstance(alert_id, str) or not alert_id.strip():
+                # Direct construction / stale in-memory configs can still lack
+                # id; skip so a KeyError cannot abort later watches.
+                logger.warning("Alert missing id; skipping")
+                continue
+
             if self._within_cooldown(alert):
                 continue
 
@@ -198,7 +211,7 @@ class AlertEngine:
             if not isinstance(condition, dict):
                 logger.warning(
                     "Alert %s has non-object condition; skipping",
-                    alert.get("id"),
+                    alert_id,
                 )
                 continue
             condition_type = condition.get("type")
@@ -237,8 +250,8 @@ class AlertEngine:
                 continue
 
             event = {
-                "alert_id": alert["id"],
-                "alert_name": alert.get("name", alert["id"]),
+                "alert_id": alert_id,
+                "alert_name": alert.get("name", alert_id),
                 "symbols": triggered_symbols,
                 "timestamp": datetime.utcnow().isoformat(),
                 "condition_type": condition_type,
@@ -248,7 +261,7 @@ class AlertEngine:
                 logger.warning(
                     "Alert %s matched but no notifications were delivered; "
                     "leaving it eligible for retry.",
-                    alert["id"],
+                    alert_id,
                 )
                 continue
 
