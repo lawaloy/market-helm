@@ -46,6 +46,29 @@ def normalize_mailgun_api_base(raw: str) -> Optional[str]:
     return f"https://{host}"
 
 
+def normalize_mailgun_domain(raw: str) -> Optional[str]:
+    """Return a hostname-like Mailgun sending domain, or None if unsafe/invalid.
+
+    The domain is interpolated into ``{api_base}/v3/{domain}/messages``. Values with
+    ``/``, ``@``, whitespace, or control characters reshape the request path and
+    must be rejected before authenticated Mailgun calls are made.
+    """
+    text = str(raw).strip()
+    if not text:
+        return None
+    if any(ch in text for ch in ("/", "\\", "@", " ", "\t", "\r", "\n", "\0")):
+        return None
+    # Hostname labels: letters, digits, dots, hyphens only (Mailgun sandbox/custom).
+    if text.startswith(".") or text.endswith(".") or ".." in text:
+        return None
+    for label in text.split("."):
+        if not label or label.startswith("-") or label.endswith("-"):
+            return None
+        if not all(ch.isalnum() or ch == "-" for ch in label):
+            return None
+    return text.lower()
+
+
 def parse_recipients(value: Union[str, List[str], None]) -> List[str]:
     if not value:
         return []
@@ -489,15 +512,22 @@ def build_sendgrid_backend() -> Optional[SendGridEmailBackend]:
 
 def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
     api_key = os.environ.get("MAILGUN_API_KEY")
-    domain = os.environ.get("MAILGUN_DOMAIN")
+    domain_raw = os.environ.get("MAILGUN_DOMAIN")
     if not api_key or not str(api_key).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_API_KEY is missing."
         )
         return None
-    if not domain or not str(domain).strip():
+    if not domain_raw or not str(domain_raw).strip():
         logger.warning(
             "Mailgun email requested but MAILGUN_DOMAIN is missing."
+        )
+        return None
+    domain = normalize_mailgun_domain(str(domain_raw))
+    if domain is None:
+        logger.warning(
+            "MAILGUN_DOMAIN %r is not a valid hostname-like sending domain.",
+            domain_raw,
         )
         return None
     api_base_raw = os.environ.get("MAILGUN_API_BASE", "https://api.mailgun.net")
@@ -511,7 +541,7 @@ def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
         return None
     return MailgunEmailBackend(
         api_key=str(api_key).strip(),
-        domain=str(domain).strip(),
+        domain=domain,
         api_base=api_base,
     )
 

@@ -37,6 +37,9 @@ refresh_status = {
 
 _refresh_process: subprocess.Popen | None = None
 _refresh_cancel_event = threading.Event()
+# Serializes the already-running check + flag set + thread spawn so two
+# overlapping POSTs cannot each start a Finnhub-burning child.
+_refresh_start_lock = threading.Lock()
 
 
 def _resolve_refresh_top_n() -> int:
@@ -213,33 +216,36 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
     4. Save updated CSV/JSON files
     5. Dashboard will automatically show new data
     """
-    if refresh_status["is_running"]:
-        return RefreshResponse(
-            status="already_running",
-            message="Data refresh is already in progress. Please wait.",
-            last_refresh=refresh_status.get("last_refresh"),
-            is_running=True
-        )
-
     project_root = Path(__file__).parent.parent.parent.parent
-    if not _has_refresh_credentials(project_root):
-        refresh_status["last_status"] = "error"
-        refresh_status["progress"] = "Refresh failed. Please check your API key configuration."
-        return RefreshResponse(
-            status="error",
-            message="Refresh failed. Please check your API key configuration.",
-            last_refresh=refresh_status.get("last_refresh"),
-            is_running=False
-        )
+    with _refresh_start_lock:
+        if refresh_status["is_running"]:
+            return RefreshResponse(
+                status="already_running",
+                message="Data refresh is already in progress. Please wait.",
+                last_refresh=refresh_status.get("last_refresh"),
+                is_running=True
+            )
 
-    refresh_status["last_status"] = "running"
-    refresh_status["progress"] = "Starting market-helm..."
-    refresh_status["is_running"] = True
+        if not _has_refresh_credentials(project_root):
+            refresh_status["last_status"] = "error"
+            refresh_status["progress"] = (
+                "Refresh failed. Please check your API key configuration."
+            )
+            return RefreshResponse(
+                status="error",
+                message="Refresh failed. Please check your API key configuration.",
+                last_refresh=refresh_status.get("last_refresh"),
+                is_running=False
+            )
 
-    # Start refresh in background
-    thread = threading.Thread(target=run_daily_tracker, daemon=True)
-    thread.start()
-    
+        refresh_status["last_status"] = "running"
+        refresh_status["progress"] = "Starting market-helm..."
+        refresh_status["is_running"] = True
+
+        # Start refresh in background
+        thread = threading.Thread(target=run_daily_tracker, daemon=True)
+        thread.start()
+
     return RefreshResponse(
         status="started",
         message="Latest data will load when ready.",

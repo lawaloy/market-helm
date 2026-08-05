@@ -85,6 +85,9 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
     setIsRefreshing(true);
     setRefreshNote(null);
     refreshActiveRef.current = true;
+    // Capture generation so a late success after cancel cannot clear the note
+    // or apply a superseded summary fetch started by this poll loop.
+    const pollGeneration = loadGenerationRef.current;
     const pollStarted = Date.now();
 
     try {
@@ -97,7 +100,10 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
         }
 
         const statusRes = await api.get('/api/refresh/status');
-        if (!refreshActiveRef.current) {
+        if (
+          !refreshActiveRef.current ||
+          pollGeneration !== loadGenerationRef.current
+        ) {
           return;
         }
 
@@ -108,6 +114,9 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
 
         if (statusRes.data.last_status === 'success') {
           await fetchSummary();
+          if (pollGeneration !== loadGenerationRef.current) {
+            return;
+          }
           stopRefresh(null);
           return;
         }
@@ -121,18 +130,26 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
         return;
       }
     } catch {
-      if (refreshActiveRef.current) {
+      if (
+        refreshActiveRef.current &&
+        pollGeneration === loadGenerationRef.current
+      ) {
         stopRefresh('Failed to start refresh. Please try again.');
       }
     }
   };
 
   const handleCancelRefresh = async () => {
+    // Invalidate in-flight status / success paths before awaiting cancel so a
+    // late success cannot wipe the cancelled note or reload summary.
     refreshActiveRef.current = false;
+    const generation = ++loadGenerationRef.current;
     try {
       await api.post('/api/refresh/cancel');
+      if (generation !== loadGenerationRef.current) return;
       stopRefresh('Refresh cancelled.');
     } catch {
+      if (generation !== loadGenerationRef.current) return;
       stopRefresh('Failed to cancel refresh.');
     }
   };

@@ -127,3 +127,80 @@ describe('StockTable recommendation filter', () => {
     expect(screen.queryByText('FAKE')).toBeNull();
   });
 });
+
+describe('StockTable non-finite display and pagination clamp', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('soft-fails Infinity / NaN confidence and expectedChange cells', () => {
+    render(
+      <StockTable
+        stocks={[
+          opportunity({
+            symbol: 'BAD',
+            confidence: Number.POSITIVE_INFINITY,
+            expectedChange: Number.NaN,
+          }),
+        ]}
+      />,
+    );
+
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    expect(table.textContent).not.toMatch(/Infinity|NaN/);
+  });
+
+  it('soft-fails Infinity / NaN prices and skips non-string symbols', () => {
+    render(
+      <StockTable
+        stocks={[
+          opportunity({
+            symbol: 'OK',
+            currentPrice: Number.POSITIVE_INFINITY,
+            targetPrice: Number.NaN,
+          }),
+          // Dirty API rows previously threw on symbol.toLowerCase() during search.
+          opportunity({
+            symbol: null as unknown as string,
+            name: 'Poison',
+          }),
+        ]}
+      />,
+    );
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('OK')).toBeTruthy();
+    expect(within(table).queryByText('Poison')).toBeNull();
+    expect(table.textContent).not.toMatch(/\$∞|\$NaN|Infinity|NaN/);
+    // Searching must not throw when a sibling row had a bad symbol (already filtered).
+    fireEvent.change(screen.getByPlaceholderText('Search stocks...'), {
+      target: { value: 'ok' },
+    });
+    expect(within(table).getByText('OK')).toBeTruthy();
+  });
+
+  it('clamps to page 1 when a filter shrinks results below the current page', () => {
+    const stocks = Array.from({ length: 21 }, (_, i) =>
+      opportunity({
+        symbol: `S${String(i).padStart(2, '0')}`,
+        name: `Stock ${i}`,
+        recommendation: i === 0 ? 'BUY' : 'HOLD',
+      }),
+    );
+
+    render(<StockTable stocks={stocks} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Page 2 of 2')).toBeTruthy();
+    expect(screen.getByText('S20')).toBeTruthy();
+
+    fireEvent.change(screen.getByDisplayValue('All'), {
+      target: { value: 'BUY' },
+    });
+
+    expect(screen.getByText('S00')).toBeTruthy();
+    expect(screen.queryByText('Page 2 of')).toBeNull();
+  });
+});
+
