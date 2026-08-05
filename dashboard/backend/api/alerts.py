@@ -215,7 +215,10 @@ async def get_alerts_config(
     has_webhook_secret = _has_webhook_secret(raw or {})
     config = _public_config(_normalize_config(raw))
     defaults = dict(config.get("defaults") or {})
-    if not defaults.get("webhook_format"):
+    # File-mode only: surface process-wide format defaults in the UI. Hosted
+    # tenants must not inherit ALERT_WEBHOOK_FORMAT / DISCORD_WEBHOOK_URL —
+    # that leaks into GET responses and can be persisted on the next PUT.
+    if not defaults.get("webhook_format") and not database_enabled():
         env_format = (os.environ.get("ALERT_WEBHOOK_FORMAT") or "").strip().lower()
         if env_format in {"discord", "slack", "json"}:
             defaults["webhook_format"] = env_format
@@ -241,8 +244,11 @@ async def put_alerts_config(
     _load_env()
     config = _normalize_config(body.model_dump())
     for alert in config["alerts"]:
-        if not alert.get("id"):
+        # Watch sync strips ids; reject whitespace-only before a silent drop.
+        alert_id = str(alert.get("id") or "").strip()
+        if not alert_id:
             raise HTTPException(status_code=400, detail="Each alert must have an id.")
+        alert["id"] = alert_id
     _save_raw_config(user_id, config)
     status_source = config
     if database_enabled() and user_id:

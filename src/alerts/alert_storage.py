@@ -4,7 +4,7 @@ Alert history storage.
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 MAX_DELIVERY_LOG = 100
@@ -12,6 +12,29 @@ MAX_DELIVERY_LOG = 100
 
 def _empty_history() -> Dict[str, Any]:
     return {"last_triggered": {}, "events": [], "delivery_log": []}
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
+    """Return a storeable ISO timestamp, or None when missing/unparseable.
+
+    Corrupt markers must not be persisted: ``get_last_triggered`` returns None
+    for unparseable values, which fails open cooldown (re-fire storms), and
+    delivery-log ordering / status UI can stick on garbage timestamps.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return text
 
 
 class AlertStorage:
@@ -78,7 +101,7 @@ class AlertStorage:
             "channel": channel,
             "success": success,
             "test": test,
-            "timestamp": timestamp or datetime.utcnow().isoformat(),
+            "timestamp": _parseable_iso_timestamp(timestamp) or _utc_now_iso(),
         }
         if error:
             entry["error"] = error[:500]
@@ -104,8 +127,11 @@ class AlertStorage:
 
     def record_event(self, event: Dict) -> None:
         history = self._load()
-        history.setdefault("events", []).append(event)
-        history.setdefault("last_triggered", {})[event["alert_id"]] = event["timestamp"]
+        cleaned = dict(event)
+        ts = _parseable_iso_timestamp(cleaned.get("timestamp")) or _utc_now_iso()
+        cleaned["timestamp"] = ts
+        history.setdefault("events", []).append(cleaned)
+        history.setdefault("last_triggered", {})[cleaned["alert_id"]] = ts
         self._save(history)
 
     def latest_event_timestamp(self) -> Optional[str]:
