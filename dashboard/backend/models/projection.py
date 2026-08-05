@@ -25,6 +25,7 @@ class Opportunity(BaseModel):
     expectedChange: float
     confidence: int
     risk: str
+    recommendation: str
     trend: str
     reason: str
     volume: int

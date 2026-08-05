@@ -23,31 +23,37 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
   const summaryRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   const refreshActiveRef = useRef(false);
-
-  useEffect(() => {
-    fetchSummary(false);
-  }, []);
-
-  useEffect(() => {
-    if (isInitialMount.current) return;
-    fetchSummary(true);
-  }, [refreshKey]);
+  /** Bumped on unmount / superseded refreshKey loads so late responses are ignored. */
+  const loadGenerationRef = useRef(0);
 
   useEffect(() => {
     return () => {
       refreshActiveRef.current = false;
+      loadGenerationRef.current += 1;
     };
   }, []);
 
+  useEffect(() => {
+    void fetchSummary(false);
+  }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current) return;
+    void fetchSummary(true);
+  }, [refreshKey]);
+
   const fetchSummary = async (silent = false) => {
+    const generation = ++loadGenerationRef.current;
     if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await summaryApi.getSummary();
+      if (generation !== loadGenerationRef.current) return;
       setSummary(res.data.summary);
       setDate(res.data.date);
       setSource(res.data.source);
     } catch (e) {
+      if (generation !== loadGenerationRef.current) return;
       if (!silent) {
         let msg = 'Unable to load summary.';
         if (axios.isAxiosError(e)) {
@@ -63,6 +69,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
         setError(msg);
       }
     } finally {
+      if (generation !== loadGenerationRef.current) return;
       setLoading(false);
       if (!silent) isInitialMount.current = false;
     }
