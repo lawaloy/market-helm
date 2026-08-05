@@ -5,13 +5,25 @@ interface SentimentPieChartProps {
   recommendations: Record<string, number>;
 }
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   STRONG_BUY: '#10B981',
   BUY: '#34D399',
   HOLD: '#64748B',
   SELL: '#F59E0B',
   STRONG_SELL: '#EF4444',
 };
+const FALLBACK_COLOR = '#94A3B8';
+
+/** Exported for unit tests — Recharts can pass NaN percent for degenerate slices. */
+export function formatSliceLabel(name: string, percent: number | undefined | null): string {
+  const pct = Number.isFinite(percent) ? (percent as number) * 100 : 0;
+  return `${name}: ${pct.toFixed(1)}%`;
+}
+
+export function colorForRecommendation(displayName: string): string {
+  const key = displayName.replace(/ /g, '_');
+  return COLORS[key] ?? FALLBACK_COLOR;
+}
 
 const SentimentPieChart: React.FC<SentimentPieChartProps> = ({ recommendations }) => {
   // Dirty summary payloads can include NaN/±Inf; Inf > 0 is true and breaks pie math.
@@ -32,13 +44,13 @@ const SentimentPieChart: React.FC<SentimentPieChartProps> = ({ recommendations }
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(1)}%`}
+            label={({ name, percent }) => formatSliceLabel(name, percent)}
             outerRadius={80}
             fill="#8884d8"
             dataKey="value"
           >
             {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[entry.name.replace(' ', '_') as keyof typeof COLORS]} />
+              <Cell key={`cell-${index}`} fill={colorForRecommendation(entry.name)} />
             ))}
           </Pie>
           <Tooltip />

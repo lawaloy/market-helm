@@ -10,9 +10,14 @@ interface CompanyLogoProps {
 
 const CompanyLogo: React.FC<CompanyLogoProps> = ({ symbol, name, size = 24, className }) => {
   const [hasError, setHasError] = useState(false);
-  const logoUrl = useMemo(() => getCompanyLogoUrl(symbol), [symbol]);
-  const initials = symbol?.trim().toUpperCase().slice(0, 2) || '?';
-  const label = name ? `${name} (${symbol})` : symbol;
+  // Dirty table/API rows can pass non-string symbols; ?. only guards nullish.
+  const safeSymbol = typeof symbol === 'string' ? symbol : '';
+  const safeName = typeof name === 'string' ? name : undefined;
+  const logoUrl = useMemo(() => getCompanyLogoUrl(safeSymbol), [safeSymbol]);
+  const initials = safeSymbol.trim().toUpperCase().slice(0, 2) || '?';
+  const label = safeName
+    ? `${safeName} (${safeSymbol || '?'})`
+    : safeSymbol || '?';
 
   return (
     <div
@@ -24,7 +29,7 @@ const CompanyLogo: React.FC<CompanyLogoProps> = ({ symbol, name, size = 24, clas
       {!hasError && logoUrl ? (
         <img
           src={logoUrl}
-          alt={`${symbol} logo`}
+          alt={`${safeSymbol} logo`}
           width={size}
           height={size}
           className="object-contain"

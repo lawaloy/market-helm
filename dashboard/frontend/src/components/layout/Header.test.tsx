@@ -313,6 +313,91 @@ describe('Header refresh controls', () => {
     expect(apiMocks.get.mock.calls.length).toBe(pollsAtTimeout);
   });
 
+  it('does not clear Full refresh status when Reload precedes Fetch New within 1s', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Fetching quotes' },
+    });
+    const onQuickRefresh = vi.fn();
+
+    render(
+      <Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(onQuickRefresh).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Reloading data...')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Refresh started')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fetching...' })).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    // Stale Quick Reload timeout must not wipe in-flight Full refresh status.
+    expect(screen.getByText('Refresh started')).toBeTruthy();
+    expect(screen.queryByText('Reloading data...')).toBeNull();
+  });
+
+  it('clears Reload status after 1s when no Full refresh is running', async () => {
+    vi.useFakeTimers();
+    const onQuickRefresh = vi.fn();
+
+    render(<Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(screen.getByText('Reloading data...')).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(screen.queryByText('Reloading data...')).toBeNull();
+    expect(onQuickRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Failed to start refresh when POST /api/refresh rejects', async () => {
+    vi.useFakeTimers();
+    apiMocks.post.mockRejectedValueOnce(new Error('network'));
+
+    render(<Header dataDate="2026-06-07" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Failed to start refresh')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+  });
+
+  it('clears status when refresh finishes with idle last_status', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValueOnce({
+      data: { is_running: false, last_status: 'idle', progress: '' },
+    });
+
+    render(<Header dataDate="2026-06-07" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(screen.queryByText('Refresh started')).toBeNull();
+    expect(screen.queryByText('Data refreshed successfully!')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+  });
+
   it('ignores a late cancel response after unmount', async () => {
     vi.useFakeTimers();
     apiMocks.get.mockResolvedValue({
