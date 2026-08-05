@@ -63,6 +63,7 @@ def enqueue_job(
                 job_type, payload_json, status, attempts, max_attempts,
                 run_after, created_at, updated_at
             ) VALUES (?, ?, ?, 0, ?, ?, ?, ?)
+            RETURNING id
             """,
             (
                 job_type,
@@ -74,7 +75,7 @@ def enqueue_job(
                 now,
             ),
         )
-        return int(cursor.lastrowid)
+        return int(cursor.fetchone()["id"])
 
 
 def enqueue_jobs(job_type: str, payloads: List[Dict[str, Any]]) -> int:

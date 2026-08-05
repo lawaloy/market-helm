@@ -7,6 +7,10 @@ import pytest
 from src.storage.database import (
     LATEST_SCHEMA_VERSION,
     MigrationError,
+    _MIGRATIONS,
+    _PostgresConnection,
+    _migration_statements,
+    database_backend,
     database_enabled,
     default_database_path,
     get_connection,
@@ -57,7 +61,7 @@ class TestResolveDatabasePath:
 
     def test_non_sqlite_scheme_rejected(self, monkeypatch):
         monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "postgres://localhost/db")
-        with pytest.raises(ValueError, match="Only sqlite URLs"):
+        with pytest.raises(ValueError, match="Expected a sqlite URL"):
             resolve_database_path()
 
     def test_sqlite_url_without_path_rejected(self, monkeypatch):
@@ -81,6 +85,52 @@ class TestResolveDatabasePath:
         )
         with pytest.raises(ValueError, match="without a host"):
             resolve_database_path()
+
+
+class TestDatabaseBackend:
+    @pytest.mark.parametrize("scheme", ["postgres", "postgresql"])
+    def test_postgresql_aliases(self, monkeypatch, scheme):
+        monkeypatch.setenv(
+            "MARKET_HELM_DATABASE_URL", f"{scheme}://db.example/markethelm"
+        )
+        assert database_backend() == "postgresql"
+
+    def test_sqlite_backend(self, monkeypatch):
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///markethelm.db")
+        assert database_backend() == "sqlite"
+
+    def test_unknown_backend_rejected(self, monkeypatch):
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "mysql://localhost/db")
+        with pytest.raises(ValueError, match="Unsupported database URL scheme"):
+            database_backend()
+
+    def test_postgresql_schema_uses_portable_identity_and_collation(self):
+        statements = _migration_statements("postgresql", _MIGRATIONS[0])
+        schema = "\n".join(statements)
+        assert "BIGSERIAL PRIMARY KEY" in schema
+        assert "AUTOINCREMENT" not in schema
+        assert "COLLATE NOCASE" not in schema
+
+    def test_postgresql_adapter_translates_qmark_parameters(self):
+        class FakeConnection:
+            def __init__(self):
+                self.call = None
+
+            def execute(self, sql, params):
+                self.call = (sql, params)
+                return "cursor"
+
+        raw = FakeConnection()
+        connection = _PostgresConnection(raw)
+        result = connection.execute(
+            "SELECT * FROM users WHERE id = ? AND email = ?",
+            ("user-1", "user@example.com"),
+        )
+        assert result == "cursor"
+        assert raw.call == (
+            "SELECT * FROM users WHERE id = %s AND email = %s",
+            ("user-1", "user@example.com"),
+        )
 
 
 class TestInitDatabase:

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Iterator
 from urllib.parse import urlparse
 
 from src.alerts.alert_paths import user_config_dir
@@ -113,6 +113,22 @@ def database_enabled() -> bool:
     return bool((os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip())
 
 
+def database_backend() -> str:
+    """Return the configured storage backend name."""
+    raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
+    if not raw:
+        raise RuntimeError("MARKET_HELM_DATABASE_URL is not set")
+    scheme = urlparse(raw).scheme.lower()
+    if scheme == "sqlite":
+        return "sqlite"
+    if scheme in {"postgres", "postgresql"}:
+        return "postgresql"
+    raise ValueError(
+        f"Unsupported database URL scheme {scheme!r}. "
+        "Use sqlite:///... or postgresql://..."
+    )
+
+
 def resolve_database_path() -> Path:
     """Resolve SQLite file path from MARKET_HELM_DATABASE_URL (sqlite:///...)."""
     raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
@@ -121,8 +137,8 @@ def resolve_database_path() -> Path:
     parsed = urlparse(raw)
     if parsed.scheme != "sqlite":
         raise ValueError(
-            f"Only sqlite URLs are supported today (got {parsed.scheme!r}). "
-            "Use sqlite:////absolute/path/to/markethelm.db"
+            f"Expected a sqlite URL (got {parsed.scheme!r}). "
+            "Use resolve_database_path() only for SQLite connections."
         )
     # sqlite://host/path silently ignored host before and wrote a local file —
     # fail closed so misconfigured hosted URLs cannot point at the wrong DB.
@@ -141,8 +157,38 @@ def resolve_database_path() -> Path:
     raise ValueError(f"Invalid SQLite URL: {raw!r}")
 
 
-@contextmanager
-def get_connection() -> Iterator[sqlite3.Connection]:
+class _PostgresConnection:
+    """Small DB-API compatibility layer for the existing SQLite-style queries."""
+
+    backend = "postgresql"
+
+    def __init__(self, connection: Any):
+        self._connection = connection
+
+    @staticmethod
+    def _query(sql: str) -> str:
+        # Storage SQL uses DB-API qmark placeholders and contains no literal
+        # question marks. Psycopg uses the format placeholder style.
+        return sql.replace("?", "%s")
+
+    def execute(self, sql: str, params: Any = None) -> Any:
+        return self._connection.execute(self._query(sql), params or ())
+
+    def executemany(self, sql: str, params: Any) -> Any:
+        cursor = self._connection.cursor()
+        return cursor.executemany(self._query(sql), params)
+
+    def commit(self) -> None:
+        self._connection.commit()
+
+    def rollback(self) -> None:
+        self._connection.rollback()
+
+    def close(self) -> None:
+        self._connection.close()
+
+
+def _connect_sqlite() -> sqlite3.Connection:
     path = resolve_database_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +202,26 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    return conn
+
+
+def _connect_postgresql() -> _PostgresConnection:
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+    except ImportError as exc:
+        raise RuntimeError(
+            "PostgreSQL support requires Psycopg with a usable libpq implementation. "
+            "Install libpq or psycopg[binary] on a supported platform."
+        ) from exc
+    raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
+    return _PostgresConnection(psycopg.connect(raw, row_factory=dict_row))
+
+
+@contextmanager
+def get_connection() -> Iterator[Any]:
+    backend = database_backend()
+    conn = _connect_sqlite() if backend == "sqlite" else _connect_postgresql()
     try:
         yield conn
         conn.commit()
@@ -166,7 +232,18 @@ def get_connection() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def apply_migrations(conn: sqlite3.Connection) -> None:
+def _migration_statements(backend: str, migration: Migration) -> tuple[str, ...]:
+    if backend == "sqlite":
+        return migration.statements
+    return tuple(
+        statement.replace(" UNIQUE COLLATE NOCASE", " UNIQUE").replace(
+            "INTEGER PRIMARY KEY AUTOINCREMENT", "BIGSERIAL PRIMARY KEY"
+        )
+        for statement in migration.statements
+    )
+
+
+def apply_migrations(conn: Any) -> None:
     """Apply pending schema migrations atomically and in version order."""
     versions = [migration.version for migration in _MIGRATIONS]
     if versions != list(range(1, LATEST_SCHEMA_VERSION + 1)):
@@ -175,7 +252,11 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     try:
         # Serialize startup migrations so concurrent application processes do
         # not both attempt to apply the same version.
-        conn.execute("BEGIN IMMEDIATE")
+        backend = getattr(conn, "backend", "sqlite")
+        if backend == "sqlite":
+            conn.execute("BEGIN IMMEDIATE")
+        else:
+            conn.execute("SELECT pg_advisory_xact_lock(1296387149)")
         conn.execute(_MIGRATION_TABLE)
         applied_rows = conn.execute(
             "SELECT version FROM schema_migrations ORDER BY version"
@@ -192,7 +273,7 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
         for migration in _MIGRATIONS:
             if migration.version in applied:
                 continue
-            for statement in migration.statements:
+            for statement in _migration_statements(backend, migration):
                 conn.execute(statement)
             conn.execute(
                 """INSERT INTO schema_migrations (version, name, applied_at)
@@ -206,7 +287,7 @@ def apply_migrations(conn: sqlite3.Connection) -> None:
     except MigrationError:
         conn.rollback()
         raise
-    except sqlite3.Error as exc:
+    except Exception as exc:
         conn.rollback()
         raise MigrationError(f"Failed to apply database migrations: {exc}") from exc
 

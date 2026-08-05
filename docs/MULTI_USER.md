@@ -32,6 +32,17 @@ export MARKET_HELM_AUTH_SECRET=change-me-in-production-min-16-chars
 
 When `MARKET_HELM_DATABASE_URL` is **unset**, behavior is unchanged (file-backed alerts).
 
+For hosted environments, use a PostgreSQL URL instead:
+
+```bash
+export MARKET_HELM_DATABASE_URL=postgresql://user:password@host:5432/markethelm
+```
+
+Both backends use the same storage API and migration history. SQLite remains the
+recommended local-development backend; PostgreSQL is recommended for hosted use.
+The base package includes portable Psycopg; production images must also provide
+`libpq` (or explicitly install `psycopg[binary]` on a supported platform).
+
 ### Schema upgrades
 
 `init_database()` applies pending schema migrations in version order at startup.
@@ -71,6 +82,6 @@ curl http://localhost:8000/api/alerts/config \
 
 | Priority | Work |
 |----------|------|
-| 1 | **PostgreSQL storage** — add a production database adapter using the versioned schema boundary |
+| 1 | **PostgreSQL deployment verification** — exercise migrations and worker concurrency against a managed staging database |
 | 2 | **Auth lifecycle** — password reset, email verification, and session invalidation |
 | 3 | **Production controls** — rate limits, account controls, observability, hosted deploy docs |

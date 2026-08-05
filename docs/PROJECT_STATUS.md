@@ -96,7 +96,7 @@ per-user alerts, the database-backed worker queue, and delivery history.
 | Per-user alerts API when `MARKET_HELM_DATABASE_URL` set | Done |
 | Helmtower sign-in / sign-up UI | Done |
 | Multi-user alert worker + delivery history | Done |
-| Versioned database migrations | In progress (`feat/hosted-beta-readiness`) |
+| Versioned SQLite/PostgreSQL migrations | In progress (`feat/hosted-beta-readiness`) |
 
 See [MULTI_USER.md](MULTI_USER.md).
 
@@ -110,7 +110,7 @@ The multi-user foundation is complete. Remaining work for a hosted beta:
 
 - [x] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
 - [x] **Multi-user worker and delivery history** — database-backed orchestration, jobs, cooldown state, and per-user outcomes
-- [ ] **Production database** — versioned migrations (in progress), then PostgreSQL support
+- [ ] **Production database** — adapter and versioned migrations implemented; managed PostgreSQL staging verification remains
 - [ ] **Auth lifecycle** — password reset, email verification, session invalidation
 - [ ] **Production controls** — rate limits, account deletion/export, observability, hosted deploy docs
 
