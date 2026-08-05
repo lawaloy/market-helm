@@ -142,6 +142,68 @@ describe('Summary refresh controls', () => {
     expect(apiMocks.get.mock.calls.length).toBe(pollsBeforeCancel);
   });
 
+  it('ignores a late successful status response after cancel', async () => {
+    vi.useFakeTimers();
+    let resolveStatus: ((value: { data: Record<string, unknown> }) => void) | undefined;
+    apiMocks.get.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        }),
+    );
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return { data: { message: 'cancelled' } };
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+    apiMocks.getSummary
+      .mockRejectedValueOnce(notFoundError())
+      .mockResolvedValue({
+        data: {
+          summary: 'Late success must not replace the empty state.',
+          date: '2026-08-05',
+          source: 'demo',
+        },
+      });
+
+    await renderEmptySummary();
+    const summaryLoadsBefore = apiMocks.getSummary.mock.calls.length;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.get).toHaveBeenCalledWith('/api/refresh/status');
+    expect(resolveStatus).toBeTypeOf('function');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
+
+    await act(async () => {
+      resolveStatus?.({
+        data: { is_running: false, last_status: 'success' },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+
+    expect(apiMocks.getSummary.mock.calls.length).toBe(summaryLoadsBefore);
+    expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
+    expect(
+      screen.queryByText('Late success must not replace the empty state.'),
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+  });
+
   it('stops polling after max wait without loading a summary', async () => {
     vi.useFakeTimers();
     apiMocks.get.mockResolvedValue({
@@ -206,6 +268,44 @@ describe('Summary refresh controls', () => {
 
     // Unmount cleared the active flag before the late success could reload summary.
     expect(apiMocks.getSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a late cancel response after unmount', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Fetching quotes' },
+    });
+    let resolveCancel: ((value: unknown) => void) | undefined;
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        return new Promise((resolve) => {
+          resolveCancel = resolve;
+        });
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+
+    await renderEmptySummary();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    cleanup();
+
+    await act(async () => {
+      resolveCancel?.({ data: { message: 'cancelled' } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Refresh cancelled.')).toBeNull();
   });
 });
 

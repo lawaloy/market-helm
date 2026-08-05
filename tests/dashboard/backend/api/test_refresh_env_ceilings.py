@@ -55,6 +55,13 @@ def test_resolve_refresh_top_n_clamps_extreme_values(monkeypatch) -> None:
     monkeypatch.setenv("REFRESH_TOP_N", "0")
     assert refresh._resolve_refresh_top_n() == 0
 
+    # Negatives must not collapse to unlimited (0) via max(0, n).
+    monkeypatch.setenv("REFRESH_TOP_N", "-1")
+    assert refresh._resolve_refresh_top_n() == refresh.DEFAULT_REFRESH_TOP_N
+
+    monkeypatch.setenv("REFRESH_TOP_N", "-999")
+    assert refresh._resolve_refresh_top_n() == refresh.DEFAULT_REFRESH_TOP_N
+
 
 def test_resolve_refresh_timeout_clamps_extreme_values(monkeypatch) -> None:
     monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "999999999")
@@ -115,3 +122,21 @@ def test_run_daily_tracker_honors_top_n_and_timeout_ceilings(monkeypatch) -> Non
     )
     assert refresh.refresh_status["last_status"] == "timeout"
     assert fake_process.terminated is True
+
+
+def test_run_daily_tracker_negative_top_n_keeps_default_cap(monkeypatch) -> None:
+    """Typo REFRESH_TOP_N=-1 must still pass --top-n DEFAULT, not unbounded."""
+    _reset()
+    fake_process = _FakeProcess(returncode=0, running=False)
+    popen = MagicMock(return_value=fake_process)
+
+    monkeypatch.setattr(refresh.subprocess, "Popen", popen)
+    monkeypatch.setenv("REFRESH_TOP_N", "-1")
+    monkeypatch.setenv("REFRESH_NO_SCREENER", "1")
+    monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
+
+    refresh.run_daily_tracker()
+
+    command = popen.call_args.args[0]
+    assert "--top-n" in command
+    assert command[command.index("--top-n") + 1] == str(refresh.DEFAULT_REFRESH_TOP_N)

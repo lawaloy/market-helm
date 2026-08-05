@@ -14,6 +14,7 @@ import math
 import pandas as pd
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
+from ..utils.tickers import normalize_ticker
 
 logger = setup_logger("projector")
 
@@ -49,6 +50,15 @@ class StockProjector:
         Returns:
             Dictionary mapping symbols to their projections
         """
+        # Dirty callers can pass None/dict/scalar; soft-fail so projection batch
+        # never TypeErrors on len()/iteration and aborts the daily run.
+        if not isinstance(current_data, list):
+            logger.warning(
+                "generate_projections expected a list, got %s; returning empty",
+                type(current_data).__name__,
+            )
+            return {}
+
         logger.info(f"Generating projections for {len(current_data)} stocks")
         
         projections = {}
@@ -58,9 +68,12 @@ class StockProjector:
             # one bad entry cannot AttributeError the whole daily projection run.
             if not isinstance(stock, dict):
                 continue
-            symbol = stock.get('symbol')
+            # NaN/NONE/blank symbols are truthy or collapse under one key — skip
+            # and canonicalize so projection maps never store float("nan").
+            symbol = normalize_ticker(stock.get('symbol'))
             if not symbol:
                 continue
+            stock = {**stock, 'symbol': symbol}
             
             projection = self._project_stock(stock, historical_data)
             if projection:

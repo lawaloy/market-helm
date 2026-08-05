@@ -14,6 +14,7 @@ from .alert_rules import evaluate_price_threshold, evaluate_screening_match
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
+from src.utils.company_names import _clean_display_name
 from src.utils.tickers import normalize_ticker
 
 logger = setup_logger("alerts")
@@ -127,7 +128,16 @@ class AlertEngine:
         if not delivered:
             return False
 
-        self.storage.record_event(event)
+        # Notifiers already succeeded — a history write failure must not raise
+        # and cause job retries / duplicate sends, or abort sibling watches.
+        try:
+            self.storage.record_event(event)
+        except Exception as exc:
+            logger.warning(
+                "Alert %s delivered but event history write failed: %s",
+                alert.get("id"),
+                exc,
+            )
         return True
 
     def _within_cooldown(self, alert: Dict) -> bool:
@@ -196,6 +206,11 @@ class AlertEngine:
 
     def evaluate(self, stocks: List[Dict]) -> List[Dict]:
         events: List[Dict] = []
+        # Hand-edited / corrupt runners can pass None/dict; iterating must not
+        # TypeError and abort the entire alert check cycle.
+        if not isinstance(stocks, list):
+            logger.warning("Alert evaluate received non-list stocks; skipping")
+            return events
         for alert in self.alerts:
             alert_id = alert.get("id")
             if not isinstance(alert_id, str) or not alert_id.strip():
@@ -249,9 +264,11 @@ class AlertEngine:
             if not triggered_symbols:
                 continue
 
+            # Float NaN names stringify to "nan" and leak into email/webhook copy.
+            alert_name = _clean_display_name(alert.get("name")) or alert_id
             event = {
                 "alert_id": alert_id,
-                "alert_name": alert.get("name", alert_id),
+                "alert_name": alert_name,
                 "symbols": triggered_symbols,
                 "timestamp": datetime.utcnow().isoformat(),
                 "condition_type": condition_type,
