@@ -243,7 +243,8 @@ async def get_opportunities(
 
             opportunities.append(Opportunity(
                 symbol=symbol,
-                name=row.get('name', symbol),
+                # Dirty CSV name/reason cells (NaN/None) fail Pydantic str → 500.
+                name=_safe_label(row.get('name'), symbol),
                 currentPrice=current_price,
                 targetPrice=target_price,
                 expectedChange=expected_change,
@@ -253,7 +254,7 @@ async def get_opportunities(
                 # by BUY/HOLD/SELL without conflating it with Bullish/Bearish trend.
                 recommendation=rec_map[type],
                 trend=_safe_label(row.get("trend"), "Neutral"),
-                reason=row.get('reason', '') or '',
+                reason=_safe_label(row.get('reason'), ''),
                 volume=volume,
                 momentum=momentum,
                 volatility=volatility,
