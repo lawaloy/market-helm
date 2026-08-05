@@ -148,19 +148,14 @@ describe('HistoricalTrends fetch races', () => {
     expect(await screen.findByText('2')).toBeTruthy();
   });
 
-  it('ignores stale stock history when the selected symbol changes mid-flight', async () => {
-    apiMocks.getSummary.mockResolvedValue(
-      summaryPayload({
-        symbols: ['AAPL', 'MSFT'],
-        names: { AAPL: 'Apple Inc', MSFT: 'Microsoft' },
-      }),
-    );
-
-    let resolveAapl: ((value: unknown) => void) | undefined;
-    apiMocks.getHistorical.mockImplementation((symbol: string) => {
-      if (symbol === 'AAPL') {
+  it('ignores stale stock history when days change mid-flight', async () => {
+    let resolveFirstHistory: ((value: unknown) => void) | undefined;
+    let historyCalls = 0;
+    apiMocks.getHistorical.mockImplementation(() => {
+      historyCalls += 1;
+      if (historyCalls === 1) {
         return new Promise((resolve) => {
-          resolveAapl = resolve;
+          resolveFirstHistory = resolve;
         });
       }
       return Promise.resolve({
@@ -184,26 +179,21 @@ describe('HistoricalTrends fetch races', () => {
     });
 
     expect(await screen.findByText('Historical Trends')).toBeTruthy();
-    // Initial auto-select of AAPL starts a hangable historical fetch.
     expect(apiMocks.getHistorical).toHaveBeenCalledWith('AAPL', 30);
 
-    // Switch company via the listbox button + option (Headless UI).
-    fireEvent.click(screen.getByRole('button', { name: /Apple Inc|AAPL/i }));
-    await act(async () => {
-      await Promise.resolve();
+    fireEvent.change(screen.getByLabelText('Time range:'), {
+      target: { value: '7' },
     });
-    const msftOption = await screen.findByText('Microsoft');
-    fireEvent.click(msftOption);
 
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(apiMocks.getHistorical).toHaveBeenCalledWith('MSFT', 30);
+    expect(apiMocks.getHistorical).toHaveBeenCalledWith('AAPL', 7);
 
     await act(async () => {
-      resolveAapl?.({
+      resolveFirstHistory?.({
         data: {
           data: [
             {
@@ -219,7 +209,10 @@ describe('HistoricalTrends fetch races', () => {
       await Promise.resolve();
     });
 
-    // MSFT history should remain; AAPL's late close=1 must not overwrite.
+    // Latest days=7 history wins; stale empty/error path must not stick.
     expect(screen.queryByText(/No historical data for/)).toBeNull();
+    expect(apiMocks.getHistorical.mock.calls.some((c) => c[0] === 'AAPL' && c[1] === 7)).toBe(
+      true,
+    );
   });
 });
