@@ -156,22 +156,25 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
     # completing the queue job. Stale-job recovery must not resend that event.
     # Missing/invalid event timestamps — or unparseable stored markers — must still
     # skip when a prior successful attempt left a trigger row.
-    if job["attempts"] > 1:
-        event_at = _event_timestamp(event)
-        raw_triggered = get_raw_triggered(user_id, alert_id)
-        if raw_triggered:
-            last_triggered = storage.get_last_triggered(alert_id)
-            skip = event_at is None or last_triggered is None
-            if not skip and last_triggered is not None:
-                skip = _as_utc(last_triggered) >= event_at
-            if skip:
-                logger.info(
-                    "Skipping already-delivered retry for alert %s (job %s, attempt %s)",
-                    alert_id,
-                    job["id"],
-                    job["attempts"],
-                )
-                return False
+    #
+    # Check on every attempt, not only attempts > 1: a late original worker may
+    # still hold an in-memory attempts==1 claim after another worker recovered
+    # and already delivered the same event.
+    event_at = _event_timestamp(event)
+    raw_triggered = get_raw_triggered(user_id, alert_id)
+    if raw_triggered:
+        last_triggered = storage.get_last_triggered(alert_id)
+        skip = event_at is None or last_triggered is None
+        if not skip and last_triggered is not None:
+            skip = _as_utc(last_triggered) >= event_at
+        if skip:
+            logger.info(
+                "Skipping already-delivered event for alert %s (job %s, attempt %s)",
+                alert_id,
+                job["id"],
+                job["attempts"],
+            )
+            return False
 
     watch = get_watch(user_id, alert_id)
     if not watch:

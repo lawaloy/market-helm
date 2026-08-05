@@ -23,6 +23,24 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
+    """Return a storeable ISO timestamp, or None when missing/unparseable.
+
+    Delivery log rows are ordered by timestamp text. Corrupt values like
+    ``"zzzz"`` can sort as newest forever and distort prune / status UI.
+    """
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return text
+
+
 def _coerce_threshold(raw_value: Any, alert_id: str) -> Optional[float]:
     if raw_value is None:
         return None
@@ -281,7 +299,7 @@ def record_delivery(
     error: Optional[str] = None,
     timestamp: Optional[str] = None,
 ) -> None:
-    ts = timestamp or _utc_now()
+    ts = _parseable_iso_timestamp(timestamp) or _utc_now()
     with get_connection() as conn:
         conn.execute(
             """

@@ -33,6 +33,8 @@ describe('safeReturnPath', () => {
     expect(safeReturnPath('https://evil.example/phish')).toBe('/alerts');
     expect(safeReturnPath('//evil.example/phish')).toBe('/alerts');
     expect(safeReturnPath('\\\\evil.example')).toBe('/alerts');
+    expect(safeReturnPath('/\\evil.example')).toBe('/alerts');
+    expect(safeReturnPath('/alerts/..\\evil')).toBe('/alerts');
     expect(safeReturnPath(null)).toBe('/alerts');
     expect(safeReturnPath('')).toBe('/alerts');
   });

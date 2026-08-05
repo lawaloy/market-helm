@@ -8,7 +8,8 @@ type AuthMode = 'sign-in' | 'sign-up';
 
 /** Only same-app relative paths; reject protocol-relative and external URLs. */
 export function safeReturnPath(raw: string | null): string {
-  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) {
+  // Backslashes can be treated as separators in some browsers (open-redirect).
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) {
     return '/alerts';
   }
   return raw;
