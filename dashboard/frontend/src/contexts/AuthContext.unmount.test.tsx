@@ -56,11 +56,11 @@ describe('AuthProvider init cancel', () => {
   });
 
   it('ignores a late multi-user probe after unmount when no token is stored', async () => {
-    let resolveMe: ((value: unknown) => void) | undefined;
+    let rejectMe: ((reason?: unknown) => void) | undefined;
     vi.spyOn(authApi, 'me').mockImplementation(
       () =>
-        new Promise((resolve, reject) => {
-          resolveMe = reject;
+        new Promise((_resolve, reject) => {
+          rejectMe = reject;
         }),
     );
 
@@ -77,7 +77,7 @@ describe('AuthProvider init cancel', () => {
     cleanup();
 
     await act(async () => {
-      resolveMe?.({
+      rejectMe?.({
         isAxiosError: true,
         response: { status: 401 },
       });
