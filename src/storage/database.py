@@ -124,7 +124,15 @@ def resolve_database_path() -> Path:
 @contextmanager
 def get_connection() -> Iterator[sqlite3.Connection]:
     path = resolve_database_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        # Unwritable / blocked parents must surface as a clear RuntimeError so
+        # multi-user auth/alerts paths fail closed with an actionable message
+        # instead of an opaque PermissionError from pathlib.
+        raise RuntimeError(
+            f"Cannot create database directory {path.parent}: {exc}"
+        ) from exc
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

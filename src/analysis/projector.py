@@ -50,6 +50,15 @@ class StockProjector:
         Returns:
             Dictionary mapping symbols to their projections
         """
+        # Dirty callers can pass None/dict/scalar; soft-fail so projection batch
+        # never TypeErrors on len()/iteration and aborts the daily run.
+        if not isinstance(current_data, list):
+            logger.warning(
+                "generate_projections expected a list, got %s; returning empty",
+                type(current_data).__name__,
+            )
+            return {}
+
         logger.info(f"Generating projections for {len(current_data)} stocks")
         
         projections = {}

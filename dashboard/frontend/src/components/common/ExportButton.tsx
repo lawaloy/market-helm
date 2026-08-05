@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { exportToCsv, exportToPng, exportToPdf } from '../../utils/exportUtils';
 import type { Opportunity } from '../../types';
@@ -24,8 +24,20 @@ const ExportButton: React.FC<ExportButtonProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState<string | null>(null);
+  /** Sync guard: disabled attrs alone cannot block double-clicks before re-render. */
+  const exportingRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const handleExport = async (format: 'csv' | 'png' | 'pdf') => {
+    if (exportingRef.current) return;
+    exportingRef.current = true;
     setExporting(format);
     try {
       if (format === 'csv' && stocks.length > 0) {
@@ -40,8 +52,11 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     } catch (err) {
       console.error('Export failed:', err);
     } finally {
-      setExporting(null);
-      setOpen(false);
+      exportingRef.current = false;
+      if (mountedRef.current) {
+        setExporting(null);
+        setOpen(false);
+      }
     }
   };
 
