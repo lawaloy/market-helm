@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,29 @@ STATUS_COMPLETED = "completed"
 STATUS_FAILED = "failed"
 
 DEFAULT_STALE_JOB_TIMEOUT_SECONDS = 30 * 60
+# Hard ceiling so a poisoned retry_delay cannot OverflowError fromtimestamp
+# or schedule run_after years out.
+MAX_RETRY_DELAY_SECONDS = 86400
+
+
+def _clamp_retry_delay_seconds(retry_delay_seconds: Any) -> int:
+    """Bound retry delay to [0, MAX]; non-numeric / non-finite → 0."""
+    try:
+        delay = float(retry_delay_seconds)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(delay):
+        return 0
+    return max(0, min(int(delay), MAX_RETRY_DELAY_SECONDS))
+
+
+def _clamp_claim_limit(limit: Any) -> int:
+    """SQLite LIMIT -1 means unlimited; force a non-negative int floor."""
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, value)
 
 
 def _utc_now() -> str:
@@ -83,6 +107,8 @@ def claim_jobs(
 ) -> List[Dict[str, Any]]:
     if not job_types:
         return []
+    # Negative LIMIT is unlimited in SQLite — never drain the whole queue by accident.
+    limit = _clamp_claim_limit(limit)
     now_dt = datetime.now(timezone.utc)
     now = now_dt.isoformat()
     placeholders = ",".join("?" for _ in job_types)
@@ -205,6 +231,7 @@ def fail_job(
     """
     now_dt = datetime.now(timezone.utc)
     now = now_dt.isoformat()
+    delay = _clamp_retry_delay_seconds(retry_delay_seconds)
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -237,7 +264,7 @@ def fail_job(
             )
             return updated.rowcount == 1
         run_after = datetime.fromtimestamp(
-            now_dt.timestamp() + retry_delay_seconds,
+            now_dt.timestamp() + delay,
             tz=timezone.utc,
         ).isoformat()
         updated = conn.execute(
