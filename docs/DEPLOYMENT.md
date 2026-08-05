@@ -43,6 +43,12 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 | `FINNHUB_API_KEY` | Tracker CLI | Market data (required for live fetches) |
 | `CORS_ORIGINS` | Dashboard backend | Comma-separated origins allowed in browser (e.g. `https://app.example.com`) |
 | `VITE_API_URL` | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`) |
+| `MARKET_HELM_RATE_LIMIT_ENABLED` | Dashboard backend | Enables API rate limiting; defaults on when database mode is enabled |
+| `MARKET_HELM_RATE_LIMIT_GLOBAL` | Dashboard backend | Per-client API requests/minute (default `120`) |
+| `MARKET_HELM_RATE_LIMIT_LOGIN` | Dashboard backend | Login attempts/client/minute (default `10`) |
+| `MARKET_HELM_RATE_LIMIT_REGISTER` | Dashboard backend | Registrations/client/hour (default `5`) |
+| `MARKET_HELM_RATE_LIMIT_EXPENSIVE` | Dashboard backend | Expensive write requests/client/minute (default `10`) |
+| `MARKET_HELM_TRUSTED_PROXY_CIDRS` | Dashboard backend | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For` |
 | `ALERT_WEBHOOK_URL` | Tracker (alerts) | Default webhook when rules use `webhook` without per-rule `url` |
 | `ALERT_WEBHOOK_FORMAT` | Tracker (alerts) | `json`, `slack`, or `discord` webhook body format |
 | `DISCORD_WEBHOOK_URL` | Tracker (alerts) | Default Discord incoming webhook URL when a rule has no `webhook_url` |
@@ -65,6 +71,23 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 **Dev vs product email:** SMTP env vars suit **self-host / operator** mail (e.g. personal Gmail). For production, use a transactional provider with a verified domain — see [Transactional alert email](#transactional-alert-email) below.
 
 Never commit values; use your host’s secret manager or encrypted env.
+
+### API rate limiting
+
+Hosted database mode enables rate limiting automatically. Counters are stored in
+SQLite or PostgreSQL so PostgreSQL deployments share limits across every API
+instance. File mode remains unlimited unless `MARKET_HELM_RATE_LIMIT_ENABLED=true`;
+in that mode counters are process-local and intended only for development.
+
+The API returns `429 Too Many Requests` with `Retry-After` and
+`X-RateLimit-*` response headers. If the shared rate-limit database is unavailable,
+hosted API requests fail closed with `503` instead of silently bypassing limits.
+
+Do not trust forwarded client headers by default. When a known load balancer or
+reverse proxy connects directly to MarketHelm, set `MARKET_HELM_TRUSTED_PROXY_CIDRS`
+to only that proxy network. The middleware walks `X-Forwarded-For` from right to
+left and selects the first untrusted hop, preventing a client-supplied prefix from
+bypassing per-client limits.
 
 ---
 

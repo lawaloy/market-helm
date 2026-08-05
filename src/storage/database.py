@@ -98,6 +98,21 @@ _MIGRATIONS = (
     ON alert_jobs(status, run_after, id)""",
         ),
     ),
+    Migration(
+        version=2,
+        name="api_rate_limits",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS api_rate_limits (
+    bucket_key TEXT NOT NULL,
+    window_start INTEGER NOT NULL,
+    request_count INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    PRIMARY KEY (bucket_key, window_start)
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_api_rate_limits_expiry
+    ON api_rate_limits(expires_at)""",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version

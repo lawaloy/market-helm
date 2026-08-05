@@ -17,6 +17,7 @@ from src.storage.alert_jobs import (
 )
 from src.storage.alert_watches import get_watch
 from src.storage.database import get_connection, init_database
+from src.storage.rate_limits import consume_rate_limit
 from src.storage.user_alerts import load_user_alerts_config, save_user_alerts_config
 from src.storage.users import create_user
 
@@ -95,4 +96,8 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == [1]
+    assert [row["version"] for row in versions] == [1, 2]
+
+    first_limit = consume_rate_limit("integration:client", now=121, window_seconds=60)
+    second_limit = consume_rate_limit("integration:client", now=122, window_seconds=60)
+    assert (first_limit.count, second_limit.count, second_limit.reset_at) == (1, 2, 180)

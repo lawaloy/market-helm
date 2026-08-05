@@ -168,7 +168,8 @@ class TestDatabaseMigrations:
 
         with get_connection() as conn:
             migration = conn.execute(
-                "SELECT version, name, applied_at FROM schema_migrations"
+                """SELECT version, name, applied_at FROM schema_migrations
+                   ORDER BY version DESC LIMIT 1"""
             ).fetchone()
             tables = {
                 row["name"]
@@ -178,7 +179,7 @@ class TestDatabaseMigrations:
             }
 
         assert migration["version"] == LATEST_SCHEMA_VERSION
-        assert migration["name"] == "initial_multi_user_schema"
+        assert migration["name"] == "api_rate_limits"
         assert migration["applied_at"]
         assert {"users", "alert_watches", "alert_jobs"}.issubset(tables)
 
@@ -208,7 +209,9 @@ class TestDatabaseMigrations:
                 "SELECT version FROM schema_migrations"
             ).fetchall()
         assert user["email"] == "user@example.com"
-        assert [row["version"] for row in versions] == [LATEST_SCHEMA_VERSION]
+        assert [row["version"] for row in versions] == list(
+            range(1, LATEST_SCHEMA_VERSION + 1)
+        )
 
     def test_repeated_initialization_is_idempotent(self, monkeypatch, tmp_path):
         self.configure_database(monkeypatch, tmp_path)
@@ -218,7 +221,7 @@ class TestDatabaseMigrations:
 
         with get_connection() as conn:
             count = conn.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
-        assert count == 1
+        assert count == LATEST_SCHEMA_VERSION
 
     def test_unknown_future_schema_version_fails_closed(self, monkeypatch, tmp_path):
         self.configure_database(monkeypatch, tmp_path)
