@@ -205,6 +205,34 @@ def test_has_refresh_credentials_checks_env_var_and_dotenv(tmp_path, monkeypatch
     assert refresh._has_refresh_credentials(tmp_path) is True
 
 
+def test_has_refresh_credentials_rejects_empty_or_unrelated_dotenv(
+    tmp_path, monkeypatch
+) -> None:
+    """A present .env without a usable Finnhub key must not false-start refresh."""
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+
+    (tmp_path / ".env").write_text("", encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-demo\n", encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+    (tmp_path / ".env").write_text("FINNHUB_API_KEY=\n", encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+    (tmp_path / ".env").write_text('FINNHUB_API_KEY=""\n', encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+    (tmp_path / ".env").write_text(
+        "export FINNHUB_API_KEY='real-key'\n", encoding="utf-8"
+    )
+    assert refresh._has_refresh_credentials(tmp_path) is True
+
+    monkeypatch.setenv("FINNHUB_API_KEY", "   ")
+    (tmp_path / ".env").write_text("OPENAI_API_KEY=sk-demo\n", encoding="utf-8")
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+
 def test_run_daily_tracker_timeout_terminates_without_alert_check(monkeypatch) -> None:
     """Wall-clock timeout must stop a hung child and skip post-refresh alerts."""
     reset_refresh_state()
