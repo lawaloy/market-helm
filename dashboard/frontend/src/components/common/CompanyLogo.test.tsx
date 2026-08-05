@@ -20,4 +20,12 @@ describe('CompanyLogo', () => {
     expect(screen.queryByRole('img')).toBeNull();
     expect(container.querySelector('span')?.textContent).toBe('?');
   });
+
+  it('falls back to initials when the logo image errors', () => {
+    const { container } = render(<CompanyLogo symbol="MSFT" name="Microsoft" />);
+    const img = screen.getByRole('img', { name: 'MSFT logo' });
+    img.dispatchEvent(new Event('error'));
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(container.querySelector('span')?.textContent).toBe('MS');
+  });
 });
