@@ -372,6 +372,97 @@ def record_trigger(user_id: str, alert_id: str, timestamp: Optional[str] = None)
         )
 
 
+def _as_utc_datetime(raw: Any) -> Optional[datetime]:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def try_claim_trigger(
+    user_id: str,
+    alert_id: str,
+    timestamp: Optional[str] = None,
+    *,
+    cooldown_minutes: int = 0,
+) -> tuple[bool, Optional[str]]:
+    """Atomically claim a delivery slot before sending notifications.
+
+    Returns ``(claimed, previous_timestamp)``. Callers that fail after a
+    successful claim must ``restore_trigger_claim`` so retries stay eligible.
+
+    Under a positive cooldown, concurrent workers that both passed a stale
+    read of trigger state cannot both send — only the IMMEDIATE winner
+    proceeds. Same/newer event timestamps still lose the claim.
+    """
+    from datetime import timedelta
+
+    claim_ts = timestamp or _utc_now()
+    event_at = _as_utc_datetime(timestamp) if timestamp else None
+
+    with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+            (user_id, alert_id),
+        ).fetchone()
+        previous = str(row["last_triggered_at"]) if row else None
+
+        if previous is not None:
+            # Mirror job_processor: missing/invalid event stamps still skip when
+            # a prior successful delivery left a trigger row.
+            if event_at is None:
+                return False, previous
+            last_at = _as_utc_datetime(previous)
+            if last_at is None or last_at >= event_at:
+                return False, previous
+            if cooldown_minutes > 0:
+                now = datetime.now(timezone.utc)
+                if now - last_at < timedelta(minutes=int(cooldown_minutes)):
+                    return False, previous
+
+        conn.execute(
+            """
+            INSERT INTO alert_trigger_state (user_id, alert_id, last_triggered_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, alert_id) DO UPDATE SET last_triggered_at = excluded.last_triggered_at
+            """,
+            (user_id, alert_id, claim_ts),
+        )
+        return True, previous
+
+
+def restore_trigger_claim(
+    user_id: str,
+    alert_id: str,
+    previous: Optional[str],
+) -> None:
+    """Roll back a ``try_claim_trigger`` after a failed notification send."""
+    with get_connection() as conn:
+        if previous is None:
+            conn.execute(
+                "DELETE FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                (user_id, alert_id),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE alert_trigger_state
+                SET last_triggered_at = ?
+                WHERE user_id = ? AND alert_id = ?
+                """,
+                (previous, user_id, alert_id),
+            )
+
+
 def record_delivery(
     user_id: str,
     alert_id: str,
