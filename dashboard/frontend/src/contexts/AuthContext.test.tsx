@@ -128,6 +128,99 @@ describe('AuthProvider', () => {
     expect(me).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps a stored token when /me returns 500 so a blip does not sign the user out', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(500));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a stored token when /me returns 503 so RequireAuth stays gated', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(503));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a stored token on network /me failure while staying in hosted mode', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
+    const networkErr = {
+      isAxiosError: true,
+      message: 'Network Error',
+      response: undefined,
+    };
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(networkErr);
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a stored token on 403 and probes hosted mode', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'forbidden-token');
+    const me = vi
+      .spyOn(authApi, 'me')
+      .mockRejectedValueOnce(axiosStatus(403))
+      .mockRejectedValueOnce(axiosStatus(401));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(me).toHaveBeenCalledTimes(2);
+  });
+
+  it('drops a stored token on 501 and leaves single-user mode', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'stale-token');
+    const me = vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(501));
+
+    render(
+      <AuthProvider>
+        <AuthState />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('single-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(me).toHaveBeenCalledTimes(1);
+  });
+
   it('restores a valid session and enables multi-user mode', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
     const me = vi.spyOn(authApi, 'me').mockResolvedValueOnce({

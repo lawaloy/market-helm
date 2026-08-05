@@ -3,6 +3,8 @@
 import sys
 from pathlib import Path
 
+import pytest
+
 from src.alerts.alert_paths import (
     apply_alert_defaults,
     update_user_env_vars,
@@ -158,6 +160,39 @@ def test_polish_alerts_config_strips_your_webhook_placeholder(monkeypatch) -> No
         }
     )
     assert "webhook_url" not in polished["alerts"][0]
+
+
+@pytest.mark.parametrize(
+    "placeholder",
+    [
+        "https://hooks.example.com/services/T00/B00/xxx",
+        "https://hooks.slack.com/services/your/webhook",
+        "https://discord.com/api/webhooks/your/webhook",
+    ],
+)
+def test_polish_alerts_config_strips_defaults_webhook_placeholders(
+    monkeypatch, placeholder
+) -> None:
+    monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
+    polished = polish_alerts_config(
+        {
+            "defaults": {"webhook_url": placeholder, "webhook_format": "slack"},
+            "alerts": [],
+        },
+        seed_env_email=False,
+    )
+    assert "webhook_url" not in polished["defaults"]
+    assert polished["defaults"].get("webhook_format") == "slack"
+
+
+def test_polish_alerts_config_preserves_real_defaults_webhook(monkeypatch) -> None:
+    monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
+    real = "https://hooks.slack.com/services/T123/B456/real-secret"
+    polished = polish_alerts_config(
+        {"defaults": {"webhook_url": real}, "alerts": []},
+        seed_env_email=False,
+    )
+    assert polished["defaults"]["webhook_url"] == real
 
 
 def test_polish_alerts_config_can_skip_env_email_seed(monkeypatch) -> None:

@@ -53,8 +53,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setMultiUserEnabled(true);
             }
             return;
-          } catch {
-            clearAuthToken();
+          } catch (err) {
+            // Auth disabled while a stale token remains — drop it and leave
+            // single-user mode (do not fall through to a second /me probe).
+            if (axios.isAxiosError(err) && err.response?.status === 501) {
+              clearAuthToken();
+              if (!cancelled) {
+                setMultiUserEnabled(false);
+              }
+              return;
+            }
+            // Only clear on explicit auth rejection. Transient 5xx / network
+            // failures must keep the session so a blip cannot bounce a signed-in
+            // user to SignIn while RequireAuth still expects a bearer.
+            if (
+              axios.isAxiosError(err) &&
+              (err.response?.status === 401 || err.response?.status === 403)
+            ) {
+              clearAuthToken();
+            } else {
+              if (!cancelled) {
+                setMultiUserEnabled(true);
+              }
+              return;
+            }
           }
         }
 
