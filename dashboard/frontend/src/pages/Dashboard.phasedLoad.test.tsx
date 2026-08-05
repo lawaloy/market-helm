@@ -98,6 +98,7 @@ function opportunity(symbol: string): Opportunity {
     expectedChange: 10,
     confidence: 80,
     risk: 'Low',
+    recommendation: 'STRONG BUY',
     trend: 'Bullish',
     reason: 'momentum',
     volume: 1_000_000,
