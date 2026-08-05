@@ -38,6 +38,19 @@ def _safe_volume(value: Any) -> int:
         return 0
 
 
+def _safe_label(value: Any, default: str) -> str:
+    """Return a display label; blank/NaN sentinels fall back instead of crashing."""
+    if value is None:
+        return default
+    try:
+        text = str(value).strip()
+    except Exception:
+        return default
+    if not text or text.lower() in {"nan", "<na>", "none"}:
+        return default
+    return text
+
+
 @router.get("/summary", response_model=ProjectionsSummary)
 async def get_projections_summary():
     """Get projections summary with statistics"""
@@ -186,15 +199,26 @@ async def get_opportunities(
             ):
                 continue
 
-            # Get current price from daily data (normalize like stock detail)
-            stock_daily = daily_df[daily_df["symbol"].map(normalize_ticker) == symbol]
-            if stock_daily.empty:
+            # Get current price from daily data (normalize like stock detail).
+            # Missing daily schema must soft-fail to zeros — not KeyError→500.
+            if (
+                daily_df is None
+                or getattr(daily_df, "empty", True)
+                or "symbol" not in getattr(daily_df, "columns", [])
+            ):
                 current_price = 0.0
                 volume = 0
             else:
-                daily_row = stock_daily.iloc[0]
-                current_price = _finite_float(daily_row.get('close')) or 0.0
-                volume = _safe_volume(daily_row.get('volume', 0))
+                stock_daily = daily_df[
+                    daily_df["symbol"].map(normalize_ticker) == symbol
+                ]
+                if stock_daily.empty:
+                    current_price = 0.0
+                    volume = 0
+                else:
+                    daily_row = stock_daily.iloc[0]
+                    current_price = _finite_float(daily_row.get('close')) or 0.0
+                    volume = _safe_volume(daily_row.get('volume', 0))
 
             momentum = (
                 _finite_float(row.get('momentum_score'))
@@ -214,9 +238,9 @@ async def get_opportunities(
                 targetPrice=target_price,
                 expectedChange=expected_change,
                 confidence=int(confidence_f),
-                risk=row['risk_level'],
-                trend=row['trend'],
-                reason=row.get('reason', ''),
+                risk=_safe_label(row.get("risk_level"), "Unknown"),
+                trend=_safe_label(row.get("trend"), "Neutral"),
+                reason=row.get('reason', '') or '',
                 volume=volume,
                 momentum=momentum,
                 volatility=volatility,

@@ -42,8 +42,15 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
         
         # Load daily data — match padded / mixed-case CSV symbols to the path key.
         daily_df = loader.load_daily_data()
+        if (
+            daily_df is None
+            or getattr(daily_df, "empty", True)
+            or "symbol" not in getattr(daily_df, "columns", [])
+        ):
+            raise HTTPException(status_code=404, detail="Stock not found.")
+
         stock_daily = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
-        
+
         if stock_daily.empty:
             raise HTTPException(status_code=404, detail="Stock not found.")
         
