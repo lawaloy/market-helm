@@ -91,6 +91,7 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
     defaults = raw_defaults if isinstance(raw_defaults, dict) else {}
     alerts = config.get("alerts") or []
     rows: List[tuple] = []
+    seen_ids: set[str] = set()
 
     for alert in alerts:
         if not isinstance(alert, dict):
@@ -98,6 +99,10 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         alert_id = str(alert.get("id") or "").strip()
         if not alert_id:
             continue
+        # Primary key is (user_id, alert_id); duplicates would IntegrityError → 500.
+        if alert_id in seen_ids:
+            raise InvalidAlertWatchConfig(f"Duplicate alert id '{alert_id}'.")
+        seen_ids.add(alert_id)
         condition = alert.get("condition") or {}
         if not isinstance(condition, dict):
             condition = {}
