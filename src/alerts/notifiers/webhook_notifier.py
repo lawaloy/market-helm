@@ -4,8 +4,10 @@ POST alert events to an HTTPS webhook (Slack-compatible, Discord, or custom JSON
 
 from __future__ import annotations
 
+import ipaddress
 import os
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -13,6 +15,45 @@ from ...core.logger import setup_logger
 from .delivery_retry import DeliveryAttempt, deliver_with_retry, is_retriable_http_status
 
 logger = setup_logger("alerts.webhook")
+
+_BLOCKED_WEBHOOK_HOSTS = frozenset(
+    {
+        "localhost",
+        "metadata.google.internal",
+        "metadata",
+    }
+)
+
+
+def is_safe_webhook_url(url: str) -> bool:
+    """Return True when *url* is an HTTPS endpoint that is not an obvious SSRF target.
+
+    Checks the literal hostname/IP only (no DNS resolution) so validation stays
+    deterministic. Rejects non-HTTPS schemes, credentials in the URL, loopback /
+    private / link-local / unspecified IP literals, and a small set of well-known
+    metadata hostnames.
+    """
+    cleaned = (url or "").strip()
+    if not cleaned:
+        return False
+    try:
+        parsed = urlparse(cleaned)
+    except ValueError:
+        return False
+    if parsed.scheme != "https":
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    if host in _BLOCKED_WEBHOOK_HOSTS or host.endswith(".localhost"):
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return True
+    return bool(ip.is_global)
 
 
 class WebhookNotifier:
@@ -44,13 +85,21 @@ class WebhookNotifier:
                 "or ALERT_WEBHOOK_URL in the environment."
             )
             return None
+        cleaned_url = str(url).strip()
+        if not is_safe_webhook_url(cleaned_url):
+            logger.warning(
+                "Webhook notifier rejected unsafe URL for alert %s "
+                "(require https:// to a public host).",
+                alert.get("id") or alert.get("alert_id"),
+            )
+            return None
         payload_format = (
             alert.get("webhook_format")
             or alert.get("payload_format")
             or (os.environ.get("ALERT_WEBHOOK_FORMAT") if allow_env_webhook else None)
             or "json"
         )
-        return cls(url=str(url).strip(), payload_format=str(payload_format).strip().lower())
+        return cls(url=cleaned_url, payload_format=str(payload_format).strip().lower())
 
     @staticmethod
     def _format_symbols(raw: Any) -> str:
