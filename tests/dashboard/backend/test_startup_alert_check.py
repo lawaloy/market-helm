@@ -30,6 +30,30 @@ def test_startup_alert_check_logs_triggered_count(caplog):
     assert any("triggered 2 watch" in r.message for r in caplog.records)
 
 
+def test_startup_alert_check_soft_coerces_nonfinite_triggered(caplog):
+    """Inf/NaN triggered is truthy; must not log a phantom startup trigger."""
+    for dirty in (float("nan"), float("inf"), float("-inf"), "nope", object()):
+        with patch(
+            "src.alerts.alert_worker.run_check_once",
+            return_value={"triggered": dirty},
+        ):
+            with caplog.at_level("INFO"):
+                backend_main._startup_alert_check()
+
+        assert not any(
+            "Startup alert check triggered" in r.message for r in caplog.records
+        )
+        caplog.clear()
+
+
+def test_coerce_startup_triggered_rejects_nonfinite():
+    assert backend_main._coerce_startup_triggered(float("nan")) == 0
+    assert backend_main._coerce_startup_triggered(float("inf")) == 0
+    assert backend_main._coerce_startup_triggered(3) == 3
+    assert backend_main._coerce_startup_triggered(True) == 1
+    assert backend_main._coerce_startup_triggered(None) == 0
+
+
 def test_lifespan_continues_when_db_init_fails(caplog):
     """DB init failure must not prevent lifespan from yielding (app still boots)."""
     fake_thread = MagicMock()
