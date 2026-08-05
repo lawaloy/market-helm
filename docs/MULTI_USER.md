@@ -43,6 +43,18 @@ recommended local-development backend; PostgreSQL is recommended for hosted use.
 The base package includes portable Psycopg; production images must also provide
 `libpq` (or explicitly install `psycopg[binary]` on a supported platform).
 
+Run the real PostgreSQL storage integration gate locally with Docker:
+
+```bash
+docker compose -f docker-compose.postgres-test.yml up \
+  --abort-on-container-exit --exit-code-from tests
+docker compose -f docker-compose.postgres-test.yml down --volumes
+```
+
+The integration test creates an isolated schema, exercises migrations, users,
+alert/watch persistence, and the worker job lifecycle, then drops that schema.
+CI runs the same test against a PostgreSQL 16 service container on every PR.
+
 ### Schema upgrades
 
 `init_database()` applies pending schema migrations in version order at startup.

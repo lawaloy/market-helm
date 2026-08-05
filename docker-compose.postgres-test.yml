@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: markethelm
+      POSTGRES_USER: markethelm
+      POSTGRES_PASSWORD: markethelm-test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U markethelm -d markethelm"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  tests:
+    image: python:3.12-slim
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      MARKET_HELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@postgres:5432/markethelm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >-
+      sh -c "pip install 'pytest>=7.0.0' 'psycopg[binary]>=3.2.0' 'pandas>=2.0.0'
+      'requests>=2.31.0' 'python-dotenv>=1.0.0'
+      && pytest tests/integration/test_postgresql_storage.py -v"

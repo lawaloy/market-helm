@@ -132,6 +132,9 @@ class TestDatabaseBackend:
             ("user-1", "user@example.com"),
         )
 
+        connection.execute("BEGIN IMMEDIATE")
+        assert raw.call == ("SELECT 1", ())
+
 
 class TestInitDatabase:
     def test_init_noop_when_disabled(self, monkeypatch):

@@ -37,6 +37,38 @@ jobs:
       - name: Test with pytest
         run: pytest tests/ -v
 
+  postgres:
+    name: PostgreSQL integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: markethelm
+          POSTGRES_USER: markethelm
+          POSTGRES_PASSWORD: markethelm-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U markethelm -d markethelm"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install integration dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev] "psycopg[binary]>=3.2.0"
+      - name: Test PostgreSQL storage
+        env:
+          MARKET_HELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@localhost:5432/markethelm
+        run: pytest tests/integration/test_postgresql_storage.py -v
+
   frontend:
     name: Dashboard frontend
     runs-on: ubuntu-latest

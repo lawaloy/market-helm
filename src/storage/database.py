@@ -167,6 +167,11 @@ class _PostgresConnection:
 
     @staticmethod
     def _query(sql: str) -> str:
+        if sql.strip().upper() == "BEGIN IMMEDIATE":
+            # Psycopg opens a transaction automatically on the first command.
+            # A harmless statement preserves that boundary without issuing a
+            # redundant BEGIN (which PostgreSQL warns about).
+            return "SELECT 1"
         # Storage SQL uses DB-API qmark placeholders and contains no literal
         # question marks. Psycopg uses the format placeholder style.
         return sql.replace("?", "%s")
