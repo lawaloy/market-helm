@@ -106,15 +106,8 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
         raise InvalidAlertWatchConfig("Alerts config must be an object.")
     raw_defaults = config.get("defaults")
     defaults = raw_defaults if isinstance(raw_defaults, dict) else {}
-    alerts = config.get("alerts", [])
-    if alerts is None:
-        alerts = []
-    if not isinstance(alerts, list):
-        raise InvalidAlertWatchConfig("Alerts config must include an 'alerts' array.")
-    if len(alerts) > MAX_ALERTS_PER_CONFIG:
-        raise InvalidAlertWatchConfig(
-            f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts."
-        )
+    ensure_alerts_within_limit(config)
+    alerts = config.get("alerts") or []
     rows: List[tuple] = []
     seen_ids: set[str] = set()
 
@@ -159,8 +152,29 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
     return rows
 
 
+def ensure_alerts_within_limit(config: Dict[str, Any]) -> None:
+    """Reject oversized raw ``alerts`` arrays before polish/dedupe can shrink them.
+
+    Hosted saves polish (and dedupe same price-threshold keys) before watch
+    validation — without this gate a 10k duplicate payload would silently
+    collapse to one rule and overwrite a prior config.
+    """
+    if not isinstance(config, dict):
+        raise InvalidAlertWatchConfig("Alerts config must be an object.")
+    alerts = config.get("alerts", [])
+    if alerts is None:
+        return
+    if not isinstance(alerts, list):
+        raise InvalidAlertWatchConfig("Alerts config must include an 'alerts' array.")
+    if len(alerts) > MAX_ALERTS_PER_CONFIG:
+        raise InvalidAlertWatchConfig(
+            f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts."
+        )
+
+
 def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
     """Validate that a config can be normalized without mutating watch rows."""
+    ensure_alerts_within_limit(config)
     _rows_from_config(user_id, config, _utc_now())
 
 

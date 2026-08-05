@@ -44,7 +44,19 @@ def test_validate_rejects_more_than_max_alerts(db_user) -> None:
 
 
 def test_validate_accepts_exactly_max_alerts(db_user) -> None:
-    alerts = [_price_alert(f"a{i}") for i in range(MAX_ALERTS_PER_CONFIG)]
+    # Distinct symbols so polish/dedupe cannot shrink below the cap.
+    alerts = [
+        {
+            **_price_alert(f"a{i}", value=100 + i),
+            "condition": {
+                "type": "price_threshold",
+                "symbol": f"S{i:04d}",
+                "operator": "less_than",
+                "value": 100 + i,
+            },
+        }
+        for i in range(MAX_ALERTS_PER_CONFIG)
+    ]
     validate_watches_config(db_user, {"defaults": {}, "alerts": alerts})
 
 

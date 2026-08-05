@@ -40,7 +40,9 @@ def _register(client, email: str = "limits@example.com") -> str:
     return r.json()["access_token"]
 
 
-def _payload(n: int) -> dict:
+def _payload(n: int, *, unique_symbols: bool = False) -> dict:
+    # Default: identical price keys (stress raw-length gate before polish/dedupe).
+    # unique_symbols=True keeps post-dedupe length == n for the accept-at-max case.
     return {
         "defaults": {},
         "alerts": [
@@ -51,9 +53,9 @@ def _payload(n: int) -> dict:
                 "cooldown_minutes": 15,
                 "condition": {
                     "type": "price_threshold",
-                    "symbol": "AAPL",
+                    "symbol": (f"S{i:04d}" if unique_symbols else "AAPL"),
                     "operator": "less_than",
-                    "value": 150,
+                    "value": 150 + i if unique_symbols else 150,
                 },
                 "notifications": ["log"],
             }
@@ -87,7 +89,7 @@ def test_hosted_put_accepts_exactly_max_alerts(client, multi_user_env):
 
     response = client.put(
         "/api/alerts/config",
-        json=_payload(MAX_ALERTS_PER_CONFIG),
+        json=_payload(MAX_ALERTS_PER_CONFIG, unique_symbols=True),
         headers=headers,
     )
 
