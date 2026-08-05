@@ -25,6 +25,30 @@ def test_loads_indices_from_stock_tracker_config_env(monkeypatch, tmp_path):
     assert get_indices_to_track() == ["Dow Jones", "NASDAQ-100"]
 
 
+def test_stock_tracker_config_env_overrides_bundled_exchanges_json(
+    monkeypatch, tmp_path
+):
+    """Env path must win even when repo config/exchanges.json exists on disk."""
+    custom = tmp_path / "custom_exchanges.json"
+    custom.write_text(
+        json.dumps({"indices_to_track": ["Dow Jones"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("STOCK_TRACKER_CONFIG", str(custom))
+
+    # Do not mock Path.exists — the bundled config is present in this checkout.
+    assert get_indices_to_track() == ["Dow Jones"]
+
+
+def test_invalid_stock_tracker_config_falls_back_to_bundled(monkeypatch, tmp_path):
+    """Corrupt env config must not stick on defaults when bundled is readable."""
+    bad = tmp_path / "bad_exchanges.json"
+    bad.write_text("{not-json", encoding="utf-8")
+    monkeypatch.setenv("STOCK_TRACKER_CONFIG", str(bad))
+
+    assert get_indices_to_track() == ["S&P 500", "NASDAQ-100"]
+
+
 def test_defaults_when_stock_tracker_config_unset_and_paths_missing(monkeypatch):
     monkeypatch.delenv("STOCK_TRACKER_CONFIG", raising=False)
     monkeypatch.setattr(Path, "exists", lambda self: False)
