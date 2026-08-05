@@ -14,8 +14,9 @@ const COLORS = {
 };
 
 const SentimentPieChart: React.FC<SentimentPieChartProps> = ({ recommendations }) => {
+  // Dirty summary payloads can include NaN/±Inf; Inf > 0 is true and breaks pie math.
   const data = Object.entries(recommendations)
-    .filter(([_, value]) => value > 0)
+    .filter(([_, value]) => Number.isFinite(value) && value > 0)
     .map(([key, value]) => ({
       name: key.replace('_', ' '),
       value,

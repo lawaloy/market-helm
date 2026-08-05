@@ -9,24 +9,31 @@ interface GainersLosersChartProps {
   losers: StockMover[];
 }
 
+type MoverRow = {
+  symbol: string;
+  change: number;
+  type: 'gainer' | 'loser';
+};
+
+function toMoverRow(
+  mover: StockMover,
+  type: 'gainer' | 'loser',
+): MoverRow | null {
+  const change = coerceTooltipNumber(mover.changePercent);
+  if (change == null) return null;
+  return { symbol: mover.symbol, change, type };
+}
+
 const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers }) => {
-  // Take top 5 gainers and top 5 losers
+  // Take top 5 gainers and top 5 losers; drop non-finite changePercent so
+  // list toFixed / bar fills cannot throw on API drift.
   const topGainers = gainers.slice(0, 5);
   const topLosers = losers.slice(0, 5);
 
-  // Combine and format data
-  const data = [
-    ...topGainers.map(g => ({
-      symbol: g.symbol,
-      change: g.changePercent,
-      type: 'gainer'
-    })),
-    ...topLosers.map(l => ({
-      symbol: l.symbol,
-      change: l.changePercent,
-      type: 'loser'
-    }))
-  ];
+  const data: MoverRow[] = [
+    ...topGainers.map((g) => toMoverRow(g, 'gainer')),
+    ...topLosers.map((l) => toMoverRow(l, 'loser')),
+  ].filter((row): row is MoverRow => row != null);
 
   return (
     <div className="card p-6">
