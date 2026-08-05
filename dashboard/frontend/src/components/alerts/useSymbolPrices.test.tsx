@@ -107,7 +107,10 @@ describe('useSymbolPrices', () => {
 
   it('cools down a missing quote symbol for FAILED_RETRY_MS', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
-    vi.mocked(alertsApi.getQuotes).mockResolvedValue({ data: { prices: {} } });
+    // Partial AxiosResponse is enough for this hook; cast like other API mocks.
+    vi.mocked(alertsApi.getQuotes).mockResolvedValue({
+      data: { prices: {} },
+    } as never);
 
     render(<ProbeHarness symbols={['MSFT']} />);
 
