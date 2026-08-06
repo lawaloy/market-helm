@@ -17,6 +17,16 @@ class TestSession:
         token = create_access_token("user-123")
         payload = decode_access_token(token)
         assert payload["user_id"] == "user-123"
+        assert payload["session_version"] == 1
+
+    def test_session_version_round_trip(self, auth_secret):
+        token = create_access_token("user-123", session_version=7)
+        assert decode_access_token(token)["session_version"] == 7
+
+    @pytest.mark.parametrize("version", [0, -1, True, 1.5, "1"])
+    def test_invalid_session_version_rejected(self, auth_secret, version):
+        with pytest.raises(AuthError, match="session version"):
+            create_access_token("user-123", session_version=version)
 
     def test_expired_token_rejected(self, auth_secret, monkeypatch):
         monkeypatch.setattr(time, "time", lambda: 1_000_000)

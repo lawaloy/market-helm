@@ -9,7 +9,7 @@ venv/
 .venv/
 .venv-audit/
 .pytest_cache/
-.pytest_tmp/
+.pytest_*/
 ENV/
 build/
 develop-eggs/

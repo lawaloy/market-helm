@@ -47,10 +47,16 @@ def _b64url_decode(segment: str) -> bytes:
     return base64.urlsafe_b64decode(segment + padding)
 
 
-def create_access_token(user_id: str, *, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> str:
+def create_access_token(
+    user_id: str, *, session_version: int = 1, ttl_seconds: int = DEFAULT_TTL_SECONDS
+) -> str:
+    if isinstance(session_version, bool) or not isinstance(session_version, int) \
+            or session_version < 1:
+        raise AuthError("Invalid session version.")
     payload = {
         "sub": user_id,
         "exp": int(time.time()) + ttl_seconds,
+        "sv": session_version,
     }
     body_segment = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode())
     sig = hmac.new(_auth_secret(), body_segment.encode("ascii"), hashlib.sha256).digest()
@@ -85,7 +91,11 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         # Reject non-strings (True/123/{} stringify into fake IDs) and blank subjects.
         if not isinstance(user_id, str) or not user_id.strip():
             raise AuthError("Invalid token subject.")
-        return {"user_id": user_id.strip()}
+        session_version = payload.get("sv", 1)
+        if isinstance(session_version, bool) or not isinstance(session_version, int) \
+                or session_version < 1:
+            raise AuthError("Invalid session version.")
+        return {"user_id": user_id.strip(), "session_version": session_version}
     except AuthError:
         raise
     except (ValueError, json.JSONDecodeError, KeyError, OverflowError, TypeError) as exc:
