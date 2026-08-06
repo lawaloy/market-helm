@@ -85,6 +85,16 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
             methods=("POST",),
         ),
         RateLimitRule(
+            "auth-email",
+            _bounded_env("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", 5, maximum=1000),
+            3600,
+            paths=(
+                "/api/auth/password-reset/request",
+                "/api/auth/verify-email/request",
+            ),
+            methods=("POST",),
+        ),
+        RateLimitRule(
             "expensive-write",
             _bounded_env("MARKET_HELM_RATE_LIMIT_EXPENSIVE", 10, maximum=10000),
             60,

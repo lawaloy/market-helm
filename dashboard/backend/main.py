@@ -11,7 +11,7 @@ logging.basicConfig(
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from typing import List, Optional
@@ -51,6 +51,7 @@ from dashboard.backend.api import market, projections, stocks, refresh, history,
 from dashboard.backend.api.market import get_market_summary
 from dashboard.backend.auth import require_user_id
 from dashboard.backend.rate_limit import RateLimitMiddleware
+from dashboard.backend.observability import ObservabilityMiddleware, prometheus_metrics
 
 
 def _coerce_startup_triggered(raw) -> int:
@@ -155,6 +156,7 @@ def parse_cors_origins(
 origins = parse_cors_origins(os.getenv("CORS_ORIGINS", ""))
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(ObservabilityMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -177,6 +179,49 @@ app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 async def health():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+@app.get("/health/live")
+async def health_live():
+    return {"status": "healthy", "service": "api"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    from src.storage.database import database_enabled
+    if not database_enabled():
+        return {"status": "ready", "database": "disabled"}
+    from src.storage.health import database_health, latest_worker_heartbeat
+    database = database_health()
+    payload = {"status": "ready" if database["ok"] else "not_ready",
+               "database": database, "worker": None}
+    if database["ok"]:
+        try:
+            payload["worker"] = latest_worker_heartbeat()
+        except Exception:
+            payload["worker"] = None
+    if not database["ok"]:
+        return JSONResponse(payload, status_code=503)
+    return payload
+
+
+@app.get("/health/worker")
+async def health_worker():
+    from src.storage.database import database_enabled
+    if not database_enabled():
+        return {"status": "disabled"}
+    from src.alerts.alert_worker import resolve_interval_seconds
+    from src.storage.health import worker_health
+    health = worker_health(stale_after_seconds=resolve_interval_seconds() * 2 + 30)
+    payload = {"status": "healthy" if health["ok"] else "unhealthy", **health}
+    if not health["ok"]:
+        return JSONResponse(payload, status_code=503)
+    return payload
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    return PlainTextResponse(prometheus_metrics(), media_type="text/plain; version=0.0.4")
 
 
 @app.get("/api/data-info")

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from src.storage.database import database_enabled, init_database
@@ -15,8 +16,15 @@ from src.storage.users import (
     UserError,
     authenticate_user,
     create_user,
+    get_user_by_email,
     get_user_by_id,
+    mark_email_verified,
+    update_password,
 )
+from src.storage.account_tokens import (
+    RESET_PASSWORD, VERIFY_EMAIL, consume_token, issue_token, revoke_tokens,
+)
+from dashboard.backend.account_email import send_account_email
 
 router = APIRouter()
 
@@ -41,6 +49,37 @@ class UserResponse(BaseModel):
     id: str
     email: str
     created_at: str
+    email_verified: bool = False
+
+
+class EmailRequest(BaseModel):
+    email: str = Field(..., max_length=MAX_EMAIL_LENGTH)
+
+
+class TokenRequest(BaseModel):
+    token: str = Field(..., min_length=20, max_length=256)
+
+
+class PasswordResetConfirm(TokenRequest):
+    password: str = Field(..., min_length=8, max_length=MAX_PASSWORD_LENGTH)
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+def _verification_required() -> bool:
+    return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def _send_token(user: dict, purpose: str) -> bool:
+    token = issue_token(user["id"], purpose)
+    if send_account_email(recipient=user["email"], purpose=purpose, token=token):
+        return True
+    revoke_tokens(user["id"], purpose)
+    return False
 
 
 def _require_multi_user() -> None:
@@ -52,7 +91,7 @@ def _require_multi_user() -> None:
 
 
 @router.post("/register", response_model=AuthResponse)
-async def register(body: RegisterRequest) -> AuthResponse:
+async def register(body: RegisterRequest, background_tasks: BackgroundTasks) -> AuthResponse:
     _require_multi_user()
     init_database()
     # Fail before create_user so a missing/short AUTH_SECRET cannot orphan an account
@@ -65,6 +104,8 @@ async def register(body: RegisterRequest) -> AuthResponse:
         user = create_user(body.email, body.password)
     except UserError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    user["email_verified"] = False
+    background_tasks.add_task(_send_token, user, VERIFY_EMAIL)
     try:
         token = create_access_token(user["id"])
     except AuthError as exc:
@@ -79,11 +120,64 @@ async def login(body: LoginRequest) -> AuthResponse:
     user = authenticate_user(body.email, body.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+    full_user = get_user_by_id(user["id"]) or user
+    if _verification_required() and not full_user.get("email_verified"):
+        raise HTTPException(status_code=403, detail="Verify your email before signing in.")
     try:
         token = create_access_token(user["id"])
     except AuthError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return AuthResponse(access_token=token, user=user)
+    return AuthResponse(access_token=token, user=full_user)
+
+
+@router.post("/verify-email/request", response_model=MessageResponse)
+async def request_email_verification(
+    body: EmailRequest, background_tasks: BackgroundTasks
+) -> MessageResponse:
+    _require_multi_user()
+    init_database()
+    user = get_user_by_email(body.email)
+    if user and not user.get("email_verified"):
+        background_tasks.add_task(_send_token, user, VERIFY_EMAIL)
+    return MessageResponse(message="If the account exists, a verification email has been sent.")
+
+
+@router.post("/verify-email/confirm", response_model=MessageResponse)
+async def confirm_email_verification(body: TokenRequest) -> MessageResponse:
+    _require_multi_user()
+    init_database()
+    user_id = consume_token(body.token, VERIFY_EMAIL)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="This verification link is invalid or expired.")
+    mark_email_verified(user_id)
+    return MessageResponse(message="Email verified. You can now sign in.")
+
+
+@router.post("/password-reset/request", response_model=MessageResponse)
+async def request_password_reset(
+    body: EmailRequest, background_tasks: BackgroundTasks
+) -> MessageResponse:
+    _require_multi_user()
+    init_database()
+    user = get_user_by_email(body.email)
+    if user:
+        background_tasks.add_task(_send_token, user, RESET_PASSWORD)
+    return MessageResponse(message="If the account exists, a password reset email has been sent.")
+
+
+@router.post("/password-reset/confirm", response_model=MessageResponse)
+async def confirm_password_reset(body: PasswordResetConfirm) -> MessageResponse:
+    _require_multi_user()
+    init_database()
+    user_id = consume_token(body.token, RESET_PASSWORD)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="This reset link is invalid or expired.")
+    try:
+        update_password(user_id, body.password)
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    revoke_tokens(user_id, RESET_PASSWORD)
+    return MessageResponse(message="Password updated. You can now sign in.")
 
 
 @router.get("/me", response_model=UserResponse)

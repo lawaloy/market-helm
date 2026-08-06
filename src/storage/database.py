@@ -113,6 +113,37 @@ _MIGRATIONS = (
     ON api_rate_limits(expires_at)""",
         ),
     ),
+    Migration(
+        version=3,
+        name="account_verification_and_password_reset",
+        statements=(
+            "ALTER TABLE users ADD COLUMN email_verified_at TEXT",
+            """CREATE TABLE IF NOT EXISTS account_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    consumed_at TEXT,
+    created_at TEXT NOT NULL
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_account_tokens_user_purpose
+    ON account_tokens(user_id, purpose, expires_at)""",
+        ),
+    ),
+    Migration(
+        version=4,
+        name="worker_heartbeats",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS worker_heartbeats (
+    worker_id TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    details_json TEXT NOT NULL DEFAULT '{}'
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_worker_heartbeats_seen
+    ON worker_heartbeats(last_seen_at)""",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version
