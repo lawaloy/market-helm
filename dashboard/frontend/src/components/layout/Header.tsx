@@ -18,6 +18,8 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
   const { user, multiUserEnabled, logout } = useAuth();
   const [isRefreshing, setIsRefreshingState] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
+  const [logoutError, setLogoutError] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   /** Bumped on cancel / new fetch so in-flight status responses cannot finish after leave. */
   const pollGenerationRef = useRef(0);
@@ -170,6 +172,19 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
     }
   };
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    setLogoutError('');
+    try {
+      await logout();
+    } catch {
+      setLogoutError('Sign out failed. Your session is still active; please try again.');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <header className="bg-white border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -238,6 +253,11 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
             {multiUserEnabled && (
               user ? (
                 <div className="flex items-center gap-2">
+                  {logoutError && (
+                    <span className="max-w-xs text-sm text-red-600 dark:text-red-400" role="alert">
+                      {logoutError}
+                    </span>
+                  )}
                   <span
                     className="hidden max-w-[10rem] truncate text-sm text-slate-600 dark:text-slate-400 sm:inline"
                     title={user.email}
@@ -246,10 +266,11 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
                   </span>
                   <button
                     type="button"
-                    onClick={logout}
+                    onClick={() => void handleLogout()}
+                    disabled={isLoggingOut}
                     className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
-                    Sign out
+                    {isLoggingOut ? 'Signing out...' : 'Sign out'}
                   </button>
                 </div>
               ) : (
