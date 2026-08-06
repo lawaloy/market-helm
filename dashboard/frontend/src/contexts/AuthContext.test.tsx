@@ -288,6 +288,28 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
   });
 
+  it('preserves the active session when server-side logout fails', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
+    vi.spyOn(authApi, 'me').mockResolvedValueOnce({
+      data: { id: 'u1', email: 'user@example.com' },
+    } as never);
+    vi.spyOn(authApi, 'logout').mockRejectedValueOnce(axiosStatus(503));
+
+    function LogoutProbe() {
+      const { loading, user, logout } = useAuth();
+      return <button type="button" disabled={loading} onClick={() => void logout().catch(() => undefined)}>
+        {user?.email ?? 'anonymous'}
+      </button>;
+    }
+
+    render(<AuthProvider><LogoutProbe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByRole('button').textContent).toBe('user@example.com'));
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(authApi.logout).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button').textContent).toBe('user@example.com');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
+  });
+
   it('login enables multi-user mode and stores the session user', async () => {
     vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(501));
     const login = vi.spyOn(authApi, 'login').mockResolvedValueOnce({

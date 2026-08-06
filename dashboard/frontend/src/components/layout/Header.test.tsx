@@ -6,6 +6,9 @@ const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   toggleTheme: vi.fn(),
+  logout: vi.fn(),
+  authUser: null as { id: string; email: string } | null,
+  multiUserEnabled: false,
 }));
 
 vi.mock('../../contexts/ThemeContext', () => ({
@@ -17,12 +20,12 @@ vi.mock('../../contexts/ThemeContext', () => ({
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: null,
+    user: apiMocks.authUser,
     loading: false,
-    multiUserEnabled: false,
+    multiUserEnabled: apiMocks.multiUserEnabled,
     login: vi.fn(),
     register: vi.fn(),
-    logout: vi.fn(),
+    logout: apiMocks.logout,
   }),
 }));
 
@@ -35,8 +38,26 @@ vi.mock('../../services/api', () => ({
 
 describe('Header refresh controls', () => {
   beforeEach(() => {
+    apiMocks.authUser = null;
+    apiMocks.multiUserEnabled = false;
+    apiMocks.logout.mockResolvedValue(undefined);
     apiMocks.post.mockResolvedValue({ data: { message: 'Refresh started' } });
     apiMocks.get.mockResolvedValue({ data: { is_running: false, last_status: 'success' } });
+  });
+
+  it('keeps the user signed in and offers retry when revocation fails', async () => {
+    apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
+    apiMocks.multiUserEnabled = true;
+    apiMocks.logout.mockRejectedValueOnce(new Error('network unavailable'));
+
+    render(<Header />);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Sign out failed. Your session is still active; please try again.',
+    );
+    expect(screen.getByText('user@example.com')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 
   afterEach(() => {

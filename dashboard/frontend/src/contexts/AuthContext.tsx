@@ -114,9 +114,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await authApi.logout();
-    } finally {
       clearAuthToken();
       setUser(null);
+    } catch (err) {
+      // A 401 means the credential is already unusable, so local cleanup is safe.
+      // Preserve it for timeouts, 429s, and 5xx responses so the user can retry
+      // server-side revocation instead of being left with a false local sign-out.
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        clearAuthToken();
+        setUser(null);
+        return;
+      }
+      throw err;
     }
   }, []);
 
