@@ -9,7 +9,7 @@ interface AuthContextType {
   multiUserEnabled: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,9 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setMultiUserEnabled(true);
   }, []);
 
-  const logout = useCallback(() => {
-    clearAuthToken();
-    setUser(null);
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } finally {
+      clearAuthToken();
+      setUser(null);
+    }
   }, []);
 
   return (

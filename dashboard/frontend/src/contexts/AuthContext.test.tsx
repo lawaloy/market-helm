@@ -247,6 +247,9 @@ describe('AuthProvider', () => {
     vi.spyOn(authApi, 'me').mockResolvedValueOnce({
       data: { id: 'u1', email: 'user@example.com' },
     } as never);
+    const logout = vi.spyOn(authApi, 'logout').mockResolvedValueOnce({
+      data: { message: 'Signed out from all sessions.' },
+    } as never);
 
     function LogoutProbe() {
       const { loading, multiUserEnabled, user, logout } = useAuth();
@@ -278,7 +281,10 @@ describe('AuthProvider', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'logout' }));
 
-    expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(logout).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
   });
 

@@ -151,6 +151,7 @@ export const authApi = {
   login: (body: { email: string; password: string }) =>
     api.post<AuthResponse>('/api/auth/login', body),
   me: () => api.get<User>('/api/auth/me'),
+  logout: () => api.post<{ message: string }>('/api/auth/logout'),
   requestPasswordReset: (email: string) =>
     api.post<{ message: string }>('/api/auth/password-reset/request', { email }),
   confirmPasswordReset: (token: string, password: string) =>

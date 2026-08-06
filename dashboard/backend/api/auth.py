@@ -19,6 +19,7 @@ from src.storage.users import (
     get_user_by_email,
     get_user_by_id,
     mark_email_verified,
+    revoke_user_sessions,
     update_password,
 )
 from src.storage.account_tokens import (
@@ -107,7 +108,7 @@ async def register(body: RegisterRequest, background_tasks: BackgroundTasks) -> 
     user["email_verified"] = False
     background_tasks.add_task(_send_token, user, VERIFY_EMAIL)
     try:
-        token = create_access_token(user["id"])
+        token = create_access_token(user["id"], session_version=user["session_version"])
     except AuthError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return AuthResponse(access_token=token, user=user)
@@ -124,7 +125,9 @@ async def login(body: LoginRequest) -> AuthResponse:
     if _verification_required() and not full_user.get("email_verified"):
         raise HTTPException(status_code=403, detail="Verify your email before signing in.")
     try:
-        token = create_access_token(user["id"])
+        token = create_access_token(
+            user["id"], session_version=full_user["session_version"]
+        )
     except AuthError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return AuthResponse(access_token=token, user=full_user)
@@ -182,13 +185,23 @@ async def confirm_password_reset(body: PasswordResetConfirm) -> MessageResponse:
 
 @router.get("/me", response_model=UserResponse)
 async def me(authorization: Optional[str] = Header(default=None)) -> UserResponse:
-    from dashboard.backend.auth import bearer_user_id
+    from dashboard.backend.auth import require_user_id
 
     _require_multi_user()
-    user_id = bearer_user_id(authorization)
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = await require_user_id(authorization)
     user = get_user_by_id(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="User not found.")
     return UserResponse(**user)
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(authorization: Optional[str] = Header(default=None)) -> MessageResponse:
+    from dashboard.backend.auth import require_user_id
+
+    _require_multi_user()
+    user_id = await require_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    revoke_user_sessions(user_id)
+    return MessageResponse(message="Signed out from all sessions.")

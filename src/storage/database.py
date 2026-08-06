@@ -144,6 +144,13 @@ _MIGRATIONS = (
     ON worker_heartbeats(last_seen_at)""",
         ),
     ),
+    Migration(
+        version=5,
+        name="session_revocation",
+        statements=(
+            "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version
