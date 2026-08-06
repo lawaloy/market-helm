@@ -1,5 +1,24 @@
 # Deployment & persistence
 
+## Hosted staging (API + worker + PostgreSQL)
+
+The staging stack in `docker-compose.staging.yml` builds the React application
+into the API image and runs the API, scheduled alert worker, and PostgreSQL as
+separate services.
+
+1. Copy `.env.staging.example` to `.env.staging` and replace every placeholder.
+2. Set `POSTGRES_PASSWORD` in the host environment (never commit it).
+3. Validate with `docker compose -f docker-compose.staging.yml config`.
+4. Start with `docker compose -f docker-compose.staging.yml up -d --build`.
+5. Put a TLS reverse proxy in front of `127.0.0.1:8000` and add its IP/CIDR to
+   `MARKET_HELM_TRUSTED_PROXY_CIDRS`.
+6. Verify `/health/live`, `/health/ready`, `/health/worker`, and `/metrics`, then test registration
+   and the email-verification link against the public staging hostname.
+
+`/health/live` proves the API process is alive. `/health/ready` returns 503 when
+the database is unavailable or migrations are incomplete and includes the latest
+worker heartbeat when one exists.
+
 This project runs **locally** and can run **on a host** (VPS, PaaS, containers) the same way: application code is deployed; **market data and projections stay on disk** (or, in the future, in a database) configured via environment variables—not committed to git.
 
 ---

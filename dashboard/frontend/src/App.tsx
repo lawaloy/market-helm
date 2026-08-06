@@ -9,6 +9,7 @@ import HistoricalTrends from './pages/HistoricalTrends';
 import Summary from './pages/Summary';
 import AlertsSettings from './pages/AlertsSettings';
 import SignIn from './pages/SignIn';
+import AccountRecovery from './pages/AccountRecovery';
 import api, { alertsApi } from './services/api';
 
 function App() {
@@ -166,6 +167,9 @@ function App() {
           <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
           <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
           <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
+          <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
+          <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
           <Route
             path="/alerts"
             element={

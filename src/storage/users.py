@@ -137,9 +137,40 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, created_at FROM users WHERE id = ?",
+            "SELECT id, email, created_at, email_verified_at FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
     if not row:
         return None
-    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"]}
+    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"],
+            "email_verified": bool(row["email_verified_at"])}
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    try:
+        normalized = _normalize_email(email)
+    except UserError:
+        return None
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, email, created_at, email_verified_at FROM users WHERE email = ?",
+            (normalized,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"],
+            "email_verified": bool(row["email_verified_at"])}
+
+
+def update_password(user_id: str, password: str) -> None:
+    password_hash = _hash_password(password)
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+
+
+def mark_email_verified(user_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET email_verified_at = ? WHERE id = ? AND email_verified_at IS NULL",
+            (datetime.now(timezone.utc).isoformat(), user_id),
+        )

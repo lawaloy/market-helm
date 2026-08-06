@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: markethelm
+      POSTGRES_USER: markethelm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U markethelm -d markethelm"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+  api:
+    build: {context: ., dockerfile: Dockerfile.web}
+    restart: unless-stopped
+    env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
+    environment:
+      MARKET_HELM_DATABASE_URL: postgresql://markethelm:${POSTGRES_PASSWORD}@postgres:5432/markethelm
+    ports: ["127.0.0.1:${MARKET_HELM_PORT:-8000}:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+  worker:
+    build: {context: ., dockerfile: Dockerfile.web}
+    restart: unless-stopped
+    command: ["market-helm", "alerts", "run", "--loop"]
+    env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
+    environment:
+      MARKET_HELM_DATABASE_URL: postgresql://markethelm:${POSTGRES_PASSWORD}@postgres:5432/markethelm
+    depends_on:
+      postgres: {condition: service_healthy}
+volumes:
+  postgres-data:

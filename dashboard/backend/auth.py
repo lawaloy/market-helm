@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from fastapi import Header, HTTPException
@@ -27,9 +28,18 @@ def _existing_user_id(user_id: Optional[str]) -> Optional[str]:
     """Return *user_id* only when the account still exists (deleted → None)."""
     if not user_id:
         return None
-    if get_user_by_id(user_id) is None:
+    user = get_user_by_id(user_id)
+    if user is None:
+        return None
+    if _verification_required() and not user.get("email_verified"):
         return None
     return user_id
+
+
+def _verification_required() -> bool:
+    return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+        "1", "true", "yes", "on"
+    }
 
 
 async def optional_user_id(
@@ -50,6 +60,9 @@ async def require_user_id(
         raise HTTPException(status_code=401, detail="Authentication required.")
     # Match /api/auth/me: a still-valid signature for a deleted user must not
     # authorize protected alert/refresh routes (empty 200 or FK 500).
-    if get_user_by_id(user_id) is None:
+    user = get_user_by_id(user_id)
+    if user is None:
         raise HTTPException(status_code=401, detail="User not found.")
+    if _verification_required() and not user.get("email_verified"):
+        raise HTTPException(status_code=403, detail="Email verification required.")
     return user_id

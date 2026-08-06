@@ -8,6 +8,8 @@ env/
 venv/
 .venv/
 .venv-audit/
+.pytest_cache/
+.pytest_tmp/
 ENV/
 build/
 develop-eggs/
@@ -27,6 +29,7 @@ wheels/
 
 # Environment variables
 .env
+.env.staging
 .env.local
 
 # Node

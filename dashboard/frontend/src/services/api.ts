@@ -151,6 +151,14 @@ export const authApi = {
   login: (body: { email: string; password: string }) =>
     api.post<AuthResponse>('/api/auth/login', body),
   me: () => api.get<User>('/api/auth/me'),
+  requestPasswordReset: (email: string) =>
+    api.post<{ message: string }>('/api/auth/password-reset/request', { email }),
+  confirmPasswordReset: (token: string, password: string) =>
+    api.post<{ message: string }>('/api/auth/password-reset/confirm', { token, password }),
+  requestEmailVerification: (email: string) =>
+    api.post<{ message: string }>('/api/auth/verify-email/request', { email }),
+  confirmEmailVerification: (token: string) =>
+    api.post<{ message: string }>('/api/auth/verify-email/confirm', { token }),
 };
 
 export default api;

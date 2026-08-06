@@ -185,6 +185,11 @@ const SignIn: React.FC = () => {
           <button type="submit" disabled={submitting} className="alerts-cta w-full">
             {submitting ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
           </button>
+          {mode === 'sign-in' && (
+            <Link to="/forgot-password" className="block text-center text-sm text-teal-600 hover:underline">
+              Forgot your password?
+            </Link>
+          )}
         </form>
       </div>
     </div>

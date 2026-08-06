@@ -19,6 +19,7 @@ MIN_INTERVAL_SECONDS = 60
 # Hard ceiling so a poisoned interval cannot sleep the worker loop "forever"
 # (e.g. 1e18) and silently stop alert evaluation after the first tick.
 MAX_INTERVAL_SECONDS = 86400
+_PROCESS_WORKER_ID = f"worker-{uuid.uuid4().hex[:12]}"
 
 
 def resolve_interval_seconds(explicit: Optional[int] = None) -> int:
@@ -119,10 +120,19 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     from src.alerts.alert_orchestrator import run_orchestrator_tick
     from src.alerts.job_processor import process_job_queue
 
-    wid = worker_id or f"worker-{uuid.uuid4().hex[:12]}"
-    tick = run_orchestrator_tick()
-    stats = process_job_queue(wid)
-    return {
+    from src.storage.database import init_database
+    init_database()
+    wid = worker_id or _PROCESS_WORKER_ID
+    from src.storage.health import record_worker_heartbeat
+
+    record_worker_heartbeat(wid, "running")
+    try:
+        tick = run_orchestrator_tick()
+        stats = process_job_queue(wid)
+    except Exception as exc:
+        record_worker_heartbeat(wid, "error", {"error": type(exc).__name__})
+        raise
+    result = {
         "triggered": stats.get("delivered", 0),
         "events": [],
         "last_data_date": tick.get("last_data_date"),
@@ -130,6 +140,8 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
         "enqueued": tick.get("enqueued", 0),
         "jobs": stats,
     }
+    record_worker_heartbeat(wid, "healthy", {"enqueued": result["enqueued"], "jobs": stats})
+    return result
 
 
 def _coerce_triggered_count(raw: Any) -> int:

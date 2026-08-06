@@ -18,6 +18,8 @@ from src.storage.alert_jobs import (
 from src.storage.alert_watches import get_watch
 from src.storage.database import get_connection, init_database
 from src.storage.rate_limits import consume_rate_limit
+from src.storage.account_tokens import RESET_PASSWORD, consume_token, issue_token
+from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
 from src.storage.user_alerts import load_user_alerts_config, save_user_alerts_config
 from src.storage.users import create_user
 
@@ -96,7 +98,17 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == [1, 2]
+    assert [row["version"] for row in versions] == [1, 2, 3, 4]
+
+    reset_token = issue_token(user["id"], RESET_PASSWORD)
+    assert consume_token(reset_token, RESET_PASSWORD) == user["id"]
+    assert consume_token(reset_token, RESET_PASSWORD) is None
+
+    record_worker_heartbeat("postgres-worker", "healthy", {"delivered": 1})
+    heartbeat = latest_worker_heartbeat()
+    assert heartbeat is not None
+    assert heartbeat["worker_id"] == "postgres-worker"
+    assert heartbeat["details"] == {"delivered": 1}
 
     first_limit = consume_rate_limit("integration:client", now=121, window_seconds=60)
     second_limit = consume_rate_limit("integration:client", now=122, window_seconds=60)
