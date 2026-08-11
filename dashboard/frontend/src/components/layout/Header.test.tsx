@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Header from './Header';
+import { MemoryRouter } from 'react-router';
 
 const apiMocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -50,7 +51,7 @@ describe('Header refresh controls', () => {
     apiMocks.multiUserEnabled = true;
     apiMocks.logout.mockRejectedValueOnce(new Error('network unavailable'));
 
-    render(<Header />);
+    render(<MemoryRouter><Header /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe(

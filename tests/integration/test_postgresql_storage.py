@@ -21,7 +21,13 @@ from src.storage.rate_limits import consume_rate_limit
 from src.storage.account_tokens import RESET_PASSWORD, consume_token, issue_token
 from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
 from src.storage.user_alerts import load_user_alerts_config, save_user_alerts_config
-from src.storage.users import create_user
+from src.storage.users import (
+    authenticate_user,
+    change_password,
+    create_user,
+    delete_user_account,
+    get_user_by_id,
+)
 
 
 pytestmark = pytest.mark.integration
@@ -113,3 +119,11 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
     first_limit = consume_rate_limit("integration:client", now=121, window_seconds=60)
     second_limit = consume_rate_limit("integration:client", now=122, window_seconds=60)
     assert (first_limit.count, second_limit.count, second_limit.reset_at) == (1, 2, 180)
+
+    managed = create_user("managed-postgres@example.com", "password123")
+    change_password(managed["id"], "password123", "new-password-123")
+    changed = authenticate_user("managed-postgres@example.com", "new-password-123")
+    assert changed is not None
+    assert changed["session_version"] == 2
+    delete_user_account(managed["id"], "new-password-123")
+    assert get_user_by_id(managed["id"]) is None

@@ -15,7 +15,9 @@ from src.storage.users import (
     MAX_PASSWORD_LENGTH,
     UserError,
     authenticate_user,
+    change_password,
     create_user,
+    delete_user_account,
     get_user_by_email,
     get_user_by_id,
     mark_email_verified,
@@ -67,6 +69,16 @@ class PasswordResetConfirm(TokenRequest):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., max_length=MAX_PASSWORD_LENGTH)
+    new_password: str = Field(..., min_length=8, max_length=MAX_PASSWORD_LENGTH)
+
+
+class DeleteAccountRequest(BaseModel):
+    current_password: str = Field(..., max_length=MAX_PASSWORD_LENGTH)
+    confirmation: str = Field(..., max_length=16)
 
 
 def _verification_required() -> bool:
@@ -205,3 +217,41 @@ async def logout(authorization: Optional[str] = Header(default=None)) -> Message
         raise HTTPException(status_code=401, detail="Authentication required.")
     revoke_user_sessions(user_id)
     return MessageResponse(message="Signed out from all sessions.")
+
+
+@router.post("/password/change", response_model=MessageResponse)
+async def change_account_password(
+    body: ChangePasswordRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> MessageResponse:
+    from dashboard.backend.auth import require_user_id
+
+    _require_multi_user()
+    user_id = await require_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    try:
+        change_password(user_id, body.current_password, body.new_password)
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return MessageResponse(message="Password changed. Sign in again on every device.")
+
+
+@router.delete("/account", response_model=MessageResponse)
+async def delete_account(
+    body: DeleteAccountRequest,
+    authorization: Optional[str] = Header(default=None),
+) -> MessageResponse:
+    from dashboard.backend.auth import require_user_id
+
+    _require_multi_user()
+    user_id = await require_user_id(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    if body.confirmation != "DELETE":
+        raise HTTPException(status_code=400, detail="Type DELETE to confirm account deletion.")
+    try:
+        delete_user_account(user_id, body.current_password)
+    except UserError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return MessageResponse(message="Account permanently deleted.")

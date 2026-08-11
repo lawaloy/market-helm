@@ -175,6 +175,32 @@ def update_password(user_id: str, password: str) -> None:
         )
 
 
+def change_password(user_id: str, current_password: str, new_password: str) -> None:
+    if current_password == new_password:
+        raise UserError("New password must be different from the current password.")
+    new_hash = _hash_password(new_password)
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if not row or not _verify_password(current_password, row["password_hash"]):
+            raise UserError("Current password is incorrect.")
+        conn.execute(
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+            (new_hash, user_id),
+        )
+
+
+def delete_user_account(user_id: str, current_password: str) -> None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if not row or not _verify_password(current_password, row["password_hash"]):
+            raise UserError("Current password is incorrect.")
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
+
 def revoke_user_sessions(user_id: str) -> None:
     with get_connection() as conn:
         updated = conn.execute(
