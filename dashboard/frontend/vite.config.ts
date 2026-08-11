@@ -32,6 +32,10 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       environment: 'jsdom',
+      // Keep DOM-heavy suites stable on shared CI runners and developer machines.
+      maxWorkers: 4,
+      testTimeout: 10_000,
+      hookTimeout: 10_000,
     },
   }
 })
