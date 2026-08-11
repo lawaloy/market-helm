@@ -10,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,9 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const clearSession = useCallback(() => {
+    clearAuthToken();
+    setUser(null);
+  }, []);
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, multiUserEnabled, login, register, logout }}
+      value={{ user, loading, multiUserEnabled, login, register, logout, clearSession }}
     >
       {children}
     </AuthContext.Provider>

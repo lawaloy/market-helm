@@ -10,6 +10,7 @@ import Summary from './pages/Summary';
 import AlertsSettings from './pages/AlertsSettings';
 import SignIn from './pages/SignIn';
 import AccountRecovery from './pages/AccountRecovery';
+import AccountSettings from './pages/AccountSettings';
 import api, { alertsApi } from './services/api';
 
 function App() {
@@ -170,6 +171,7 @@ function App() {
           <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
           <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
           <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
+          <Route path="/account" element={<RequireAuth><AccountSettings /></RequireAuth>} />
           <Route
             path="/alerts"
             element={

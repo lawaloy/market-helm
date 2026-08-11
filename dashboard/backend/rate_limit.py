@@ -104,6 +104,8 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
                 "/api/alerts/run",
                 "/api/alerts/test",
                 "/api/alerts/quotes",
+                "/api/auth/password/change",
+                "/api/auth/account",
             ),
             methods=("POST",),
         ),
