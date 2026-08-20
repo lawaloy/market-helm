@@ -4,5 +4,5 @@ httpx>=0.28.1
 pandas>=3.0.5
 pydantic>=2.13.4
 python-multipart>=0.0.32
-python-dotenv>=1.2.2
+python-dotenv>=1.2.3
 pytickersymbols>=1.17.10
