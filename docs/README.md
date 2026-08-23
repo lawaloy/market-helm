@@ -5,14 +5,11 @@ Start with the [main README](../README.md) for install and quick start. Use this
 | Topic | Document |
 |-------|----------|
 | **Install & daily use** | [USAGE.md](USAGE.md) — CLI entry points, output files, programmatic API |
-| **Configuration** | [CONFIGURATION.md](CONFIGURATION.md) — indices, screening filters, performance |
-| **Deployment & hosting** | [DEPLOYMENT.md](DEPLOYMENT.md) — `DATA_DIR`, env vars, Docker, Kubernetes, secrets |
-| **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md) — project layout, workflow, rate limiting, API client |
+| **Configuration** | [CONFIGURATION.md](CONFIGURATION.md) — screening, performance, optional AI, custom providers |
+| **Deployment & hosting** | [DEPLOYMENT.md](DEPLOYMENT.md) — staging, PostgreSQL/auth, workers, persistence, providers, secrets |
+| **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md) — operating modes, tenant/auth and alert boundaries, workflows, data ownership |
 | **Troubleshooting & FAQ** | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common errors and answers |
-| **Advanced** | [ADVANCED.md](ADVANCED.md) — OpenAI summaries, custom data providers |
 | **Roadmap & status** | [PROJECT_STATUS.md](PROJECT_STATUS.md) — what shipped, what's next, go-live → [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) |
-| **Alerts design** | [ALERTING_DESIGN.md](ALERTING_DESIGN.md) — Helmtower / price alerts |
 | **Projections** | [STOCK_PROJECTIONS.md](STOCK_PROJECTIONS.md) — 5-day projection logic |
-| **Dashboard design** | [DASHBOARD_DESIGN.md](DASHBOARD_DESIGN.md) — UI/API reference |
-| **Dashboard dev** | [dashboard/README.md](../dashboard/README.md) — run locally, develop the React UI |
+| **Dashboard** | [dashboard/README.md](../dashboard/README.md) — features, API surface, local development |
 | **Contributing** | [CONTRIBUTING.md](../CONTRIBUTING.md) — dev setup, tests, PR workflow |

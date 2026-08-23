@@ -62,7 +62,44 @@ Edit `config/filters.json`:
 
 ---
 
+## Optional AI summaries
+
+Without `OPENAI_API_KEY`, MarketHelm generates a template-based summary. To use
+the optional OpenAI summarizer:
+
+1. Install the AI extra:
+
+   ```bash
+   pip install 'market-helm[ai]'
+   ```
+
+2. Add the key to `.env` or the process environment:
+
+   ```text
+   FINNHUB_API_KEY=your-finnhub-key
+   OPENAI_API_KEY=your-openai-key
+   ```
+
+3. Run the tracker normally. The summarizer falls back safely when the optional
+   package or API call is unavailable.
+
+The current model and prompt are defined in `src/analysis/ai_summarizer.py`.
+Review provider pricing and model availability before enabling this in a scheduled
+or hosted environment.
+
+---
+
+## Custom market-data providers
+
+The Finnhub boundary lives in `src/services/api_client.py`. A replacement provider
+should preserve the existing client contract or be introduced behind an adapter so
+screening and workflow code do not become provider-specific. It must also define
+authentication, quotas, retry behavior, response normalization, and tests.
+
+---
+
 ## Related
 
 - [USAGE.md](USAGE.md) — how to run the tracker
 - [ARCHITECTURE.md](ARCHITECTURE.md) — how screening and rate limiting work
+- [DEPLOYMENT.md](DEPLOYMENT.md) — production environment and secrets

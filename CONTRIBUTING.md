@@ -240,7 +240,10 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 ### Current Gaps & Opportunities
 
-- **Alerts (product):** Helmtower v1 shipped; remaining gaps are **reliability** (retry/backoff, delivery status UI) and **multi-user** (accounts, DB) — see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-requirements--alerts-non‑negotiable-direction).
+- **Hosted readiness:** Alerts, retries, delivery history, accounts, tenant isolation,
+  and the database worker are implemented. The important gaps are managed staging,
+  real-provider delivery, backup/restore, load, and operational verification — see
+  [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 - **Historical / accuracy:** Multi-day trends and **projection accuracy** (API + Historical Trends UI) are in place; deeper **metrics by confidence**, **risk-adjusted** views, and **business-calendar** target dates are still open.
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
 - **Screening:** Advanced technical filters (RSI/MACD, etc.) remain future work.
@@ -254,7 +257,8 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 #### Priority #1: Alert & notification system
 
-**Status:** v1 shipped; **reliability + multi-user** next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+**Status:** Local and hosted foundations are shipped; infrastructure validation and
+advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 **On `main`:**
 
@@ -263,11 +267,14 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 - [x] **SMTP email** + transactional providers (SendGrid, Mailgun)
 - [x] CLI: `alerts init`, `alerts list`, `alerts test`, `alerts run --loop`
 - [x] **Helmtower** — dashboard Settings UI for watches, email, webhooks, test send
+- [x] Delivery retry/backoff and per-channel status/history
+- [x] Accounts, tenant-scoped storage, database queue/worker, and auth lifecycle
 
 **Next:**
 
-- [ ] Email/webhook **retry/backoff**; optional delivery status in UI
-- [ ] Later: accounts, DB, SMS/push
+- [ ] Validate managed PostgreSQL, real email/webhooks, ingress, metrics, and
+  backup/restore in hosted staging
+- [ ] Technical/compound rules; later, SMS/push
 
 ---
 

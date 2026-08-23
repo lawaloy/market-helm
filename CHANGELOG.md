@@ -13,16 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Alerts:** SMTP **email** notifier (`"notifications": ["email"]`) with env-based defaults (`SMTP_*`, `ALERT_EMAIL_TO`) and per-rule `email_to`; see `config/alerts.example.json` and [dashboard/README.md](dashboard/README.md).
-- **Alerts CLI:** `market-helm alerts init|list|test` with user config at `~/.market-helm/alerts.json`.
-- **Alerts:** Slack- and Discord-formatted webhook payloads via `webhook_format: slack|discord` or `ALERT_WEBHOOK_FORMAT`.
+- **Alerts product:** Helmtower configuration, live quote picker, test sends,
+  looping and database-backed workers, retry/backoff, and delivery history.
+- **Notification channels:** SMTP, SendGrid, and Mailgun email plus generic, Slack,
+  and Discord webhooks.
+- **Hosted accounts:** Registration, sessions, tenant-isolated alerts, email
+  verification, password reset/change, logout/session invalidation, and account
+  deletion.
+- **Hosted persistence and operations:** SQLite/PostgreSQL storage, versioned
+  migrations, worker jobs, shared rate limiting, liveness/readiness/worker health,
+  and metrics.
 
-### Planned (not yet shipped)
+### Not yet shipped
 
-- **Alerts:** dashboard settings UI for rules and notification channels; technical / multi-condition rules (see [docs/ALERTING_DESIGN.md](docs/ALERTING_DESIGN.md)).
+- **Alerts:** Technical/multi-condition rules and SMS/push channels (see
+  [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Dashboard:** Route-level code splitting, watchlist, keyboard shortcuts (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
-- **Product:** User authentication, multi-user data isolation.
+- **Execution:** Broker integration and automated order placement.
 
 ## [0.3.4] - 2026-08-21
 
@@ -76,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- Synced markdown with shipped behavior on `main`: historical trends UI, projection accuracy API (`GET /api/history/accuracy`), partial alerting (log + webhook), and corrected “planned vs shipped” language across `CHANGELOG`, `dashboard/FEATURES.md`, `docs/DASHBOARD_DESIGN.md`, `docs/ALERTING_DESIGN.md`, `docs/STOCK_PROJECTIONS.md`, and `docs/PROJECT_STATUS.md`.
+- Synced the documentation set with shipped historical trends, projection
+  accuracy, and the alerting behavior available at that release.
 - Aligned package metadata with the **`v0.2.*`** release tag line (follows **`v0.2.7`**).
 
 ## [0.5.0] - 2026-03-26

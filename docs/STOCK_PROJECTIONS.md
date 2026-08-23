@@ -258,7 +258,9 @@ Potential improvements for future versions:
 - [ ] News sentiment integration
 - [ ] Sector correlation analysis
 - [ ] Backtesting framework
-- [ ] More alert channels and rules for high-confidence opportunities (partial alerting exists; see [ALERTING_DESIGN.md](ALERTING_DESIGN.md))
+- [ ] Technical/compound rules and SMS/push for high-confidence opportunities
+  (price/screening rules plus email/webhooks already ship; see
+  [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))
 
 ## Architecture
 
