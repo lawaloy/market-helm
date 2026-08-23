@@ -32,15 +32,21 @@ See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 
 Open PRs **ready for review by default**. Use `--draft` only when the user explicitly requests a draft or the work is intentionally incomplete.
 
-When creating PRs (including via `gh pr create`), use [`.github/pull_request_template.md`](.github/pull_request_template.md):
+For GitHub-side operations, use the installed **GitHub app/connector** whenever its
+tools are available. This includes creating or updating PRs, enabling auto-merge,
+checking workflow/status results, merging, and reading PR metadata. Do **not**
+default to GitHub CLI authentication. Use `gh` only as an explicitly disclosed
+fallback when the connector is unavailable or lacks the required operation.
+
+Continue to use local `git` for working-tree operations such as branches, commits,
+fetch, push, checkout, and pull; the connector does not synchronize the local
+working tree.
+
+When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
 - **`## Checks`** for local verification before push
 - **`<!-- AUTO:START -->` … `<!-- AUTO:END -->`** markers so the PR Description workflow can update the file list in place
-
-```bash
-gh pr create --title "..." --body-file .github/pull_request_template.md
-```
 
 Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBUTING.md#6-push-and-create-pull-request).
 

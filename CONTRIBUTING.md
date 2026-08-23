@@ -119,7 +119,8 @@ git commit -m "fix: resolve issue with Y"
 git push origin feature/your-feature-name
 ```
 
-Create a Pull Request on GitHub (or with `gh pr create`) using the repo template format:
+Create a Pull Request through GitHub or an installed GitHub integration using the
+repo template format:
 
 ```markdown
 ## What + Why
@@ -138,14 +139,9 @@ Create a Pull Request on GitHub (or with `gh pr create`) using the repo template
 - Use **`## What + Why`**, not `## Summary` — matches [`.github/pull_request_template.md`](.github/pull_request_template.md).
 - Include the **`<!-- AUTO:START -->` / `<!-- AUTO:END -->`** markers so the [PR Description workflow](.github/workflows/pr-description.yml) can refresh the file list without overwriting your text.
 - Fill in **at least one What + Why bullet** before pushing again; until then, later syncs skip auto-updates so an empty template is not clobbered.
-
-Example with `gh`:
-
-```bash
-gh pr create --title "feat: your change" --body-file .github/pull_request_template.md
-```
-
-Then edit **What + Why** on GitHub (or amend the body locally) before your next push if the template bullets are still empty.
+- For Codex-driven work, prefer the installed GitHub app/connector for PR creation,
+  updates, checks, and auto-merge. Local `git` remains responsible for pushing the
+  branch and synchronizing the working tree.
 
 Also include when relevant:
 
