@@ -1,190 +1,134 @@
-# Project status & roadmap
+# Project status and roadmap
 
-**Last updated:** 2026-06-17 — transactional email providers + alert worker on `main`; reliability/UI delivery status next
+**Last updated:** 2026-08-22
 
-This file is the **single place** for “where we are,” “what’s next,” and **gaps** (skipped or deferred work). Other READMEs link here for details. **Hosting and go-live steps:** [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live).
+This is the authoritative inventory of what MarketHelm currently ships, what is
+covered by automated tests, and what remains unfinished. Deployment instructions
+live in [DEPLOYMENT.md](DEPLOYMENT.md); design documents describe longer-term ideas
+and should not be read as implementation claims.
 
----
+## Product direction
 
-## Product vision
+MarketHelm is a stock-market monitoring product with a Python CLI and a React web
+dashboard. It screens and fetches market data, produces heuristic short-term
+projections, stores historical runs, and can notify users when alert rules match.
 
-**Goal:** Build a **real product** that anyone can use—not a tool only a single operator configures on their machine.
+The repository supports two operating modes:
 
-Users should be able to **sign up, enter email (and later phone/push), pick what to watch, and receive alerts** without editing JSON, cloning a repo, or SSH-ing into a server. That is the target experience (similar to well-known consumer finance apps).
+- **Local/self-hosted mode:** market data and alert preferences are flat files.
+- **Hosted multi-user mode:** market data remains shared flat-file data, while
+  accounts, sessions, per-user alert settings, jobs, and delivery history use
+  SQLite or PostgreSQL.
 
-**Phased capability:**
+Automated broker execution is a future direction, not a current capability.
+MarketHelm does not provide investment, legal, or tax advice.
 
-1. **Monitor** the market on a schedule (screening, data fetch, summaries).
-2. **Suggest** what to buy or sell (projections, recommendations, opportunities, alerts).
-3. **Execute** trades on the user’s behalf **safely** (broker API, limits, audit trail)—**not in the codebase yet**; see [DEPLOYMENT.md](DEPLOYMENT.md).
-4. **Serve many users** — accounts, per-user preferences, isolated secrets, likely a **database** (not only shared flat files).
+## Status definitions
 
-**Where we are today:** analysis + file-backed storage + dashboard for **viewing** data + **Helmtower** (price-alert UI) + alert engine with email/webhook delivery + scheduled worker CLI. JSON under `~/.market-helm/` remains **interim storage** behind the API—not the user-facing workflow.
+| Label | Meaning |
+|-------|---------|
+| **Shipped and tested** | Implemented with automated coverage in this repository |
+| **Shipped; operational verification needed** | Implemented and tested in isolation, but requires a real provider or hosted environment to validate end to end |
+| **Partial** | A useful first version exists, with material scope still open |
+| **Not implemented** | Design or roadmap only |
 
-**Disclaimer:** This is software design, not investment, legal, or tax advice. Automated trading has regulatory and broker rules; validate with professionals and your broker.
+Automated coverage does not mean every production integration has been exercised.
+For example, tests mock Finnhub and notification providers; managed PostgreSQL,
+real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
----
+## Current capability matrix
 
-## Product requirements — Alerts (non‑negotiable direction)
+| Area | Status | What exists | Important remaining work |
+|------|--------|-------------|--------------------------|
+| CLI and daily tracker | **Shipped and tested** | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output | Live Finnhub smoke testing and broader service-level failure tests |
+| Web dashboard | **Shipped and tested** | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
+| Projection model | **Partial** | Five-day heuristic targets, confidence, risk, and recommendations | Backtesting, calibration, business-day targets, confidence-band analytics, fundamentals/news/ML |
+| Historical accuracy | **Partial** | API and UI compare past projections with later closes | Richer metrics, confidence cohorts, risk-adjusted views, clearer market-calendar handling |
+| Alerts | **Shipped and tested** | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI | Technical-indicator and compound rules; SMS/push; real-provider staging tests |
+| Accounts and tenant isolation | **Shipped and tested** | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data | Account export and stronger administrative/support tooling |
+| Hosted persistence | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, PostgreSQL integration gate, queue/orchestrator | Managed staging, connection pooling validation, backup/restore drills, failover planning |
+| Production controls | **Shipped; operational verification needed** | API rate limiting, trusted-proxy handling, liveness/readiness/worker health, metrics | Production dashboards/alerts, capacity testing, retention policy, operational runbooks |
+| Automated trading | **Not implemented** | No broker connection or order execution | Broker integration, order/risk model, audit trail, compliance and safety controls |
 
-These define what “done” looks like for alerts as a **product feature**. Local JSON is acceptable only as a **temporary storage layer** behind an API/UI—not as the user-facing workflow.
+## Hosted alerts and accounts
 
-| Requirement | Target | Today |
-|-------------|--------|--------|
-| **Subscribe without config files** | User enters email (and later phone) in **Helmtower** | ✅ Dashboard UI (`/alerts`) |
-| **No repo clone for end users** | Pip install or hosted app; preferences via UI → `~/.market-helm` | ✅ Onboarding + save via API |
-| **Always-on delivery** | Background job checks rules on a schedule (not “user opened dashboard today”) | ✅ `market-helm alerts run --loop` — operator schedules on host (see [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live)) |
-| **Per-user isolation** | Each user’s rules and contact info are private | ❌ Single shared config file |
-| **Test from UI** | “Send test notification” button | ✅ Per-rule test in Helmtower |
-| **Accounts (later)** | Sign-in, saved preferences across devices | ❌ Planned |
+The hosted foundation is implemented. When `MARKET_HELM_DATABASE_URL` is set,
+alert routes require authentication and scope configuration, watches, jobs, and
+delivery history to the signed-in user. The account lifecycle includes:
 
-**Explicitly not the product:** “One operator edits `alerts.json` and sets SMTP env vars.” CLI/env remain valid for **self-hosted dev**, but Helmtower is the primary surface for dashboard users.
+- registration, login, current-user lookup, and logout;
+- optional email-verification enforcement;
+- verification and password-reset email flows;
+- password change with session invalidation; and
+- account deletion.
 
----
+The database-backed worker evaluates enabled watches across users and records
+per-channel outcomes. SMTP, SendGrid, and Mailgun are supported for platform email;
+generic, Slack, and Discord webhook formats are supported. Retry/backoff is
+configurable with `ALERT_DELIVERY_*` environment variables.
 
-## Production alert delivery (target)
+Local mode remains intentionally supported. Without `MARKET_HELM_DATABASE_URL`,
+Helmtower and the alert CLI use the operator's `alerts.json` file and environment
+credentials. End users of a hosted deployment do not provide SMTP credentials.
 
-How email (and later SMS/push) should work in a **hosted product** vs what we use **today** for dev/self-host. Provider setup (SPF, DKIM, API keys): [DEPLOYMENT.md — Transactional alert email](DEPLOYMENT.md#transactional-alert-email).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries and
+[DEPLOYMENT.md](DEPLOYMENT.md) for hosted configuration.
 
-| | **Today (dev / self-host)** | **Target (hosted product)** |
-|--|-----------------------------|-----------------------------|
-| **Who configures delivery** | Operator in `.env` or `~/.market-helm/.env` | **Platform** ops — one provider account for the whole app |
-| **From** | Often same as `SMTP_USER` (e.g. your Gmail) | **MarketHelm** `<alerts@yourdomain.com>` via SendGrid, Mailgun, or SES SMTP |
-| **To** | Email saved in Helmtower (single-tenant) | **Each user’s email** from DB (multi-tenant) |
-| **Secrets** | Operator’s Gmail app password in env; webhooks in `~/.market-helm/.env` | Provider API key / SMTP creds in **host secret manager only** |
-| **User action** | Helmtower: email, Discord/Slack webhook, set watch, test | Same UX; platform-owned **From** and per-user **To** |
+## Test posture and known verification gaps
 
-**Code today:** `ALERT_EMAIL_PROVIDER` supports **smtp** (default), **sendgrid**, and **mailgun**; users set **To** in Helmtower only.
+The repository has broad Python and frontend unit/integration coverage, including
+auth lifecycle, tenant isolation, storage migrations, worker orchestration,
+delivery history, rate limits, security boundaries, API routes, and UI flows. CI
+also defines a PostgreSQL 16 integration gate and browser smoke coverage.
 
-**Why tests look like “email yourself”:** dev mode uses *your* mailbox to authenticate and *your* address as recipient. That proves delivery; it is not the end-user UX for a hosted product.
+The following should not be inferred from those tests:
 
-**Phased path:**
+- live Finnhub availability, quota behavior, or full-market run reliability;
+- successful delivery through production SendGrid, Mailgun, SMTP, Slack, or Discord;
+- managed PostgreSQL backup, restore, failover, pooling, and TLS behavior;
+- production ingress/proxy correctness and sustained-load capacity;
+- complete cross-browser, mobile-device, accessibility, and performance coverage; or
+- financial validity of the projection heuristic.
 
-1. ~~**Foundation** — SMTP + webhook notifiers, CLI, alerts API.~~ **Shipped** (PR #142).
-2. ~~**Helmtower v1** — dashboard UI; user enters **To** and rules; server delivery from env.~~ **Shipped** (PR #143).
-3. ~~**Production delivery plumbing** — always-on worker CLI, transactional providers (SendGrid/Mailgun), deploy docs.~~ **Shipped** on `main` / `feat/transactional-email`.
-4. ~~**Production gaps (remaining)**~~ **Shipped** — retry/backoff + delivery status in Helmtower.
-5. **Hosted product** — user accounts, DB-backed rules, SMS/push.
+These are the highest-value testing gaps because they cross system boundaries that
+unit tests and container-only integration tests cannot fully reproduce.
 
-We do **not** require each end user to create a Gmail app password or supply SMTP credentials.
+## Recommended next work
 
----
+1. **Hosted staging:** deploy the API, worker, PostgreSQL, and one transactional
+   email provider; validate migrations, email links, proxy headers, metrics, and
+   tenant isolation end to end.
+2. **Operational safety:** rehearse backup/restore, define retention and incident
+   runbooks, add capacity/load tests, and connect health/metrics to monitoring.
+3. **Projection validation:** add repeatable backtests, confidence calibration,
+   confidence-band reports, and explicit market-calendar semantics.
+4. **Alert depth:** add technical-indicator and compound conditions; consider
+   SMS/push only after hosted email is proven reliable.
+5. **Dashboard quality:** code-split routes, run accessibility/performance audits,
+   and decide whether saved watchlists/views belong in the product.
+6. **Service integration coverage:** add controlled tests around fetcher errors,
+   provider throttling, malformed upstream data, and a complete tracker run.
 
-## Snapshot
+## Explicitly deferred
 
-| Area | Status | Notes |
-|------|--------|--------|
-| CLI / daily tracker | **Stable** | Core workflows, CSV/JSON output; evaluates watch symbols on fetch |
-| Web dashboard | **Active** | FastAPI + React; market views, Historical Trends, projection accuracy, **Helmtower** |
-| Alerts (backend) | **Stable (v1+)** | Engine, log/webhook/email (SMTP + SendGrid/Mailgun), CLI, `/api/alerts/*`, worker |
-| Alerts (product UI) | **Shipped (v1)** | Helmtower: watches, channels, live picker prices, E2E in CI |
-| Historical / accuracy | **Partial** | Multi-day charts + `GET /api/history/accuracy` + UI |
-| Tests | **Good coverage** | Core, dashboard, alerts API, Helmtower picker E2E |
-| Hosting / deploy | **Documented** | [DEPLOYMENT.md](DEPLOYMENT.md) incl. [go-live steps](DEPLOYMENT.md#when-you-go-live) |
-
----
-
-## Work in flight
-
-The hosted multi-user foundation is on `main`: SQLite storage, auth/UI,
-per-user alerts, the database-backed worker queue, and delivery history.
-
-| Item | Status |
+| Item | Reason |
 |------|--------|
-| SQLite schema + user accounts | Done |
-| Auth API (`/api/auth/register`, `/login`, `/me`) | Done |
-| Per-user alerts API when `MARKET_HELM_DATABASE_URL` set | Done |
-| Helmtower sign-in / sign-up UI | Done |
-| Multi-user alert worker + delivery history | Done |
-| Versioned SQLite/PostgreSQL migrations + container integration gate | Done on `feat/hosted-beta-readiness` |
+| Automated trading | Requires a separate risk, compliance, broker, and audit design |
+| SMS and push notifications | Email/webhook production operation should be proven first |
+| Advanced technical/compound alert rules | Current price and screening rules cover the initial alert product |
+| International exchanges | Current screening is centered on S&P 500 and NASDAQ-100 |
+| ML/fundamental/news projections | Current projection engine is intentionally heuristic |
 
-See [MULTI_USER.md](MULTI_USER.md).
+## Keeping this document current
 
----
+- Update the date and capability matrix after meaningful behavior changes.
+- Distinguish code completion from real-environment operational verification.
+- Link roadmap references here instead of maintaining conflicting status lists.
+- Keep release-specific history in [CHANGELOG.md](../CHANGELOG.md).
 
-## What’s next (recommended order)
+## Related documentation
 
-### 1. **Hosted beta — production readiness**
-
-The multi-user foundation is complete. Remaining work for a hosted beta:
-
-- [x] **Helmtower auth UI** — sign-in / sign-up screens; persist bearer token; attach `Authorization` header on alerts API calls
-- [x] **Multi-user worker and delivery history** — database-backed orchestration, jobs, cooldown state, and per-user outcomes
-- [x] **Production database foundation** — adapter, versioned migrations, and PostgreSQL 16 container integration gate
-- [ ] **Managed staging** — provision hosted PostgreSQL, verify backups/restore, pooling, TLS, and operational metrics
-- [ ] **Auth lifecycle** — password reset, email verification, session invalidation
-- [ ] **Production controls** — rate limits, account deletion/export, observability, hosted deploy docs
-
-See [MULTI_USER.md](MULTI_USER.md).
-
-### 2. **Alerts — production gaps** (complete on `main`)
-
-- [x] **Always-on worker** — `market-helm alerts run --loop` (+ `scripts/run-alert-worker.ps1`)
-- [x] **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER`
-- [x] **Deploy docs** — [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) and [transactional email](DEPLOYMENT.md#transactional-alert-email)
-- [x] **Reliability** — retry/backoff for webhook/email failures (`ALERT_DELIVERY_*` env)
-- [x] **Delivery status in UI** — latest per-channel outcomes on `/alerts`
-
-**Later (same epic):** SMS/push after hosted email works.
-
-### 3. Projection accuracy — deeper analytics
-
-- Buckets by **confidence** band; business-day targets if needed.
-
-### 4. Dashboard UX (general)
-
-- Code splitting, watchlist, saved views.
-
-### 5. Tests & services coverage
-
-- `data_fetcher.py`, `stock_screener.py`, `index_fetcher.py`; optional full tracker integration test.
-
-### 6. Future: execution & multi-tenant SaaS
-
-- Broker API, order DB, auth — see [DEPLOYMENT.md](DEPLOYMENT.md) and product vision above.
-
----
-
-## Recently shipped (on `main`)
-
-1. **Delivery retry/backoff** — transient email/webhook failures with `ALERT_DELIVERY_*` env (PR #196).
-2. **Scheduled alert worker** — `market-helm alerts run` / `--loop`, interval via env or flag.
-2. **Helmtower (Alerts Settings UI)** — `/alerts`: watches, email + Discord/Slack, company picker with live quotes (PR #143).
-3. **Alerts foundation** — SMTP email, Discord/Slack webhooks, CLI `alerts init|list|test`, user config at `~/.market-helm/` (PR #142).
-4. **Docs split** — README slimmed; guides under `docs/` (PR #177).
-5. **Projection accuracy** — API + Historical Trends UI.
-6. **CI / release automation** — E2E smoke (incl. Helmtower picker), post-release auto-finish.
-
-6. **Transactional email** — SendGrid/Mailgun/SMTP via `ALERT_EMAIL_PROVIDER` (PR #188).
-7. **Delivery retry/backoff** — PR #196.
-
----
-
-## Skipped / deferred / gaps — and how we address them
-
-| Item | Why deferred | How we address it |
-|------|----------------|-------------------|
-| **Operator must schedule worker on host** | CLI exists; no managed SaaS yet | [DEPLOYMENT.md — When you go live](DEPLOYMENT.md#when-you-go-live) |
-| **Email retry / delivery status in UI** | v1 proves delivery path | **§1 above** — reliability |
-| **User accounts + DB** | Large scope | **§1 above** — foundation in this PR; UI + worker next |
-| **Phone / SMS / push** | Email + webhook first | After hosted email works |
-| **Technical rules (RSI, AND/OR)** | Scope | [ALERTING_DESIGN.md](ALERTING_DESIGN.md); after production gaps |
-| **Automated trading** | Out of scope | Broker + DB + compliance; later phase |
-
----
-
-## How to keep this current
-
-- After meaningful merges, update **Last updated**, **Work in flight**, and **What’s next**.
-- When a branch merges, move items from **Work in flight** to **Recently shipped**.
-- Prefer **one** roadmap section in [CONTRIBUTING.md](../CONTRIBUTING.md) that points here.
-
----
-
-## Related docs
-
-- [Deployment & persistence](DEPLOYMENT.md)
-- [Alerting design (full vision)](ALERTING_DESIGN.md)
-- [Dashboard design](DASHBOARD_DESIGN.md)
+- [Deployment and persistence](DEPLOYMENT.md)
+- [Dashboard guide](../dashboard/README.md)
+- [Architecture](ARCHITECTURE.md)
 - [Contributing](../CONTRIBUTING.md)
-- [Dashboard README](../dashboard/README.md)

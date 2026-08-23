@@ -79,6 +79,9 @@ Navigate to **<http://localhost:3000>** in your browser (Vite dev server).
 - STRONG BUY opportunities section
 - Filterable/sortable stock table
 - Stock detail modal
+- Search, recommendation filters, pagination, and responsive layouts
+- Dark mode with saved/system preference
+- CSV, PNG, and PDF exports
 
 ### Historical Trends (implemented)
 
@@ -91,9 +94,27 @@ The **Historical Trends** page is shipped. It includes:
 **Why “projection accuracy” can look empty:**  
 Nothing is wrong with the UI. The accuracy block only has numbers to show when **both** are true: (1) you have saved runs in the `data/` folder across multiple dates (`daily_data_*.csv` and `projections_*.csv`), and (2) enough **calendar time has passed** that each projection’s **target date** is in the past, so there is a real close to compare. Until then you may still see the market charts, while accuracy stays in its empty state. Keep running **Fetch New** on successive days (or add historical files) and it will fill in over time.
 
-### Phase 2 (still in progress)
+### Hosted accounts and Helmtower (implemented)
 
-Other dashboard Phase 2 ideas (watchlist, code splitting, keyboard shortcuts, etc.) are **not** finished yet. See **What’s Next?** below and [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md).
+The dashboard includes Helmtower alert settings, sign-in and registration, email
+verification and password recovery, account settings, per-user delivery history,
+and authenticated alert configuration when database mode is enabled. Local file
+mode remains available without authentication.
+
+Other dashboard ideas (watchlists, code splitting, keyboard shortcuts, etc.) are
+not finished. See **What's Next?** below and
+[docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md).
+
+### Current limitations
+
+- Historical charts and accuracy need multiple dated tracker runs.
+- Data refresh is explicit/batch based; there are no WebSocket quote updates.
+- File mode is operator-oriented and does not require authentication; hosted
+  database mode protects tenant data with sign-in.
+- Watchlists, portfolios, multi-stock comparison, Excel export, keyboard shortcuts,
+  sector views, and correlation heatmaps are not implemented.
+- Live providers, managed PostgreSQL, ingress, backups, accessibility, performance,
+  and broad browser/device behavior still need real-environment validation.
 
 ### API Endpoints
 
@@ -106,13 +127,18 @@ Other dashboard Phase 2 ideas (watchlist, code splitting, keyboard shortcuts, et
 - `/api/stocks/{symbol}/historical` - Historical data
 - `/api/history/summary` - Aggregated historical summary over time
 - `/api/history/accuracy` - Projection vs actual accuracy (see [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md))
+- `/api/alerts/*` - Alert configuration, quotes, status, execution, and test delivery
+- `/api/auth/*` - Hosted registration, sessions, verification, recovery, and account controls
+- `/api/refresh/*` - Start, inspect, or cancel a background data refresh
+- `/health`, `/health/live`, `/health/ready`, `/health/worker` - Operational health
+- `/metrics` - Prometheus-style service metrics
 
 ### Technologies
 
 - FastAPI backend with pandas data loading
-- React 18 + TypeScript frontend
-- TailwindCSS for styling
-- Recharts for visualizations
+- React 19 + TypeScript frontend
+- TailwindCSS 4 for styling
+- Recharts 3 for visualizations
 - Headless UI for modals
 
 ## Project Structure
@@ -181,6 +207,15 @@ npm run build
 
 - `DATA_DIR` - Path to data directory (defaults to `../../data`). In production, set to a **persistent** absolute path (see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)).
 - `CORS_ORIGINS` - Allowed CORS origins (defaults to localhost:3000)
+- `MARKET_HELM_DATABASE_URL` - Enables hosted mode with SQLite or PostgreSQL
+- `MARKET_HELM_AUTH_SECRET` - Required session-signing secret in hosted mode (minimum 16 characters)
+- `MARKET_HELM_PUBLIC_URL` - Public HTTPS base URL used in verification/reset links
+- `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` - Require verification before protected hosted operations
+
+Rate limits, trusted proxies, health checks, account email, and provider settings
+have additional production variables. Use the complete tables in
+[docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) rather than copying a partial hosted
+configuration from this quick-start guide.
 
 **Alerts (Python tracker / `config/alerts.json`):**
 
@@ -253,14 +288,16 @@ Per-rule overrides in alerts config: `webhook_url`, `webhook_format` (`json`, `s
 1. **Performance** — Code splitting, lazy route loading (bundle size)
 2. **Watchlist** — Save favorite symbols (local persistence first)
 3. **Keyboard shortcuts** — Quick navigation
-4. **Alerts (future)** — Optional UI to view/test rules (backend alerts today live in `config/alerts.json` + **webhook** / log)
+4. **Quality validation** — Accessibility, browser/device, performance, and hosted end-to-end passes
+5. **Alert depth** — Technical/compound rules and, later, SMS/push channels
 
-See [DASHBOARD_DESIGN.md](../docs/DASHBOARD_DESIGN.md) for full Phase 2 design.
+Repo-wide priorities and deferred ideas are tracked only in
+[docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT License - See [LICENSE](../../LICENSE)
+MIT License - See [LICENSE](../LICENSE)

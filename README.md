@@ -2,7 +2,10 @@
 
 A stock market **monitoring** and analysis tool (CLI + web dashboard) that screens indices, fetches data, and projects short-term moves—aimed at growing toward suggestions, alerts, and (later) execution. Perfect for traders and analysts building a daily workflow.
 
-**Direction:** The long-term goal is a product that **monitors** markets, **suggests** buys/sells, and can **eventually execute** via broker APIs—with room to grow from the installable **CLI** toward a **multi-user** app. Read the full picture in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md#product-vision).
+**Direction:** MarketHelm already supports local and hosted multi-user monitoring,
+projections, and alerts. Broker execution remains a longer-term idea and is not
+implemented. Read the evidence-based capability matrix in
+[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 ## What Does It Do?
 
@@ -114,11 +117,10 @@ Full index: **[docs/README.md](docs/README.md)**
 | Guide | Topics |
 |-------|--------|
 | [USAGE.md](docs/USAGE.md) | CLI options, dashboard, output files |
-| [CONFIGURATION.md](docs/CONFIGURATION.md) | Indices, screening filters, performance |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker, Kubernetes, `DATA_DIR`, secrets |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code layout, workflow, rate limiting |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Screening, performance, optional AI, custom providers |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Hosted mode, PostgreSQL, workers, persistence, secrets |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Operating modes, workflows, auth/alert boundaries |
 | [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors, FAQ |
-| [ADVANCED.md](docs/ADVANCED.md) | OpenAI summaries, custom providers |
 | [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Roadmap, alerts, product vision |
 
 ---
@@ -127,7 +129,9 @@ Full index: **[docs/README.md](docs/README.md)**
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Next priorities:** alerts delivery, projection accuracy, dashboard polish — details in [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
+**Next priorities:** hosted staging/operations, projection validation, deeper alert
+rules, and dashboard quality — details in
+[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 ---
 

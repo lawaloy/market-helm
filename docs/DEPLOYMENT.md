@@ -19,6 +19,33 @@ separate services.
 the database is unavailable or migrations are incomplete and includes the latest
 worker heartbeat when one exists.
 
+### Hosted-mode configuration
+
+Hosted mode requires a database URL and a stable signing secret. SQLite is useful
+for development; PostgreSQL is recommended for a deployed service:
+
+```bash
+export MARKET_HELM_DATABASE_URL=sqlite:////path/to/markethelm.db
+export MARKET_HELM_AUTH_SECRET=change-me-in-production-min-16-chars
+
+# Hosted alternative:
+export MARKET_HELM_DATABASE_URL=postgresql://user:password@host:5432/markethelm
+```
+
+When `MARKET_HELM_DATABASE_URL` is unset, the application remains in local file
+mode. Market data stays in `DATA_DIR` in both modes; the database stores accounts,
+sessions, per-user alert settings, jobs, and delivery outcomes.
+
+The account API under `/api/auth` includes registration, login/logout, current-user
+lookup, email-verification request/confirmation, password-reset
+request/confirmation, password change, and account deletion. Account email links
+require `MARKET_HELM_PUBLIC_URL` plus a configured platform email provider.
+
+Schema migrations run automatically at startup and fail closed if the database has
+an unknown newer version. Before production, exercise the PostgreSQL integration
+gate documented in [ARCHITECTURE.md](ARCHITECTURE.md) and verify managed backups,
+restore, pooling, TLS, and worker concurrency in staging.
+
 This project runs **locally** and can run **on a host** (VPS, PaaS, containers) the same way: application code is deployed; **market data and projections stay on disk** (or, in the future, in a database) configured via environment variables—not committed to git.
 
 ---
@@ -62,10 +89,15 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 | `FINNHUB_API_KEY` | Tracker CLI | Market data (required for live fetches) |
 | `CORS_ORIGINS` | Dashboard backend | Comma-separated origins allowed in browser (e.g. `https://app.example.com`) |
 | `VITE_API_URL` | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`) |
+| `MARKET_HELM_DATABASE_URL` | API, worker | Enables hosted mode; SQLite for development or PostgreSQL for hosted use |
+| `MARKET_HELM_AUTH_SECRET` | Dashboard backend | Required hosted session-signing secret; minimum 16 characters |
+| `MARKET_HELM_PUBLIC_URL` | Dashboard backend | Safe public base URL for email verification and password-reset links |
+| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend | Require verified email before protected hosted operations |
 | `MARKET_HELM_RATE_LIMIT_ENABLED` | Dashboard backend | Enables API rate limiting; defaults on when database mode is enabled |
 | `MARKET_HELM_RATE_LIMIT_GLOBAL` | Dashboard backend | Per-client API requests/minute (default `120`) |
 | `MARKET_HELM_RATE_LIMIT_LOGIN` | Dashboard backend | Login attempts/client/minute (default `10`) |
 | `MARKET_HELM_RATE_LIMIT_REGISTER` | Dashboard backend | Registrations/client/hour (default `5`) |
+| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL` | Dashboard backend | Verification/reset email requests/client/hour (default `5`) |
 | `MARKET_HELM_RATE_LIMIT_EXPENSIVE` | Dashboard backend | Expensive write requests/client/minute (default `10`) |
 | `MARKET_HELM_TRUSTED_PROXY_CIDRS` | Dashboard backend | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For` |
 | `ALERT_WEBHOOK_URL` | Tracker (alerts) | Default webhook when rules use `webhook` without per-rule `url` |
@@ -186,21 +218,26 @@ Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider a
 
 Use this when moving from **local dev** to a **public host**. For day-to-day development, Gmail SMTP in `.env` is enough — skip this section until you deploy.
 
-1. **Host** — VPS (Hetzner, DigitalOcean) or PaaS (Fly.io, Railway) with a **persistent volume** for `DATA_DIR`.
-2. **Deploy app** — `market-helm-web` (Docker or `pip install` + process manager); set `FINNHUB_API_KEY` and `CORS_ORIGINS`.
-3. **Daily tracker** — cron or scheduler once per day (`market-helm`).
-4. **Alert worker** — run `market-helm alerts run --loop` (systemd, Docker sidecar, or `scripts/run-alert-worker.ps1` on Windows) so alerts fire without opening the dashboard.
-5. **Email (production)** — register a domain, verify it with SendGrid (or use Mailgun / SES SMTP), set `ALERT_EMAIL_PROVIDER` and provider secrets on the host — see [Transactional alert email](#transactional-alert-email). Users only enter their **To** address in Helmtower.
-6. **Secrets** — all API keys in host env or secret manager; never commit `.env`.
-7. **Smoke test** — Helmtower **Send test**, then confirm an alert delivers with the dashboard stopped and the worker running.
+1. **Host and ingress** — provision TLS, a persistent `DATA_DIR`, and an explicitly trusted reverse-proxy CIDR.
+2. **Database** — use managed PostgreSQL for hosted mode; set `MARKET_HELM_DATABASE_URL`, verify migrations, pooling, TLS, backups, and restore.
+3. **Deploy API and worker** — run `market-helm-web` plus a separate `market-helm alerts run --loop` process using the same database and secrets.
+4. **Auth** — set `MARKET_HELM_AUTH_SECRET`, `MARKET_HELM_PUBLIC_URL`, and email-verification policy; test registration, verification, reset, password change, logout, and deletion.
+5. **Daily tracker** — schedule `market-helm` and persist its shared market-data output.
+6. **Email** — verify a sender domain and configure SendGrid, Mailgun, or SES SMTP. Users only enter their recipient address in Helmtower.
+7. **Operations** — configure rate limits/proxies, collect `/metrics`, and monitor `/health/ready` plus `/health/worker`.
+8. **Secrets** — keep all credentials in the host secret manager; never commit `.env`.
+9. **Staging proof** — test cross-tenant isolation, a real alert with the dashboard stopped, provider failures/retries, backup/restore, and worker recovery before public traffic.
 
 Roadmap context: [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ---
 
-## Future: hosting and **automated trading** (not implemented yet)
+## Future: **automated trading** (not implemented)
 
-This repo today is **analysis + dashboard + alerts**. It does **not** place orders. The **product direction** (monitor → suggest → execute, multi-user) is in [PROJECT_STATUS.md](PROJECT_STATUS.md#product-vision). If you later add **automated buy/sell**:
+This repo today is **analysis + dashboard + alerts**. It does **not** place orders.
+The current product direction and capability matrix are in
+[PROJECT_STATUS.md](PROJECT_STATUS.md#product-direction). If you later add
+**automated buy/sell**:
 
 1. **Broker API** — You need a broker that exposes **order placement** (e.g. Alpaca, Interactive Brokers, Tradier). Finnhub is **market data**, not a substitute for execution.
 2. **Secrets** — Trading keys must live only in **host secrets**; rotate and scope to paper vs live.
@@ -256,7 +293,9 @@ Use cron (Linux/Mac), Task Scheduler (Windows), or systemd to run once per day.
 0 9 * * * docker run --rm -e FINNHUB_API_KEY=$(cat /path/to/key) market-helm:latest >> /var/log/market-helm.log 2>&1
 ```
 
-For alert evaluation on a schedule (independent of dashboard access), use `market-helm alerts run --loop` — see [ALERTING_DESIGN.md](ALERTING_DESIGN.md).
+For alert evaluation on a schedule (independent of dashboard access), use
+`market-helm alerts run --loop`. Alert component boundaries and unsupported rule
+types/channels are documented in [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow).
 
 ---
 

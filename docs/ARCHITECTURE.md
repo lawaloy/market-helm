@@ -1,98 +1,181 @@
 # Architecture
 
-Overview of the codebase, daily workflow, and Finnhub API usage.
+MarketHelm has a reusable Python core, two presentation layers (CLI and web), a
+React dashboard, and an optional hosted persistence/worker subsystem.
 
----
-
-## Project structure
+## Repository layout
 
 ```text
 market-helm/
-├── main.py                     # Entry point (run this!)
-├── src/
-│   ├── __init__.py
-│   ├── core/                   # Core utilities
-│   │   ├── config.py           # Configuration loader
-│   │   └── logger.py           # Logging setup
-│   ├── services/               # External data services
-│   │   ├── api_client.py       # Finnhub API client (rate limiting, retries)
-│   │   ├── index_fetcher.py    # Gets stock lists from indices
-│   │   ├── stock_screener.py   # Filters stocks by volume/activity
-│   │   └── data_fetcher.py     # Fetches detailed stock data
-│   ├── analysis/               # Data analysis & AI
-│   │   ├── analyzer.py         # Computes gainers/losers/stats
-│   │   └── ai_summarizer.py    # AI-powered market summaries
-│   ├── storage/                # Data persistence
-│   │   └── data_storage.py     # Saves CSV/JSON files
-│   ├── workflows/              # Business logic (reusable)
-│   │   └── tracker.py          # Core workflow orchestration
-│   └── cli/                    # CLI interface (presentation)
-│       └── commands.py         # Command-line interface
-├── config/
-│   ├── exchanges.json          # Which indices to track
-│   └── filters.json            # Screening criteria
-├── data/                       # Output files (CSV, JSON)
-└── logs/                       # Execution logs
+|-- main.py                         # Source-checkout CLI entry point
+|-- src/
+|   |-- core/                       # Configuration and logging
+|   |-- services/                   # Finnhub client, index/screening/data fetch
+|   |-- analysis/                   # Market analysis, projections, summaries
+|   |-- storage/                    # Files, SQLite/PostgreSQL, sessions, migrations
+|   |-- workflows/                  # Reusable tracker orchestration
+|   |-- alerts/                     # Rules, workers, channels, delivery status
+|   `-- cli/                        # `market-helm` command presentation
+|-- dashboard/
+|   |-- backend/                    # FastAPI routes, auth, rate limits, health
+|   `-- frontend/                   # React/TypeScript SPA
+|-- config/                         # Exchange, filter, and alert examples
+|-- data/                           # Shared CSV/JSON/Markdown market output
+|-- tests/                          # Python unit/integration/security tests
+`-- scripts/                        # Build, release, worker, and validation helpers
 ```
 
-The dashboard lives under `dashboard/` (FastAPI backend + React frontend). See [dashboard/README.md](../dashboard/README.md).
+Business logic belongs in `src/` so the CLI, FastAPI routes, and workers can reuse
+it. The frontend communicates with FastAPI through `/api/*` routes. A production
+frontend build is emitted into `dashboard/backend/static/` and served by FastAPI.
 
----
+## Operating modes
 
-## How the daily workflow works
+### Local/self-hosted file mode
 
-1. **Index fetching** — stock symbols from S&P 500 (first 100) and NASDAQ-100.
-2. **Screening** (1 API call per stock) — quick price/volume check to filter candidates.
-3. **Data fetching** (2 API calls per qualified stock) — detailed data for the top N stocks.
-4. **Analysis** — calculate changes, identify trends, optional AI summary.
-5. **Storage** — save CSV/JSON under `data/` (or `DATA_DIR`).
+This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 
----
+- Market runs write dated CSV/JSON/Markdown files under `DATA_DIR`.
+- Alert preferences and history use the local MarketHelm configuration directory.
+- Alert API routes are intended for an operator-controlled deployment and do not
+  require user accounts.
+- `market-helm alerts run --loop` evaluates rules on a schedule.
 
-## Rate limiting
+### Hosted multi-user mode
 
-- **Free tier:** 60 API calls per minute.
-- **Typical run:** ~241 total calls (~4 minutes).
-- **How we stay under the limit:**
-  - Screening uses a lightweight 1-call method (quote only).
-  - Only qualified stocks get the full 2-call fetch (quote + profile).
-  - S&P 500 is capped at 100 symbols for screening.
-  - 2 parallel workers with staggered starts.
-  - Automatic pauses every 25–50 requests.
+Setting `MARKET_HELM_DATABASE_URL` enables SQLite or PostgreSQL persistence for
+accounts and tenant-owned alert state.
 
----
+- Bearer sessions protect tenant-specific API routes.
+- Alert configuration, watches, jobs, and delivery history are scoped per user.
+- Market data files remain shared platform inputs.
+- The orchestrator creates jobs and workers claim/process them from the database.
+- Versioned migrations run at startup and fail closed on an unknown newer schema.
+- Rate limiting defaults on and health/readiness/worker/metrics endpoints support
+  operations.
 
-## API client
+The account router provides registration, login/logout, current-user lookup,
+verification request/confirmation, password-reset request/confirmation, password
+change, and account deletion. Password changes invalidate other sessions. Optional
+verification enforcement is controlled with
+`MARKET_HELM_REQUIRE_EMAIL_VERIFICATION`.
 
-Implementation: `src/services/api_client.py`.
+`init_database()` applies pending migrations in version order. Older untracked
+SQLite installations are adopted through the idempotent initial migration, while
+an unknown newer schema version causes startup to fail closed. The PostgreSQL 16
+integration gate exercises migrations, tenant storage, and the worker lifecycle:
 
-| Capability | Detail |
-|------------|--------|
-| **Rate limiting** | Thread-safe token bucket; stays under 60 calls/min |
-| **Retry** | Exponential backoff on failures (1s, 2s, 4s) |
-| **429 handling** | Respects `Retry-After`; resets limiter after waits |
-| **Session** | Connection pooling |
+```bash
+docker compose -f docker-compose.postgres-test.yml up \
+  --abort-on-container-exit --exit-code-from tests
+docker compose -f docker-compose.postgres-test.yml down --volumes
+```
 
-**Two fetch modes:**
+See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration and hosted verification.
 
-- `get_stock_data_for_screening()` — 1 API call (quote only), used during screening.
-- `get_stock_data()` — 2 API calls (quote + profile), used for qualified stocks.
+## Daily market workflow
 
-This minimizes API usage while keeping data quality for the final set.
+```text
+index constituents
+        |
+        v
+lightweight quote screening -- Finnhub rate limiter/retry
+        |
+        v
+detailed quote/profile fetch for selected symbols
+        |
+        v
+market analysis + heuristic five-day projections
+        |
+        +--> dated CSV/JSON/Markdown files
+        +--> dashboard history/accuracy APIs
+        `--> alert evaluation snapshot
+```
 
----
+The workflow is batch-oriented. "Fetch New" starts the same underlying tracker
+work in a background process; it is not a streaming quote service.
 
-## External resources
+## Alert workflow
 
-- **Finnhub documentation:** <https://finnhub.io/docs/api>
-- **API status:** <https://finnhub.io/status>
-- **Support:** <support@finnhub.io>
-- **Usage dashboard:** <https://finnhub.io/dashboard>
+```text
+market snapshot / selected quote
+             |
+             v
+       rule evaluation ---- cooldown state
+             |
+             v
+   log / email / webhook delivery
+             |
+             v
+       delivery outcome/history
+```
 
----
+In hosted mode, database jobs add claim/lease semantics around evaluation so
+multiple workers can process user rules without sharing in-memory tenant state.
 
-## Related
+Current conditions are price thresholds and screening matches. Current channels
+are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Technical
+indicators, patterns, compound rules, SMS, push, and cloud queue-provider adapters
+are not implemented.
 
-- [CONFIGURATION.md](CONFIGURATION.md) — tune indices and filters
-- [ADVANCED.md](ADVANCED.md) — OpenAI summaries, custom providers
-- [STOCK_PROJECTIONS.md](STOCK_PROJECTIONS.md) — projection pipeline
+| Module | Responsibility |
+|--------|----------------|
+| `alert_engine.py`, `alert_rules.py` | Parse and evaluate current rules |
+| `alert_storage.py`, `user_alert_storage.py` | Local and tenant-scoped persistence |
+| `alert_runner.py`, `alert_worker.py` | One-shot and looping evaluation |
+| `alert_orchestrator.py`, `job_processor.py` | Schedule, claim, and process hosted jobs |
+| `delivery_status.py` | Record per-channel outcomes |
+| `notifiers/` | Email/webhook delivery and retry classification |
+
+## Data ownership
+
+| Data | Local mode | Hosted mode |
+|------|------------|-------------|
+| Market CSV/JSON/Markdown | `DATA_DIR` | Shared `DATA_DIR` |
+| Alert config and history | Local JSON/files | Per-user database records |
+| Accounts and sessions | Not used | Database |
+| Worker jobs and outcomes | Local run state/history | Database |
+| Provider credentials | Environment or local `.env` | Platform secret manager/environment |
+
+The database is not currently a market-data warehouse. Persistence for generated
+market history remains file based in both modes.
+
+## External API limiting and retries
+
+`src/services/api_client.py` owns Finnhub request limiting, connection reuse, retry,
+and `429 Retry-After` behavior. Screening uses a quote-only request; only selected
+symbols receive the more expensive detailed fetch. Configuration should stay
+within the active Finnhub plan rather than relying on a hard-coded provider quota.
+
+This limiter is separate from the dashboard's inbound API rate limiter in
+`dashboard/backend/rate_limit.py`. Hosted API limits are configurable by route
+class and use trusted-proxy configuration to determine the client address.
+
+## Web/API boundaries
+
+FastAPI groups routes by concern:
+
+- market overview/movers, projections, stocks, summaries, and history;
+- background refresh start/status/cancel;
+- alert configuration, quotes, execution, tests, and delivery status;
+- registration, sessions, verification, recovery, and account controls; and
+- liveness, readiness, worker health, and metrics.
+
+File mode preserves the original operator workflow. Hosted mode changes ownership
+and authorization of tenant data; it does not change the shared market-data model.
+
+## Important limitations
+
+- Projections are heuristic and are not a validated trading model.
+- Quotes and dashboard data are batch/refresh based, not WebSocket streams.
+- Managed PostgreSQL, provider delivery, ingress, backups, and restore need staging
+  verification even though adapters and tests exist.
+- There is no broker API, order model, or automated execution path.
+
+## Related documentation
+
+- [Project status and test gaps](PROJECT_STATUS.md)
+- [Configuration](CONFIGURATION.md)
+- [Deployment](DEPLOYMENT.md)
+- [Stock projections](STOCK_PROJECTIONS.md)
+- [Dashboard guide](../dashboard/README.md)
