@@ -155,6 +155,12 @@ _MIGRATIONS = (
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version
 
+# SQLite BEGIN IMMEDIATE takes a reserved lock for the whole database. Postgres
+# autobegins a transaction, so RMW sections that issue BEGIN IMMEDIATE must take
+# this transaction-scoped advisory lock instead of a no-op SELECT. Same key as
+# apply_migrations so schema changes cannot interleave with those writers.
+POSTGRES_WRITE_MUTEX_KEY = 1296387149
+
 _MIGRATION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -221,10 +227,11 @@ class _PostgresConnection:
     @staticmethod
     def _query(sql: str) -> str:
         if sql.strip().upper() == "BEGIN IMMEDIATE":
-            # Psycopg opens a transaction automatically on the first command.
-            # A harmless statement preserves that boundary without issuing a
-            # redundant BEGIN (which PostgreSQL warns about).
-            return "SELECT 1"
+            # Do not reduce this to SELECT 1. Callers use BEGIN IMMEDIATE as a
+            # writer mutex (config RMW, trigger claims, job claims, rate-limit
+            # upserts). A no-op leaves concurrent Postgres transactions free to
+            # double-notify and clobber webhook secrets.
+            return f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"
         # Storage SQL uses DB-API qmark placeholders and contains no literal
         # question marks. Psycopg uses the format placeholder style.
         return sql.replace("?", "%s")
@@ -309,12 +316,10 @@ def apply_migrations(conn: Any) -> None:
 
     try:
         # Serialize startup migrations so concurrent application processes do
-        # not both attempt to apply the same version.
+        # not both attempt to apply the same version. BEGIN IMMEDIATE is a
+        # reserved lock on SQLite and the Postgres write mutex via _query().
         backend = getattr(conn, "backend", "sqlite")
-        if backend == "sqlite":
-            conn.execute("BEGIN IMMEDIATE")
-        else:
-            conn.execute("SELECT pg_advisory_xact_lock(1296387149)")
+        conn.execute("BEGIN IMMEDIATE")
         conn.execute(_MIGRATION_TABLE)
         applied_rows = conn.execute(
             "SELECT version FROM schema_migrations ORDER BY version"

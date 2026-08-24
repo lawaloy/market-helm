@@ -7,6 +7,7 @@ import pytest
 from src.storage.database import (
     LATEST_SCHEMA_VERSION,
     MigrationError,
+    POSTGRES_WRITE_MUTEX_KEY,
     _MIGRATIONS,
     _PostgresConnection,
     _migration_statements,
@@ -132,8 +133,28 @@ class TestDatabaseBackend:
             ("user-1", "user@example.com"),
         )
 
-        connection.execute("BEGIN IMMEDIATE")
-        assert raw.call == ("SELECT 1", ())
+    def test_postgresql_begin_immediate_takes_write_mutex(self):
+        """BEGIN IMMEDIATE is a writer mutex, not a transaction-start no-op.
+
+        SELECT 1 would leave concurrent Postgres RMW sections unlocked, so
+        overlapping deliver jobs could double-notify and a blank alert-config
+        save could clobber a rotated webhook URL.
+        """
+
+        class FakeConnection:
+            def __init__(self):
+                self.sql = None
+
+            def execute(self, sql, params):
+                self.sql = sql
+                return "cursor"
+
+        raw = FakeConnection()
+        _PostgresConnection(raw).execute("BEGIN IMMEDIATE")
+        assert raw.sql == (
+            f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"
+        )
+        assert "SELECT 1" not in raw.sql
 
 
 class TestInitDatabase:
