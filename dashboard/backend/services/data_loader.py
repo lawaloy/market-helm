@@ -102,7 +102,11 @@ class DataLoader:
         """Get the most recent file matching the pattern.
         When sort_by_date=True, uses date in filename (YYYY-MM-DD) for daily_data/projections/summary.
         """
-        files = list(self.data_dir.glob(pattern))
+        try:
+            files = list(self.data_dir.glob(pattern))
+        except OSError as exc:
+            # Unreadable data/ must map to ValueError → API 404, not generic 500.
+            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
         if not files:
             return None
         if sort_by_date:
@@ -128,7 +132,10 @@ class DataLoader:
                 if _is_weekday(d):
                     return f
             return dated[0][0]  # Fallback to most recent if all weekends
-        return max(files, key=lambda f: f.stat().st_mtime)
+        try:
+            return max(files, key=lambda f: f.stat().st_mtime)
+        except OSError as exc:
+            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
 
     def get_latest_date(self) -> Optional[str]:
         """Get the date of the most recent trading-day data (skips weekends when market is closed)."""

@@ -43,7 +43,17 @@ def latest_worker_heartbeat() -> Optional[Dict[str, Any]]:
     if not row:
         return None
     return {"worker_id": row["worker_id"], "status": row["status"],
-            "last_seen_at": row["last_seen_at"], "details": json.loads(row["details_json"])}
+            "last_seen_at": row["last_seen_at"],
+            "details": _heartbeat_details(row["details_json"])}
+
+
+def _heartbeat_details(raw: Any) -> Dict[str, Any]:
+    """Corrupt heartbeat JSON must not 500 readiness/worker probes."""
+    try:
+        details = json.loads(raw or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return details if isinstance(details, dict) else {}
 
 
 def worker_health(*, stale_after_seconds: int) -> Dict[str, Any]:
