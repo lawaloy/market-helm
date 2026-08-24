@@ -5,7 +5,12 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 
 import dashboard.backend.rate_limit as rate_limit
-from dashboard.backend.rate_limit import RateLimitMiddleware, RateLimitRule, client_ip
+from dashboard.backend.rate_limit import (
+    RateLimitMiddleware,
+    RateLimitRule,
+    check_rate_limits,
+    client_ip,
+)
 
 
 def _app() -> FastAPI:
@@ -186,3 +191,37 @@ def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
     monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", secret_value)
     assert client_ip(_request("203.0.113.5")) == "203.0.113.5"
     assert secret_value not in caplog.text
+
+
+def test_rate_limit_buckets_are_isolated_by_client_ip(monkeypatch) -> None:
+    """Dropping identity from the bucket key would make every client share one counter."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
+    rules = (RateLimitRule("test", 1, 60),)
+    now = 1_700_000_000
+
+    first = check_rate_limits(
+        _api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules
+    )
+    exhausted = check_rate_limits(
+        _api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules
+    )
+    other = check_rate_limits(
+        _api_request("/api/test", peer="198.51.100.20"), now=now, rules=rules
+    )
+
+    assert first is not None and first.allowed is True
+    assert exhausted is not None and exhausted.allowed is False
+    assert other is not None and other.allowed is True
+
+
+def test_empty_forwarded_header_from_trusted_proxy_uses_peer(monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    assert client_ip(_request("10.0.0.5", "")) == "10.0.0.5"
+
+
+def test_all_trusted_hops_use_leftmost_forwarded_address(monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    request = _request("10.0.0.5", "10.0.0.9, 10.0.0.8")
+    assert client_ip(request) == "10.0.0.9"
