@@ -133,6 +133,61 @@ def test_restore_deletes_row_when_there_was_no_previous_trigger(db_user) -> None
     assert retried is True
 
 
+def test_first_claim_succeeds_even_when_cooldown_is_positive(db_user) -> None:
+    """Cooldown only applies after a prior trigger row exists."""
+    claimed, previous = try_claim_trigger(
+        db_user,
+        "aapl-low",
+        "2026-07-24T12:00:00+00:00",
+        cooldown_minutes=60,
+    )
+    assert claimed is True
+    assert previous is None
+    assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T12:00:00+00:00"
+
+
+def test_z_suffix_and_offset_instants_compare_equal_to_stored_utc(db_user) -> None:
+    """Same instant in Z or +01:00 must lose the claim, not double-notify."""
+    try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
+
+    z_same, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00Z")
+    offset_same, _ = try_claim_trigger(
+        db_user, "aapl-low", "2026-07-24T13:00:00+01:00"
+    )
+    offset_newer, _ = try_claim_trigger(
+        db_user, "aapl-low", "2026-07-24T14:00:00+01:00"
+    )
+
+    assert z_same is False
+    assert offset_same is False
+    assert offset_newer is True
+    assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T14:00:00+01:00"
+
+
+def test_naive_previous_timestamp_does_not_typeerror_against_aware_event(
+    db_user,
+) -> None:
+    """Legacy naive ISO markers must compare as UTC, not crash the claim txn."""
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO alert_trigger_state (user_id, alert_id, last_triggered_at)
+            VALUES (?, ?, ?)
+            """,
+            (db_user, "aapl-low", "2026-07-24T12:00:00"),
+        )
+
+    same, previous = try_claim_trigger(
+        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
+    )
+    newer, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T13:00:00+00:00")
+
+    assert same is False
+    assert previous == "2026-07-24T12:00:00"
+    assert newer is True
+    assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T13:00:00+00:00"
+
+
 def test_restore_puts_previous_timestamp_back_for_retry(db_user) -> None:
     try_claim_trigger(db_user, "aapl-low", "2026-07-24T10:00:00+00:00")
     claimed, previous = try_claim_trigger(
