@@ -58,6 +58,27 @@ describe('AccountRecovery', () => {
     fireEvent.change(password, { target: { value: 'new-password-123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(confirm).toHaveBeenCalledWith('reset-token-value', 'new-password-123'));
+    expect(screen.getByText('Password updated. You can now sign in.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+  });
+
+  it('surfaces a generic error when password reset confirmation fails', async () => {
+    vi.spyOn(authApi, 'confirmPasswordReset').mockRejectedValueOnce(new Error('expired'));
+    render(
+      <MemoryRouter initialEntries={['/reset-password?token=reset-token-value']}>
+        <AccountRecovery mode="reset" />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'new-password-123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => {
+      expect(
+        screen.getByText('This request could not be completed. The link may be invalid or expired.'),
+      ).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
   });
 
   it('surfaces a generic error when the forgot-password request fails', async () => {
