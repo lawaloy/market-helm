@@ -2,8 +2,9 @@
 
 `configured_rules().matches()` is unit-tested separately. These HTTP tests
 prove the middleware still applies the expensive-write bucket to refresh,
-account mutations, POST quotes, and alert runs so a path or method refactor
-cannot silently drop those throttles (or start applying them to GET quotes).
+refresh cancel, account mutations, POST quotes, alert runs, and live alert
+tests so a path or method refactor cannot silently drop those throttles
+(or start applying them to GET quotes / refresh status).
 """
 
 from unittest.mock import MagicMock
@@ -147,3 +148,75 @@ def test_expensive_write_bucket_is_shared_and_does_not_gate_get_quotes(
     run_user_check.assert_not_called()
     # GET quotes is the only quotes call that reached the handler.
     assert resolve_prices.call_count == 1
+
+
+def test_expensive_write_gates_alert_test_and_refresh_cancel(client, monkeypatch):
+    """Live test-sends and refresh cancel share the expensive-write bucket.
+
+    Sibling POST paths are covered above. These two can still send mail/webhooks
+    or terminate an in-flight Finnhub child if a path typo drops them from the
+    rule, so the middleware must 429 before those handlers run.
+    """
+    from dashboard.backend.api import refresh
+    from src.storage.user_alerts import save_user_alerts_config
+    from tests.dashboard.backend.api.test_refresh import FakeProcess, reset_refresh_state
+
+    headers = _spend_expensive_bucket(client)
+    user_id = client.get("/api/auth/me", headers=headers).json()["id"]
+    save_user_alerts_config(
+        user_id,
+        {
+            "defaults": {},
+            "alerts": [
+                {
+                    "id": "watch_aapl",
+                    "name": "AAPL watch",
+                    "enabled": True,
+                    "condition": {
+                        "type": "price_threshold",
+                        "symbol": "AAPL",
+                        "operator": "below",
+                        "value": 100,
+                    },
+                }
+            ],
+        },
+    )
+    run_alert_test = MagicMock(
+        return_value={
+            "alert_id": "watch_aapl",
+            "status": "sent",
+            "notifiers": ["email"],
+        }
+    )
+    monkeypatch.setattr(
+        "dashboard.backend.api.alerts.run_alert_test",
+        run_alert_test,
+    )
+
+    tested = client.post(
+        "/api/alerts/test",
+        headers=headers,
+        json={"id": "watch_aapl", "dry_run": False},
+    )
+    assert tested.status_code == 429
+    assert tested.json() == {"detail": "Too many requests."}
+    run_alert_test.assert_not_called()
+
+    reset_refresh_state()
+    fake_process = FakeProcess(returncode=-15, running=True)
+    refresh.refresh_status["is_running"] = True
+    refresh.refresh_status["last_status"] = "running"
+    refresh._refresh_process = fake_process
+    try:
+        cancelled = client.post("/api/refresh/cancel", headers=headers)
+        assert cancelled.status_code == 429
+        assert cancelled.json() == {"detail": "Too many requests."}
+        assert fake_process.terminated is False
+        assert refresh._refresh_cancel_event.is_set() is False
+        # Status stays off the expensive-write rule so operators can still poll.
+        status = client.get("/api/refresh/status", headers=headers)
+        assert status.status_code == 200
+        assert status.json()["is_running"] is True
+    finally:
+        reset_refresh_state()
