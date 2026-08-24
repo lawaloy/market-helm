@@ -1,4 +1,6 @@
-"""Hosted init/PUT must recover a poison config row without touching sibling tenants."""
+"""Hosted init/PUT recover poison configs; run/test must fail closed until then."""
+
+from unittest.mock import patch
 
 import pytest
 
@@ -145,3 +147,80 @@ def test_hosted_put_replaces_corrupt_row_and_reindexes_watches_without_touching_
     assert aapl == {(user_a, "aapl_drop")}
     assert [w["alert_id"] for w in list_watches_for_symbol("MSFT")] == ["sibling-msft"]
     assert {w["user_id"] for w in list_watches_for_symbol("MSFT")} == {user_b}
+
+
+def test_hosted_run_poison_row_stays_idle_200_without_touching_sibling(
+    client, multi_user_env
+) -> None:
+    """exists=True + unparseable JSON must idle like a missing config, not 500."""
+    token_a, user_a = _register(client, "run-corrupt-a@example.com")
+    token_b, _user_b = _register(client, "run-corrupt-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    sibling = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_price_payload("sibling-msft", "MSFT"),
+    )
+    assert sibling.status_code == 200
+    _poison_row(user_a)
+
+    with patch(
+        "src.alerts.market_snapshot.load_market_snapshot",
+        return_value=("2026-06-09", {}, []),
+    ) as mock_snapshot:
+        with patch(
+            "src.alerts.alert_worker.run_check_once",
+            return_value={"triggered": 99, "message": None},
+        ) as mock_global:
+            poisoned = client.post("/api/alerts/run", headers=headers_a)
+            sibling_run = client.post("/api/alerts/run", headers=headers_b)
+
+    assert poisoned.status_code == 200
+    assert poisoned.json()["triggered"] == 0
+    assert poisoned.json()["message"] == "No active watches configured."
+    assert sibling_run.status_code == 404
+    assert "No market data available" in sibling_run.json()["detail"]
+    mock_global.assert_not_called()
+    mock_snapshot.assert_called_once_with(["MSFT"], fetch_missing_quotes=True)
+
+
+def test_hosted_test_poison_row_404s_without_building_notifiers_or_touching_sibling(
+    client, multi_user_env
+) -> None:
+    token_a, user_a = _register(client, "test-corrupt-a@example.com")
+    token_b, _user_b = _register(client, "test-corrupt-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    sibling = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_price_payload("sibling-msft", "MSFT"),
+    )
+    assert sibling.status_code == 200
+    _poison_row(user_a)
+
+    with patch(
+        "src.cli.alerts_commands.AlertEngine._build_notifiers",
+    ) as mock_build:
+        poisoned = client.post(
+            "/api/alerts/test",
+            json={"id": "sibling-msft", "dry_run": True},
+            headers=headers_a,
+        )
+        mock_build.assert_not_called()
+
+    sibling_test = client.post(
+        "/api/alerts/test",
+        json={"id": "sibling-msft", "dry_run": True},
+        headers=headers_b,
+    )
+
+    assert poisoned.status_code == 404
+    assert poisoned.json()["detail"] == "No alerts config for this user."
+    assert sibling_test.status_code == 200
+    assert sibling_test.json()["alert_id"] == "sibling-msft"
+    assert sibling_test.json()["status"] == "dry_run"
+
