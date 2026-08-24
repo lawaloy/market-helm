@@ -10,6 +10,7 @@ from src.storage.database import (
     POSTGRES_WRITE_MUTEX_KEY,
     _MIGRATIONS,
     _PostgresConnection,
+    _connect_postgresql,
     _migration_statements,
     apply_migrations,
     database_backend,
@@ -172,6 +173,24 @@ class TestDatabaseBackend:
         _PostgresConnection(raw).execute("BEGIN")
         assert raw.sql == "BEGIN"
         assert "pg_advisory_xact_lock" not in raw.sql
+
+    def test_connect_postgresql_requires_psycopg(self, monkeypatch):
+        """Hosted boot without psycopg must fail closed with an actionable error."""
+        monkeypatch.setenv(
+            "MARKET_HELM_DATABASE_URL", "postgresql://db.example/markethelm"
+        )
+        import builtins
+
+        real_import = builtins.__import__
+
+        def blocked(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "psycopg" or name.startswith("psycopg."):
+                raise ImportError("simulated missing psycopg")
+            return real_import(name, globals, locals, fromlist, level)
+
+        monkeypatch.setattr(builtins, "__import__", blocked)
+        with pytest.raises(RuntimeError, match="requires Psycopg"):
+            _connect_postgresql()
 
 
 class TestInitDatabase:

@@ -46,6 +46,28 @@ def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path: Path) -> No
     assert (resolved / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
 
 
+def test_user_config_dir_soft_fails_when_legacy_rename_raises(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """A busy/unwritable ~/.market-desk must not crash config resolution."""
+    home = _fake_home(monkeypatch, tmp_path)
+    legacy = home / ".market-desk"
+    legacy.mkdir()
+    (legacy / "alerts.json").write_text('{"alerts": []}', encoding="utf-8")
+
+    def boom(_self, _dest):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr(Path, "rename", boom)
+
+    resolved = user_config_dir()
+
+    assert resolved == home / ".market-helm"
+    assert not resolved.exists()
+    assert legacy.exists()
+    assert (legacy / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
+
+
 def test_user_config_dir_keeps_existing_market_helm(monkeypatch, tmp_path: Path) -> None:
     home = _fake_home(monkeypatch, tmp_path)
     dest = home / ".market-helm"

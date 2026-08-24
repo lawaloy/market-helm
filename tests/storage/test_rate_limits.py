@@ -1,5 +1,8 @@
 """Database-backed API rate-limit counter tests."""
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from src.storage.database import get_connection, init_database
@@ -32,3 +35,26 @@ def test_expired_rate_limit_rows_are_removed(rate_limit_database) -> None:
             "SELECT bucket_key FROM api_rate_limits ORDER BY bucket_key"
         ).fetchall()
     assert [row["bucket_key"] for row in rows] == ["new:key"]
+
+
+def test_consume_rate_limit_serializes_concurrent_increments(
+    rate_limit_database,
+) -> None:
+    """Overlapping upserts must not lose counts (BEGIN IMMEDIATE writer mutex)."""
+    workers = 8
+    barrier = threading.Barrier(workers)
+    counts: list[int] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        barrier.wait(timeout=5)
+        usage = consume_rate_limit("login:key", now=121, window_seconds=60)
+        with lock:
+            counts.append(usage.count)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(worker) for _ in range(workers)]
+        for future in futures:
+            future.result(timeout=10)
+
+    assert sorted(counts) == list(range(1, workers + 1))
