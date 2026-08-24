@@ -310,6 +310,81 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
   });
 
+  it('clears a revoked session locally when logout returns 401', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'revoked-token');
+    vi.spyOn(authApi, 'me').mockResolvedValueOnce({
+      data: { id: 'u1', email: 'user@example.com' },
+    } as never);
+    vi.spyOn(authApi, 'logout').mockRejectedValueOnce(axiosStatus(401));
+
+    function LogoutProbe() {
+      const { loading, multiUserEnabled, user, logout } = useAuth();
+      return (
+        <div>
+          <span data-testid="auth-state">
+            {loading
+              ? 'loading'
+              : `${multiUserEnabled ? 'multi-user' : 'single-user'}:${user?.email ?? 'anonymous'}`}
+          </span>
+          <button type="button" onClick={() => void logout()}>
+            logout
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <LogoutProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe(
+        'multi-user:user@example.com',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'logout' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
+  it('preserves the active session when logout is rate-limited with 429', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
+    vi.spyOn(authApi, 'me').mockResolvedValueOnce({
+      data: { id: 'u1', email: 'user@example.com' },
+    } as never);
+    vi.spyOn(authApi, 'logout').mockRejectedValueOnce(axiosStatus(429));
+
+    function LogoutProbe() {
+      const { loading, user, logout } = useAuth();
+      return (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void logout().catch(() => undefined)}
+        >
+          {user?.email ?? 'anonymous'}
+        </button>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <LogoutProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole('button').textContent).toBe('user@example.com'));
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(authApi.logout).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button').textContent).toBe('user@example.com');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
+  });
+
   it('login enables multi-user mode and stores the session user', async () => {
     vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(501));
     const login = vi.spyOn(authApi, 'login').mockResolvedValueOnce({

@@ -73,3 +73,18 @@ def test_require_user_id_401_when_user_deleted(db_on) -> None:
     assert exc.value.detail == "User not found."
 
     assert asyncio.run(optional_user_id(authorization=f"Bearer {token}")) is None
+
+
+def test_require_user_id_401_when_session_revoked(db_on) -> None:
+    from src.storage.users import create_user, revoke_user_sessions
+
+    user = create_user("revoked-helper@example.com", "password123")
+    token = create_access_token(user["id"], session_version=user["session_version"])
+    revoke_user_sessions(user["id"])
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(require_user_id(authorization=f"Bearer {token}"))
+    assert exc.value.status_code == 401
+    assert exc.value.detail == "Session revoked."
+
+    assert asyncio.run(optional_user_id(authorization=f"Bearer {token}")) is None

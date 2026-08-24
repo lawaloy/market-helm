@@ -141,11 +141,13 @@ def test_poisoned_rate_limit_env_clamps_to_safe_bounds(monkeypatch) -> None:
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "not-a-number")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "0")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "-5")
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "999999999")
     rules = {rule.name: rule for rule in rate_limit.configured_rules()}
     assert rules["auth-register"].limit == 1000
     assert rules["auth-login"].limit == 10
     assert rules["api-global"].limit == 1
     assert rules["expensive-write"].limit == 1
+    assert rules["auth-email"].limit == 1000
 
 
 def test_expensive_write_rule_covers_account_mutations() -> None:
@@ -157,6 +159,26 @@ def test_expensive_write_rule_covers_account_mutations() -> None:
     assert expensive.matches(_api_request("/api/auth/account", method="DELETE"))
     assert not expensive.matches(_api_request("/api/auth/account", method="GET"))
     assert not expensive.matches(_api_request("/api/alerts/quotes", method="GET"))
+
+
+def test_auth_email_rule_covers_request_endpoints_not_confirm() -> None:
+    rules = {rule.name: rule for rule in rate_limit.configured_rules()}
+    auth_email = rules["auth-email"]
+    assert auth_email.matches(
+        _api_request("/api/auth/password-reset/request", method="POST")
+    )
+    assert auth_email.matches(
+        _api_request("/api/auth/verify-email/request", method="POST")
+    )
+    assert not auth_email.matches(
+        _api_request("/api/auth/password-reset/confirm", method="POST")
+    )
+    assert not auth_email.matches(
+        _api_request("/api/auth/verify-email/confirm", method="POST")
+    )
+    assert not auth_email.matches(
+        _api_request("/api/auth/password-reset/request", method="GET")
+    )
 
 
 def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
