@@ -107,7 +107,8 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
                 "/api/auth/password/change",
                 "/api/auth/account",
             ),
-            methods=("POST",),
+            # DELETE covers /api/auth/account; GET quotes stay on the global bucket.
+            methods=("POST", "DELETE"),
         ),
         RateLimitRule(
             "api-global",

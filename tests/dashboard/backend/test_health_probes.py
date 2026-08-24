@@ -27,6 +27,32 @@ def test_ready_503_when_database_unhealthy(tmp_path, monkeypatch):
     assert payload["worker"] is None
 
 
+def test_ready_reports_disabled_without_database(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    response = TestClient(app).get("/health/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ready", "database": "disabled"}
+
+
+def test_ready_stays_200_when_worker_heartbeat_lookup_fails(tmp_path, monkeypatch):
+    """A worker-table error must not take down the hosted readiness probe."""
+    monkeypatch.setenv(
+        "MARKET_HELM_DATABASE_URL",
+        f"sqlite:///{(tmp_path / 'ready-worker.db').as_posix()}",
+    )
+    init_database()
+    with patch(
+        "src.storage.health.latest_worker_heartbeat",
+        side_effect=RuntimeError("heartbeat table missing"),
+    ):
+        response = TestClient(app).get("/health/ready")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["database"]["ok"] is True
+    assert payload["worker"] is None
+
+
 def test_worker_probe_disabled_without_database(monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     response = TestClient(app).get("/health/worker")

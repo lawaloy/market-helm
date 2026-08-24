@@ -205,6 +205,27 @@ def test_has_refresh_credentials_checks_env_var_and_dotenv(tmp_path, monkeypatch
     assert refresh._has_refresh_credentials(tmp_path) is True
 
 
+def test_has_refresh_credentials_soft_fails_unreadable_dotenv(
+    tmp_path, monkeypatch
+) -> None:
+    """An unreadable project .env must not 500 the Fetch New credential gate."""
+    from pathlib import Path
+
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    env_path = tmp_path / ".env"
+    env_path.write_text("FINNHUB_API_KEY=from-file\n", encoding="utf-8")
+
+    original = Path.read_text
+
+    def maybe_boom(self, *args, **kwargs):
+        if self == env_path:
+            raise OSError("permission denied")
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", maybe_boom)
+    assert refresh._has_refresh_credentials(tmp_path) is False
+
+
 def test_has_refresh_credentials_rejects_empty_or_unrelated_dotenv(
     tmp_path, monkeypatch
 ) -> None:
