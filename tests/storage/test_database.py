@@ -11,6 +11,7 @@ from src.storage.database import (
     _MIGRATIONS,
     _PostgresConnection,
     _migration_statements,
+    apply_migrations,
     database_backend,
     database_enabled,
     default_database_path,
@@ -156,6 +157,22 @@ class TestDatabaseBackend:
         )
         assert "SELECT 1" not in raw.sql
 
+    def test_postgresql_plain_begin_is_not_write_mutex(self):
+        """Only BEGIN IMMEDIATE is the writer mutex; a plain BEGIN must stay a BEGIN."""
+
+        class FakeConnection:
+            def __init__(self):
+                self.sql = None
+
+            def execute(self, sql, params):
+                self.sql = sql
+                return "cursor"
+
+        raw = FakeConnection()
+        _PostgresConnection(raw).execute("BEGIN")
+        assert raw.sql == "BEGIN"
+        assert "pg_advisory_xact_lock" not in raw.sql
+
 
 class TestInitDatabase:
     def test_init_noop_when_disabled(self, monkeypatch):
@@ -261,3 +278,30 @@ class TestDatabaseMigrations:
 
         with pytest.raises(MigrationError, match="newer than this application"):
             init_database()
+
+    def test_apply_migrations_takes_postgres_write_mutex(self):
+        """Postgres apply_migrations must lock via BEGIN IMMEDIATE, not a no-op.
+
+        Hosted startup used to call pg_advisory_xact_lock directly while RMW
+        writers used BEGIN IMMEDIATE (rewritten to SELECT 1). Both paths now
+        share the adapter mutex so schema changes cannot interleave with
+        config/claim writers.
+        """
+
+        class FakeRaw:
+            def __init__(self):
+                self.statements = []
+
+            def execute(self, sql, params=()):
+                self.statements.append(sql)
+                raise RuntimeError("stop after lock")
+
+            def rollback(self):
+                pass
+
+        raw = FakeRaw()
+        with pytest.raises(MigrationError, match="Failed to apply"):
+            apply_migrations(_PostgresConnection(raw))
+        assert raw.statements == [
+            f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"
+        ]

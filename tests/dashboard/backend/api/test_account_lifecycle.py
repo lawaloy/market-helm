@@ -61,3 +61,39 @@ def test_failed_delivery_does_not_leave_live_token(client, monkeypatch):
     with get_connection() as conn:
         count = conn.execute("SELECT COUNT(*) AS count FROM account_tokens").fetchone()["count"]
     assert count == 0
+
+
+def test_verify_email_request_is_generic_and_skips_verified(client, monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "dashboard.backend.api.auth.send_account_email",
+        lambda **kwargs: sent.append(kwargs) or True,
+    )
+    client.post(
+        "/api/auth/register",
+        json={"email": "verify-req@example.com", "password": "password123"},
+    )
+    # Registration already queued one verification email.
+    sent.clear()
+
+    known = client.post(
+        "/api/auth/verify-email/request", json={"email": "verify-req@example.com"}
+    )
+    unknown = client.post(
+        "/api/auth/verify-email/request", json={"email": "missing@example.com"}
+    )
+    assert known.status_code == unknown.status_code == 200
+    assert known.json() == unknown.json()
+    assert len(sent) == 1
+    assert sent[0]["recipient"] == "verify-req@example.com"
+
+    confirmed = client.post(
+        "/api/auth/verify-email/confirm", json={"token": sent[0]["token"]}
+    )
+    assert confirmed.status_code == 200
+    sent.clear()
+    again = client.post(
+        "/api/auth/verify-email/request", json={"email": "verify-req@example.com"}
+    )
+    assert again.status_code == 200
+    assert sent == []
