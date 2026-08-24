@@ -97,3 +97,49 @@ def test_verify_email_request_is_generic_and_skips_verified(client, monkeypatch)
     )
     assert again.status_code == 200
     assert sent == []
+
+
+def test_failed_password_reset_delivery_does_not_leave_live_token(client, monkeypatch):
+    monkeypatch.setattr("dashboard.backend.api.auth.send_account_email", lambda **_kwargs: True)
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "reset-maildown@example.com", "password": "password123"},
+    )
+    assert registered.status_code == 200
+
+    monkeypatch.setattr("dashboard.backend.api.auth.send_account_email", lambda **_kwargs: False)
+    response = client.post(
+        "/api/auth/password-reset/request",
+        json={"email": "reset-maildown@example.com"},
+    )
+    assert response.status_code == 200
+    from src.storage.database import get_connection
+
+    with get_connection() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) AS count FROM account_tokens WHERE purpose = 'reset_password'"
+        ).fetchone()["count"]
+    assert count == 0
+
+
+def test_failed_verify_email_request_delivery_does_not_leave_live_token(client, monkeypatch):
+    monkeypatch.setattr("dashboard.backend.api.auth.send_account_email", lambda **_kwargs: True)
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "verify-maildown@example.com", "password": "password123"},
+    )
+    assert registered.status_code == 200
+
+    monkeypatch.setattr("dashboard.backend.api.auth.send_account_email", lambda **_kwargs: False)
+    response = client.post(
+        "/api/auth/verify-email/request",
+        json={"email": "verify-maildown@example.com"},
+    )
+    assert response.status_code == 200
+    from src.storage.database import get_connection
+
+    with get_connection() as conn:
+        count = conn.execute(
+            "SELECT COUNT(*) AS count FROM account_tokens WHERE purpose = 'verify_email'"
+        ).fetchone()["count"]
+    assert count == 0

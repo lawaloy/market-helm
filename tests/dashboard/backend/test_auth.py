@@ -88,3 +88,18 @@ def test_require_user_id_401_when_session_revoked(db_on) -> None:
     assert exc.value.detail == "Session revoked."
 
     assert asyncio.run(optional_user_id(authorization=f"Bearer {token}")) is None
+
+
+def test_require_user_id_403_when_email_unverified(db_on, monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", "true")
+    from src.storage.users import create_user
+
+    user = create_user("unverified-helper@example.com", "password123")
+    token = create_access_token(user["id"], session_version=user["session_version"])
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(require_user_id(authorization=f"Bearer {token}"))
+    assert exc.value.status_code == 403
+    assert exc.value.detail == "Email verification required."
+
+    assert asyncio.run(optional_user_id(authorization=f"Bearer {token}")) is None

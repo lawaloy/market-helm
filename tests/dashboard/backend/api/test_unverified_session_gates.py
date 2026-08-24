@@ -77,3 +77,80 @@ def test_unverified_registration_token_is_forbidden_until_confirm(client, monkey
         "/api/auth/login",
         json={"email": "gated@example.com", "password": "password123"},
     ).status_code == 200
+
+
+@pytest.fixture
+def unverified_headers(client, monkeypatch):
+    monkeypatch.setattr(
+        "dashboard.backend.api.auth.send_account_email",
+        lambda **_kwargs: True,
+    )
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "gated-more@example.com", "password": "password123"},
+    )
+    assert registered.status_code == 200
+    return {"Authorization": f"Bearer {registered.json()['access_token']}"}
+
+
+@pytest.mark.parametrize(
+    "method,path,json_body",
+    [
+        ("post", "/api/auth/logout", None),
+        (
+            "delete",
+            "/api/auth/account",
+            {"current_password": "password123", "confirmation": "DELETE"},
+        ),
+        ("get", "/api/refresh/status", None),
+        ("post", "/api/refresh/cancel", None),
+        ("post", "/api/alerts/init", None),
+        ("put", "/api/alerts/config", {"defaults": {}, "alerts": []}),
+        ("get", "/api/alerts/symbols", None),
+        ("get", "/api/alerts/quotes", None),
+        ("get", "/api/alerts/quotes?symbols=AAPL", None),
+        ("post", "/api/alerts/quotes", {"symbols": ["AAPL"]}),
+        ("get", "/api/alerts/status", None),
+        ("post", "/api/alerts/run", None),
+        ("post", "/api/alerts/test", {"id": "watch_aapl", "dry_run": True}),
+    ],
+)
+def test_unverified_token_is_forbidden_on_remaining_hosted_routes(
+    client, unverified_headers, method, path, json_body
+):
+    kwargs = {"headers": unverified_headers}
+    if json_body is not None:
+        kwargs["json"] = json_body
+    response = client.request(method.upper(), path, **kwargs)
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Email verification required."
+
+
+def test_alerts_health_stays_open_for_unverified_session(client, unverified_headers):
+    response = client.get("/api/alerts/health", headers=unverified_headers)
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+
+def test_unverified_logout_does_not_revoke_the_registration_token(client, monkeypatch):
+    sent = {}
+    monkeypatch.setattr(
+        "dashboard.backend.api.auth.send_account_email",
+        lambda **kwargs: sent.update(kwargs) is None or True,
+    )
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "gated-logout@example.com", "password": "password123"},
+    )
+    assert registered.status_code == 200
+    headers = {"Authorization": f"Bearer {registered.json()['access_token']}"}
+
+    logout = client.post("/api/auth/logout", headers=headers)
+    assert logout.status_code == 403
+    assert logout.json()["detail"] == "Email verification required."
+
+    confirmed = client.post(
+        "/api/auth/verify-email/confirm", json={"token": sent["token"]}
+    )
+    assert confirmed.status_code == 200
+    assert client.get("/api/auth/me", headers=headers).status_code == 200

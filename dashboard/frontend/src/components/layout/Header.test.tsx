@@ -117,6 +117,10 @@ describe('Header refresh controls', () => {
     expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh/cancel');
     expect(screen.getByText('Failed to cancel refresh.')).toBeTruthy();
     expect(onRefreshComplete).not.toHaveBeenCalled();
+    // Header does not clear isRefreshing on cancel failure (unlike Summary).
+    expect(screen.getByRole('button', { name: 'Fetching...' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Fetch New' })).toBeNull();
   });
 
   afterEach(() => {

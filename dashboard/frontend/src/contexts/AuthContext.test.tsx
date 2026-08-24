@@ -353,6 +353,38 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
   });
 
+  it('preserves the active session when logout returns 403', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'unverified-token');
+    vi.spyOn(authApi, 'me').mockResolvedValueOnce({
+      data: { id: 'u1', email: 'user@example.com' },
+    } as never);
+    vi.spyOn(authApi, 'logout').mockRejectedValueOnce(axiosStatus(403));
+
+    function LogoutProbe() {
+      const { loading, user, logout } = useAuth();
+      return (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void logout().catch(() => undefined)}
+        >
+          {user?.email ?? 'anonymous'}
+        </button>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <LogoutProbe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByRole('button').textContent).toBe('user@example.com'));
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => expect(authApi.logout).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button').textContent).toBe('user@example.com');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('unverified-token');
+  });
+
   it('preserves the active session when logout is rate-limited with 429', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, 'good-token');
     vi.spyOn(authApi, 'me').mockResolvedValueOnce({
