@@ -1,4 +1,9 @@
-"""Hosted Settings disable/retarget must drop the old watch index key."""
+"""Hosted Settings disable/retarget must drop the old watch index key.
+
+Pause/resume and same-id symbol swaps also have to be visible to in-flight
+``evaluate_symbol`` jobs: a paused or retargeted rule must not notify, and a
+resumed rule must start firing again without touching a sibling tenant.
+"""
 
 from unittest.mock import patch
 
@@ -167,6 +172,67 @@ def test_put_reenable_restores_watch_index_without_touching_sibling(client) -> N
     assert list_enabled_symbols() == ["AAPL", "MSFT"]
 
 
+def test_put_reenable_queued_evaluate_delivers_without_touching_sibling(client) -> None:
+    token_a, user_a = _register(client, "resume-eval-a@example.com")
+    token_b, user_b = _register(client, "resume-eval-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    saved_a = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_price_payload("aapl_pause", "AAPL"),
+    )
+    saved_b = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_price_payload("sibling-msft", "MSFT"),
+    )
+    assert saved_a.status_code == 200
+    assert saved_b.status_code == 200
+
+    paused = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_price_payload("aapl_pause", "AAPL", enabled=False),
+    )
+    assert paused.status_code == 200
+    assert _watch_ids("AAPL") == set()
+
+    resumed = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_price_payload("aapl_pause", "AAPL", enabled=True),
+    )
+    assert resumed.status_code == 200
+    assert _watch_ids("AAPL") == {(user_a, "aapl_pause")}
+
+    enqueue_job(
+        JOB_EVALUATE_SYMBOL,
+        {"symbol": "AAPL", "price": 100.0, "tick_id": "t-aapl"},
+    )
+    enqueue_job(
+        JOB_EVALUATE_SYMBOL,
+        {"symbol": "MSFT", "price": 100.0, "tick_id": "t-msft"},
+    )
+
+    with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+        stats = process_job_queue("resume-worker")
+
+    assert stats["evaluated"] == 2
+    assert stats["delivered"] == 2
+    assert stats["failed"] == 0
+    assert pending_job_count([JOB_DELIVER]) == 0
+    deliveries = {
+        (call.args[0]["user_id"], call.args[0]["alert_id"], tuple(call.args[0]["symbols"]))
+        for call in send.call_args_list
+    }
+    assert deliveries == {
+        (user_a, "aapl_pause", ("AAPL",)),
+        (user_b, "sibling-msft", ("MSFT",)),
+    }
+
+
 def test_put_disable_skips_queued_evaluate_without_touching_sibling(client) -> None:
     token_a, user_a = _register(client, "queued-a@example.com")
     token_b, user_b = _register(client, "queued-b@example.com")
@@ -262,3 +328,61 @@ def test_put_same_id_symbol_swap_drops_old_symbol_without_touching_sibling(
     assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
         "sibling-msft"
     ]
+
+
+def test_put_retarget_skips_queued_old_symbol_and_delivers_new(client) -> None:
+    token_a, user_a = _register(client, "retarget-eval-a@example.com")
+    token_b, user_b = _register(client, "retarget-eval-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    saved_a = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_price_payload("price_watch", "AAPL"),
+    )
+    saved_b = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_price_payload("sibling-msft", "MSFT"),
+    )
+    assert saved_a.status_code == 200
+    assert saved_b.status_code == 200
+
+    enqueue_job(
+        JOB_EVALUATE_SYMBOL,
+        {"symbol": "AAPL", "price": 100.0, "tick_id": "t-aapl"},
+    )
+    enqueue_job(
+        JOB_EVALUATE_SYMBOL,
+        {"symbol": "GOOG", "price": 100.0, "tick_id": "t-goog"},
+    )
+    enqueue_job(
+        JOB_EVALUATE_SYMBOL,
+        {"symbol": "MSFT", "price": 100.0, "tick_id": "t-msft"},
+    )
+
+    swapped = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_price_payload("price_watch", "GOOG"),
+    )
+    assert swapped.status_code == 200
+    assert _watch_ids("AAPL") == set()
+    assert _watch_ids("GOOG") == {(user_a, "price_watch")}
+
+    with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
+        stats = process_job_queue("retarget-worker")
+
+    assert stats["evaluated"] == 3
+    assert stats["delivered"] == 2
+    assert stats["failed"] == 0
+    assert pending_job_count([JOB_DELIVER]) == 0
+    deliveries = {
+        (call.args[0]["user_id"], call.args[0]["alert_id"], tuple(call.args[0]["symbols"]))
+        for call in send.call_args_list
+    }
+    assert deliveries == {
+        (user_a, "price_watch", ("GOOG",)),
+        (user_b, "sibling-msft", ("MSFT",)),
+    }
