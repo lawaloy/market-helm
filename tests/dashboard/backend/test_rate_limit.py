@@ -162,8 +162,11 @@ def test_expensive_write_rule_covers_account_mutations() -> None:
         _api_request("/api/auth/password/change", method="POST")
     )
     assert expensive.matches(_api_request("/api/auth/account", method="DELETE"))
+    assert expensive.matches(_api_request("/api/alerts/test", method="POST"))
+    assert expensive.matches(_api_request("/api/refresh/cancel", method="POST"))
     assert not expensive.matches(_api_request("/api/auth/account", method="GET"))
     assert not expensive.matches(_api_request("/api/alerts/quotes", method="GET"))
+    assert not expensive.matches(_api_request("/api/refresh/status", method="GET"))
 
 
 def test_auth_email_rule_covers_request_endpoints_not_confirm() -> None:
