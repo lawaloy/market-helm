@@ -46,14 +46,27 @@ def test_consume_token_rejects_wrong_purpose_without_consuming(db):
     assert consume_token(token, RESET_PASSWORD) == db["id"]
 
 
-def test_expired_token_cannot_be_consumed(db):
-    token = issue_token(db["id"], RESET_PASSWORD)
+@pytest.mark.parametrize("purpose", [RESET_PASSWORD, VERIFY_EMAIL])
+def test_expired_token_cannot_be_consumed(db, purpose):
+    token = issue_token(db["id"], purpose)
     with get_connection() as conn:
         conn.execute(
             "UPDATE account_tokens SET expires_at = ? WHERE token_hash = ?",
             ("2000-01-01T00:00:00+00:00", _digest(token)),
         )
-    assert consume_token(token, RESET_PASSWORD) is None
+    assert consume_token(token, purpose) is None
+
+
+@pytest.mark.parametrize("purpose", [RESET_PASSWORD, VERIFY_EMAIL])
+def test_token_at_expiry_instant_cannot_be_consumed(db, purpose):
+    token = issue_token(db["id"], purpose)
+    now = datetime.now(timezone.utc).isoformat()
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE account_tokens SET expires_at = ? WHERE token_hash = ?",
+            (now, _digest(token)),
+        )
+    assert consume_token(token, purpose) is None
 
 
 def _stored_expiry() -> datetime:
