@@ -8,7 +8,6 @@ not change the password.
 
 import pytest
 
-from src.storage.account_tokens import _digest
 from src.storage.database import get_connection
 
 
@@ -133,8 +132,8 @@ def test_expired_reset_token_cannot_change_password(client, capture_tokens):
     token = capture_tokens["reset_password"][0]
     with get_connection() as conn:
         conn.execute(
-            "UPDATE account_tokens SET expires_at = ? WHERE token_hash = ?",
-            ("2000-01-01T00:00:00+00:00", _digest(token)),
+            "UPDATE account_tokens SET expires_at = ? WHERE purpose = ?",
+            ("2000-01-01T00:00:00+00:00", "reset_password"),
         )
 
     expired = client.post(
