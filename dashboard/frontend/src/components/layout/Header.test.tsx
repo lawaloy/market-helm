@@ -46,6 +46,27 @@ describe('Header refresh controls', () => {
     apiMocks.get.mockResolvedValue({ data: { is_running: false, last_status: 'success' } });
   });
 
+  it('links signed-in hosted users to account settings', () => {
+    apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
+    apiMocks.multiUserEnabled = true;
+
+    render(<MemoryRouter><Header /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: 'Account' }).getAttribute('href')).toBe('/account');
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+  });
+
+  it('links hosted anonymous users to sign-in with a same-app alerts return', () => {
+    apiMocks.multiUserEnabled = true;
+
+    render(<MemoryRouter><Header /></MemoryRouter>);
+
+    expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe(
+      '/sign-in?return=%2Falerts',
+    );
+    expect(screen.queryByRole('link', { name: 'Account' })).toBeNull();
+  });
+
   it('keeps the user signed in and offers retry when revocation fails', async () => {
     apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
     apiMocks.multiUserEnabled = true;

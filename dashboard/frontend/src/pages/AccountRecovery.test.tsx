@@ -60,6 +60,24 @@ describe('AccountRecovery', () => {
     await waitFor(() => expect(confirm).toHaveBeenCalledWith('reset-token-value', 'new-password-123'));
   });
 
+  it('surfaces a generic error when the forgot-password request fails', async () => {
+    vi.spyOn(authApi, 'requestPasswordReset').mockRejectedValueOnce(new Error('mail down'));
+    render(
+      <MemoryRouter>
+        <AccountRecovery mode="forgot" />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => {
+      expect(
+        screen.getByText('This request could not be completed. The link may be invalid or expired.'),
+      ).toBeTruthy();
+    });
+  });
+
   it('confirms email verification and surfaces expired-link errors', async () => {
     const confirm = vi.spyOn(authApi, 'confirmEmailVerification').mockRejectedValueOnce(
       new Error('expired'),
