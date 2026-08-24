@@ -142,6 +142,36 @@ describe('Summary refresh controls', () => {
     expect(apiMocks.get.mock.calls.length).toBe(pollsBeforeCancel);
   });
 
+  it('shows Failed to cancel refresh and re-enables Fetch New when cancel POST rejects', async () => {
+    vi.useFakeTimers();
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running' },
+    });
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        throw new Error('network');
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+
+    await renderEmptySummary();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh/cancel');
+    expect(screen.getByText('Failed to cancel refresh.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
+  });
+
   it('ignores a late successful status response after cancel', async () => {
     vi.useFakeTimers();
     let resolveStatus: ((value: { data: Record<string, unknown> }) => void) | undefined;

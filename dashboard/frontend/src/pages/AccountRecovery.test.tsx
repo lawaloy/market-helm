@@ -93,4 +93,19 @@ describe('AccountRecovery', () => {
       screen.getByText('This request could not be completed. The link may be invalid or expired.'),
     ).toBeTruthy();
   });
+
+  it('hides Continue after a successful email verification', async () => {
+    const confirm = vi.spyOn(authApi, 'confirmEmailVerification').mockResolvedValueOnce({
+      data: { message: 'Email verified. You can now sign in.' },
+    } as never);
+    render(
+      <MemoryRouter initialEntries={['/verify-email?token=verify-token-value']}>
+        <AccountRecovery mode="verify" />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith('verify-token-value'));
+    expect(screen.getByText('Email verified. You can now sign in.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
+  });
 });
