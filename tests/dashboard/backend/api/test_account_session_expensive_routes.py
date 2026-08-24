@@ -1,4 +1,6 @@
-"""Password change and HTTP account delete must revoke expensive hosted routes."""
+"""Session bumps must 401 Finnhub-burning hosted routes for the old bearer."""
+
+from unittest.mock import patch
 
 import pytest
 
@@ -45,6 +47,26 @@ def _assert_expensive_routes_401(client, headers: dict, detail: str) -> None:
     assert refresh.status_code == 401
     assert refresh.json()["detail"] == detail
 
+    with patch(
+        "dashboard.backend.api.alerts.resolve_symbol_prices",
+        return_value={"AAPL": 1.0},
+    ) as resolve:
+        get_quotes = client.get(
+            "/api/alerts/quotes",
+            params={"symbols": "AAPL"},
+            headers=headers,
+        )
+        post_quotes = client.post(
+            "/api/alerts/quotes",
+            json={"symbols": ["AAPL"]},
+            headers=headers,
+        )
+    assert get_quotes.status_code == 401
+    assert get_quotes.json()["detail"] == detail
+    assert post_quotes.status_code == 401
+    assert post_quotes.json()["detail"] == detail
+    resolve.assert_not_called()
+
 
 def _assert_expensive_routes_authorized(client, headers: dict) -> None:
     run = client.post("/api/alerts/run", headers=headers)
@@ -62,6 +84,26 @@ def _assert_expensive_routes_authorized(client, headers: dict) -> None:
 
     refresh = client.post("/api/refresh", headers=headers)
     assert refresh.status_code == 200
+
+    with patch(
+        "dashboard.backend.api.alerts.resolve_symbol_prices",
+        return_value={"AAPL": 180.0},
+    ) as resolve:
+        get_quotes = client.get(
+            "/api/alerts/quotes",
+            params={"symbols": "AAPL"},
+            headers=headers,
+        )
+        post_quotes = client.post(
+            "/api/alerts/quotes",
+            json={"symbols": ["AAPL"]},
+            headers=headers,
+        )
+    assert get_quotes.status_code == 200
+    assert get_quotes.json()["prices"]["AAPL"] == 180.0
+    assert post_quotes.status_code == 200
+    assert post_quotes.json()["prices"]["AAPL"] == 180.0
+    assert resolve.call_count == 2
 
 
 def test_change_password_revokes_old_token_on_run_test_and_refresh(client) -> None:
@@ -96,4 +138,45 @@ def test_http_delete_account_rejects_old_token_on_run_test_and_refresh(client) -
     assert deleted.status_code == 200
 
     _assert_expensive_routes_401(client, headers_a, "User not found.")
+    _assert_expensive_routes_authorized(client, headers_b)
+
+
+def test_logout_revokes_old_token_on_run_test_refresh_and_quotes(client) -> None:
+    token_a = _register(client, "logout-run-a@example.com")
+    token_b = _register(client, "logout-run-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    logged_out = client.post("/api/auth/logout", headers=headers_a)
+    assert logged_out.status_code == 200
+
+    _assert_expensive_routes_401(client, headers_a, "Session revoked.")
+    _assert_expensive_routes_authorized(client, headers_b)
+
+
+def test_password_reset_revokes_old_token_on_run_test_refresh_and_quotes(
+    client, monkeypatch
+) -> None:
+    sent = {}
+    monkeypatch.setattr(
+        "dashboard.backend.api.auth.send_account_email",
+        lambda **kwargs: sent.update(kwargs) is None or True,
+    )
+    token_a = _register(client, "reset-run-a@example.com")
+    token_b = _register(client, "reset-run-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    requested = client.post(
+        "/api/auth/password-reset/request",
+        json={"email": "reset-run-a@example.com"},
+    )
+    assert requested.status_code == 200
+    reset = client.post(
+        "/api/auth/password-reset/confirm",
+        json={"token": sent["token"], "password": "new-password-123"},
+    )
+    assert reset.status_code == 200
+
+    _assert_expensive_routes_401(client, headers_a, "Session revoked.")
     _assert_expensive_routes_authorized(client, headers_b)
