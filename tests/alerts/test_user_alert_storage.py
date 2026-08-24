@@ -6,7 +6,7 @@ import pytest
 
 from src.alerts.user_alert_storage import UserAlertStorage
 from src.storage.alert_watches import sync_watches_from_config
-from src.storage.database import init_database
+from src.storage.database import get_connection, init_database
 from src.storage.users import create_user
 
 
@@ -65,6 +65,22 @@ class TestUserAlertStorage:
         storage = UserAlertStorage(db_user)
         assert storage.get_last_triggered("aapl-drop") is None
         assert storage.latest_event_timestamp() is None
+
+    def test_get_last_triggered_returns_none_for_unparseable_db_timestamp(
+        self, db_user
+    ):
+        """Corrupt hosted trigger rows must fail closed (no cooldown parse)."""
+        sync_watches_from_config(db_user, _config())
+        with get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO alert_trigger_state (user_id, alert_id, last_triggered_at)
+                VALUES (?, ?, ?)
+                """,
+                (db_user, "aapl-drop", "not-a-timestamp"),
+            )
+        storage = UserAlertStorage(db_user)
+        assert storage.get_last_triggered("aapl-drop") is None
 
     def test_record_delivery_and_latest_by_channel(self, db_user):
         sync_watches_from_config(db_user, _config())
