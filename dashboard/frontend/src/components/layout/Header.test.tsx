@@ -82,6 +82,43 @@ describe('Header refresh controls', () => {
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
   });
 
+  it('shows Failed to cancel refresh when cancel POST rejects', async () => {
+    vi.useFakeTimers();
+    apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
+    apiMocks.multiUserEnabled = true;
+    apiMocks.get.mockResolvedValue({
+      data: { is_running: true, last_status: 'running', progress: 'Fetching quotes' },
+    });
+    apiMocks.post.mockImplementation(async (url: string) => {
+      if (url === '/api/refresh/cancel') {
+        throw new Error('network');
+      }
+      return { data: { message: 'Refresh started' } };
+    });
+    const onRefreshComplete = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(apiMocks.post).toHaveBeenCalledWith('/api/refresh/cancel');
+    expect(screen.getByText('Failed to cancel refresh.')).toBeTruthy();
+    expect(onRefreshComplete).not.toHaveBeenCalled();
+  });
+
   afterEach(() => {
     cleanup();
     vi.useRealTimers();

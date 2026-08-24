@@ -128,4 +128,27 @@ describe('SignIn return navigation', () => {
     });
     expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
   });
+
+  it('stays on sign-in and shows verify-email detail when login returns 403', async () => {
+    authMocks.login.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: { detail: 'Verify your email before signing in.' }, status: 403 },
+    });
+    render(
+      <MemoryRouter initialEntries={['/sign-in?return=%2Falerts']}>
+        <SignIn />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Authentication form' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Verify your email before signing in.')).toBeTruthy();
+    });
+    expect(authMocks.login).toHaveBeenCalledWith('user@example.com', 'password123');
+    expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
+  });
 });
