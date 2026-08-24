@@ -106,4 +106,26 @@ describe('SignIn return navigation', () => {
       expect(screen.getByTestId('location').textContent).toBe('/alerts');
     });
   });
+
+  it('stays on sign-in and shows API detail when login fails', async () => {
+    authMocks.login.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: { detail: 'Invalid email or password.' } },
+    });
+    render(
+      <MemoryRouter initialEntries={['/sign-in?return=%2Falerts']}>
+        <SignIn />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Authentication form' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Invalid email or password.')).toBeTruthy();
+    });
+    expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
+  });
 });
