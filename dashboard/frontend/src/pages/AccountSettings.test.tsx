@@ -56,6 +56,7 @@ describe('AccountSettings', () => {
     fireEvent.click(button);
     await waitFor(() => expect(remove).toHaveBeenCalledWith('password123', 'DELETE'));
     expect(mocks.clearSession).toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith('/sign-in', { replace: true });
   });
 
   it('surfaces password-change API errors without signing the user out', async () => {
