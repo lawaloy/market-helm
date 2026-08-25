@@ -130,11 +130,14 @@ def test_expired_reset_token_cannot_change_password(client, capture_tokens):
     )
     assert requested.status_code == 200
     token = capture_tokens["reset_password"][0]
+    # Expire by purpose so this HTTP test never SHA-256s the reset token
+    # (CodeQL otherwise treats that digest as password hashing).
     with get_connection() as conn:
-        conn.execute(
+        updated = conn.execute(
             "UPDATE account_tokens SET expires_at = ? WHERE purpose = ?",
             ("2000-01-01T00:00:00+00:00", "reset_password"),
         )
+        assert updated.rowcount == 1
 
     expired = client.post(
         "/api/auth/password-reset/confirm",

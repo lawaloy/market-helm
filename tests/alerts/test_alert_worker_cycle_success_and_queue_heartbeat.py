@@ -1,0 +1,92 @@
+"""Successful ticks must clear leftover running; queue crashes must fail closed."""
+
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+from src.alerts.alert_worker import run_db_worker_cycle
+from src.storage.database import init_database
+from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
+
+
+@pytest.fixture
+def db(tmp_path, monkeypatch):
+    path = tmp_path / "cycle-success-queue.db"
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
+    init_database()
+
+
+def test_run_db_worker_cycle_success_clears_running_heartbeat_and_probe_200s(db) -> None:
+    """A leftover running stamp from a prior crash must not stick after a good tick."""
+    record_worker_heartbeat("w1", "running", {"tick": 0})
+    with patch(
+        "src.alerts.alert_orchestrator.run_orchestrator_tick",
+        return_value={"last_data_date": "2026-06-09", "message": None, "enqueued": 2},
+    ) as mock_tick:
+        with patch(
+            "src.alerts.job_processor.process_job_queue",
+            return_value={"evaluated": 2, "delivered": 1, "failed": 0},
+        ) as mock_queue:
+            result = run_db_worker_cycle("w1")
+
+    mock_tick.assert_called_once()
+    mock_queue.assert_called_once_with("w1")
+    assert result["enqueued"] == 2
+    assert result["triggered"] == 1
+    assert result["last_data_date"] == "2026-06-09"
+    assert result["jobs"] == {"evaluated": 2, "delivered": 1, "failed": 0}
+
+    heartbeat = latest_worker_heartbeat()
+    assert heartbeat is not None
+    assert heartbeat["worker_id"] == "w1"
+    assert heartbeat["status"] == "healthy"
+    assert heartbeat["details"] == {
+        "enqueued": 2,
+        "jobs": {"evaluated": 2, "delivered": 1, "failed": 0},
+    }
+
+    from dashboard.backend.main import app
+
+    response = TestClient(app).get("/health/worker")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["status"] == "healthy"
+    assert payload["worker_id"] == "w1"
+
+
+def test_run_db_worker_cycle_queue_crash_records_error_heartbeat_and_probe_503s(
+    db,
+) -> None:
+    """process_job_queue is inside the same try as the orchestrator tick."""
+    record_worker_heartbeat("w1", "healthy", {"enqueued": 1})
+    with patch(
+        "src.alerts.alert_orchestrator.run_orchestrator_tick",
+        return_value={"last_data_date": "2026-06-09", "message": None, "enqueued": 3},
+    ) as mock_tick:
+        with patch(
+            "src.alerts.job_processor.process_job_queue",
+            side_effect=RuntimeError("queue failed"),
+        ) as mock_queue:
+            with pytest.raises(RuntimeError, match="queue failed"):
+                run_db_worker_cycle("w1")
+
+    mock_tick.assert_called_once()
+    mock_queue.assert_called_once_with("w1")
+
+    heartbeat = latest_worker_heartbeat()
+    assert heartbeat is not None
+    assert heartbeat["worker_id"] == "w1"
+    assert heartbeat["status"] == "error"
+    assert heartbeat["details"] == {"error": "RuntimeError"}
+
+    from dashboard.backend.main import app
+
+    response = TestClient(app).get("/health/worker")
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["status"] == "error"
+    assert payload["worker_id"] == "w1"
+    assert payload["details"] == {"error": "RuntimeError"}
