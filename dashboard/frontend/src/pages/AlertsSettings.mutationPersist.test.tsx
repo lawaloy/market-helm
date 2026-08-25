@@ -263,6 +263,39 @@ describe('AlertsSettings mutation persist', () => {
     ]);
   });
 
+  it('auto-saves a composer rises-above watch under the rewritten id', async () => {
+    apiMocks.getConfig.mockResolvedValue({ data: structuredClone(configResponse([])) });
+    await renderReady();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Set watch' })).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Price direction' }), {
+      target: { value: 'greater_than' },
+    });
+    fireEvent.change(screen.getByLabelText('Target price'), { target: { value: '200' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set watch' }));
+
+    await waitFor(() => {
+      expect(apiMocks.saveConfig).toHaveBeenCalledTimes(1);
+    });
+    const risePayload = apiMocks.saveConfig.mock.calls[0][0];
+    expect(risePayload.alerts).toHaveLength(1);
+    expect(risePayload.alerts[0]).toEqual(
+      expect.objectContaining({
+        id: 'aapl_greater_than_200',
+        enabled: true,
+        cooldown_minutes: 60,
+        condition: expect.objectContaining({
+          type: 'price_threshold',
+          symbol: 'AAPL',
+          operator: 'greater_than',
+          value: 200,
+        }),
+      }),
+    );
+  });
+
   it('auto-saves a new watch with the default 60-minute cooldown', async () => {
     apiMocks.getConfig.mockResolvedValue({ data: structuredClone(configResponse([])) });
     await renderReady();
