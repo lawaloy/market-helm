@@ -397,7 +397,9 @@ def try_claim_trigger(
     """Atomically claim a delivery slot before sending notifications.
 
     Returns ``(claimed, previous_timestamp)``. Callers that fail after a
-    successful claim must ``restore_trigger_claim`` so retries stay eligible.
+    successful claim must ``restore_trigger_claim`` with the same
+    ``claimed_at`` timestamp so retries stay eligible without clobbering a
+    newer successful claim.
 
     Under a positive cooldown, concurrent workers that both passed a stale
     read of trigger state cannot both send — only the IMMEDIATE winner
@@ -444,22 +446,38 @@ def restore_trigger_claim(
     user_id: str,
     alert_id: str,
     previous: Optional[str],
+    *,
+    claimed_at: Optional[str] = None,
 ) -> None:
-    """Roll back a ``try_claim_trigger`` after a failed notification send."""
+    """Roll back a ``try_claim_trigger`` after a failed notification send.
+
+    Only revert when ``last_triggered_at`` is still this claim. A newer
+    overlapping deliver can commit after we claimed and before send fails;
+    blindly deleting/updating the row would erase that success and reopen
+    duplicate webhook/email delivery. Missing/unparseable ``claimed_at``
+    must no-op rather than clobber.
+    """
+    claim_ts = _parseable_trigger_timestamp(claimed_at)
+    if claim_ts is None:
+        return
     with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         if previous is None:
             conn.execute(
-                "DELETE FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
-                (user_id, alert_id),
+                """
+                DELETE FROM alert_trigger_state
+                WHERE user_id = ? AND alert_id = ? AND last_triggered_at = ?
+                """,
+                (user_id, alert_id, claim_ts),
             )
         else:
             conn.execute(
                 """
                 UPDATE alert_trigger_state
                 SET last_triggered_at = ?
-                WHERE user_id = ? AND alert_id = ?
+                WHERE user_id = ? AND alert_id = ? AND last_triggered_at = ?
                 """,
-                (previous, user_id, alert_id),
+                (previous, user_id, alert_id, claim_ts),
             )
 
 
