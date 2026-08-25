@@ -80,16 +80,18 @@ function configResponse(alerts: typeof sampleRule[]) {
   };
 }
 
-async function renderReady(expectTestButton = true) {
+async function renderReady() {
   render(<AlertsSettings />);
   await waitFor(() => {
-    expect(screen.getByRole('button', { name: /Set watch|Add to list|Check watches now/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Check watches now' })).toBeTruthy();
   });
-  if (expectTestButton) {
-    await waitFor(() => {
-      expect(screen.getByTitle('Send test')).toBeTruthy();
-    });
-  }
+}
+
+async function renderWithWatches() {
+  await renderReady();
+  await waitFor(() => {
+    expect(screen.getByTitle('Send test')).toBeTruthy();
+  });
 }
 
 describe('AlertsSettings mutation persist', () => {
@@ -140,7 +142,7 @@ describe('AlertsSettings mutation persist', () => {
   });
 
   it('saves a paused watch as enabled: false', async () => {
-    await renderReady();
+    await renderWithWatches();
 
     fireEvent.click(screen.getByRole('switch', { name: 'Enable AAPL price alert' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
@@ -155,7 +157,7 @@ describe('AlertsSettings mutation persist', () => {
   });
 
   it('saves a removed watch as an empty alerts list', async () => {
-    await renderReady();
+    await renderWithWatches();
 
     fireEvent.click(screen.getByTitle('Remove'));
     fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
@@ -169,10 +171,13 @@ describe('AlertsSettings mutation persist', () => {
 
   it('auto-saves a new watch with the default 60-minute cooldown', async () => {
     apiMocks.getConfig.mockResolvedValue({ data: structuredClone(configResponse([])) });
-    await renderReady(false);
+    await renderReady();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Set watch' })).toBeTruthy();
+    });
 
     fireEvent.change(screen.getByLabelText('Target price'), { target: { value: '200' } });
-    fireEvent.click(screen.getByRole('button', { name: /Set watch|Add to list/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Set watch' }));
 
     await waitFor(() => {
       expect(apiMocks.saveConfig).toHaveBeenCalledTimes(1);
