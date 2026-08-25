@@ -466,6 +466,48 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('new-token');
   });
 
+  it('does not store a token when login is rejected', async () => {
+    vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(401));
+    const login = vi.spyOn(authApi, 'login').mockRejectedValueOnce(axiosStatus(401));
+
+    function LoginProbe() {
+      const { loading, multiUserEnabled, user, login: doLogin } = useAuth();
+      return (
+        <div>
+          <span data-testid="auth-state">
+            {loading
+              ? 'loading'
+              : `${multiUserEnabled ? 'multi-user' : 'single-user'}:${user?.email ?? 'anonymous'}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void doLogin('new@example.com', 'secret').catch(() => undefined);
+            }}
+          >
+            login
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <LoginProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'login' }));
+
+    await waitFor(() => expect(login).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
   it('register enables multi-user mode and stores the session user', async () => {
     vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(501));
     const register = vi.spyOn(authApi, 'register').mockResolvedValueOnce({
@@ -516,5 +558,47 @@ describe('AuthProvider', () => {
       password: 'secret',
     });
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('reg-token');
+  });
+
+  it('does not store a token when register is rejected', async () => {
+    vi.spyOn(authApi, 'me').mockRejectedValueOnce(axiosStatus(401));
+    const register = vi.spyOn(authApi, 'register').mockRejectedValueOnce(axiosStatus(400));
+
+    function RegisterProbe() {
+      const { loading, multiUserEnabled, user, register: doRegister } = useAuth();
+      return (
+        <div>
+          <span data-testid="auth-state">
+            {loading
+              ? 'loading'
+              : `${multiUserEnabled ? 'multi-user' : 'single-user'}:${user?.email ?? 'anonymous'}`}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void doRegister('reg@example.com', 'secret').catch(() => undefined);
+            }}
+          >
+            register
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <RegisterProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'register' }));
+
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
   });
 });
