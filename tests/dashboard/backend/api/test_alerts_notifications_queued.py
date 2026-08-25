@@ -3,8 +3,9 @@
 Cooldown (#457) is a dedicated watch column. Channel membership and webhook
 destination live in ``alert_json`` / defaults and are re-read at deliver time.
 Turning webhook off after a job is already queued must not POST. Rotating the
-webhook URL must POST to the new destination. A sibling tenant must still
-notify its own URL.
+webhook URL must POST to the new destination. Rotating ``webhook_format`` must
+POST the new payload shape (Discord ``content`` vs raw JSON). A sibling tenant
+must still notify its own URL and format.
 """
 
 from datetime import datetime, timezone
@@ -51,11 +52,12 @@ def _webhook_payload(
     webhook_url: str,
     *,
     notifications: list[str],
+    webhook_format: str = "json",
 ) -> dict:
     return {
         "defaults": {
             "webhook_url": webhook_url,
-            "webhook_format": "json",
+            "webhook_format": webhook_format,
         },
         "alerts": [
             {
@@ -199,3 +201,100 @@ def test_put_rotates_webhook_url_retargets_queued_deliver_without_touching_sibli
     assert mock_post.call_count == 2
     assert set(posted) == {url_a_new, url_b}
     assert url_a_old not in posted
+
+
+def _posted_payloads(mock_post) -> dict[str, dict]:
+    """Map webhook URL -> JSON body for each POST."""
+    return {call.args[0]: call.kwargs["json"] for call in mock_post.call_args_list}
+
+
+def test_put_rotates_webhook_format_retargets_queued_deliver_without_touching_sibling(
+    client, monkeypatch
+) -> None:
+    """json → discord after enqueue must reshape tenant A's body, not the sibling's.
+
+    ``from_alert`` reads ``webhook_format`` at deliver time via
+    ``apply_alert_defaults``. A process-wide ``ALERT_WEBHOOK_FORMAT`` must not
+    leak into hosted tenants (``allow_env_webhook`` is off when the DB is on).
+    """
+    monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
+    monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/global-shared")
+
+    token_a, user_a = _register(client, "notify-format-a@example.com")
+    token_b, user_b = _register(client, "notify-format-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    url_a = "https://hooks.example/tenant-a"
+    url_b = "https://hooks.example/tenant-b"
+
+    saved_a = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_webhook_payload(
+            "aapl_drop",
+            "AAPL",
+            url_a,
+            notifications=["webhook"],
+            webhook_format="json",
+        ),
+    )
+    saved_b = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_webhook_payload(
+            "sibling-msft",
+            "MSFT",
+            url_b,
+            notifications=["webhook"],
+            webhook_format="json",
+        ),
+    )
+    assert saved_a.status_code == 200
+    assert saved_b.status_code == 200
+    assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_format"] == "json"
+    assert get_watch(user_b, "sibling-msft")["defaults"]["webhook_format"] == "json"
+
+    event_ts = datetime.now(timezone.utc).isoformat()
+    enqueue_job(JOB_DELIVER, _deliver_job(user_a, "aapl_drop", "AAPL", event_ts))
+    enqueue_job(JOB_DELIVER, _deliver_job(user_b, "sibling-msft", "MSFT", event_ts))
+
+    rotated = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_webhook_payload(
+            "aapl_drop",
+            "AAPL",
+            url_a,
+            notifications=["webhook"],
+            webhook_format="discord",
+        ),
+    )
+    assert rotated.status_code == 200
+    assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_format"] == "discord"
+    assert get_watch(user_b, "sibling-msft")["defaults"]["webhook_format"] == "json"
+    assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_url"] == url_a
+
+    with patch("src.alerts.notifiers.webhook_notifier.requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        stats = process_job_queue("notify-format-worker")
+
+    assert stats["evaluated"] == 0
+    assert stats["delivered"] == 2
+    assert stats["failed"] == 0
+    assert pending_job_count([JOB_DELIVER]) == 0
+    bodies = _posted_payloads(mock_post)
+    assert set(bodies) == {url_a, url_b}
+    assert "https://hooks.example/global-shared" not in bodies
+
+    discord_body = bodies[url_a]
+    json_body = bodies[url_b]
+    assert "content" in discord_body
+    assert "alert_id" not in discord_body
+    assert "blocks" not in discord_body
+    assert "aapl_drop" in discord_body["content"]
+    assert "AAPL" in discord_body["content"]
+
+    assert json_body["alert_id"] == "sibling-msft"
+    assert json_body["symbols"] == ["MSFT"]
+    assert "content" not in json_body
+    assert "blocks" not in json_body
