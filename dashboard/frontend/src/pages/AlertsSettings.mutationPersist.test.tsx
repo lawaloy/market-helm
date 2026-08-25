@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AlertsSettings from './AlertsSettings';
 
@@ -167,6 +167,43 @@ describe('AlertsSettings mutation persist', () => {
     });
     const payload = apiMocks.saveConfig.mock.calls[0][0];
     expect(payload.alerts).toEqual([]);
+  });
+
+  it('saves an inline operator and threshold edit under the rewritten watch id', async () => {
+    await renderWithWatches();
+
+    fireEvent.click(screen.getByTitle('Edit'));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Save' })).toBeTruthy();
+    });
+    const editor = screen.getByRole('button', { name: 'Save' }).closest('div');
+    expect(editor).toBeTruthy();
+    fireEvent.change(within(editor as HTMLElement).getByDisplayValue('Falls below'), {
+      target: { value: 'greater_than' },
+    });
+    fireEvent.change(within(editor as HTMLElement).getByDisplayValue('150'), {
+      target: { value: '50' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
+
+    await waitFor(() => {
+      expect(apiMocks.saveConfig).toHaveBeenCalledTimes(1);
+    });
+    const payload = apiMocks.saveConfig.mock.calls[0][0];
+    expect(payload.alerts).toHaveLength(1);
+    expect(payload.alerts[0]).toEqual(
+      expect.objectContaining({
+        id: 'aapl_greater_than_50',
+        enabled: true,
+        condition: expect.objectContaining({
+          type: 'price_threshold',
+          symbol: 'AAPL',
+          operator: 'greater_than',
+          value: 50,
+        }),
+      }),
+    );
   });
 
   it('auto-saves a new watch with the default 60-minute cooldown', async () => {
