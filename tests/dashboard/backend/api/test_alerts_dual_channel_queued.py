@@ -8,6 +8,7 @@ SendGrid-POST. A sibling tenant must still notify its own URL. Process-wide
 
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
+from urllib.parse import urlparse
 
 import pytest
 
@@ -108,11 +109,15 @@ def _post_side_effect(url, *args, **kwargs):
 
 
 def _webhook_urls(mock_post: MagicMock) -> list[str]:
-    return [
-        str(call.args[0])
-        for call in mock_post.call_args_list
-        if call.args and str(call.args[0]).startswith("https://hooks.example")
-    ]
+    urls: list[str] = []
+    for call in mock_post.call_args_list:
+        if not call.args:
+            continue
+        raw = str(call.args[0])
+        # Hostname equality — a URL prefix startswith matches hooks.example.evil.
+        if (urlparse(raw).hostname or "").lower() == "hooks.example":
+            urls.append(raw)
+    return urls
 
 
 def _sendgrid_recipients(mock_post: MagicMock) -> list[str]:
