@@ -1,9 +1,10 @@
 """Hosted notification-channel PUTs must take effect for already-queued deliver jobs.
 
-Cooldown (#457) is a dedicated watch column. Channel membership lives in
-``alert_json`` / defaults and is re-read at deliver time. Turning webhook off
-after a job is already queued must not POST, while a sibling tenant still
-notifies.
+Cooldown (#457) is a dedicated watch column. Channel membership and webhook
+destination live in ``alert_json`` / defaults and are re-read at deliver time.
+Turning webhook off after a job is already queued must not POST. Rotating the
+webhook URL must POST to the new destination. A sibling tenant must still
+notify its own URL.
 """
 
 from datetime import datetime, timezone
@@ -140,3 +141,61 @@ def test_put_drops_webhook_skips_queued_deliver_without_touching_sibling(client)
     assert log_event["user_id"] == user_a
     mock_post.assert_called_once()
     assert mock_post.call_args.args[0] == url_b
+
+
+def test_put_rotates_webhook_url_retargets_queued_deliver_without_touching_sibling(
+    client,
+) -> None:
+    token_a, user_a = _register(client, "notify-rotate-a@example.com")
+    token_b, user_b = _register(client, "notify-rotate-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    url_a_old = "https://hooks.example/tenant-a-leaked"
+    url_a_new = "https://hooks.example/tenant-a-rotated"
+    url_b = "https://hooks.example/tenant-b"
+
+    saved_a = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_webhook_payload(
+            "aapl_drop", "AAPL", url_a_old, notifications=["webhook"]
+        ),
+    )
+    saved_b = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_webhook_payload(
+            "sibling-msft", "MSFT", url_b, notifications=["webhook"]
+        ),
+    )
+    assert saved_a.status_code == 200
+    assert saved_b.status_code == 200
+    assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_url"] == url_a_old
+
+    event_ts = datetime.now(timezone.utc).isoformat()
+    enqueue_job(JOB_DELIVER, _deliver_job(user_a, "aapl_drop", "AAPL", event_ts))
+    enqueue_job(JOB_DELIVER, _deliver_job(user_b, "sibling-msft", "MSFT", event_ts))
+
+    rotated = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json=_webhook_payload(
+            "aapl_drop", "AAPL", url_a_new, notifications=["webhook"]
+        ),
+    )
+    assert rotated.status_code == 200
+    assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_url"] == url_a_new
+    assert get_watch(user_b, "sibling-msft")["defaults"]["webhook_url"] == url_b
+
+    with patch("src.alerts.notifiers.webhook_notifier.requests.post") as mock_post:
+        mock_post.return_value.status_code = 200
+        stats = process_job_queue("notify-rotate-worker")
+
+    assert stats["evaluated"] == 0
+    assert stats["delivered"] == 2
+    assert stats["failed"] == 0
+    assert pending_job_count([JOB_DELIVER]) == 0
+    posted = [call.args[0] for call in mock_post.call_args_list]
+    assert mock_post.call_count == 2
+    assert set(posted) == {url_a_new, url_b}
+    assert url_a_old not in posted

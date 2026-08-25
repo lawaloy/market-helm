@@ -206,6 +206,34 @@ describe('AlertsSettings mutation persist', () => {
     );
   });
 
+  it('rewrites existing watch channels when switching from email to Discord', async () => {
+    await renderWithWatches();
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Discord or Slack' }));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Webhook URL/i)).toBeTruthy();
+    });
+    fireEvent.change(screen.getByLabelText(/Webhook URL/i), {
+      target: { value: 'https://discord.com/api/webhooks/rotated' },
+    });
+    fireEvent.click(screen.getByRole('switch', { name: 'Email' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save now' }));
+
+    await waitFor(() => {
+      expect(apiMocks.saveConfig).toHaveBeenCalledTimes(1);
+    });
+    const payload = apiMocks.saveConfig.mock.calls[0][0];
+    expect(payload.defaults.notify_email).toBe(false);
+    expect(payload.defaults.notify_webhook).toBe(true);
+    expect(payload.defaults.webhook_url).toBe('https://discord.com/api/webhooks/rotated');
+    expect(payload.alerts).toEqual([
+      expect.objectContaining({
+        id: 'aapl_less_than_150',
+        notifications: ['log', 'webhook'],
+      }),
+    ]);
+  });
+
   it('auto-saves a new watch with the default 60-minute cooldown', async () => {
     apiMocks.getConfig.mockResolvedValue({ data: structuredClone(configResponse([])) });
     await renderReady();
