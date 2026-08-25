@@ -126,7 +126,9 @@ def test_restore_deletes_row_when_there_was_no_previous_trigger(db_user) -> None
     assert claimed is True
     assert previous is None
 
-    restore_trigger_claim(db_user, "aapl-low", previous)
+    restore_trigger_claim(
+        db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00"
+    )
 
     assert get_last_triggered(db_user, "aapl-low") is None
     retried, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:01+00:00")
@@ -196,8 +198,63 @@ def test_restore_puts_previous_timestamp_back_for_retry(db_user) -> None:
     assert claimed is True
     assert previous == "2026-07-24T10:00:00+00:00"
 
-    restore_trigger_claim(db_user, "aapl-low", previous)
+    restore_trigger_claim(
+        db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00"
+    )
 
     assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T10:00:00+00:00"
     retried, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     assert retried is True
+
+
+def test_restore_does_not_clobber_newer_successful_claim(db_user) -> None:
+    """A failed older send must not erase a newer overlapping claim.
+
+    cooldown=0 allows a later deliver to claim after we wrote our marker.
+    Restoring unconditionally would delete that success and reopen
+    duplicate delivery after a crash-before-complete window.
+    """
+    older = "2026-07-24T12:00:00+00:00"
+    newer = "2026-07-24T12:00:01+00:00"
+
+    claimed_old, previous_old = try_claim_trigger(db_user, "aapl-low", older)
+    assert claimed_old is True
+    assert previous_old is None
+
+    claimed_new, previous_new = try_claim_trigger(db_user, "aapl-low", newer)
+    assert claimed_new is True
+    assert previous_new == older
+    assert get_last_triggered(db_user, "aapl-low") == newer
+
+    restore_trigger_claim(db_user, "aapl-low", previous_old, claimed_at=older)
+
+    assert get_last_triggered(db_user, "aapl-low") == newer
+
+
+def test_restore_does_not_clobber_newer_claim_when_previous_existed(db_user) -> None:
+    first = "2026-07-24T10:00:00+00:00"
+    older = "2026-07-24T12:00:00+00:00"
+    newer = "2026-07-24T12:00:01+00:00"
+
+    assert try_claim_trigger(db_user, "aapl-low", first)[0] is True
+    claimed_old, previous_old = try_claim_trigger(db_user, "aapl-low", older)
+    assert claimed_old is True
+    assert previous_old == first
+
+    claimed_new, _ = try_claim_trigger(db_user, "aapl-low", newer)
+    assert claimed_new is True
+    assert get_last_triggered(db_user, "aapl-low") == newer
+
+    restore_trigger_claim(db_user, "aapl-low", previous_old, claimed_at=older)
+
+    assert get_last_triggered(db_user, "aapl-low") == newer
+
+
+def test_restore_without_claimed_at_does_not_clobber(db_user) -> None:
+    ts = "2026-07-24T12:00:00+00:00"
+    assert try_claim_trigger(db_user, "aapl-low", ts)[0] is True
+
+    restore_trigger_claim(db_user, "aapl-low", None)
+    restore_trigger_claim(db_user, "aapl-low", None, claimed_at="zzzz")
+
+    assert get_last_triggered(db_user, "aapl-low") == ts
