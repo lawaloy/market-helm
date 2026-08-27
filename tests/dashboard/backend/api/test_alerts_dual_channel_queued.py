@@ -102,25 +102,29 @@ def _deliver_job(user_id: str, alert_id: str, symbol: str, event_ts: str) -> dic
 
 
 def _post_side_effect(url, *args, **kwargs):
+    payload = kwargs.get("json")
+    is_sendgrid = isinstance(payload, dict) and "personalizations" in payload
     response = MagicMock()
-    response.status_code = 202 if "sendgrid" in str(url) else 200
+    response.status_code = 202 if is_sendgrid else 200
     return response
 
 
 def _webhook_urls(mock_post: MagicMock) -> list[str]:
-    return [
-        str(call.args[0])
-        for call in mock_post.call_args_list
-        if call.args and str(call.args[0]).startswith("https://hooks.example")
-    ]
+    urls: list[str] = []
+    for call in mock_post.call_args_list:
+        payload = call.kwargs.get("json")
+        is_sendgrid = isinstance(payload, dict) and "personalizations" in payload
+        if call.args and not is_sendgrid:
+            urls.append(str(call.args[0]))
+    return urls
 
 
 def _sendgrid_recipients(mock_post: MagicMock) -> list[str]:
     emails: list[str] = []
     for call in mock_post.call_args_list:
-        if not call.args or "sendgrid" not in str(call.args[0]):
+        payload = call.kwargs.get("json")
+        if not isinstance(payload, dict) or "personalizations" not in payload:
             continue
-        payload = call.kwargs["json"]
         emails.extend(item["email"] for item in payload["personalizations"][0]["to"])
     return emails
 
