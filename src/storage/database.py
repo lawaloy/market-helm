@@ -369,21 +369,25 @@ def _backfill_watches_from_configs() -> None:
     from .alert_watches import InvalidAlertWatchConfig
     from .alert_watches import sync_watches_from_config
 
+    # Snapshot+rewrite must share the writer mutex. A committed SELECT followed
+    # by a later sync can restore stale watches over a save that already wrote
+    # a newer config (pause/delete/retarget during worker init or login).
     with get_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         rows = conn.execute(
             "SELECT user_id, config_json FROM user_alert_configs",
         ).fetchall()
-    for row in rows:
-        try:
-            config = json.loads(row["config_json"])
-            sync_watches_from_config(row["user_id"], config)
-        except (json.JSONDecodeError, InvalidAlertWatchConfig) as exc:
-            logger.warning(
-                "Skipping invalid alert config during watch backfill for user %s: %s",
-                row["user_id"],
-                exc,
-            )
-            continue
+        for row in rows:
+            try:
+                config = json.loads(row["config_json"])
+                sync_watches_from_config(row["user_id"], config, connection=conn)
+            except (json.JSONDecodeError, InvalidAlertWatchConfig) as exc:
+                logger.warning(
+                    "Skipping invalid alert config during watch backfill for user %s: %s",
+                    row["user_id"],
+                    exc,
+                )
+                continue
 
 
 def default_database_path() -> Path:
