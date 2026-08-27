@@ -148,4 +148,43 @@ describe('AlertsSettings dual-channel Check watches now', () => {
       expect(apiMocks.getStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore);
     });
   });
+
+  it('shows the idle message when dual-channel Check watches now matches nothing', async () => {
+    apiMocks.runCheck.mockResolvedValue({
+      data: {
+        triggered: 0,
+        last_data_date: '2026-08-27',
+        events: [],
+        message: 'No alerts triggered on latest data.',
+      },
+    });
+    await renderWithWatches();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check watches now' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain(
+        'No alerts triggered on latest data.',
+      );
+    });
+    expect(apiMocks.saveConfig).not.toHaveBeenCalled();
+    expect(apiMocks.testAlert).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a Check watches now error without saving or sending a test', async () => {
+    apiMocks.runCheck.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Request failed',
+      response: { data: { detail: 'Check failed.' } },
+    });
+    await renderWithWatches();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check watches now' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('Check failed.');
+    });
+    expect(apiMocks.saveConfig).not.toHaveBeenCalled();
+    expect(apiMocks.testAlert).not.toHaveBeenCalled();
+  });
 });
