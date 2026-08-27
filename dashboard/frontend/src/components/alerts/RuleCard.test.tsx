@@ -87,4 +87,46 @@ describe('RuleCard edit validation', () => {
       }),
     );
   });
+
+  it('rejects an edit that collides with another watch', () => {
+    const keep = priceRule(150);
+    const other: AlertRule = {
+      id: 'aapl_less_than_200',
+      name: 'AAPL price alert',
+      enabled: true,
+      condition: {
+        type: 'price_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: 200,
+      },
+      notifications: ['log'],
+    };
+    const onUpdate = vi.fn();
+    const onEditError = vi.fn();
+
+    render(
+      <RuleCard
+        rule={other}
+        index={1}
+        testing={false}
+        symbolPrices={{}}
+        allAlerts={[keep, other]}
+        onToggleEnabled={vi.fn()}
+        onTest={vi.fn()}
+        onRemove={vi.fn()}
+        onUpdate={onUpdate}
+        onEditError={onEditError}
+      />,
+    );
+
+    fireEvent.click(screen.getByTitle('Edit'));
+    fireEvent.change(screen.getByDisplayValue('200'), { target: { value: '150' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(onEditError).toHaveBeenCalledWith(
+      'You already have a watch when aapl falls below $150.00.',
+    );
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });
