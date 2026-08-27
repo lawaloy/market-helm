@@ -145,4 +145,24 @@ describe('AlertsSettings dual-channel Send test', () => {
       expect(apiMocks.getStatus.mock.calls.length).toBeGreaterThan(statusCallsBefore);
     });
   });
+
+  it('surfaces a Send test error without saving or running a live check', async () => {
+    apiMocks.testAlert.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Request failed',
+      response: { data: { detail: 'Test failed.' } },
+    });
+    await renderWithWatches();
+    const runCheckCallsBefore = apiMocks.runCheck.mock.calls.length;
+
+    fireEvent.click(screen.getByTitle('Send test'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toContain('Test failed.');
+    });
+    expect(apiMocks.testAlert).toHaveBeenCalledTimes(1);
+    expect(apiMocks.testAlert).toHaveBeenCalledWith('aapl_less_than_150', false);
+    expect(apiMocks.saveConfig).not.toHaveBeenCalled();
+    expect(apiMocks.runCheck.mock.calls.length).toBe(runCheckCallsBefore);
+  });
 });
