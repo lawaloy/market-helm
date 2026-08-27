@@ -1,5 +1,6 @@
 """Watch backfill during init_database must skip unparseable configs without aborting."""
 
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
@@ -99,6 +100,9 @@ def test_stale_backfill_cannot_restore_watches_over_newer_save(
     def delayed_sync(*args, **kwargs):
         # Pause after backfill has already read config_json so a save can commit.
         # save_user_alerts_config binds sync at import time and is not delayed.
+        # connection= is required: a second SQLite connection would block on
+        # BEGIN IMMEDIATE held by this thread and deadlock init_database.
+        assert kwargs.get("connection") is not None
         barrier.wait(timeout=5)
         return original_sync(*args, **kwargs)
 
@@ -124,3 +128,82 @@ def test_stale_backfill_cannot_restore_watches_over_newer_save(
         (user_id, "goog_drop")
     }
     assert list_watches_for_symbol("AAPL") == []
+
+
+def test_backfill_skips_invalid_watch_config_and_keeps_sibling_watches(
+    tmp_path, monkeypatch
+) -> None:
+    """InvalidAlertWatchConfig must not roll back sibling users' backfill.
+
+    Snapshot+rewrite now share one BEGIN IMMEDIATE transaction. json.loads
+    failures never call sync; invalid watch payloads do. An uncaught
+    InvalidAlertWatchConfig would abort that transaction and leave every
+    other tenant unindexed after worker/login init_database.
+    """
+    db_path = tmp_path / "backfill-invalid.db"
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    init_database()
+    good_user = create_user("backfill-valid@example.com", "password123")["id"]
+    bad_user = create_user("backfill-invalid@example.com", "password123")["id"]
+    # Configs only — no watch rows — so a rolled-back transaction cannot hide
+    # behind watches that already existed before init_database.
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_alert_configs (user_id, config_json, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                good_user,
+                json.dumps(_price_config("aapl_drop", "AAPL")),
+                "2026-07-24T00:00:00+00:00",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO user_alert_configs (user_id, config_json, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                bad_user,
+                json.dumps(
+                    {
+                        "defaults": {},
+                        "alerts": [
+                            {
+                                "id": "same",
+                                "enabled": True,
+                                "condition": {
+                                    "type": "price_threshold",
+                                    "symbol": "MSFT",
+                                    "operator": "less_than",
+                                    "value": 100,
+                                },
+                            },
+                            {
+                                "id": "same",
+                                "enabled": True,
+                                "condition": {
+                                    "type": "price_threshold",
+                                    "symbol": "TSLA",
+                                    "operator": "less_than",
+                                    "value": 100,
+                                },
+                            },
+                        ],
+                    }
+                ),
+                "2026-07-24T00:00:00+00:00",
+            ),
+        )
+
+    assert list_enabled_symbols() == []
+
+    init_database()
+
+    assert list_enabled_symbols() == ["AAPL"]
+    assert list_watches_for_symbol("MSFT") == []
+    assert list_watches_for_symbol("TSLA") == []
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")} == {
+        (good_user, "aapl_drop")
+    }
