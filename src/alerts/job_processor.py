@@ -214,11 +214,13 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
         return False
 
     # Claim the trigger row before send so concurrent workers that both passed
-    # the reads above cannot double-notify. Failed sends roll the claim back.
+    # the reads above cannot double-notify. Failed sends roll the claim back
+    # only when this event's timestamp is still the stored marker.
+    claim_ts = event.get("timestamp")
     claimed, previous_trigger = try_claim_trigger(
         user_id,
         alert_id,
-        event.get("timestamp"),
+        claim_ts,
         cooldown_minutes=watch["cooldown_minutes"],
     )
     if not claimed:
@@ -238,7 +240,9 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
             raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
         return True
     except Exception:
-        restore_trigger_claim(user_id, alert_id, previous_trigger)
+        restore_trigger_claim(
+            user_id, alert_id, previous_trigger, claimed_at=claim_ts
+        )
         raise
 
 
