@@ -3,7 +3,9 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.alerts.alert_engine import AlertEngine
+from src.alerts.alert_engine import AlertEngine, LogNotifier
+from src.alerts.notifiers.email_notifier import EmailNotifier
+from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 
 class InMemoryCooldownStorage:
@@ -295,6 +297,85 @@ def test_from_config_dict_keeps_only_enabled_alerts():
 
     assert engine is not None
     assert [alert["id"] for alert in engine.alerts] == ["on"]
+
+
+class _FailingEmailNotifier(EmailNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return False
+
+
+class _FailingWebhookNotifier(WebhookNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return False
+
+
+class _SucceedingWebhookNotifier(WebhookNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return True
+
+
+def test_deliver_event_does_not_count_log_success_when_user_channels_fail():
+    """Hosted Settings always prepends log; that must not complete a failed email/webhook send."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [
+        LogNotifier(),
+        _FailingEmailNotifier(),
+        _FailingWebhookNotifier(),
+    ]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
+def test_deliver_event_still_succeeds_when_one_user_channel_sends():
+    """A later webhook success still completes the job even if email failed."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [
+        LogNotifier(),
+        _FailingEmailNotifier(),
+        _SucceedingWebhookNotifier(),
+    ]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is True
+    storage.record_event.assert_called_once_with(event)
+
+
+def test_deliver_event_log_only_still_counts_as_delivered():
+    """CLI / log-only watches keep completing when the log notifier succeeds."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch.object(engine, "_build_notifiers", return_value=[LogNotifier()]):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is True
+    storage.record_event.assert_called_once_with(event)
 
 
 def test_deliver_event_records_notifier_exception_without_marking_delivered():
