@@ -323,6 +323,14 @@ class _SucceedingWebhookNotifier(WebhookNotifier):
         return True
 
 
+class _RaisingEmailNotifier(EmailNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        raise RuntimeError("smtp down")
+
+
 def test_deliver_event_does_not_count_log_success_when_user_channels_fail():
     """Hosted Settings always prepends log; that must not complete a failed email/webhook send."""
     storage = MagicMock()
@@ -376,6 +384,38 @@ def test_deliver_event_log_only_still_counts_as_delivered():
 
     assert delivered is True
     storage.record_event.assert_called_once_with(event)
+
+
+def test_deliver_event_does_not_count_log_success_when_email_raises():
+    """Raising EmailNotifier is still a user-channel attempt; log must not complete the job."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _RaisingEmailNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
+def test_deliver_event_email_only_failure_does_not_count_log():
+    """Settings email-on/webhook-off is [log, email]; a failed send must still retry."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _FailingEmailNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
 
 
 def test_deliver_event_records_notifier_exception_without_marking_delivered():
