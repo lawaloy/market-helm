@@ -124,6 +124,27 @@ def test_evaluate_does_not_count_log_success_when_webhook_fails():
     storage.record_event.assert_called_once_with(retried_events[0])
 
 
+def test_evaluate_does_not_count_log_success_when_email_fails():
+    """Settings email-on prepends log; evaluate must still retry when the email send fails."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    email = _FailingEmailNotifier()
+    email.send = MagicMock(side_effect=[False, True])
+    alert = _price_alert(notifications=["log", "email"], cooldown_minutes=60)
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch(
+        "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email
+    ):
+        failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+        retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert failed_events == []
+    assert len(retried_events) == 1
+    assert email.send.call_count == 2
+    storage.record_event.assert_called_once_with(retried_events[0])
+
+
 def test_evaluate_falls_back_to_log_notifier_when_webhook_is_not_configured():
     """Webhook-only alerts still emit via log fallback when URL resolution fails."""
     storage = MagicMock()
