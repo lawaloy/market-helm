@@ -5,7 +5,10 @@ from unittest.mock import patch
 
 import pytest
 
+from src.alerts.alert_engine import AlertEngine, LogNotifier
 from src.alerts.job_processor import _process_deliver, process_job_queue
+from src.alerts.notifiers.email_notifier import EmailNotifier
+from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 from src.storage.alert_jobs import (
     JOB_DELIVER,
     JOB_EVALUATE_SYMBOL,
@@ -258,6 +261,61 @@ class TestJobProcessor:
         )
 
         with patch("src.alerts.alert_engine.LogNotifier.send", return_value=False):
+            stats = process_job_queue("test-worker")
+
+        assert stats["delivered"] == 0
+        assert stats["failed"] == 1
+        with get_connection() as conn:
+            trigger = conn.execute(
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                (db_user, "aapl-low"),
+            ).fetchone()
+            job = conn.execute(
+                "SELECT status, last_error FROM alert_jobs WHERE id = ?",
+                (job_id,),
+            ).fetchone()
+        assert trigger is None
+        assert job["status"] == STATUS_FAILED
+        assert "Delivery failed" in job["last_error"]
+
+    def test_queued_deliver_retries_when_user_channels_fail_despite_log(
+        self, db_user
+    ):
+        """Settings prepends log; a log hit must not complete a failed email/webhook send."""
+        sync_watches_from_config(db_user, _watch_config())
+        event = {
+            "alert_id": "aapl-low",
+            "alert_name": "AAPL low",
+            "symbols": ["AAPL"],
+            "timestamp": "2026-06-09T12:00:00+00:00",
+            "condition_type": "price_threshold",
+            "user_id": db_user,
+        }
+        job_id = enqueue_job(
+            JOB_DELIVER,
+            {"user_id": db_user, "alert_id": "aapl-low", "event": event},
+            max_attempts=1,
+        )
+
+        class _FailingEmail(EmailNotifier):
+            def __init__(self):
+                pass
+
+            def send(self, _event):
+                return False
+
+        class _FailingWebhook(WebhookNotifier):
+            def __init__(self):
+                pass
+
+            def send(self, _event):
+                return False
+
+        with patch.object(
+            AlertEngine,
+            "_build_notifiers",
+            return_value=[LogNotifier(), _FailingEmail(), _FailingWebhook()],
+        ):
             stats = process_job_queue("test-worker")
 
         assert stats["delivered"] == 0

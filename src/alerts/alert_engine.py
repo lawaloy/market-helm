@@ -93,9 +93,17 @@ class AlertEngine:
 
     def deliver_event(self, alert: Dict, event: Dict) -> bool:
         """Send notifications for a matched watch (used by the delivery job worker)."""
-        delivered = False
+        # Settings always prepends "log" via buildNotifications. A successful
+        # log write must not complete the job when email/webhook were attempted
+        # and failed — that skipped retries and lost the user-facing send.
+        user_channel_attempted = False
+        user_channel_ok = False
+        log_ok = False
         is_test = bool(event.get("test"))
         for notifier in self._build_notifiers(alert):
+            is_user_channel = isinstance(notifier, (EmailNotifier, WebhookNotifier))
+            if is_user_channel:
+                user_channel_attempted = True
             try:
                 result = notifier.send(event)
             except Exception as exc:
@@ -123,7 +131,12 @@ class AlertEngine:
                 test=is_test,
             )
             if success:
-                delivered = True
+                if is_user_channel:
+                    user_channel_ok = True
+                else:
+                    log_ok = True
+
+        delivered = user_channel_ok if user_channel_attempted else log_ok
 
         if not delivered:
             return False
