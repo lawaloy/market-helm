@@ -418,6 +418,22 @@ def test_deliver_event_email_only_failure_does_not_count_log():
     storage.record_event.assert_not_called()
 
 
+def test_deliver_event_webhook_only_failure_does_not_count_log():
+    """Settings webhook-on/email-off is [log, webhook]; a failed send must still retry."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _FailingWebhookNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
 def test_deliver_event_records_notifier_exception_without_marking_delivered():
     """Raising notifiers are failure-recorded and must not start cooldown."""
     storage = MagicMock()
