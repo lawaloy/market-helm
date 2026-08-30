@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
-from src.alerts.alert_paths import polish_alerts_config
+from src.alerts.alert_paths import alert_rows, polish_alerts_config
 
 from .database import get_connection
 from .alert_watches import (
@@ -60,11 +60,11 @@ def _merge_existing_webhook_secrets(
 
     existing_alerts = {
         str(alert.get("id")): alert
-        for alert in existing.get("alerts") or []
+        for alert in alert_rows(existing)
         if isinstance(alert, dict) and alert.get("id")
     }
     alerts = []
-    for alert in merged.get("alerts") or []:
+    for alert in alert_rows(merged):
         if not isinstance(alert, dict):
             alerts.append(alert)
             continue
