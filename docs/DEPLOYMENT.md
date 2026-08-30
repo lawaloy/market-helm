@@ -4,7 +4,8 @@
 
 The staging stack in `docker-compose.staging.yml` builds the React application
 into the API image and runs the API, scheduled alert worker, and PostgreSQL as
-separate services.
+separate services. Named volumes persist PostgreSQL and the shared `DATA_DIR` used
+by both application processes.
 
 1. Copy `.env.staging.example` to `.env.staging` and replace every placeholder.
 2. Set `POSTGRES_PASSWORD` in the host environment (never commit it).
@@ -18,6 +19,216 @@ separate services.
 `/health/live` proves the API process is alive. `/health/ready` returns 503 when
 the database is unavailable or migrations are incomplete and includes the latest
 worker heartbeat when one exists.
+
+### Staging acceptance harness
+
+After the stack is reachable, run the credential-free operational checks:
+
+```bash
+python scripts/staging_acceptance.py \
+  --base-url https://staging.example.com \
+  --report staging-acceptance.json
+```
+
+The harness requires HTTPS except for loopback development URLs. It verifies API
+liveness, database readiness and schema version, a fresh worker heartbeat,
+Prometheus metrics, and the hosted authentication boundary. The JSON report
+contains check results and timings but no credentials; keep generated reports as
+deployment evidence rather than committing them.
+
+To prove write isolation, prepare two **dedicated, verified staging accounts**.
+Their alert configurations must be empty. Supply credentials through the process
+environment so passwords do not appear in shell history:
+
+```bash
+export MARKET_HELM_STAGING_TENANT_A_EMAIL=acceptance-a@example.com
+export MARKET_HELM_STAGING_TENANT_A_PASSWORD='...'
+export MARKET_HELM_STAGING_TENANT_B_EMAIL=acceptance-b@example.com
+export MARKET_HELM_STAGING_TENANT_B_PASSWORD='...'
+python scripts/staging_acceptance.py \
+  --base-url https://staging.example.com \
+  --tenant-check \
+  --report staging-acceptance.json
+```
+
+The tenant check refuses non-empty accounts, creates two distinct log-only
+watches, confirms config/index/dry-run isolation, and restores both configurations
+to their original empty state. It never sends email or webhooks. A failed cleanup
+is reported as a failed acceptance check and must be handled before reusing the
+accounts.
+
+`--skip-worker` is available for diagnosing a stack before its worker starts, but
+a report produced with that option is marked `incomplete`, exits nonzero, and is
+not sufficient for staging sign-off.
+
+Pass `--ingress-origin https://staging.example.com` to additionally require a
+correlation ID, exact-origin credentialed CORS, rejection of an untrusted origin,
+and HSTS on HTTPS. Disposable tenant bootstrapping is available only on loopback:
+
+```bash
+python scripts/staging_acceptance.py \
+  --base-url http://127.0.0.1:8000 \
+  --ingress-origin http://127.0.0.1:8000 \
+  --tenant-check --bootstrap-loopback-tenants
+```
+
+### Operational readiness drills
+
+The `Hosted staging readiness` workflow is the repeatable repository gate. It
+builds the real images, starts API + worker + PostgreSQL, runs operational/ingress/
+tenant checks, applies a bounded load baseline, restores PostgreSQL and shared
+market data, restarts the database and worker, and publishes credential-free JSON
+evidence. Run it locally before changing deployment behavior and trigger it
+manually after infrastructure changes.
+
+For an environment-specific capacity baseline:
+
+```bash
+python scripts/staging_load.py \
+  --base-url https://staging.example.com \
+  --requests 100 --concurrency 10 \
+  --max-error-rate 0 --max-p95-ms 1000 \
+  --report staging-load.json
+```
+
+This deliberately defaults to the read-only readiness endpoint, exercising a
+database connection without mutating tenant data. Raise traffic gradually and set
+thresholds from the service's actual SLO; do not turn the tool into an unapproved
+stress test against a shared host.
+
+### Backup and restore runbook
+
+Back up **both** persistence layers as one recovery set:
+
+1. Take a managed PostgreSQL snapshot or custom-format `pg_dump`.
+2. Archive the persistent `DATA_DIR` at the same logical time.
+3. Record application version, schema version from `/health/ready`, timestamps,
+   checksums, encryption/key reference, and retention expiry with the artifacts.
+4. Restore PostgreSQL into a newly named database—never over the active database.
+5. Restore `DATA_DIR` into a new empty path, start one API and one worker against
+   the restored stores, and run `staging_acceptance.py`.
+6. Compare user/config/migration counts and a sample of dated market files before
+   declaring the recovery point usable. Remove the drill resources afterward.
+
+The compose readiness workflow demonstrates these mechanics with a disposable
+database and volume. A managed staging sign-off must additionally use the cloud
+provider's snapshot/PITR process, TLS settings, and credentials because a local
+container cannot prove those controls.
+
+Default retention unless a stricter policy applies:
+
+- encrypted daily PostgreSQL + `DATA_DIR` recovery sets for 30 days;
+- encrypted weekly recovery sets for 12 weeks;
+- application logs for 14 days and metrics for 30 days;
+- readiness reports for at least 14 days and through the next deployment; and
+- delivery history is already bounded to the newest 100 records per user.
+
+Test one restore monthly and after database/schema changes. Alert on a missed
+backup, failed checksum, expired encryption key, or failed restore drill.
+
+### Monitoring and incident runbook
+
+Scrape `/metrics` and probe `/health/live`, `/health/ready`, and `/health/worker`
+from outside the host. Preserve `X-Request-ID` in proxy and application logs.
+Recommended pages are: liveness unavailable for 2 minutes, readiness unavailable
+for 5 minutes, worker unhealthy for two evaluation intervals, HTTP 5xx above 2%
+for 5 minutes, or backup/restore evidence overdue.
+
+Respond in this order:
+
+1. **Liveness failure:** stop rollout, inspect proxy/container logs, and roll back
+   the application image if the previous release is healthy.
+2. **Readiness/database failure:** stop writes and workers, check provider health,
+   connection/TLS limits, and schema version; fail over only through the managed
+   database procedure, then rerun acceptance.
+3. **Worker failure:** keep the API online, stop duplicate workers, restart one
+   worker, and verify a fresh heartbeat plus queued-job progress before scaling.
+4. **Provider failure:** pause alert delivery, retain queued jobs, check provider
+   status/credentials/sender-domain records, then resume and inspect retry results.
+5. **Suspected data loss:** freeze writes, preserve logs, restore the newest
+   verified recovery set into new resources, validate it, then perform a deliberate
+   cutover with a documented rollback target.
+
+### External staging sign-off
+
+Repository automation cannot prove controls owned by a hosting or email provider.
+Complete this operator-owned TODO in order after the staging-readiness PR merges.
+Never put provider credentials in an issue, PR, report, or committed environment
+file; use the selected platform's secret manager.
+
+#### External staging execution TODO
+
+##### 1. Record decisions and ownership
+
+- [ ] Choose the staging hostname and confirm who controls its DNS.
+- [ ] Choose the application host, managed PostgreSQL provider, region, and budget.
+- [ ] Choose SendGrid, Mailgun, or SES and the sender domain/address.
+- [ ] Choose the monitoring service and its email/Slack/PagerDuty destination.
+- [ ] Record the availability target, database RPO/RTO, backup retention, and
+  person responsible for acknowledging staging incidents.
+
+##### 2. Add and provision the target deployment
+
+- [ ] Add provider-specific deployment configuration or infrastructure-as-code;
+  the checked-in compose stack is the portable reference, not proof of a managed
+  deployment.
+- [ ] Provision secret storage and inject credentials without committing them.
+- [ ] Provision persistent shared `DATA_DIR` storage for the API and worker.
+- [ ] Deploy the same reviewed application image as separate API and worker
+  services, then record the image digest and application version.
+
+##### 3. Sign off managed PostgreSQL
+
+- [ ] Provision PostgreSQL 16 with encryption at rest, TLS required, restricted
+  networking, least-privilege application credentials, and pooling/connection
+  limits appropriate for the host.
+- [ ] Enable automated snapshots and point-in-time recovery with the recorded
+  retention policy.
+- [ ] Run migrations and the staging acceptance/tenant checks against the managed
+  database.
+- [ ] Restore a snapshot/PITR point into a newly named database, compare schema and
+  critical record counts, and record the measured RPO/RTO.
+- [ ] Perform a controlled provider failover, rerun acceptance, and save provider
+  event IDs and recovery timings.
+
+##### 4. Sign off public DNS and TLS
+
+- [ ] Create the staging DNS record pointing only to the intended ingress.
+- [ ] Install or enable a trusted, hostname-matching certificate with automatic
+  renewal; enforce HTTP-to-HTTPS redirects and HSTS.
+- [ ] Set `MARKET_HELM_PUBLIC_URL`, `CORS_ORIGINS`, and the exact trusted-proxy
+  CIDRs for the deployed ingress.
+- [ ] Run `staging_acceptance.py --ingress-origin ...` against the public HTTPS URL
+  and save its JSON report plus certificate/DNS evidence.
+
+##### 5. Sign off transactional email
+
+- [ ] Authenticate the sender domain with provider-supplied SPF/DKIM records and
+  publish a DMARC policy.
+- [ ] Store a restricted provider key and configure `ALERT_EMAIL_PROVIDER` plus
+  `ALERT_EMAIL_FROM`.
+- [ ] Receive and complete registration verification and password-reset links;
+  confirm both use `MARKET_HELM_PUBLIC_URL`.
+- [ ] Deliver a real alert while the dashboard is closed and record the provider
+  message ID and inbox authentication results.
+- [ ] Trigger a controlled rejection and confirm retries/failure details appear in
+  MarketHelm delivery history without leaking credentials.
+
+##### 6. Sign off external monitoring and release evidence
+
+- [ ] Probe `/health/live`, `/health/ready`, and `/health/worker` from outside the
+  host and collect `/metrics` through an appropriately restricted path.
+- [ ] Configure the runbook thresholds and notification destination.
+- [ ] Stop the staging worker and API in controlled drills; confirm alerts arrive,
+  are acknowledged, and send recovery notifications after restoration.
+- [ ] Attach DNS/TLS results, database restore/failover evidence, email message IDs,
+  monitoring incident IDs, image digest, and acceptance/load JSON reports to the
+  staging release record.
+- [ ] Review least privilege, secret rotation, backup retention, and rollback;
+  obtain the named operator's final staging sign-off.
+
+Until those artifacts exist for a specific environment, the code is staging-ready
+but that environment is not approved for production.
 
 ### Hosted-mode configuration
 

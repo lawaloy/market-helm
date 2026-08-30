@@ -1,0 +1,141 @@
+name: Hosted staging readiness
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-readiness-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose-drill:
+    name: Compose + PostgreSQL operations
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: markethelm-readiness-ci
+      POSTGRES_PASSWORD: local-ci-postgres-only
+      MARKET_HELM_ENV_FILE: ${{ github.workspace }}/.env.staging.ci
+      MARKET_HELM_PORT: "8012"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create isolated staging configuration
+        shell: bash
+        run: |
+          umask 077
+          printf '%s\n' \
+            'MARKET_HELM_AUTH_SECRET=local-ci-acceptance-secret-at-least-32-characters' \
+            'MARKET_HELM_PUBLIC_URL=http://127.0.0.1:8012' \
+            'MARKET_HELM_REQUIRE_EMAIL_VERIFICATION=false' \
+            'CORS_ORIGINS=http://127.0.0.1:8012' \
+            'MARKET_HELM_TRUSTED_PROXY_CIDRS=127.0.0.1/32' \
+            'FINNHUB_API_KEY=' \
+            'ALERT_EMAIL_PROVIDER=smtp' \
+            'ALERT_EMAIL_FROM=' \
+            'ALERT_CHECK_INTERVAL_SECONDS=60' \
+            'MARKET_HELM_RATE_LIMIT_AUTH_EMAIL=100' \
+            > "$MARKET_HELM_ENV_FILE"
+
+      - name: Validate and start staging stack
+        run: |
+          docker compose -f docker-compose.staging.yml config --quiet
+          docker compose -f docker-compose.staging.yml up -d --build --wait
+
+      - name: Run operational, ingress, and tenant acceptance
+        run: |
+          python scripts/staging_acceptance.py \
+            --base-url http://127.0.0.1:8012 \
+            --ingress-origin http://127.0.0.1:8012 \
+            --tenant-check \
+            --bootstrap-loopback-tenants \
+            --report "$RUNNER_TEMP/staging-acceptance.json"
+
+      - name: Run bounded capacity baseline
+        run: |
+          python scripts/staging_load.py \
+            --base-url http://127.0.0.1:8012 \
+            --requests 100 \
+            --concurrency 10 \
+            --max-error-rate 0 \
+            --max-p95-ms 1000 \
+            --report "$RUNNER_TEMP/staging-load.json"
+
+      - name: Rehearse PostgreSQL backup and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          restore_db=markethelm_restore_drill_ci
+          exists=$(docker compose -f docker-compose.staging.yml exec -T postgres \
+            psql -U markethelm -d postgres -tAc \
+            "SELECT count(*) FROM pg_database WHERE datname = '$restore_db'")
+          test "$exists" = "0"
+          docker compose -f docker-compose.staging.yml exec -T postgres \
+            pg_dump -U markethelm -d markethelm --format=custom \
+            --file=/tmp/markethelm-readiness.dump
+          docker compose -f docker-compose.staging.yml exec -T postgres \
+            pg_restore --list /tmp/markethelm-readiness.dump >/dev/null
+          docker compose -f docker-compose.staging.yml exec -T postgres \
+            createdb -U markethelm "$restore_db"
+          trap 'docker compose -f docker-compose.staging.yml exec -T postgres dropdb -U markethelm --if-exists "$restore_db"' EXIT
+          docker compose -f docker-compose.staging.yml exec -T postgres \
+            pg_restore -U markethelm -d "$restore_db" --exit-on-error \
+            /tmp/markethelm-readiness.dump
+          source_signature=$(docker compose -f docker-compose.staging.yml exec -T postgres \
+            psql -U markethelm -d markethelm -tAc \
+            "SELECT (SELECT count(*) FROM users) || ':' || (SELECT count(*) FROM user_alert_configs) || ':' || (SELECT count(*) FROM schema_migrations)")
+          restored_signature=$(docker compose -f docker-compose.staging.yml exec -T postgres \
+            psql -U markethelm -d "$restore_db" -tAc \
+            "SELECT (SELECT count(*) FROM users) || ':' || (SELECT count(*) FROM user_alert_configs) || ':' || (SELECT count(*) FROM schema_migrations)")
+          test "$source_signature" = "$restored_signature"
+
+      - name: Rehearse shared market-data backup and restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.staging.yml exec -T api \
+            sh -c 'printf "%s\n" staging-readiness > /var/lib/markethelm/data/.readiness-sentinel'
+          docker compose -f docker-compose.staging.yml exec -T worker \
+            grep -Fx staging-readiness /var/lib/markethelm/data/.readiness-sentinel
+          docker compose -f docker-compose.staging.yml exec -T api \
+            tar -C /var/lib/markethelm -czf - data > "$RUNNER_TEMP/market-data.tar.gz"
+          docker compose -f docker-compose.staging.yml exec -T api \
+            rm /var/lib/markethelm/data/.readiness-sentinel
+          docker compose -f docker-compose.staging.yml exec -T api \
+            tar -C /var/lib/markethelm -xzf - < "$RUNNER_TEMP/market-data.tar.gz"
+          docker compose -f docker-compose.staging.yml exec -T worker \
+            grep -Fx staging-readiness /var/lib/markethelm/data/.readiness-sentinel
+
+      - name: Rehearse database and worker recovery
+        run: |
+          docker compose -f docker-compose.staging.yml restart postgres worker
+          docker compose -f docker-compose.staging.yml up -d --wait
+          python scripts/staging_acceptance.py \
+            --base-url http://127.0.0.1:8012 \
+            --report "$RUNNER_TEMP/staging-recovery.json"
+
+      - name: Upload readiness evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-readiness-reports
+          path: ${{ runner.temp }}/staging-*.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.staging.yml logs --no-color --tail 300
+
+      - name: Remove isolated staging stack
+        if: always()
+        run: docker compose -f docker-compose.staging.yml down -v --remove-orphans

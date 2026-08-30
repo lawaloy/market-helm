@@ -236,9 +236,9 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 ### Current Gaps & Opportunities
 
-- **Hosted readiness:** Alerts, retries, delivery history, accounts, tenant isolation,
-  and the database worker are implemented. The important gaps are managed staging,
-  real-provider delivery, backup/restore, load, and operational verification — see
+- **Hosted readiness:** Container acceptance, persistence, recovery, backup/restore,
+  bounded load, retention, and incident procedures are implemented. External gates
+  are managed infrastructure, real-provider delivery, and monitoring sign-off — see
   [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 - **Historical / accuracy:** Multi-day trends and **projection accuracy** (API + Historical Trends UI) are in place; deeper **metrics by confidence**, **risk-adjusted** views, and **business-calendar** target dates are still open.
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
@@ -268,8 +268,8 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 
 **Next:**
 
-- [ ] Validate managed PostgreSQL, real email/webhooks, ingress, metrics, and
-  backup/restore in hosted staging
+- [ ] Record managed PostgreSQL, real email/webhook, ingress, and monitoring
+  evidence using the staging runbook
 - [ ] Technical/compound rules; later, SMS/push
 
 ---

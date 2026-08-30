@@ -6,6 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Psycopg's default Python implementation loads libpq at runtime.
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Upgrade pip tooling
 RUN python -m pip install --upgrade pip setuptools wheel
 

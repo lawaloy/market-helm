@@ -129,7 +129,7 @@ Full index: **[docs/README.md](docs/README.md)**
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Next priorities:** hosted staging/operations, projection validation, deeper alert
+**Next priorities:** projection validation/backtesting, external staging sign-off, deeper alert
 rules, and dashboard quality — details in
 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
