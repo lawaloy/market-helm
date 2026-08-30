@@ -84,6 +84,16 @@ def _is_placeholder_webhook(url: str) -> bool:
     return host == "example.com" or host.endswith(".example.com")
 
 
+def alert_rows(config: Dict[str, Any]) -> list[Any]:
+    """Return the alerts array, or [] when a hand-edited key is not a list.
+
+    ``config.get("alerts") or []`` treats missing/empty as empty but still
+    iterates a truthy non-list (``1``, ``true``, a dict) and TypeErrors.
+    """
+    alerts = config.get("alerts") if isinstance(config, dict) else None
+    return alerts if isinstance(alerts, list) else []
+
+
 def polish_alerts_config(
     config: Dict[str, Any],
     *,
@@ -112,7 +122,7 @@ def polish_alerts_config(
 
     polished["defaults"] = defaults
     alerts: list[Dict[str, Any]] = []
-    for alert in polished.get("alerts") or []:
+    for alert in alert_rows(polished):
         if not isinstance(alert, dict):
             continue
         cleaned = dict(alert)
@@ -144,7 +154,7 @@ def dedupe_alerts_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """Keep one rule per price-threshold condition (first wins)."""
     seen: set[str] = set()
     unique: list[Dict[str, Any]] = []
-    for alert in config.get("alerts") or []:
+    for alert in alert_rows(config):
         if not isinstance(alert, dict):
             continue
         raw_condition = alert.get("condition")
@@ -221,7 +231,7 @@ def get_enabled_watch_symbols() -> List[str]:
     if not raw:
         return []
     symbols: set[str] = set()
-    for alert in raw.get("alerts") or []:
+    for alert in alert_rows(raw):
         if not isinstance(alert, dict):
             continue
         if not alert.get("enabled"):
@@ -267,7 +277,7 @@ def strip_webhook_secrets_from_config(config: Dict[str, Any]) -> Dict[str, Any]:
     cleaned["defaults"] = defaults
     cleaned["alerts"] = [
         {k: v for k, v in alert.items() if k != "webhook_url"}
-        for alert in cleaned.get("alerts") or []
+        for alert in alert_rows(cleaned)
         if isinstance(alert, dict)
     ]
     return cleaned

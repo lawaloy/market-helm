@@ -82,3 +82,43 @@ def test_save_tolerates_truthy_non_dict_defaults_on_merge(db_user, bad_defaults)
     assert raw["defaults"]["email_to"] == "ops@example.com"
     # Secret preserved from existing alert row despite poison defaults.
     assert raw["alerts"][0]["webhook_url"] == "https://hooks.example/secret"
+
+
+@pytest.mark.parametrize("bad_alerts", [1, True, {"id": "x"}])
+def test_save_tolerates_truthy_non_list_existing_alerts_on_merge(
+    db_user, bad_alerts
+) -> None:
+    """Existing poison ``alerts`` must not TypeError during webhook secret merge."""
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_alert_configs (user_id, config_json, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                db_user,
+                json.dumps(
+                    {
+                        "defaults": {
+                            "webhook_url": "https://hooks.example/secret",
+                        },
+                        "alerts": bad_alerts,
+                    }
+                ),
+                "2026-07-24T00:00:00+00:00",
+            ),
+        )
+
+    save_user_alerts_config(
+        db_user,
+        {
+            "defaults": {},
+            "alerts": [{"id": "keep", "enabled": True}],
+        },
+    )
+
+    exists, raw = load_user_alerts_config(db_user)
+    assert exists is True
+    assert raw is not None
+    assert raw["alerts"][0]["id"] == "keep"
+    assert raw["defaults"]["webhook_url"] == "https://hooks.example/secret"
