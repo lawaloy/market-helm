@@ -92,13 +92,17 @@ def _data_date_for_filename() -> datetime.date:
 class DataStorage:
     """Manages storage of stock market data in CSV format."""
     
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: Optional[str] = None):
         """
         Initialize data storage.
-        
+
         Args:
-            data_dir: Directory to store data files
+            data_dir: Directory to store data files. When omitted, uses
+                ``DATA_DIR`` if set so Fetch New / CLI writes land in the same
+                persistent directory the dashboard and worker read.
         """
+        if data_dir is None:
+            data_dir = os.getenv("DATA_DIR") or "data"
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
     
