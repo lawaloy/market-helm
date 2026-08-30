@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import io
+import urllib.error
+import urllib.request
+from email.message import Message
+
 import pytest
 
 from scripts.staging_acceptance import AcceptanceError
-from scripts.staging_load import Sample, percentile, run_baseline
+from scripts.staging_load import Sample, _request, main, percentile, run_baseline
 
 
 def test_percentile_uses_nearest_rank() -> None:
@@ -55,7 +60,14 @@ def test_baseline_fails_thresholds() -> None:
 
 @pytest.mark.parametrize(
     ("requests", "concurrency", "timeout", "error_rate", "p95"),
-    [(0, 1, 1, 0, 1), (1, 2, 1, 0, 1), (1, 1, 0, 0, 1), (1, 1, 1, 1.1, 1)],
+    [
+        (0, 1, 1, 0, 1),
+        (1, 2, 1, 0, 1),
+        (1, 1, 0, 0, 1),
+        (1, 1, 1, 1.1, 1),
+        (1, 1, 1, 0, 0),
+        (1, 1, 1, -0.1, 1),
+    ],
 )
 def test_baseline_rejects_invalid_limits(
     requests, concurrency, timeout, error_rate, p95
@@ -82,3 +94,34 @@ def test_baseline_rejects_mutating_or_unknown_endpoint() -> None:
             max_error_rate=0,
             max_p95_ms=100,
         )
+
+
+def test_request_maps_http_error_to_sample(monkeypatch) -> None:
+    class FakeOpener:
+        def open(self, request, timeout=None):
+            headers = Message()
+            raise urllib.error.HTTPError(
+                request.full_url, 503, "Unavailable", headers, io.BytesIO(b"down")
+            )
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *_args, **_kwargs: FakeOpener())
+    sample = _request("https://staging.example.com/health/ready", 1.0)
+    assert sample.status == 503
+    assert sample.error == "HTTP 503"
+    assert sample.duration_ms >= 0
+
+
+def test_request_maps_transport_error_to_status_zero(monkeypatch) -> None:
+    class FakeOpener:
+        def open(self, request, timeout=None):
+            raise urllib.error.URLError("timed out")
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *_args, **_kwargs: FakeOpener())
+    sample = _request("https://staging.example.com/health/ready", 1.0)
+    assert sample.status == 0
+    assert sample.error == "URLError"
+
+
+def test_main_invalid_configuration_exits_two(capsys) -> None:
+    assert main(["--base-url", "https://staging.example.com", "--requests", "0"]) == 2
+    assert "Configuration error" in capsys.readouterr().err
