@@ -18,7 +18,9 @@ services:
     env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
     environment:
       MARKET_HELM_DATABASE_URL: postgresql://markethelm:${POSTGRES_PASSWORD}@postgres:5432/markethelm
+      DATA_DIR: /var/lib/markethelm/data
     ports: ["127.0.0.1:${MARKET_HELM_PORT:-8000}:8000"]
+    volumes: [market-data:/var/lib/markethelm/data]
     depends_on:
       postgres: {condition: service_healthy}
     healthcheck:
@@ -30,10 +32,15 @@ services:
     build: {context: ., dockerfile: Dockerfile.web}
     restart: unless-stopped
     command: ["market-helm", "alerts", "run", "--loop"]
+    healthcheck:
+      disable: true
     env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
     environment:
       MARKET_HELM_DATABASE_URL: postgresql://markethelm:${POSTGRES_PASSWORD}@postgres:5432/markethelm
+      DATA_DIR: /var/lib/markethelm/data
+    volumes: [market-data:/var/lib/markethelm/data]
     depends_on:
       postgres: {condition: service_healthy}
 volumes:
   postgres-data:
+  market-data:

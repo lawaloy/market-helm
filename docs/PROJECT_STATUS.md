@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-08-22
+**Last updated:** 2026-08-28
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -46,8 +46,8 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 | Historical accuracy | **Partial** | API and UI compare past projections with later closes | Richer metrics, confidence cohorts, risk-adjusted views, clearer market-calendar handling |
 | Alerts | **Shipped and tested** | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI | Technical-indicator and compound rules; SMS/push; real-provider staging tests |
 | Accounts and tenant isolation | **Shipped and tested** | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data | Account export and stronger administrative/support tooling |
-| Hosted persistence | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, PostgreSQL integration gate, queue/orchestrator | Managed staging, connection pooling validation, backup/restore drills, failover planning |
-| Production controls | **Shipped; operational verification needed** | API rate limiting, trusted-proxy handling, liveness/readiness/worker health, metrics | Production dashboards/alerts, capacity testing, retention policy, operational runbooks |
+| Hosted persistence | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
+| Production controls | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks | Connect a real staging ingress/provider/monitor and record external sign-off evidence |
 | Automated trading | **Not implemented** | No broker connection or order execution | Broker integration, order/risk model, audit trail, compliance and safety controls |
 
 ## Hosted alerts and accounts
@@ -79,7 +79,8 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries and
 The repository has broad Python and frontend unit/integration coverage, including
 auth lifecycle, tenant isolation, storage migrations, worker orchestration,
 delivery history, rate limits, security boundaries, API routes, and UI flows. CI
-also defines a PostgreSQL 16 integration gate and browser smoke coverage.
+also defines PostgreSQL 16 integration, browser smoke, and full container
+staging-readiness gates.
 
 The following should not be inferred from those tests:
 
@@ -95,18 +96,19 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Hosted staging:** deploy the API, worker, PostgreSQL, and one transactional
-   email provider; validate migrations, email links, proxy headers, metrics, and
-   tenant isolation end to end.
-2. **Operational safety:** rehearse backup/restore, define retention and incident
-   runbooks, add capacity/load tests, and connect health/metrics to monitoring.
-3. **Projection validation:** add repeatable backtests, confidence calibration,
-   confidence-band reports, and explicit market-calendar semantics.
-4. **Alert depth:** add technical-indicator and compound conditions; consider
+1. **Projection validation:** the next repository engineering milestone is
+   repeatable backtests, confidence calibration, confidence-band reports, and
+   explicit market-calendar semantics.
+2. **External staging sign-off:** in parallel, complete the ordered
+   [external staging execution TODO](DEPLOYMENT.md#external-staging-execution-todo)
+   against the chosen managed PostgreSQL, ingress, monitoring, and
+   transactional-email providers. This is an operator-owned release gate requiring
+   credentials/evidence, not unfinished repository automation.
+3. **Alert depth:** add technical-indicator and compound conditions; consider
    SMS/push only after hosted email is proven reliable.
-5. **Dashboard quality:** code-split routes, run accessibility/performance audits,
+4. **Dashboard quality:** code-split routes, run accessibility/performance audits,
    and decide whether saved watchlists/views belong in the product.
-6. **Service integration coverage:** add controlled tests around fetcher errors,
+5. **Service integration coverage:** add controlled tests around fetcher errors,
    provider throttling, malformed upstream data, and a complete tracker run.
 
 ## Explicitly deferred
