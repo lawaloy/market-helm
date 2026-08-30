@@ -3,7 +3,9 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from src.alerts.alert_engine import AlertEngine
+from src.alerts.alert_engine import AlertEngine, LogNotifier
+from src.alerts.notifiers.email_notifier import EmailNotifier
+from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 
 class InMemoryCooldownStorage:
@@ -98,6 +100,48 @@ def test_evaluate_does_not_record_failed_delivery_so_retry_can_fire():
     assert failed_events == []
     assert len(retried_events) == 1
     assert webhook.send.call_count == 2
+    storage.record_event.assert_called_once_with(retried_events[0])
+
+
+def test_evaluate_does_not_count_log_success_when_webhook_fails():
+    """Settings prepends log; evaluate must still retry when the webhook send fails."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    webhook = _FailingWebhookNotifier()
+    webhook.send = MagicMock(side_effect=[False, True])
+    alert = _price_alert(notifications=["log", "webhook"], cooldown_minutes=60)
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch(
+        "src.alerts.alert_engine.WebhookNotifier.from_alert", return_value=webhook
+    ):
+        failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+        retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert failed_events == []
+    assert len(retried_events) == 1
+    assert webhook.send.call_count == 2
+    storage.record_event.assert_called_once_with(retried_events[0])
+
+
+def test_evaluate_does_not_count_log_success_when_email_fails():
+    """Settings email-on prepends log; evaluate must still retry when the email send fails."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    email = _FailingEmailNotifier()
+    email.send = MagicMock(side_effect=[False, True])
+    alert = _price_alert(notifications=["log", "email"], cooldown_minutes=60)
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch(
+        "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email
+    ):
+        failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+        retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
+
+    assert failed_events == []
+    assert len(retried_events) == 1
+    assert email.send.call_count == 2
     storage.record_event.assert_called_once_with(retried_events[0])
 
 
@@ -295,6 +339,141 @@ def test_from_config_dict_keeps_only_enabled_alerts():
 
     assert engine is not None
     assert [alert["id"] for alert in engine.alerts] == ["on"]
+
+
+class _FailingEmailNotifier(EmailNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return False
+
+
+class _FailingWebhookNotifier(WebhookNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return False
+
+
+class _SucceedingWebhookNotifier(WebhookNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        return True
+
+
+class _RaisingEmailNotifier(EmailNotifier):
+    def __init__(self):
+        pass
+
+    def send(self, event):
+        raise RuntimeError("smtp down")
+
+
+def test_deliver_event_does_not_count_log_success_when_user_channels_fail():
+    """Hosted Settings always prepends log; that must not complete a failed email/webhook send."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [
+        LogNotifier(),
+        _FailingEmailNotifier(),
+        _FailingWebhookNotifier(),
+    ]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
+def test_deliver_event_still_succeeds_when_one_user_channel_sends():
+    """A later webhook success still completes the job even if email failed."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [
+        LogNotifier(),
+        _FailingEmailNotifier(),
+        _SucceedingWebhookNotifier(),
+    ]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is True
+    storage.record_event.assert_called_once_with(event)
+
+
+def test_deliver_event_log_only_still_counts_as_delivered():
+    """CLI / log-only watches keep completing when the log notifier succeeds."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+
+    with patch.object(engine, "_build_notifiers", return_value=[LogNotifier()]):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is True
+    storage.record_event.assert_called_once_with(event)
+
+
+def test_deliver_event_does_not_count_log_success_when_email_raises():
+    """Raising EmailNotifier is still a user-channel attempt; log must not complete the job."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _RaisingEmailNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
+def test_deliver_event_email_only_failure_does_not_count_log():
+    """Settings email-on/webhook-off is [log, email]; a failed send must still retry."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "email"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _FailingEmailNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
+
+
+def test_deliver_event_webhook_only_failure_does_not_count_log():
+    """Settings webhook-on/email-off is [log, webhook]; a failed send must still retry."""
+    storage = MagicMock()
+    alert = _price_alert(notifications=["log", "webhook"])
+    event = {"alert_id": alert["id"], "alert_name": alert["name"], "symbols": ["AAPL"]}
+    engine = AlertEngine([alert], storage=storage)
+    notifiers = [LogNotifier(), _FailingWebhookNotifier()]
+
+    with patch.object(engine, "_build_notifiers", return_value=notifiers):
+        with patch("src.alerts.alert_engine.record_notifier_delivery"):
+            delivered = engine.deliver_event(alert, event)
+
+    assert delivered is False
+    storage.record_event.assert_not_called()
 
 
 def test_deliver_event_records_notifier_exception_without_marking_delivered():
