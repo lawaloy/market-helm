@@ -42,6 +42,13 @@ Continue to use local `git` for working-tree operations such as branches, commit
 fetch, push, checkout, and pull; the connector does not synchronize the local
 working tree.
 
+Before merging or declaring a PR complete, inspect its conversation comments,
+submitted reviews, and inline review threads. Address every actionable item,
+reply with the outcome, and resolve the thread only after the concern is fixed
+or answered with a documented rationale. Re-check all three surfaces after each
+push and immediately before completion because feedback can arrive while CI is
+running.
+
 When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
 - **`## What + Why`** with at least one filled bullet (not `## Summary`)
