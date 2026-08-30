@@ -48,9 +48,28 @@ def test_from_config_dict_skips_non_dict_alert_rows() -> None:
     assert engine.defaults == {}
 
 
+def test_from_config_dict_returns_none_for_non_list_alerts() -> None:
+    """Hand-edited alerts.json may set "alerts" to a non-array.
+
+    HTTP save already 400s via _normalize_config. File-mode / hosted-tick
+    from_config_dict must return None instead of TypeError on ``for alert in 1``.
+    """
+    assert AlertEngine.from_config_dict({"defaults": {}, "alerts": 1}) is None
+    assert AlertEngine.from_config_dict({"defaults": {}, "alerts": True}) is None
+    assert AlertEngine.from_config_dict({"defaults": {}, "alerts": None}) is None
+
+
 def test_from_config_returns_none_for_list_rooted_file(tmp_path: Path) -> None:
     path = tmp_path / "alerts.json"
     path.write_text(json.dumps(["x"]), encoding="utf-8")
+    assert AlertEngine.from_config(path) is None
+
+
+def test_from_config_returns_none_when_file_has_non_list_alerts(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "alerts.json"
+    path.write_text('{"defaults": {}, "alerts": 1}', encoding="utf-8")
     assert AlertEngine.from_config(path) is None
 
 
