@@ -1,5 +1,6 @@
 """Fetch/CLI writes must land in DATA_DIR so the dashboard and worker can read them."""
 
+from datetime import date
 from pathlib import Path
 
 from dashboard.backend.services.data_loader import _default_data_dir
@@ -52,3 +53,53 @@ def test_fetch_writes_and_dashboard_reads_the_same_data_dir(monkeypatch, tmp_pat
     assert Path(saved).parent == target
     assert _default_data_dir() == target.resolve()
     assert list(target.glob("daily_data_*.csv"))
+
+
+def test_blank_data_dir_env_falls_back_to_local_data(monkeypatch, tmp_path):
+    """Empty DATA_DIR must not write to '' — same falsy fallback the dashboard uses."""
+    monkeypatch.setenv("DATA_DIR", "")
+    monkeypatch.chdir(tmp_path)
+
+    storage = DataStorage()
+
+    assert storage.data_dir == Path("data")
+    assert (tmp_path / "data").is_dir()
+
+
+def test_summary_and_projections_write_to_data_dir(monkeypatch, tmp_path):
+    """Fetch New also persists summary JSON and projection CSV/MD beside daily CSVs."""
+    target = tmp_path / "var-lib-markethelm-data"
+    target.mkdir()
+    monkeypatch.setenv("DATA_DIR", str(target))
+
+    storage = DataStorage()
+    stamp = date(2026, 8, 28)
+    summary = storage.save_summary({"total_stocks": 1}, date=stamp)
+    projections = storage.save_projections(
+        {
+            "AAPL": {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "current_price": 150.0,
+                "target_low": 145.0,
+                "target_mid": 155.0,
+                "target_high": 160.0,
+                "expected_change_percent": 3.3,
+                "recommendation": "BUY",
+                "confidence": 80,
+                "trend": "Bullish",
+                "momentum_score": 0.5,
+                "volatility_score": 0.2,
+                "risk_level": "Low",
+                "reason": "momentum",
+                "projection_date": "2026-09-02",
+                "generated_at": "2026-08-28T12:00:00",
+            }
+        },
+        date=stamp,
+    )
+
+    assert Path(summary) == target / "summary_2026-08-28.json"
+    assert Path(projections) == target / "projections_2026-08-28.csv"
+    assert (target / "projections_2026-08-28.md").is_file()
+    assert _default_data_dir() == target.resolve()
