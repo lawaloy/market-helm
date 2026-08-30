@@ -47,9 +47,22 @@ jobs:
             > "$MARKET_HELM_ENV_FILE"
 
       - name: Validate and start staging stack
+        shell: bash
         run: |
+          set -euo pipefail
           docker compose -f docker-compose.staging.yml config --quiet
-          docker compose -f docker-compose.staging.yml up -d --build --wait
+          docker compose -f docker-compose.staging.yml up -d --build --wait postgres api
+          docker compose -f docker-compose.staging.yml up -d worker
+          for attempt in {1..30}; do
+            if python -c "import json, urllib.request; payload=json.load(urllib.request.urlopen('http://127.0.0.1:8012/health/worker', timeout=3)); assert payload.get('ok') is True"; then
+              break
+            fi
+            if (( attempt == 30 )); then
+              echo "Worker did not report a healthy heartbeat in time." >&2
+              exit 1
+            fi
+            sleep 2
+          done
 
       - name: Run operational, ingress, and tenant acceptance
         run: |
@@ -116,9 +129,22 @@ jobs:
             grep -Fx staging-readiness /var/lib/markethelm/data/.readiness-sentinel
 
       - name: Rehearse database and worker recovery
+        shell: bash
         run: |
+          set -euo pipefail
           docker compose -f docker-compose.staging.yml restart postgres worker
-          docker compose -f docker-compose.staging.yml up -d --wait
+          docker compose -f docker-compose.staging.yml up -d --wait postgres api
+          docker compose -f docker-compose.staging.yml up -d worker
+          for attempt in {1..30}; do
+            if python -c "import json, urllib.request; payload=json.load(urllib.request.urlopen('http://127.0.0.1:8012/health/worker', timeout=3)); assert payload.get('ok') is True"; then
+              break
+            fi
+            if (( attempt == 30 )); then
+              echo "Worker did not recover its healthy heartbeat in time." >&2
+              exit 1
+            fi
+            sleep 2
+          done
           python scripts/staging_acceptance.py \
             --base-url http://127.0.0.1:8012 \
             --report "$RUNNER_TEMP/staging-recovery.json"

@@ -14,7 +14,7 @@ RUN apt-get update \
 COPY requirements.txt setup.cfg pyproject.toml MANIFEST.in README.md ./
 COPY src ./src
 COPY dashboard ./dashboard
-COPY --from=frontend /build/dist ./dashboard/backend/static
+COPY --from=frontend /backend/static ./dashboard/backend/static
 RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir . \
     && addgroup --system app && adduser --system --ingroup app app \
     && mkdir -p /var/lib/markethelm/data \
