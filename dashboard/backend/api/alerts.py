@@ -17,6 +17,7 @@ from src.storage.user_alerts import (
 )
 
 from src.alerts.alert_paths import (
+    alert_rows,
     init_minimal_user_alerts_config,
     load_alerts_config,
     polish_alerts_config,
@@ -464,7 +465,7 @@ async def get_alerts_status(
         if user_id:
             _, raw = load_user_alerts_config(user_id)
             if raw:
-                alerts = raw.get("alerts") or []
+                alerts = alert_rows(raw)
                 active_watches = sum(
                     1
                     for alert in alerts

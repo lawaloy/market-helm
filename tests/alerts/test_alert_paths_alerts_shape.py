@@ -1,12 +1,15 @@
 """Truthy non-list alerts.json ``alerts`` keys must soft-fail, not TypeError."""
 
+import json
 from pathlib import Path
 
 import pytest
 
 from src.alerts.alert_paths import (
+    dedupe_alerts_config,
     get_enabled_watch_symbols,
     polish_alerts_config,
+    save_alerts_config,
     strip_webhook_secrets_from_config,
 )
 
@@ -53,6 +56,23 @@ def test_get_enabled_watch_symbols_ignores_non_list_alerts(
     )
 
     assert get_enabled_watch_symbols() == []
+
+
+@pytest.mark.parametrize("bad_alerts", [1, True, "ab", {"id": "x"}])
+def test_dedupe_tolerates_truthy_non_list_alerts(bad_alerts) -> None:
+    """Direct dedupe is used by polish; ``or []`` still iterates a truthy non-list."""
+    deduped = dedupe_alerts_config(
+        {"defaults": {"email_to": "ops@example.com"}, "alerts": bad_alerts}
+    )
+    assert deduped["defaults"]["email_to"] == "ops@example.com"
+    assert deduped["alerts"] == []
+
+
+def test_save_alerts_config_tolerates_non_list_alerts(tmp_path: Path) -> None:
+    dest = tmp_path / "alerts.json"
+    save_alerts_config({"defaults": {}, "alerts": 1}, explicit=dest)
+    written = json.loads(dest.read_text(encoding="utf-8"))
+    assert written["alerts"] == []
 
 
 def test_polish_preserves_valid_alerts_list() -> None:
