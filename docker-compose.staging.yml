@@ -32,8 +32,20 @@ services:
     build: {context: ., dockerfile: Dockerfile.web}
     restart: unless-stopped
     command: ["market-helm", "alerts", "run", "--loop"]
+    # The image HEALTHCHECK probes /health/live, which only the API serves.
+    # --wait requires a worker check, so confirm the loop process is PID 1.
     healthcheck:
-      disable: true
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import pathlib; raise SystemExit(0 if b'alerts' in pathlib.Path('/proc/1/cmdline').read_bytes() else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
     env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
     environment:
       MARKET_HELM_DATABASE_URL: postgresql://markethelm:${POSTGRES_PASSWORD}@postgres:5432/markethelm

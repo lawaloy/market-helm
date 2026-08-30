@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from email.message import Message
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -318,3 +319,13 @@ def test_report_contains_results_but_no_credentials() -> None:
     assert any(check["status"] == "skipped" for check in report["checks"])
     assert "password" not in serialized.lower()
     assert "token" not in serialized.lower()
+
+
+def test_staging_compose_worker_healthcheck_supports_wait() -> None:
+    """compose up --wait fails when the worker healthcheck is disabled."""
+    compose = Path(__file__).resolve().parents[2] / "docker-compose.staging.yml"
+    text = compose.read_text(encoding="utf-8")
+    worker = text.split("  worker:\n", 1)[1].split("volumes:\n", 1)[0]
+    assert "disable: true" not in worker
+    assert "healthcheck:" in worker
+    assert "/proc/1/cmdline" in worker
