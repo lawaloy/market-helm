@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -101,3 +102,56 @@ def test_hosted_get_config_soft_fails_non_list_alerts_without_touching_sibling(
     assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
         "sibling-msft"
     ]
+
+
+@pytest.mark.parametrize("bad_alerts", [1, True, {"id": "x"}])
+def test_hosted_status_soft_fails_non_list_alerts_without_touching_sibling(
+    client, multi_user_env, bad_alerts, monkeypatch
+) -> None:
+    """Status reads raw config_json and used to TypeError on ``alerts: 1``."""
+    token_a, user_a = _register(
+        client, f"status-a-{type(bad_alerts).__name__}@example.com"
+    )
+    token_b, _user_b = _register(
+        client, f"status-b-{type(bad_alerts).__name__}@example.com"
+    )
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    saved = client.put(
+        "/api/alerts/config",
+        headers=headers_b,
+        json=_price_payload("sibling-msft", "MSFT"),
+    )
+    assert saved.status_code == 200
+
+    from src.storage.database import get_connection
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_alert_configs (user_id, config_json, updated_at)
+            VALUES (?, ?, ?)
+            """,
+            (
+                user_a,
+                json.dumps({"defaults": {}, "alerts": bad_alerts}),
+                "2026-07-24T00:00:00+00:00",
+            ),
+        )
+
+    monkeypatch.setattr(
+        "dashboard.backend.api.alerts.get_data_loader",
+        lambda: MagicMock(
+            get_latest_date=MagicMock(return_value=None),
+            load_projections=MagicMock(return_value=MagicMock(empty=True)),
+        ),
+    )
+
+    poisoned = client.get("/api/alerts/status", headers=headers_a)
+    sibling = client.get("/api/alerts/status", headers=headers_b)
+
+    assert poisoned.status_code == 200
+    assert poisoned.json()["active_watches"] == 0
+    assert sibling.status_code == 200
+    assert sibling.json()["active_watches"] == 1
