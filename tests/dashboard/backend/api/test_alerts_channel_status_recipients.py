@@ -3,8 +3,10 @@
 ``_channel_status`` ORs ``ALERT_EMAIL_TO`` / webhook env vars only in file mode.
 Hosted Settings GET used to look ready (or the staging tenant check would treat
 an empty account as having secrets) whenever those process-wide vars were set.
-Per-rule ``email_to`` is the other half: a tenant with no defaults mailbox must
-still report ``email_recipients`` so the UI and staging harness see the secret.
+Per-rule ``email_to`` / ``webhook_url`` is the other half: a tenant with empty
+defaults must still report channel flags so the UI and staging harness see the
+secret. File-mode GET must also infer ``webhook_format=discord`` from
+``DISCORD_WEBHOOK_URL`` when ``ALERT_WEBHOOK_FORMAT`` is unset.
 """
 
 from __future__ import annotations
@@ -45,7 +47,18 @@ def _register(client, email: str) -> str:
     return response.json()["access_token"]
 
 
-def _rule(*, alert_id: str, symbol: str, email_to: str | None = None) -> dict:
+def _rule(
+    *,
+    alert_id: str,
+    symbol: str,
+    email_to: str | None = None,
+    webhook_url: str | None = None,
+) -> dict:
+    notifications = ["log"]
+    if email_to:
+        notifications.append("email")
+    if webhook_url:
+        notifications.append("webhook")
     alert = {
         "id": alert_id,
         "name": alert_id,
@@ -56,10 +69,12 @@ def _rule(*, alert_id: str, symbol: str, email_to: str | None = None) -> dict:
             "operator": "less_than",
             "value": 100,
         },
-        "notifications": ["log", "email"] if email_to else ["log"],
+        "notifications": notifications,
     }
     if email_to is not None:
         alert["email_to"] = email_to
+    if webhook_url is not None:
+        alert["webhook_url"] = webhook_url
     return alert
 
 
@@ -109,14 +124,69 @@ def test_hosted_rule_email_marks_recipients_ready_without_touching_sibling(
     assert "global-shared@example.com" not in json.dumps(got_b.json())
 
 
+def test_hosted_rule_webhook_marks_channel_ready_without_touching_sibling(
+    client, multi_user_env
+) -> None:
+    """defaults.webhook_url is empty; only tenant A's rule URL must flip the flag."""
+    token_a = _register(client, "rule-hook-a@example.com")
+    token_b = _register(client, "rule-hook-b@example.com")
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+    rule_url = "https://hooks.example/tenant-rule"
+
+    saved = client.put(
+        "/api/alerts/config",
+        headers=headers_a,
+        json={
+            "defaults": {},
+            "alerts": [
+                _rule(
+                    alert_id="rule-webhook",
+                    symbol="AAPL",
+                    webhook_url=rule_url,
+                )
+            ],
+        },
+    )
+    assert saved.status_code == 200
+    assert saved.json()["channels"]["webhook_url"] is True
+    assert saved.json()["channels"]["email_recipients"] is False
+    assert saved.json()["config"]["defaults"].get("webhook_url") in (None, "")
+    assert "webhook_url" not in saved.json()["config"]["alerts"][0]
+    assert "tenant-rule" not in json.dumps(saved.json())
+
+    got_a = client.get("/api/alerts/config", headers=headers_a)
+    got_b = client.get("/api/alerts/config", headers=headers_b)
+
+    assert got_a.status_code == 200
+    assert got_a.json()["channels"]["webhook_url"] is True
+    assert got_a.json()["channels"]["email_recipients"] is False
+    assert "tenant-rule" not in json.dumps(got_a.json())
+    assert "hooks.example/global" not in json.dumps(got_a.json())
+    assert "global/token" not in json.dumps(got_a.json())
+
+    assert got_b.status_code == 200
+    assert got_b.json()["exists"] is False
+    assert got_b.json()["channels"]["webhook_url"] is False
+    assert got_b.json()["channels"]["email_recipients"] is False
+    assert got_b.json()["config"]["alerts"] == []
+    assert "tenant-rule" not in json.dumps(got_b.json())
+    assert "hooks.example/global" not in json.dumps(got_b.json())
+
+
 def test_file_mode_env_mailbox_marks_recipients_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats process-wide ALERT_EMAIL_TO as this install's mailbox."""
+    # GET calls _load_env(), which reloads ~/.market-helm/.env with override.
+    user_dir = tmp_path / "user-config"
+    user_dir.mkdir()
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
     config_dir = tmp_path / "market-helm"
     config_dir.mkdir()
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
@@ -137,10 +207,17 @@ def test_file_mode_env_webhook_marks_channel_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats DISCORD_WEBHOOK_URL as this install's webhook secret."""
+    # GET calls _load_env(), which reloads ~/.market-helm/.env with override.
+    # Earlier file-mode PUTs can leave ALERT_WEBHOOK_FORMAT=discord there, so
+    # Discord inference would still apply after DISCORD_WEBHOOK_URL is cleared.
+    user_dir = tmp_path / "user-config"
+    user_dir.mkdir()
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
     config_dir = tmp_path / "market-helm"
     config_dir.mkdir()
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
@@ -153,8 +230,10 @@ def test_file_mode_env_webhook_marks_channel_ready(
     assert response.json()["channels"]["webhook_url"] is True
     assert "local/token" not in json.dumps(response.json())
     assert response.json()["config"]["defaults"].get("webhook_url") in (None, "")
+    assert response.json()["config"]["defaults"].get("webhook_format") == "discord"
 
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
     empty = client.get("/api/alerts/config")
     assert empty.status_code == 200
     assert empty.json()["channels"]["webhook_url"] is False
+    assert empty.json()["config"]["defaults"].get("webhook_format") in (None, "")
