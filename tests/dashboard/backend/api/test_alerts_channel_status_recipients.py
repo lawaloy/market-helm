@@ -178,7 +178,9 @@ def test_file_mode_env_mailbox_marks_recipients_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats process-wide ALERT_EMAIL_TO as this install's mailbox."""
-    # GET calls _load_env(), which reloads ~/.market-helm/.env with override.
+    # Exercise the explicitly injected process environment without loading any
+    # repository- or user-level dotenv files from the host running the test.
+    monkeypatch.setattr("dashboard.backend.api.alerts._load_env", lambda: None)
     user_dir = tmp_path / "user-config"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
@@ -207,9 +209,9 @@ def test_file_mode_env_webhook_marks_channel_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats DISCORD_WEBHOOK_URL as this install's webhook secret."""
-    # GET calls _load_env(), which reloads ~/.market-helm/.env with override.
-    # Earlier file-mode PUTs can leave ALERT_WEBHOOK_FORMAT=discord there, so
-    # Discord inference would still apply after DISCORD_WEBHOOK_URL is cleared.
+    # Exercise the explicitly injected process environment without loading any
+    # repository- or user-level dotenv files from the host running the test.
+    monkeypatch.setattr("dashboard.backend.api.alerts._load_env", lambda: None)
     user_dir = tmp_path / "user-config"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
