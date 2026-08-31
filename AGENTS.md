@@ -13,10 +13,10 @@ No database is required — data is flat-file (CSV/JSON in `data/`).
 
 ### Running services
 
-| Service | Command | Port | Notes |
-|---------|---------|------|-------|
-| FastAPI backend | `python3 dashboard/backend/main.py` | 8000 | Serves API + built SPA from `dashboard/backend/static/` |
-| Vite dev server | `cd dashboard/frontend && npm run dev` | 3000 | Proxies `/api` to backend; use for frontend hot-reload |
+| Service         | Command                                | Port | Notes                                                   |
+| --------------- | -------------------------------------- | ---- | ------------------------------------------------------- |
+| FastAPI backend | `python3 dashboard/backend/main.py`    | 8000 | Serves API + built SPA from `dashboard/backend/static/` |
+| Vite dev server | `cd dashboard/frontend && npm run dev` | 3000 | Proxies `/api` to backend; use for frontend hot-reload  |
 
 Start the backend **before** the Vite dev server. Use `python3` (not `python`) — the system does not have a `python` symlink.
 
@@ -42,16 +42,9 @@ Continue to use local `git` for working-tree operations such as branches, commit
 fetch, push, checkout, and pull; the connector does not synchronize the local
 working tree.
 
-For ordinary PRs, do **not** enable auto-merge when creating the PR. Wait until
-every check run on the latest head commit is terminal, including optional review
-automation and not only checks required by branch protection. Then inspect the
-conversation comments, submitted reviews, and inline review threads. Address
-every actionable item, reply with the outcome, and resolve the thread only after
-the concern is fixed or answered with a documented rationale. Repeat the full
-wait-and-inspect cycle after every push because the new commit SHA invalidates
-the previous review, and re-check all three feedback surfaces immediately before
-completion. Manually merge only when the final inspection confirms that no
-checks are pending and no actionable feedback remains.
+For ordinary PRs, do not enable auto-merge when creating the PR. Wait until all workflows and check integrations expected for the PR’s event and changed paths have produced runs for the latest head commit and every resulting run is terminal, including checks not required by branch protection. Also wait for any PR review automation still running against an earlier commit, because it may post relevant feedback after a push. If an expected run does not appear, investigate the missing run rather than treating its absence as success. Success is acceptable; accept a skipped or neutral conclusion only when it is expected and documented. Failure, cancellation, timeout, or action-required conclusions block completion.
+Then inspect the PR conversation, submitted reviews, and inline review threads. Address every actionable item, reply with the outcome, and resolve a thread only after the concern is fixed or answered with documented rationale.
+Repeat the complete wait-and-inspect cycle after every push because a new head commit invalidates the previous check and review assessment. Immediately before completion, re-check the latest commit, all check and review-automation runs, and all three feedback surfaces. Merge manually only when nothing is pending, no expected runs are missing, no unacceptable conclusions remain, and no actionable feedback is unresolved.
 
 When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
