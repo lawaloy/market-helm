@@ -178,10 +178,14 @@ def test_file_mode_env_mailbox_marks_recipients_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats process-wide ALERT_EMAIL_TO as this install's mailbox."""
+    user_dir = tmp_path / "user-config"
+    user_dir.mkdir()
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
     config_dir = tmp_path / "market-helm"
     config_dir.mkdir()
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
@@ -202,10 +206,17 @@ def test_file_mode_env_webhook_marks_channel_ready(
     client, tmp_path: Path, monkeypatch
 ) -> None:
     """File mode still treats DISCORD_WEBHOOK_URL as this install's webhook secret."""
+    # GET calls _load_env(), which reloads ~/.market-helm/.env with override.
+    # Earlier file-mode PUTs can leave ALERT_WEBHOOK_FORMAT=discord there, so
+    # Discord inference would still apply after DISCORD_WEBHOOK_URL is cleared.
+    user_dir = tmp_path / "user-config"
+    user_dir.mkdir()
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
+    monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
     config_dir = tmp_path / "market-helm"
     config_dir.mkdir()
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
