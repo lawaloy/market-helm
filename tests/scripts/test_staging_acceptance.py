@@ -221,6 +221,61 @@ def test_operational_checks_cover_hosted_dependencies() -> None:
     assert all(result.status == "passed" for result in runner.results)
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"ok": False},
+        {"status": "unhealthy"},
+    ],
+)
+def test_worker_check_fails_when_heartbeat_payload_is_not_healthy(
+    override: dict[str, Any],
+) -> None:
+    """HTTP 200 with a lying worker body must not sign off staging.
+
+    The probe can return 200 while JSON ``status`` is overwritten by the
+    heartbeat row, or while ``ok`` is False. Either conjunct failing closed
+    is what keeps a dead worker from looking green.
+    """
+    client = _OperationalClient()
+
+    def lying_worker(method, path, **kwargs):
+        if path == "/health/worker":
+            body = {"status": "healthy", "ok": True, "worker_id": "worker-1"}
+            body.update(override)
+            return body
+        return _OperationalClient.json(client, method, path, **kwargs)
+
+    client.json = lying_worker
+    runner = AcceptanceRunner(client)
+    runner.run_operational_checks()
+
+    worker = next(result for result in runner.results if result.name == "Worker heartbeat")
+    assert worker.status == "failed"
+    assert "not healthy" in worker.detail
+
+
+def test_auth_boundary_fails_when_anonymous_error_has_no_detail() -> None:
+    """A 401 with an empty JSON object must not count as an auth boundary."""
+    client = _OperationalClient()
+
+    def empty_detail(method, path, **kwargs):
+        if path == "/api/alerts/config":
+            assert kwargs["expected_status"] == 401
+            return {}
+        return _OperationalClient.json(client, method, path, **kwargs)
+
+    client.json = empty_detail
+    runner = AcceptanceRunner(client)
+    runner.run_operational_checks(skip_worker=True)
+
+    auth = next(
+        result for result in runner.results if result.name == "Hosted authentication boundary"
+    )
+    assert auth.status == "failed"
+    assert "auth error" in auth.detail
+
+
 def test_ingress_check_requires_exact_cors_and_request_id() -> None:
     class Client(_OperationalClient):
         def request(self, method, path, **kwargs):
@@ -275,21 +330,31 @@ class _IngressClient(_OperationalClient):
         request_id: str = "request-1",
         include_hsts: bool = True,
         base_url: str = "https://staging.example.com",
+        allow_origin: str | None = "match",
+        credentials: str | None = "true",
     ) -> None:
         self.allow_untrusted = allow_untrusted
         self.request_id = request_id
         self.include_hsts = include_hsts
         self.base_url = base_url
+        self.allow_origin = allow_origin
+        self.credentials = credentials
 
     def request(self, method, path, **kwargs):
         if path == "/metrics":
             return super().request(method, path, **kwargs)
         origin = kwargs["headers"]["Origin"]
         headers = {"X-Request-ID": self.request_id}
-        trusted = origin == self.base_url or (
-            self.allow_untrusted and origin == "https://untrusted.invalid"
-        )
-        if trusted:
+        if origin == self.base_url:
+            if self.allow_origin == "match":
+                headers["Access-Control-Allow-Origin"] = origin
+            elif self.allow_origin is not None:
+                headers["Access-Control-Allow-Origin"] = self.allow_origin
+            if self.credentials is not None:
+                headers["Access-Control-Allow-Credentials"] = self.credentials
+            if self.include_hsts:
+                headers["Strict-Transport-Security"] = "max-age=31536000"
+        elif self.allow_untrusted and origin == "https://untrusted.invalid":
             headers.update({
                 "Access-Control-Allow-Origin": origin,
                 "Access-Control-Allow-Credentials": "true",
@@ -321,6 +386,31 @@ def test_ingress_check_skips_hsts_on_loopback_http() -> None:
     runner.run_operational_checks(ingress_origin="http://127.0.0.1:8012")
     assert runner.results[-1].name == "Ingress and CORS"
     assert runner.results[-1].status == "passed"
+
+
+@pytest.mark.parametrize(
+    "allow_origin",
+    [None, "https://other.example.com"],
+)
+def test_ingress_check_fails_when_expected_origin_is_not_allowed(
+    allow_origin: str | None,
+) -> None:
+    """Missing or wrong ACAO must fail before HSTS or the untrusted-origin check."""
+    runner = AcceptanceRunner(_IngressClient(allow_origin=allow_origin))
+    runner.run_operational_checks(ingress_origin="https://staging.example.com")
+    assert runner.results[-1].status == "failed"
+    assert "does not allow the expected public origin" in runner.results[-1].detail
+
+
+@pytest.mark.parametrize("credentials", [None, "false"])
+def test_ingress_check_fails_when_credentials_are_not_enabled(
+    credentials: str | None,
+) -> None:
+    """Exact-origin CORS without credentials cannot carry the SPA bearer token."""
+    runner = AcceptanceRunner(_IngressClient(credentials=credentials))
+    runner.run_operational_checks(ingress_origin="https://staging.example.com")
+    assert runner.results[-1].status == "failed"
+    assert "credential support is not enabled" in runner.results[-1].detail
 
 
 def test_readiness_rejects_file_mode_even_when_endpoint_says_ready() -> None:
