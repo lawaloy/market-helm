@@ -561,6 +561,107 @@ def test_tenant_check_rejects_same_email_accounts() -> None:
     assert client.put_payloads == []
 
 
+def test_tenant_check_refuses_login_without_access_token() -> None:
+    """A login payload without a bearer must not proceed to GET/PUT config."""
+
+    class NoTokenClient(_TenantClient):
+        def json(self, method, path, *, token=None, payload=None, **kwargs):
+            if (method, path) == ("POST", "/api/auth/login"):
+                return {}
+            return super().json(method, path, token=token, payload=payload, **kwargs)
+
+    client = NoTokenClient()
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    assert runner.results[-1].status == "failed"
+    assert "no access token" in runner.results[-1].detail
+    assert client.put_payloads == []
+    assert client.configs["token-a"]["alerts"] == []
+
+
+def test_tenant_check_refuses_when_authenticated_identity_does_not_match() -> None:
+    """Login returning another account's token must not write this tenant's config."""
+
+    class MismatchClient(_TenantClient):
+        def json(self, method, path, *, token=None, payload=None, **kwargs):
+            if (method, path) == ("GET", "/api/auth/me"):
+                return {"email": "other@example.com"}
+            return super().json(method, path, token=token, payload=payload, **kwargs)
+
+    client = MismatchClient()
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    assert runner.results[-1].status == "failed"
+    assert "authenticated identity did not match" in runner.results[-1].detail
+    assert client.put_payloads == []
+    assert client.configs["token-a"]["alerts"] == []
+    assert client.configs["token-b"]["alerts"] == []
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        {"exists": True, "config": [], "channels": {"webhook_url": False}},
+        {"exists": True, "config": {"defaults": {}, "alerts": []}},
+    ],
+)
+def test_tenant_check_refuses_unexpected_config_shape_without_overwriting(
+    broken: dict[str, Any],
+) -> None:
+    """Garbage GET /config must fail closed before the harness writes watches."""
+
+    class ShapelessClient(_TenantClient):
+        def json(self, method, path, *, token=None, payload=None, **kwargs):
+            if (method, path) == ("GET", "/api/alerts/config"):
+                return json.loads(json.dumps(broken))
+            return super().json(method, path, token=token, payload=payload, **kwargs)
+
+    client = ShapelessClient()
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    assert runner.results[-1].status == "failed"
+    assert "unexpected shape" in runner.results[-1].detail
+    assert client.put_payloads == []
+    assert client.configs["token-a"]["alerts"] == []
+
+
+def test_tenant_check_fails_when_watch_index_is_not_isolated() -> None:
+    """Config ids can look isolated while GET /status still shares the index."""
+
+    class SharedIndexClient(_TenantClient):
+        def json(self, method, path, *, token=None, payload=None, **kwargs):
+            if (method, path) == ("GET", "/api/alerts/status"):
+                return {"active_watches": 2}
+            return super().json(method, path, token=token, payload=payload, **kwargs)
+
+    client = SharedIndexClient()
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    isolation = next(result for result in runner.results if result.name == "Tenant isolation")
+    assert isolation.status == "failed"
+    assert "watch index is not isolated" in isolation.detail
+    assert client.configs == {
+        "token-a": {"defaults": {}, "alerts": []},
+        "token-b": {"defaults": {}, "alerts": []},
+    }
+
+
 def test_tenant_cleanup_failure_is_recorded() -> None:
     client = _TenantClient(fail_restore=True)
     runner = AcceptanceRunner(client)
