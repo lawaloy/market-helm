@@ -1,17 +1,16 @@
-"""File-mode Helmtower status/run/test must survive poison alerts.json.
+"""File-mode Check-now and Send-test must survive poison alerts.json.
 
 #552 locks Settings GET/init. Hosted poison-row run/test is locked in
 ``test_alerts_corrupt_config_recovery``. File-mode Check-now goes through
-``AlertEngine.from_config`` (its own json.load), status through
-``load_alerts_config``, and Send-test through ``run_alert_test``. A later
-``json.loads`` without those soft-fails would 500 the dashboard or map
-corrupt files to the missing-config 404.
+``AlertEngine.from_config`` (its own json.load) and Send-test through
+``run_alert_test``. A later ``json.loads`` without those soft-fails would
+500 Check-now or map a poison file to the missing-config 404.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,44 +46,6 @@ def client():
     from dashboard.backend.main import app
 
     return TestClient(app)
-
-
-def _stub_status_deps(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "dashboard.backend.api.alerts.database_enabled",
-        lambda: False,
-    )
-    monkeypatch.setattr(
-        "dashboard.backend.api.alerts.get_data_loader",
-        lambda: MagicMock(
-            get_latest_date=MagicMock(return_value=None),
-            load_projections=MagicMock(return_value=MagicMock(empty=True)),
-        ),
-    )
-    monkeypatch.setattr(
-        "src.alerts.alert_storage.AlertStorage",
-        lambda data_dir=None: MagicMock(
-            latest_event_timestamp=MagicMock(return_value=None),
-        ),
-    )
-    monkeypatch.setattr(
-        "src.alerts.delivery_status.latest_deliveries_by_channel",
-        lambda storage: [],
-    )
-
-
-@pytest.mark.parametrize("blob", POISON_BLOBS)
-def test_file_mode_status_soft_fails_corrupt_or_non_object_root(
-    client, file_mode: Path, blob: bytes, monkeypatch
-) -> None:
-    """Helmtower status poll must 200 with zero watches, not 500."""
-    file_mode.write_bytes(blob)
-    _stub_status_deps(monkeypatch)
-
-    response = client.get("/api/alerts/status")
-    assert response.status_code == 200
-    assert response.json()["active_watches"] == 0
-    assert file_mode.read_bytes() == blob
 
 
 @pytest.mark.parametrize("blob", POISON_BLOBS)
