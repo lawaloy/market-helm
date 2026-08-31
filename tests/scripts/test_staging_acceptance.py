@@ -662,6 +662,43 @@ def test_tenant_check_fails_when_watch_index_is_not_isolated() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"alert_id": "other-tenant"},
+        {"status": "sent"},
+        {"previews": [{"notifier": "EmailNotifier", "payload": {}}]},
+    ],
+)
+def test_tenant_check_fails_when_log_only_dry_run_is_not_isolated(
+    override: dict[str, Any],
+) -> None:
+    """Config ids can look isolated while /test dry-runs the sibling or a live send."""
+
+    class DryRunClient(_TenantClient):
+        def json(self, method, path, *, token=None, payload=None, **kwargs):
+            if (method, path) == ("POST", "/api/alerts/test"):
+                body = super().json(method, path, token=token, payload=payload, **kwargs)
+                body.update(override)
+                return body
+            return super().json(method, path, token=token, payload=payload, **kwargs)
+
+    client = DryRunClient()
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    isolation = next(result for result in runner.results if result.name == "Tenant isolation")
+    assert isolation.status == "failed"
+    assert "log-only dry run failed" in isolation.detail
+    assert client.configs == {
+        "token-a": {"defaults": {}, "alerts": []},
+        "token-b": {"defaults": {}, "alerts": []},
+    }
+
+
 def test_tenant_cleanup_failure_is_recorded() -> None:
     client = _TenantClient(fail_restore=True)
     runner = AcceptanceRunner(client)
