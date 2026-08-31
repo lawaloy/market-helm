@@ -42,6 +42,15 @@ Continue to use local `git` for working-tree operations such as branches, commit
 fetch, push, checkout, and pull; the connector does not synchronize the local
 working tree.
 
+For ordinary PRs, do **not** enable auto-merge when creating the PR. Wait until
+every check run on the latest head commit is terminal, including optional review
+automation and not only checks required by branch protection. Then inspect the
+conversation comments, submitted reviews, and inline review threads. Address
+every actionable item and repeat the wait-and-inspect cycle after every push,
+because the new commit SHA invalidates the previous review. Manually merge only
+after the final inspection confirms that no checks are pending and no actionable
+feedback remains.
+
 Before merging or declaring a PR complete, inspect its conversation comments,
 submitted reviews, and inline review threads. Address every actionable item,
 reply with the outcome, and resolve the thread only after the concern is fixed
