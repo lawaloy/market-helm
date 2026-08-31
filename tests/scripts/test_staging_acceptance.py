@@ -384,6 +384,7 @@ class _TenantClient:
         self,
         *,
         nonempty: bool = False,
+        defaults: dict[str, Any] | None = None,
         webhook_url: bool = False,
         email_recipients: bool = False,
         fail_restore: bool = False,
@@ -391,7 +392,7 @@ class _TenantClient:
         self.tokens = {"a@example.com": "token-a", "b@example.com": "token-b"}
         initial_alerts = [{"id": "real-watch"}] if nonempty else []
         self.configs = {
-            "token-a": {"defaults": {}, "alerts": list(initial_alerts)},
+            "token-a": {"defaults": dict(defaults or {}), "alerts": list(initial_alerts)},
             "token-b": {"defaults": {}, "alerts": []},
         }
         self.channels = {
@@ -479,6 +480,37 @@ def test_tenant_check_refuses_nonempty_account_without_overwriting_it() -> None:
 
 def test_tenant_check_refuses_accounts_with_notification_secrets() -> None:
     client = _TenantClient(webhook_url=True)
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    assert runner.results[-1].status == "failed"
+    assert "notification secrets" in runner.results[-1].detail
+    assert client.put_payloads == []
+    assert client.configs["token-a"]["alerts"] == []
+
+
+def test_tenant_check_refuses_account_with_defaults_mailbox_without_overwriting_it() -> None:
+    """Onboarding tenants often have defaults.email_to and no watches yet."""
+    client = _TenantClient(defaults={"email_to": "ops@example.com"})
+    runner = AcceptanceRunner(client)
+
+    runner.run_tenant_isolation(
+        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
+    )
+
+    assert runner.results[-1].status == "failed"
+    assert "dedicated staging accounts" in runner.results[-1].detail
+    assert client.put_payloads == []
+    assert client.configs["token-a"]["defaults"]["email_to"] == "ops@example.com"
+    assert client.configs["token-a"]["alerts"] == []
+
+
+def test_tenant_check_refuses_accounts_with_email_recipient_secrets() -> None:
+    """email_recipients must refuse even when public defaults/alerts look empty."""
+    client = _TenantClient(email_recipients=True)
     runner = AcceptanceRunner(client)
 
     runner.run_tenant_isolation(
