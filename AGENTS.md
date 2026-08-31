@@ -46,17 +46,12 @@ For ordinary PRs, do **not** enable auto-merge when creating the PR. Wait until
 every check run on the latest head commit is terminal, including optional review
 automation and not only checks required by branch protection. Then inspect the
 conversation comments, submitted reviews, and inline review threads. Address
-every actionable item and repeat the wait-and-inspect cycle after every push,
-because the new commit SHA invalidates the previous review. Manually merge only
-after the final inspection confirms that no checks are pending and no actionable
-feedback remains.
-
-Before merging or declaring a PR complete, inspect its conversation comments,
-submitted reviews, and inline review threads. Address every actionable item,
-reply with the outcome, and resolve the thread only after the concern is fixed
-or answered with a documented rationale. Re-check all three surfaces after each
-push and immediately before completion because feedback can arrive while CI is
-running.
+every actionable item, reply with the outcome, and resolve the thread only after
+the concern is fixed or answered with a documented rationale. Repeat the full
+wait-and-inspect cycle after every push because the new commit SHA invalidates
+the previous review, and re-check all three feedback surfaces immediately before
+completion. Manually merge only when the final inspection confirms that no
+checks are pending and no actionable feedback remains.
 
 When creating PRs, use [`.github/pull_request_template.md`](.github/pull_request_template.md):
 
