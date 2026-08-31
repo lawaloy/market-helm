@@ -87,3 +87,12 @@ def test_staging_readiness_waits_on_api_then_polls_worker_heartbeat() -> None:
     )
     assert "/health/worker" in workflow
     assert "payload.get('ok') is True" in workflow
+
+
+def test_staging_recovery_requires_a_success_from_the_restarted_worker() -> None:
+    """A fresh heartbeat from the previous process must not prove recovery."""
+    workflow = STAGING_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "previous_worker_id=" in workflow
+    assert 'PREVIOUS_WORKER_ID="$previous_worker_id"' in workflow
+    assert "payload.get('worker_id') != os.environ['PREVIOUS_WORKER_ID']" in workflow
