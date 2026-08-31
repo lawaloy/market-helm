@@ -56,6 +56,50 @@ def test_run_db_worker_cycle_success_clears_running_heartbeat_and_probe_200s(db)
     assert payload["worker_id"] == "w1"
 
 
+def test_run_db_worker_cycle_keeps_last_success_healthy_while_next_tick_runs(db) -> None:
+    """A routine cycle must not create a transient readiness outage."""
+    previous_details = {"enqueued": 1, "jobs": {"delivered": 1}}
+    record_worker_heartbeat("w1", "healthy", previous_details)
+
+    from dashboard.backend.main import app
+
+    observed_during_tick = {}
+
+    def inspect_heartbeat_during_tick():
+        heartbeat = latest_worker_heartbeat() or {}
+        probe = TestClient(app).get("/health/worker")
+        observed_during_tick.update(heartbeat)
+        observed_during_tick["probe_status"] = probe.status_code
+        observed_during_tick["probe"] = probe.json()
+        return {"last_data_date": "2026-06-09", "message": None, "enqueued": 0}
+
+    with patch(
+        "src.alerts.alert_orchestrator.run_orchestrator_tick",
+        side_effect=inspect_heartbeat_during_tick,
+    ):
+        with patch(
+            "src.alerts.job_processor.process_job_queue",
+            return_value={"evaluated": 0, "delivered": 0, "failed": 0},
+        ):
+            run_db_worker_cycle("w1")
+
+    assert observed_during_tick["status"] == "healthy"
+    assert observed_during_tick["details"] == previous_details
+    # Staging polls this probe during a live cycle; status=running used to 503 here.
+    assert observed_during_tick["probe_status"] == 200
+    assert observed_during_tick["probe"]["ok"] is True
+    assert observed_during_tick["probe"]["status"] == "healthy"
+    assert observed_during_tick["probe"]["details"] == previous_details
+
+    heartbeat = latest_worker_heartbeat()
+    assert heartbeat is not None
+    assert heartbeat["status"] == "healthy"
+    assert heartbeat["details"] == {
+        "enqueued": 0,
+        "jobs": {"evaluated": 0, "delivered": 0, "failed": 0},
+    }
+
+
 def test_run_db_worker_cycle_queue_crash_records_error_heartbeat_and_probe_503s(
     db,
 ) -> None:

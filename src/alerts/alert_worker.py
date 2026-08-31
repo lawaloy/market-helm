@@ -125,7 +125,6 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     wid = worker_id or _PROCESS_WORKER_ID
     from src.storage.health import record_worker_heartbeat
 
-    record_worker_heartbeat(wid, "running")
     try:
         tick = run_orchestrator_tick()
         stats = process_job_queue(wid)
