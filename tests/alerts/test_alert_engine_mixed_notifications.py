@@ -3,10 +3,11 @@
 Non-list ``notifications`` already fall back to log. A hand-edited *list*
 with junk items takes the iterate-and-skip path instead, and used to be
 untested: a TypeError in ``_build_notifiers`` would drop sibling watches
-in the same check cycle.
+in the same check cycle. Treating the whole list as invalid would also
+silently drop a remaining ``email`` channel after junk items.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.alerts.alert_engine import AlertEngine
 
@@ -75,3 +76,29 @@ def test_evaluate_mixed_junk_notifications_do_not_abort_sibling() -> None:
     assert events[0]["symbols"] == ["AAPL"]
     assert events[1]["symbols"] == ["MSFT"]
     assert storage.record_event.call_count == 2
+
+
+def test_evaluate_mixed_notifications_still_dispatches_email() -> None:
+    """Junk items must not discard a remaining email channel or skip defaults."""
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    email = MagicMock()
+    engine = AlertEngine(
+        [_price_alert(notifications=[1, None, "email"])],
+        storage=storage,
+        defaults={"email_to": "ops@example.com"},
+    )
+
+    with patch(
+        "src.alerts.alert_engine.EmailNotifier.from_alert",
+        return_value=email,
+    ) as from_alert:
+        events = engine.evaluate([{"symbol": "AAPL", "close": 150.0}])
+
+    assert len(events) == 1
+    assert events[0]["alert_id"] == "watch-1"
+    from_alert.assert_called_once()
+    merged = from_alert.call_args[0][0]
+    assert merged["email_to"] == "ops@example.com"
+    email.send.assert_called_once_with(events[0])
+    storage.record_event.assert_called_once_with(events[0])
