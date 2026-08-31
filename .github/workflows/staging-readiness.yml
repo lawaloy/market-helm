@@ -132,11 +132,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          previous_worker_id=$(python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8012/health/worker', timeout=3)).get('worker_id', ''))")
+          test -n "$previous_worker_id"
           docker compose -f docker-compose.staging.yml restart postgres worker
           docker compose -f docker-compose.staging.yml up -d --wait postgres api
           docker compose -f docker-compose.staging.yml up -d worker
           for attempt in {1..30}; do
-            if python -c "import json, urllib.request; payload=json.load(urllib.request.urlopen('http://127.0.0.1:8012/health/worker', timeout=3)); assert payload.get('ok') is True"; then
+            if PREVIOUS_WORKER_ID="$previous_worker_id" python -c "import json, os, urllib.request; payload=json.load(urllib.request.urlopen('http://127.0.0.1:8012/health/worker', timeout=3)); assert payload.get('ok') is True; assert payload.get('worker_id') != os.environ['PREVIOUS_WORKER_ID']"; then
               break
             fi
             if (( attempt == 30 )); then
