@@ -186,8 +186,12 @@ describe('SignIn return navigation', () => {
     });
     expect(screen.queryByText('field required')).toBeNull();
     expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
-    expect((screen.getByRole('button', { name: 'Sign in' }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    // Mode toggle is also named "Sign in"; the submit control must leave Please wait.
+    expect(screen.queryByRole('button', { name: 'Please wait…' })).toBeNull();
+    expect(
+      (screen.getByRole('form', { name: 'Authentication form' }).querySelector(
+        'button[type="submit"]',
+      ) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 });
