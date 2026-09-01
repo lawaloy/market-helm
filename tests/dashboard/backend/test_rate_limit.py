@@ -63,6 +63,25 @@ def _request(peer: str, forwarded: str = "") -> Request:
     )
 
 
+def _request_without_client(forwarded: str = "") -> Request:
+    """ASGI scope with no ``client`` (unix sockets / some proxies)."""
+    headers = []
+    if forwarded:
+        headers.append((b"x-forwarded-for", forwarded.encode("ascii")))
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/test",
+            "raw_path": b"/api/test",
+            "query_string": b"",
+            "headers": headers,
+            "server": ("testserver", 80),
+            "scheme": "http",
+        }
+    )
+
+
 def test_middleware_returns_standard_limit_headers_and_429(monkeypatch) -> None:
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
@@ -396,3 +415,41 @@ def test_memory_rate_limit_window_resets_after_expiry(monkeypatch) -> None:
     assert fresh is not None and fresh.allowed is True
     assert fresh.remaining == 1
     assert fresh.reset_at == first.reset_at + 60
+
+
+def test_missing_client_ignores_forwarded_header(monkeypatch) -> None:
+    """An unparseable peer must not honor X-Forwarded-For.
+
+    ``client_ip`` only trusts XFF when the socket peer is a real IP inside
+    ``MARKET_HELM_TRUSTED_PROXY_CIDRS``. ASGI scopes without ``client`` (unix
+    sockets, some reverse-proxy setups) stringify to ``unknown``. If that
+    ValueError path skipped ahead to the forwarded chain, anyone could mint a
+    fresh identity per request and bypass rate limits.
+    """
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    request = _request_without_client("198.51.100.9")
+    assert request.client is None
+    assert client_ip(request) == "unknown"
+
+
+def test_missing_client_shares_rate_limit_bucket(monkeypatch) -> None:
+    """Requests without a socket peer must still consume one shared bucket.
+
+    A random identity on missing ``client`` would let each call start a fresh
+    limit-1 window and never 429. ``client_ip`` must stay stable so the
+    middleware cannot be bypassed by omitting the ASGI client address.
+    """
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
+    rules = (RateLimitRule("test", 1, 60),)
+    now = 1_700_000_000
+
+    first = check_rate_limits(_request_without_client(), now=now, rules=rules)
+    second = check_rate_limits(_request_without_client(), now=now, rules=rules)
+
+    assert first is not None and first.allowed is True
+    assert first.remaining == 0
+    assert second is not None and second.allowed is False
+    assert second.remaining == 0
+    assert second.limit == 1
