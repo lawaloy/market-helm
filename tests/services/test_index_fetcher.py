@@ -60,6 +60,22 @@ def test_load_from_cache_normalizes_padded_dedupes_and_skips_sentinels(tmp_path)
     assert fetcher._load_from_cache("S&P 500") == ["AAPL", "MSFT", "GOOG"]
 
 
+def test_load_from_cache_keeps_class_share_tickers(tmp_path):
+    """Cached BRK.B / BF-B must survive normalize — they are real S&P names."""
+    fetcher = IndexFetcher(cache_dir=str(tmp_path))
+    cache_file = tmp_path / "SP_500_symbols.json"
+    cache_file.write_text(
+        json.dumps(
+            {
+                "date": datetime.now().isoformat(),
+                "symbols": ["BRK.B", " bf-b ", "AAPL"],
+            }
+        )
+    )
+
+    assert fetcher._load_from_cache("S&P 500") == ["BRK.B", "BF-B", "AAPL"]
+
+
 def test_get_sp500_symbols_normalizes_package_symbols_before_cache(tmp_path):
     fetcher = IndexFetcher(cache_dir=str(tmp_path))
     package = MagicMock()
@@ -102,6 +118,7 @@ def test_get_sp500_symbols_falls_back_when_package_unavailable(tmp_path):
 
     assert symbols == fetcher._get_minimal_fallback("S&P 500")
     assert "AAPL" in symbols
+    assert "BRK.B" in symbols
 
 
 def test_get_sp500_symbols_falls_back_when_package_returns_too_few(tmp_path):
