@@ -64,9 +64,9 @@ def is_safe_webhook_url(url: str) -> bool:
 
     Checks the literal hostname/IP only (no DNS resolution) so validation stays
     deterministic. Rejects non-HTTPS schemes, credentials in the URL, loopback /
-    private / link-local / unspecified / CGNAT IP literals (including IPv4-mapped
-    and decimal/hex/octal/short IPv4 forms), and a small set of well-known
-    metadata hostnames.
+    private / link-local / unspecified / CGNAT IP literals (including IPv4-mapped,
+    decimal/hex/octal/short IPv4 forms, and DNS-style trailing dots), and a small
+    set of well-known metadata hostnames.
     """
     cleaned = (url or "").strip()
     if not cleaned:
@@ -79,7 +79,11 @@ def is_safe_webhook_url(url: str) -> bool:
         return False
     if parsed.username is not None or parsed.password is not None:
         return False
-    host = (parsed.hostname or "").lower()
+    # A terminal dot denotes the same absolute DNS name, but makes inet_aton reject
+    # otherwise literal IPv4 (for example 127.0.0.1.). Normalize it before both the
+    # blocked-host and literal-IP checks so it cannot turn a private target into a
+    # seemingly ordinary hostname.
+    host = (parsed.hostname or "").lower().rstrip(".")
     if not host:
         return False
     if host in _BLOCKED_WEBHOOK_HOSTS or host.endswith(".localhost"):
