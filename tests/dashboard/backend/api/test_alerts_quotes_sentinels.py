@@ -84,3 +84,35 @@ def test_get_quotes_sentinels_do_not_consume_the_resolve_cap(monkeypatch):
 
     assert response.status_code == 200
     assert captured["symbols"] == [f"SYM{i}" for i in range(15)]
+
+
+def test_post_quotes_all_sentinels_does_not_resolve(monkeypatch):
+    """Poison-only POST bodies must not burn the shared quote budget."""
+    client = _client(monkeypatch)
+    captured = _capture_resolve(monkeypatch)
+
+    response = client.post(
+        "/api/alerts/quotes",
+        json={"symbols": ["NAN", "INF", "NONE", "NULL", "../ETC/PASSWD", "  "]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["prices"] == {}
+    assert "symbols" not in captured
+
+
+def test_post_quotes_sentinels_do_not_consume_the_resolve_cap(monkeypatch):
+    """Normalize before slicing so 15 NAN tokens cannot starve real tickers."""
+    client = _client(monkeypatch)
+    captured = _capture_resolve(monkeypatch)
+
+    junk = ["NAN"] * 15
+    real = [f"SYM{i}" for i in range(20)]
+    response = client.post(
+        "/api/alerts/quotes",
+        json={"symbols": junk + real},
+    )
+
+    assert response.status_code == 200
+    assert captured["symbols"] == [f"SYM{i}" for i in range(15)]
+    assert captured["fetch_missing"] is True

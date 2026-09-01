@@ -133,6 +133,60 @@ describe('useSymbolPrices', () => {
     expect(alertsApi.getQuotes).not.toHaveBeenCalled();
   });
 
+  it('does not fetch quotes while the health probe is still in flight', async () => {
+    // AlertsSettings can call fetchPricesFor as soon as the picker mounts.
+    // A getQuotes before /api/alerts/health resolves can 405 a stale backend
+    // and permanently lock quotesUnavailable, or burn Finnhub before we know
+    // the quotes route exists.
+    let resolveHealth: ((value: { data: { ok: boolean } }) => void) | undefined;
+    vi.mocked(api.get).mockImplementation(
+      () =>
+        new Promise<{ data: { ok: boolean } }>((resolve) => {
+          resolveHealth = resolve;
+        }) as never,
+    );
+    vi.mocked(alertsApi.getQuotes).mockResolvedValue({
+      data: { prices: { AAPL: 190.5 } },
+    } as never);
+
+    render(<ProbeHarness />);
+
+    expect(screen.getByTestId('ready').textContent).toBe('loading');
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(alertsApi.getQuotes).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveHealth?.({ data: { ok: true } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+    // The in-flight click is a no-op — it must not queue a fetch after ready.
+    expect(alertsApi.getQuotes).not.toHaveBeenCalled();
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+      });
+    });
+  });
+
   it('cools down a missing quote symbol for FAILED_RETRY_MS', async () => {
     vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
     // Partial AxiosResponse is enough for this hook; cast like other API mocks.
