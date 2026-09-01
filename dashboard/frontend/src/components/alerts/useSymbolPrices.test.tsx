@@ -401,4 +401,34 @@ describe('useSymbolPrices', () => {
       });
     });
   });
+
+  it('trims, uppercases, and drops blanks so duplicate watches hit getQuotes once', async () => {
+    // AlertsSettings can pass padded/mixed-case watch symbols. Sending blanks or
+    // the same ticker twice would burn the shared quote route without adding prices.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(alertsApi.getQuotes).mockResolvedValue({
+      data: { prices: { AAPL: 190.5 } },
+    } as never);
+
+    render(<ProbeHarness symbols={['  aapl  ', 'AAPL', '', '   ']} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenCalledWith(['AAPL']);
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+      });
+    });
+  });
 });
