@@ -431,4 +431,75 @@ describe('useSymbolPrices', () => {
       });
     });
   });
+
+  it('drops Inf/NaN quote values so they cannot seed prices and block refetch', async () => {
+    // JSON.stringify turns Inf/NaN into null, and formatQuotePrice treats both as
+    // missing. If fetchPricesFor merged them, the picker would show "—" forever
+    // because pricesRef already has a key and isFetchBlocked would never retry.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(alertsApi.getQuotes)
+      .mockResolvedValueOnce({
+        data: {
+          prices: {
+            AAPL: 190.5,
+            MSFT: Number.POSITIVE_INFINITY,
+            GOOG: Number.NaN,
+          },
+        },
+      } as never)
+      .mockResolvedValueOnce({
+        data: { prices: { MSFT: 415.25, GOOG: 140.0 } },
+      } as never);
+
+    render(<ProbeHarness symbols={['AAPL', 'MSFT', 'GOOG']} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenCalledWith(['AAPL', 'MSFT', 'GOOG']);
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+      });
+    });
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    // Inf/NaN symbols share the 45s fail cooldown — do not burn Finnhub again.
+    expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(45_000);
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(2);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenLastCalledWith(['MSFT', 'GOOG']);
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+        MSFT: 415.25,
+        GOOG: 140.0,
+      });
+    });
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
+  });
 });
