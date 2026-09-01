@@ -69,6 +69,35 @@ def test_blocked_decision_comes_from_first_exhausted_rule_not_sibling_headroom(
     assert blocked.remaining == 0
 
 
+def test_blocked_global_not_hidden_by_path_rule_at_exact_limit(monkeypatch) -> None:
+    """An allowed sibling at remaining==0 must not hide a blocked global bucket.
+
+    ``remaining`` is 0 both at ``count == limit`` (still allowed) and
+    ``count > limit`` (blocked). ``min(remaining)`` would pick the first
+    remaining-0 decision — here the still-allowed login rule — and skip
+    429 even though the global bucket is already exhausted. Operators can
+    set ``MARKET_HELM_RATE_LIMIT_GLOBAL`` tighter than a path rule.
+    """
+    _enable_memory_limits(monkeypatch)
+    rules = (
+        RateLimitRule(
+            "auth-login", 2, 60, paths=("/api/auth/login",), methods=("POST",)
+        ),
+        RateLimitRule("api-global", 1, 60),
+    )
+    now = 1_700_000_000
+
+    first = check_rate_limits(_api_request(), now=now, rules=rules)
+    blocked = check_rate_limits(_api_request(), now=now, rules=rules)
+
+    assert first is not None and first.allowed is True
+    assert first.limit == 1
+    assert first.remaining == 0
+    assert blocked is not None and blocked.allowed is False
+    assert blocked.limit == 1
+    assert blocked.remaining == 0
+
+
 def test_unmatched_path_does_not_consume_path_specific_rule(monkeypatch) -> None:
     """GET /api/test must not increment the auth-login bucket.
 
