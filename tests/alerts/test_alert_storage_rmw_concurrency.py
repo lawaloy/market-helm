@@ -4,8 +4,34 @@ from __future__ import annotations
 
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from src.alerts.alert_storage import AlertStorage
+
+
+def test_save_retries_transient_windows_replace_denial(tmp_path, monkeypatch):
+    """A short-lived Windows file handle must not drop a history update."""
+    real_replace = Path.replace
+    attempts = 0
+
+    def transiently_denied(path: Path, target: Path):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError("target is temporarily in use")
+        return real_replace(path, target)
+
+    monkeypatch.setattr(Path, "replace", transiently_denied)
+    storage = AlertStorage(data_dir=tmp_path)
+    storage.record_delivery(
+        alert_id="aapl",
+        channel="email",
+        success=True,
+        timestamp="2026-05-01T12:00:00+00:00",
+    )
+
+    assert attempts == 3
+    assert storage._load()["delivery_log"][0]["alert_id"] == "aapl"
 
 
 def test_concurrent_record_delivery_preserves_all_rows(tmp_path):

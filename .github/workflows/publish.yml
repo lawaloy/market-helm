@@ -38,7 +38,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest tests/ -v
+          pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py
 
       - name: Check markdown files
         run: |

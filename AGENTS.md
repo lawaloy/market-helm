@@ -25,7 +25,8 @@ Start the backend **before** the Vite dev server. Use `python3` (not `python`) â
 See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 
 - **Lint**: `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
-- **Tests**: `pytest tests/ -v` (110 tests, all pure unit/integration â€” no API key needed)
+- **Tests**: `pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py` (database-free suite; no API key needed)
+- **PostgreSQL integration**: set `MARKET_HELM_POSTGRES_TEST_URL`, then run `pytest tests/integration/test_postgresql_storage.py -v`
 - **Frontend build**: `cd dashboard/frontend && npm run build` (outputs to `dashboard/backend/static/`)
 
 ### Opening pull requests

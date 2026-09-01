@@ -4,7 +4,7 @@
 
 ## Checks
 - [ ] `dashboard/frontend`: `npm ci` and `npm run build`
-- [ ] `pytest tests/` (repo root)
+- [ ] `pytest tests/ --ignore=tests/integration/test_postgresql_storage.py` (repo root)
 
 <!-- AUTO:START -->
 ## Auto

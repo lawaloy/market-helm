@@ -66,8 +66,12 @@ No manual `sys.path.insert` is needed in individual test files.
 ### Run All Tests
 
 ```bash
-# From project root
-python -m pytest tests/ -v
+# Database-free suite from the project root
+python -m pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py
+
+# PostgreSQL integration against a disposable test database
+MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
+  python -m pytest tests/integration/test_postgresql_storage.py -v
 
 # Or using unittest
 python -m unittest discover tests/
@@ -98,7 +102,7 @@ python -m pytest tests/core/test_config.py::TestCoreConfig::test_default_indices
 
 ```bash
 pip install pytest-cov
-python -m pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --cov=src --cov-report=html
 ```
 
 ## Test Coverage
