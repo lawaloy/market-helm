@@ -53,6 +53,37 @@ def test_fetch_missing_watch_quotes_cap_counts_only_missing(
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_dedupes_padded_duplicates_before_finnhub(
+    mock_fetcher_cls,
+) -> None:
+    """Duplicate or padded watches must not extra-hit Finnhub.
+
+    File-mode evaluate and hosted orchestrator ticks call this helper with the
+    watch list. Without normalize+dedupe, ``AAPL`` plus `` aapl `` would hit
+    Finnhub twice on every check cycle.
+    """
+    fetcher = MagicMock()
+    fetcher.fetch_symbol_data.side_effect = lambda symbol: {
+        "symbol": symbol,
+        "close": 100.0,
+    }
+    mock_fetcher_cls.return_value = fetcher
+
+    enriched = _fetch_missing_watch_quotes(
+        [],
+        [" aapl ", "AAPL", "AAPL", "msft", "  ", "NAN", "MSFT"],
+    )
+
+    assert [c.args[0] for c in fetcher.fetch_symbol_data.call_args_list] == [
+        "AAPL",
+        "MSFT",
+    ]
+    assert fetcher.fetch_symbol_data.call_count == 2
+    assert [row["symbol"] for row in enriched] == ["AAPL", "MSFT"]
+    mock_fetcher_cls.assert_called_once_with(include_profile=False)
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
 def test_fetch_missing_watch_quotes_at_budget_does_not_warn(
     mock_fetcher_cls, caplog
 ) -> None:
