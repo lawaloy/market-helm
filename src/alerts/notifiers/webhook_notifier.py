@@ -42,7 +42,7 @@ def _literal_ip(
         pass
     try:
         return ipaddress.IPv4Address(socket.inet_aton(host))
-    except OSError:
+    except (OSError, UnicodeError):
         return None
 
 
@@ -83,6 +83,10 @@ def is_safe_webhook_url(url: str) -> bool:
     if not host:
         return False
     if host in _BLOCKED_WEBHOOK_HOSTS or host.endswith(".localhost"):
+        return False
+    try:
+        host.encode("idna")
+    except UnicodeError:
         return False
     ip = _literal_ip(host)
     if ip is None:
@@ -203,7 +207,7 @@ class WebhookNotifier:
                 # A public HTTPS URL can 30x onto loopback/metadata; do not follow.
                 allow_redirects=False,
             )
-            if response.status_code < 400:
+            if 200 <= response.status_code < 300:
                 return DeliveryAttempt(ok=True)
             logger.warning(
                 "Webhook returned %s for alert %s: %s",

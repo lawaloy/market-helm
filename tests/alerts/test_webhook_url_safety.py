@@ -131,6 +131,18 @@ def test_is_safe_webhook_url_still_allows_decimal_public_ipv4() -> None:
     assert is_safe_webhook_url("https://134744072/hook") is True  # 8.8.8.8
 
 
+def test_is_safe_webhook_url_rejects_lone_surrogate_hostname() -> None:
+    """inet_aton raises UnicodeEncodeError on lone surrogates; must not abort from_alert."""
+    url = "https://\ud800/hook"
+    assert is_safe_webhook_url(url) is False
+    assert (
+        WebhookNotifier.from_alert(
+            {"id": "a1", "webhook_url": url, "notifications": ["webhook"]}
+        )
+        is None
+    )
+
+
 def test_from_alert_still_accepts_public_https() -> None:
     notifier = WebhookNotifier.from_alert(
         {
