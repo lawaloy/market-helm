@@ -168,6 +168,35 @@ def test_resolve_symbol_prices_keeps_saved_when_live_fetcher_unavailable(
 
 @patch("src.services.data_fetcher.StockDataFetcher")
 @patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
+def test_resolve_symbol_prices_duplicates_do_not_starve_live_cap(
+    _mock_saved, mock_fetcher_cls
+):
+    """Padded duplicates must unique before the 15-symbol live-fetch budget.
+
+    Settings quote pickers can pass the same ticker many times. If the cap
+    sliced the raw list first, AAPL copies would fill the window and unique
+    symbols would never reach Finnhub.
+    """
+    fetcher = MagicMock()
+    fetcher.fetch_symbol_data.side_effect = lambda symbol: {
+        "symbol": symbol,
+        "close": 1.0,
+    }
+    mock_fetcher_cls.return_value = fetcher
+
+    duplicates = [" aapl ", "AAPL", "AAPL"] * 7
+    unique_rest = [f"S{i:02d}" for i in range(14)]
+    prices = resolve_symbol_prices(duplicates + unique_rest, fetch_missing=True)
+
+    expected = ["AAPL", *unique_rest]
+    assert [c.args[0] for c in fetcher.fetch_symbol_data.call_args_list] == expected
+    assert fetcher.fetch_symbol_data.call_count == 15
+    assert prices == {symbol: 1.0 for symbol in expected}
+    mock_fetcher_cls.assert_called_once_with(include_profile=False)
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+@patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
 def test_resolve_symbol_prices_caps_live_fetches_and_skips_bad_quotes(
     _mock_saved, mock_fetcher_cls
 ):
