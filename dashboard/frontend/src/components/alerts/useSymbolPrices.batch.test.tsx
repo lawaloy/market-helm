@@ -50,11 +50,12 @@ describe('useSymbolPrices quote batching', () => {
   });
 
   it('splits 16 watch symbols across two getQuotes calls of 15 then 1', async () => {
+    // Partial AxiosResponse is enough for this hook; cast like other API mocks.
     vi.mocked(alertsApi.getQuotes).mockImplementation(async (batch: string[]) => ({
       data: {
         prices: Object.fromEntries(batch.map((symbol, index) => [symbol, 100 + index])),
       },
-    }));
+    } as never));
 
     render(<ProbeHarness symbols={SYMBOLS} />);
 
