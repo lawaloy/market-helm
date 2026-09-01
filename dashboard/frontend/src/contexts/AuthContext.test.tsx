@@ -310,6 +310,46 @@ describe('AuthProvider', () => {
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
   });
 
+  it('clearSession drops the token and user while keeping hosted mode gated', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'revoked-token');
+    vi.spyOn(authApi, 'me').mockResolvedValueOnce({
+      data: { id: 'u1', email: 'user@example.com' },
+    } as never);
+
+    function ClearSessionProbe() {
+      const { loading, multiUserEnabled, user, clearSession } = useAuth();
+      return (
+        <div>
+          <span data-testid="auth-state">
+            {loading
+              ? 'loading'
+              : `${multiUserEnabled ? 'multi-user' : 'single-user'}:${user?.email ?? 'anonymous'}`}
+          </span>
+          <button type="button" onClick={() => clearSession()}>
+            clear-session
+          </button>
+        </div>
+      );
+    }
+
+    render(
+      <AuthProvider>
+        <ClearSessionProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-state').textContent).toBe(
+        'multi-user:user@example.com',
+      );
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'clear-session' }));
+
+    expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:anonymous');
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
   it('clears a revoked session locally when logout returns 401', async () => {
     localStorage.setItem(AUTH_TOKEN_KEY, 'revoked-token');
     vi.spyOn(authApi, 'me').mockResolvedValueOnce({

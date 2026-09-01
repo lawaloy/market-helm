@@ -91,6 +91,33 @@ describe('RequireAuth', () => {
     expect(decoded.includes('://')).toBe(false);
   });
 
+  it('does not redirect hosted users while the session probe is still loading', () => {
+    authMocks.useAuthImpl.mockReturnValue({
+      user: null,
+      loading: true,
+      multiUserEnabled: true,
+    });
+
+    renderProtectedRoute('/alerts?symbol=AAPL');
+
+    expect(screen.queryByRole('heading', { name: 'Sign In Route' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Private Helmtower' })).toBeNull();
+    expect(document.querySelector('.animate-pulse')).toBeTruthy();
+  });
+
+  it('renders protected children for a signed-in hosted user', () => {
+    authMocks.useAuthImpl.mockReturnValue({
+      user: { id: 'u1', email: 'user@example.com' },
+      loading: false,
+      multiUserEnabled: true,
+    });
+
+    renderProtectedRoute();
+
+    expect(screen.getByRole('heading', { name: 'Private Helmtower' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Sign In Route' })).toBeNull();
+  });
+
   it('allows unauthenticated access when the server is in single-user mode', () => {
     authMocks.useAuthImpl.mockReturnValue({
       user: null,
