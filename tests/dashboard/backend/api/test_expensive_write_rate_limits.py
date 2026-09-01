@@ -25,6 +25,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "1000")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "1000")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "1")
+    # Keep spend + follow-up POSTs in the same 60s window (CI can otherwise
+    # straddle `now % 60 == 0` and see a fresh expensive-write bucket).
+    monkeypatch.setattr("dashboard.backend.rate_limit.time.time", lambda: 1_700_000_030)
     from src.storage.database import init_database
 
     init_database()
