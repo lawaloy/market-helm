@@ -2,8 +2,8 @@ name: Dependency Maintenance Auto Finish
 
 on:
   workflow_run:
-    # PR E2E and hosted staging readiness are required on main — see GitHub ruleset "Merging".
-    workflows: ["CI", "PR Description", "CodeQL Advanced", "PR E2E", "Hosted staging readiness"]
+    # PR E2E (Curl + Playwright) is a required merge check on main — see GitHub ruleset "Merging".
+    workflows: ["CI", "PR Description", "CodeQL Advanced", "PR E2E"]
     types: [completed]
 
 permissions:
