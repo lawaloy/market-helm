@@ -151,4 +151,47 @@ describe('SignIn return navigation', () => {
     expect(authMocks.login).toHaveBeenCalledWith('user@example.com', 'password123');
     expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
   });
+
+  it('stays on sign-in with a generic error when login detail is a FastAPI 422 list', async () => {
+    // Pydantic 422 payloads use detail as a list of objects. Rendering that as
+    // React children would throw, and treating it as truthy could still navigate.
+    authMocks.login.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: {
+        status: 422,
+        data: {
+          detail: [
+            {
+              loc: ['body', 'email'],
+              msg: 'field required',
+              type: 'value_error.missing',
+            },
+          ],
+        },
+      },
+    });
+    render(
+      <MemoryRouter initialEntries={['/sign-in?return=%2Falerts']}>
+        <SignIn />
+        <LocationProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'user@example.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByRole('form', { name: 'Authentication form' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Authentication failed. Please try again.')).toBeTruthy();
+    });
+    expect(screen.queryByText('field required')).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe('/sign-in?return=%2Falerts');
+    // Mode toggle is also named "Sign in"; the submit control must leave Please wait.
+    expect(screen.queryByRole('button', { name: 'Please wait…' })).toBeNull();
+    expect(
+      (screen.getByRole('form', { name: 'Authentication form' }).querySelector(
+        'button[type="submit"]',
+      ) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
 });

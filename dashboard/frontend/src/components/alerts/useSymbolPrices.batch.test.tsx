@@ -55,7 +55,7 @@ describe('useSymbolPrices quote batching', () => {
       data: {
         prices: Object.fromEntries(batch.map((symbol, index) => [symbol, 100 + index])),
       },
-    }) as never);
+    } as never));
 
     render(<ProbeHarness symbols={SYMBOLS} />);
 

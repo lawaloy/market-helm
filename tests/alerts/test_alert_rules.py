@@ -39,6 +39,15 @@ def test_price_threshold_defaults_to_less_than_and_zero():
     assert evaluate_price_threshold({}, {}) is False  # missing close -> 0
 
 
+def test_price_threshold_matches_zero_close_against_nonzero_threshold():
+    """A finite $0 last trade must still fire less_than / greater_than watches."""
+    stock = {"close": 0}
+    assert evaluate_price_threshold({"operator": "less_than", "value": 1}, stock) is True
+    assert evaluate_price_threshold({"operator": "greater_than", "value": -1}, stock) is True
+    assert evaluate_price_threshold({"operator": "equal", "value": 0}, stock) is True
+    assert evaluate_price_threshold({"operator": "greater_than", "value": 0}, stock) is False
+
+
 def test_price_threshold_boundary_and_operator():
     stock = {"close": "25.5"}
     assert evaluate_price_threshold(

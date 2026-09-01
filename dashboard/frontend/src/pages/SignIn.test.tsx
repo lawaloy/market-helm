@@ -68,6 +68,30 @@ describe('SignIn', () => {
     expect(screen.getByText('Sign-in not required')).toBeTruthy();
   });
 
+  it('does not offer the single-user Helmtower bypass while the session probe is loading', () => {
+    // AuthProvider starts at loading=true and multiUserEnabled=false. Without the
+    // loading gate, SignIn would flash "Sign-in not required" and a Helmtower
+    // link during the hosted /me probe.
+    authMocks.useAuthImpl.mockReturnValue({
+      login: authMocks.login,
+      register: authMocks.register,
+      multiUserEnabled: false,
+      loading: true,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/sign-in?return=%2Falerts']}>
+        <SignIn />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText('Sign-in not required')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Go to Helmtower' })).toBeNull();
+    expect(screen.queryByRole('form', { name: 'Authentication form' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+    expect(document.querySelector('.animate-pulse')).toBeTruthy();
+  });
+
   it('caps password input length to match backend MAX_PASSWORD_LENGTH', () => {
     render(
       <MemoryRouter>
