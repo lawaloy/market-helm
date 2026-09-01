@@ -68,6 +68,7 @@ def test_send_posts_json(mock_post: MagicMock) -> None:
     kwargs = mock_post.call_args[1]
     assert kwargs["json"] == event
     assert kwargs["timeout"] == 10.0
+    assert kwargs["allow_redirects"] is False
 
 
 def test_build_payload_slack_format() -> None:

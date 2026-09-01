@@ -50,6 +50,13 @@ def test_is_safe_webhook_url_allows_public_https(url: str) -> None:
         "https://metadata/computeMetadata/v1/",
         "https://[fc00::1]/hook",
         "https://[fe80::1]/hook",
+        # libc/getaddrinfo accept these as 127.0.0.1 / 169.254.169.254; ipaddress does not.
+        "https://2130706433/hook",
+        "https://2852039166/latest/meta-data/",
+        "https://0x7f000001/hook",
+        "https://0177.0.0.1/hook",
+        "https://127.1/hook",
+        "https://127.0.1/hook",
     ],
 )
 def test_is_safe_webhook_url_rejects_unsafe(url: str) -> None:
@@ -99,6 +106,29 @@ def test_from_alert_rejects_unsafe_env_fallback(monkeypatch) -> None:
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "http://127.0.0.1:8080/hook")
     assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None
+
+
+def test_from_alert_rejects_decimal_loopback() -> None:
+    assert (
+        WebhookNotifier.from_alert(
+            {"id": "a1", "webhook_url": "https://2130706433/internal"}
+        )
+        is None
+    )
+
+
+def test_from_alert_rejects_hex_loopback() -> None:
+    assert (
+        WebhookNotifier.from_alert(
+            {"id": "a1", "webhook_url": "https://0x7f000001/internal"}
+        )
+        is None
+    )
+
+
+def test_is_safe_webhook_url_still_allows_decimal_public_ipv4() -> None:
+    """Decimal form of a public address must stay valid (not 'reject all numeric hosts')."""
+    assert is_safe_webhook_url("https://134744072/hook") is True  # 8.8.8.8
 
 
 def test_from_alert_still_accepts_public_https() -> None:

@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import ipaddress
 import os
-from typing import Any, Dict, Optional
+import socket
+from typing import Any, Dict, Optional, Union
 from urllib.parse import urlparse
 
 import requests
@@ -25,12 +26,46 @@ _BLOCKED_WEBHOOK_HOSTS = frozenset(
 )
 
 
+def _literal_ip(
+    host: str,
+) -> Optional[Union[ipaddress.IPv4Address, ipaddress.IPv6Address]]:
+    """Parse *host* as an IP, including libc-accepted IPv4 shorthands.
+
+    ``ipaddress.ip_address`` rejects decimal / hex / octal / short forms
+    (``2130706433``, ``0x7f000001``, ``0177.0.0.1``, ``127.1``) that
+    ``getaddrinfo`` still maps to loopback or link-local. ``inet_aton``
+    matches that resolver so we do not treat those hosts as DNS names.
+    """
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    try:
+        return ipaddress.IPv4Address(socket.inet_aton(host))
+    except OSError:
+        return None
+
+
+def _ip_is_public(ip: Union[ipaddress.IPv4Address, ipaddress.IPv6Address]) -> bool:
+    """True when *ip* is globally routable, including via IPv4-mapped IPv6.
+
+    CPython reports ``::ffff:100.64.0.1`` as global even though the embedded
+    CGNAT address is not (``IPv4Address.is_global`` excludes RFC 6598).
+    Connecting to the mapped form is the same as connecting to that IPv4.
+    """
+    mapped = getattr(ip, "ipv4_mapped", None)
+    if mapped is not None:
+        ip = mapped
+    return bool(ip.is_global)
+
+
 def is_safe_webhook_url(url: str) -> bool:
     """Return True when *url* is an HTTPS endpoint that is not an obvious SSRF target.
 
     Checks the literal hostname/IP only (no DNS resolution) so validation stays
     deterministic. Rejects non-HTTPS schemes, credentials in the URL, loopback /
-    private / link-local / unspecified IP literals, and a small set of well-known
+    private / link-local / unspecified / CGNAT IP literals (including IPv4-mapped
+    and decimal/hex/octal/short IPv4 forms), and a small set of well-known
     metadata hostnames.
     """
     cleaned = (url or "").strip()
@@ -49,11 +84,10 @@ def is_safe_webhook_url(url: str) -> bool:
         return False
     if host in _BLOCKED_WEBHOOK_HOSTS or host.endswith(".localhost"):
         return False
-    try:
-        ip = ipaddress.ip_address(host)
-    except ValueError:
+    ip = _literal_ip(host)
+    if ip is None:
         return True
-    return bool(ip.is_global)
+    return _ip_is_public(ip)
 
 
 class WebhookNotifier:
@@ -166,6 +200,8 @@ class WebhookNotifier:
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=self._timeout,
+                # A public HTTPS URL can 30x onto loopback/metadata; do not follow.
+                allow_redirects=False,
             )
             if response.status_code < 400:
                 return DeliveryAttempt(ok=True)
