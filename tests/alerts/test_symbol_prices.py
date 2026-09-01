@@ -117,6 +117,47 @@ def test_prices_from_saved_daily_data_soft_fails_loader_runtime_error(mock_get_l
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_prices_from_saved_daily_data_keeps_zero_close(mock_get_loader):
+    """A $0 saved close must still seed the picker; `if not close` would refetch."""
+    loader = MagicMock()
+    loader.load_daily_data.return_value = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 0},
+            {"symbol": "MSFT", "close": 400.0},
+        ]
+    )
+    mock_get_loader.return_value = loader
+    assert prices_from_saved_daily_data() == {"AAPL": 0.0, "MSFT": 400.0}
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+@patch(
+    "src.alerts.symbol_prices.prices_from_saved_daily_data",
+    return_value={"AAPL": 0.0},
+)
+def test_resolve_symbol_prices_does_not_fetch_when_saved_close_is_zero(
+    _mock_saved, mock_fetcher_cls
+):
+    """Zero is present, not missing — do not burn Finnhub to "fill" it."""
+    prices = resolve_symbol_prices(["AAPL"], fetch_missing=True)
+    assert prices == {"AAPL": 0.0}
+    mock_fetcher_cls.assert_not_called()
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
+@patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
+def test_resolve_symbol_prices_keeps_zero_live_quote(_mock_saved, mock_fetcher_cls):
+    fetcher = MagicMock()
+    fetcher.fetch_symbol_data.return_value = {"symbol": "MSFT", "close": 0}
+    mock_fetcher_cls.return_value = fetcher
+
+    prices = resolve_symbol_prices(["MSFT"], fetch_missing=True)
+
+    assert prices == {"MSFT": 0.0}
+    fetcher.fetch_symbol_data.assert_called_once_with("MSFT")
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
 def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
     """NaN/inf closes must not enter the quote map as JSON-null floats."""
     loader = MagicMock()

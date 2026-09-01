@@ -155,6 +155,25 @@ def test_fetch_missing_watch_quotes_skips_invalid_live_prices(mock_fetcher_cls, 
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
+def test_fetch_missing_watch_quotes_keeps_zero_live_close(mock_fetcher_cls):
+    """Live Finnhub 0.0 must enrich the watch; `if not close` would skip the send."""
+    fetcher = MagicMock()
+    fetcher.fetch_symbol_data.return_value = {"symbol": "MSFT", "close": 0}
+    mock_fetcher_cls.return_value = fetcher
+
+    enriched = _fetch_missing_watch_quotes(
+        [{"symbol": "AAPL", "close": 0.0}],
+        ["MSFT"],
+    )
+
+    assert enriched == [
+        {"symbol": "AAPL", "close": 0.0},
+        {"symbol": "MSFT", "close": 0.0},
+    ]
+    fetcher.fetch_symbol_data.assert_called_once_with("MSFT")
+
+
+@patch("src.services.data_fetcher.StockDataFetcher")
 def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cls, caplog):
     """NaN/inf live closes must not enter alert evaluation stocks."""
     fetcher = MagicMock()
@@ -187,6 +206,21 @@ def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cl
         "BAD2",
         "MSFT",
     ]
+
+def test_stocks_from_daily_df_keeps_zero_close():
+    """A halt / $0 close is finite; `if not close` would drop it before evaluate."""
+    df = pd.DataFrame(
+        [
+            {"symbol": "AAPL", "close": 0},
+            {"symbol": "MSFT", "close": 410.0},
+        ]
+    )
+
+    assert _stocks_from_daily_df(df) == [
+        {"symbol": "AAPL", "close": 0.0},
+        {"symbol": "MSFT", "close": 410.0},
+    ]
+
 
 def test_stocks_from_daily_df_skips_invalid_closes(caplog):
     """One corrupt saved row must not wipe the rest of the daily dataset."""

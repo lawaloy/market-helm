@@ -160,6 +160,8 @@ describe('formatPrice / formatQuotePrice non-finite', () => {
     expect(formatQuotePrice(Number.POSITIVE_INFINITY)).toBeNull();
     expect(formatQuotePrice(Number.NaN)).toBeNull();
     expect(formatQuotePrice(150)).toBe('$150.00');
+    expect(formatQuotePrice(0)).toBe('$0.00');
+    expect(formatPrice(0)).toBe('0.00');
   });
 });
 

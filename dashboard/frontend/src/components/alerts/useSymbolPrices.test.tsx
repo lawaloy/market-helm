@@ -66,6 +66,15 @@ function ProbeHarness({ symbols }: { symbols?: string[] }) {
       >
         merge-empty
       </button>
+      <button
+        type="button"
+        data-testid="merge-zero"
+        onClick={() => {
+          mergePrices({ AAPL: 0 });
+        }}
+      >
+        merge-zero
+      </button>
     </div>
   );
 }
@@ -430,6 +439,52 @@ describe('useSymbolPrices', () => {
         AAPL: 190.5,
       });
     });
+  });
+
+  it('treats a catalog price of 0 as present and merges a live 0 quote', async () => {
+    // Saved closes can be 0 (halt / after a reverse split). `if (!price)` would
+    // treat that as missing, refetch AAPL forever, and drop a live 0 from
+    // getQuotes the same way Inf/NaN must be dropped.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(alertsApi.getQuotes).mockResolvedValueOnce({
+      data: { prices: { MSFT: 0 } },
+    } as never);
+
+    render(<ProbeHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('merge-zero').click();
+    });
+    expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+      AAPL: 0,
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(alertsApi.getQuotes).not.toHaveBeenCalled();
+
+    await act(async () => {
+      screen.getByTestId('fetch-both').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenCalledWith(['MSFT']);
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 0,
+        MSFT: 0,
+      });
+    });
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
   });
 
   it('drops Inf/NaN quote values so they cannot seed prices and block refetch', async () => {
