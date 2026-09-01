@@ -67,3 +67,50 @@ def test_blocked_decision_comes_from_first_exhausted_rule_not_sibling_headroom(
     assert blocked is not None and blocked.allowed is False
     assert blocked.limit == 1
     assert blocked.remaining == 0
+
+
+def test_unmatched_path_does_not_consume_path_specific_rule(monkeypatch) -> None:
+    """GET /api/test must not increment the auth-login bucket.
+
+    If ``check_rate_limits`` dropped the ``continue`` on non-matching rules,
+    every API call would consume login/register/expensive buckets and exhaust
+    them for the real endpoints.
+    """
+    _enable_memory_limits(monkeypatch)
+    rules = (
+        RateLimitRule(
+            "auth-login", 1, 60, paths=("/api/auth/login",), methods=("POST",)
+        ),
+        RateLimitRule("api-global", 10, 60),
+    )
+    now = 1_700_000_000
+
+    for _ in range(2):
+        decision = check_rate_limits(
+            _api_request("/api/test", method="GET"), now=now, rules=rules
+        )
+        assert decision is not None and decision.allowed is True
+        assert decision.limit == 10
+
+    login = check_rate_limits(
+        _api_request("/api/auth/login", method="POST"), now=now, rules=rules
+    )
+    assert login is not None and login.allowed is True
+    assert login.limit == 1
+    assert login.remaining == 0
+
+
+def test_check_rate_limits_returns_none_when_no_rule_matches(monkeypatch) -> None:
+    """Unmatched API paths must pass through — not 429 or crash on min([])."""
+    _enable_memory_limits(monkeypatch)
+    rules = (
+        RateLimitRule(
+            "auth-login", 1, 60, paths=("/api/auth/login",), methods=("POST",)
+        ),
+    )
+    now = 1_700_000_000
+
+    decision = check_rate_limits(
+        _api_request("/api/test", method="GET"), now=now, rules=rules
+    )
+    assert decision is None

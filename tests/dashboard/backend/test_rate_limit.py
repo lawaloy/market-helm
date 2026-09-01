@@ -229,6 +229,22 @@ def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
     assert secret_value not in caplog.text
 
 
+def test_invalid_proxy_cidr_is_skipped_without_disabling_valid_peers(
+    monkeypatch,
+) -> None:
+    """One junk CIDR must not disable the rest of MARKET_HELM_TRUSTED_PROXY_CIDRS.
+
+    If ValueError aborted the whole parser, X-Forwarded-For would be ignored
+    and every client behind the proxy would share the proxy's rate-limit bucket.
+    """
+    monkeypatch.setenv(
+        "MARKET_HELM_TRUSTED_PROXY_CIDRS",
+        "not-a-cidr, 10.0.0.0/8, also-bad",
+    )
+    request = _request("10.0.0.5", "198.51.100.9")
+    assert client_ip(request) == "198.51.100.9"
+
+
 def test_rate_limit_buckets_are_isolated_by_client_ip(monkeypatch) -> None:
     """Dropping identity from the bucket key would make every client share one counter."""
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
