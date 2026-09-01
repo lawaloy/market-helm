@@ -261,3 +261,52 @@ def test_all_trusted_hops_use_leftmost_forwarded_address(monkeypatch) -> None:
     monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     request = _request("10.0.0.5", "10.0.0.9, 10.0.0.8")
     assert client_ip(request) == "10.0.0.9"
+
+
+def test_ipv6_client_behind_trusted_ipv4_proxy(monkeypatch) -> None:
+    """IPv6 clients behind an IPv4 hop must not share the proxy's rate-limit bucket."""
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    request = _request("10.0.0.5", "2001:db8::9")
+    assert client_ip(request) == "2001:db8::9"
+
+
+def test_forwarded_header_ignored_from_untrusted_ipv6_peer(monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32")
+    assert client_ip(_request("203.0.113.5", "2001:db8::9")) == "203.0.113.5"
+
+
+def test_ipv6_forwarded_chain_uses_first_untrusted_hop(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32,10.0.0.0/8"
+    )
+    request = _request("10.0.0.5", "198.51.100.9, 2001:db8::10")
+    assert client_ip(request) == "198.51.100.9"
+
+
+def test_bracketed_ipv6_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
+    """Bracketed X-Forwarded-For tokens are not valid IP literals; do not skip them."""
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    assert client_ip(_request("10.0.0.5", "[2001:db8::9], 198.51.100.9")) == "10.0.0.5"
+
+
+def test_rate_limit_buckets_are_isolated_by_ipv6_client_ip(monkeypatch) -> None:
+    """IPv6 identities must hash separately so two clients cannot exhaust one bucket."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
+    rules = (RateLimitRule("test", 1, 60),)
+    now = 1_700_000_000
+
+    first = check_rate_limits(
+        _api_request("/api/test", peer="2001:db8::10"), now=now, rules=rules
+    )
+    exhausted = check_rate_limits(
+        _api_request("/api/test", peer="2001:db8::10"), now=now, rules=rules
+    )
+    other = check_rate_limits(
+        _api_request("/api/test", peer="2001:db8::20"), now=now, rules=rules
+    )
+
+    assert first is not None and first.allowed is True
+    assert exhausted is not None and exhausted.allowed is False
+    assert other is not None and other.allowed is True
