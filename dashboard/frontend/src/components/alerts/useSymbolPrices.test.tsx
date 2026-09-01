@@ -21,6 +21,7 @@ function ProbeHarness({ symbols }: { symbols?: string[] }) {
     symbolPrices,
     fetchPricesFor,
     pricingPending,
+    mergePrices,
   } = useSymbolPrices();
 
   return (
@@ -37,6 +38,33 @@ function ProbeHarness({ symbols }: { symbols?: string[] }) {
         }}
       >
         fetch
+      </button>
+      <button
+        type="button"
+        data-testid="fetch-both"
+        onClick={() => {
+          void fetchPricesFor(['AAPL', 'MSFT']);
+        }}
+      >
+        fetch-both
+      </button>
+      <button
+        type="button"
+        data-testid="merge-aapl"
+        onClick={() => {
+          mergePrices({ AAPL: 180.5 });
+        }}
+      >
+        merge-aapl
+      </button>
+      <button
+        type="button"
+        data-testid="merge-empty"
+        onClick={() => {
+          mergePrices({});
+        }}
+      >
+        merge-empty
       </button>
     </div>
   );
@@ -266,5 +294,57 @@ describe('useSymbolPrices', () => {
       });
     });
     expect(screen.getByTestId('pending').textContent).toBe('0');
+  });
+
+  it('does not refetch catalog prices and only quotes the missing symbol', async () => {
+    // AlertsSettings mergePrices() seeds saved catalog quotes. Treating those
+    // as still-missing would burn Finnhub quota on every picker open, and an
+    // empty merge (no saved prices) must not wipe quotes already on screen.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(alertsApi.getQuotes).mockResolvedValueOnce({
+      data: { prices: { MSFT: 415.25 } },
+    } as never);
+
+    render(<ProbeHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('merge-aapl').click();
+    });
+    expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+      AAPL: 180.5,
+    });
+
+    await act(async () => {
+      screen.getByTestId('merge-empty').click();
+    });
+    expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+      AAPL: 180.5,
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(alertsApi.getQuotes).not.toHaveBeenCalled();
+
+    await act(async () => {
+      screen.getByTestId('fetch-both').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenCalledWith(['MSFT']);
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 180.5,
+        MSFT: 415.25,
+      });
+    });
   });
 });

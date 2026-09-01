@@ -67,6 +67,45 @@ describe('Header refresh controls', () => {
     expect(screen.queryByRole('link', { name: 'Account' })).toBeNull();
   });
 
+  it('disables Sign out while logout is in flight and does not start a second revocation', async () => {
+    apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
+    apiMocks.multiUserEnabled = true;
+    let resolveLogout: (() => void) | undefined;
+    apiMocks.logout.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLogout = resolve;
+        }),
+    );
+
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    const signingOut = await screen.findByRole('button', { name: 'Signing out...' });
+    expect((signingOut as HTMLButtonElement).disabled).toBe(true);
+    expect(apiMocks.logout).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(signingOut);
+    expect(apiMocks.logout).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('user@example.com')).toBeTruthy();
+
+    await act(async () => {
+      resolveLogout?.();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Sign out' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(apiMocks.logout).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the user signed in and offers retry when revocation fails', async () => {
     apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
     apiMocks.multiUserEnabled = true;
