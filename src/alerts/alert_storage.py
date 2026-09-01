@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 import json
 import threading
+import time
 
 MAX_DELIVERY_LOG = 100
 
@@ -103,7 +104,17 @@ class AlertStorage:
         with open(tmp, "w") as f:
             json.dump(history, f, indent=2)
             f.write("\n")
-        tmp.replace(self.history_path)
+        for attempt in range(6):
+            try:
+                tmp.replace(self.history_path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                # Windows scanners and indexers can briefly hold the target
+                # between close and replace. Preserve the atomic write while
+                # allowing that transient handle to clear.
+                time.sleep(0.01 * (2**attempt))
 
     def get_last_triggered(self, alert_id: str) -> Optional[datetime]:
         history = self._load()

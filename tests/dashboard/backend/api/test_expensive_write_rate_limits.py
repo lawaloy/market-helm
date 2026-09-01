@@ -98,12 +98,6 @@ def test_password_change_rate_limit_blocks_a_second_change(client):
     ).status_code == 200
 
 
-@pytest.mark.skip(
-    reason=(
-        "Flaky: expensive-write uses a 60s clock-aligned window; if it rolls "
-        "between password-change and POST /api/refresh, refresh is 200 not 429."
-    )
-)
 def test_expensive_write_bucket_is_shared_and_does_not_gate_get_quotes(
     client, monkeypatch
 ):

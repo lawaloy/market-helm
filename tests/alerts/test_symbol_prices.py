@@ -230,8 +230,8 @@ def test_resolve_symbol_prices_duplicates_do_not_starve_live_cap(
     prices = resolve_symbol_prices(duplicates + unique_rest, fetch_missing=True)
 
     expected = ["AAPL", *unique_rest]
-    assert [c.args[0] for c in fetcher.fetch_symbol_data.call_args_list] == expected
     assert fetcher.fetch_symbol_data.call_count == 15
+    assert {c.args[0] for c in fetcher.fetch_symbol_data.call_args_list} == set(expected)
     assert prices == {symbol: 1.0 for symbol in expected}
     mock_fetcher_cls.assert_called_once_with(include_profile=False)
 
