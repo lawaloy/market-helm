@@ -171,4 +171,100 @@ describe('useSymbolPrices', () => {
     });
     expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({});
   });
+
+  it('does not lock quotesUnavailable on a 429 so a later fetch can retry', async () => {
+    // 405 means the quotes route is absent and the picker should stop. 429 is
+    // transient rate-limiting; treating it like 405 would hide live prices
+    // until a full reload.
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    const err = new Error('Too Many Requests') as Error & {
+      isAxiosError?: boolean;
+      response?: { status: number };
+    };
+    err.isAxiosError = true;
+    err.response = { status: 429 };
+    vi.spyOn(axios, 'isAxiosError').mockReturnValue(true);
+    vi.mocked(alertsApi.getQuotes)
+      .mockRejectedValueOnce(err)
+      .mockResolvedValueOnce({ data: { prices: { AAPL: 190.5 } } } as never);
+
+    render(<ProbeHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
+    expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({});
+    expect(screen.getByTestId('pending').textContent).toBe('0');
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+      });
+    });
+    expect(screen.getByTestId('unavailable').textContent).toBe('no');
+  });
+
+  it('does not start a second getQuotes while the first request for that symbol is in flight', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    let resolveQuotes: ((value: { data: { prices: Record<string, number> } }) => void) | undefined;
+    vi.mocked(alertsApi.getQuotes).mockImplementation(
+      () =>
+        new Promise<{ data: { prices: Record<string, number> } }>((resolve) => {
+          resolveQuotes = resolve;
+        }) as never,
+    );
+
+    render(<ProbeHarness />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ready').textContent).toBe('ready');
+    });
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+
+    await waitFor(() => {
+      expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    expect(screen.getByTestId('pending').textContent).toBe('1');
+
+    await act(async () => {
+      screen.getByTestId('fetch').click();
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveQuotes?.({ data: { prices: { AAPL: 190.5 } } });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(JSON.parse(screen.getByTestId('prices').textContent || '{}')).toEqual({
+        AAPL: 190.5,
+      });
+    });
+    expect(screen.getByTestId('pending').textContent).toBe('0');
+  });
 });
