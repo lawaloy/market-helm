@@ -310,3 +310,39 @@ def test_rate_limit_buckets_are_isolated_by_ipv6_client_ip(monkeypatch) -> None:
     assert first is not None and first.allowed is True
     assert exhausted is not None and exhausted.allowed is False
     assert other is not None and other.allowed is True
+
+
+def test_memory_rate_limit_window_resets_after_expiry(monkeypatch) -> None:
+    """File-mode / non-DB counters must start a fresh window after reset_at.
+
+    ``consume_rate_limit`` already covers database windows. Self-host limiting
+    uses ``_MemoryCounters``; if the bucket key drops ``window_start`` (or the
+    window never advances), a limit-2 rule 429s the same client forever.
+    """
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
+    rules = (RateLimitRule("test", 2, 60),)
+    now = 1_700_000_000
+    request = _api_request("/api/test", peer="203.0.113.10")
+
+    first = check_rate_limits(request, now=now, rules=rules)
+    second = check_rate_limits(request, now=now, rules=rules)
+    blocked = check_rate_limits(request, now=now, rules=rules)
+
+    assert first is not None and first.allowed is True
+    assert first.remaining == 1
+    assert second is not None and second.allowed is True
+    assert second.remaining == 0
+    assert blocked is not None and blocked.allowed is False
+    assert blocked.reset_at == first.reset_at
+
+    still_blocked = check_rate_limits(
+        request, now=first.reset_at - 1, rules=rules
+    )
+    fresh = check_rate_limits(request, now=first.reset_at, rules=rules)
+
+    assert still_blocked is not None and still_blocked.allowed is False
+    assert fresh is not None and fresh.allowed is True
+    assert fresh.remaining == 1
+    assert fresh.reset_at == first.reset_at + 60
