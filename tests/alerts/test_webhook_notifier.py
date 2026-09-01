@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 from src.alerts.notifiers.webhook_notifier import WebhookNotifier
@@ -68,6 +69,7 @@ def test_send_posts_json(mock_post: MagicMock) -> None:
     kwargs = mock_post.call_args[1]
     assert kwargs["json"] == event
     assert kwargs["timeout"] == 10.0
+    assert kwargs["allow_redirects"] is False
 
 
 def test_build_payload_slack_format() -> None:
@@ -194,6 +196,16 @@ def test_send_retries_then_succeeds(mock_post: MagicMock) -> None:
 def test_send_does_not_retry_client_error(mock_post: MagicMock) -> None:
     mock_post.return_value.status_code = 403
     mock_post.return_value.text = "forbidden"
+    notifier = WebhookNotifier("https://example.com/hook")
+    assert notifier.send({"alert_id": "x"}) is False
+    mock_post.assert_called_once()
+
+
+@pytest.mark.parametrize("status", [301, 302, 307, 308])
+@patch("src.alerts.notifiers.webhook_notifier.requests.post")
+def test_send_treats_redirect_as_failed_delivery(mock_post: MagicMock, status: int) -> None:
+    mock_post.return_value.status_code = status
+    mock_post.return_value.text = "moved"
     notifier = WebhookNotifier("https://example.com/hook")
     assert notifier.send({"alert_id": "x"}) is False
     mock_post.assert_called_once()

@@ -1,10 +1,9 @@
 """Webhook SSRF must reject IPv4-mapped and CGNAT literals, not only RFC1918.
 
-``is_safe_webhook_url`` already uses ``ipaddress.ip_address(...).is_global``.
-A regression that only blocked dotted-quad loopback / 10/8 would still POST
-alert payloads (and any tenant webhook secret) to ``[::ffff:127.0.0.1]`` or
-carrier-grade NAT ``100.64.0.0/10``. Locks: mapped loopback/private/metadata
-and CGNAT are rejected at ``from_alert``; mapped public IPv4 still allowed.
+``is_safe_webhook_url`` uses the embedded IPv4 ``is_global`` for mapped
+addresses — CPython treats ``::ffff:100.64.0.1`` as global even though
+plain CGNAT is not. Locks: mapped loopback/private/metadata/CGNAT are
+rejected at ``from_alert``; mapped public IPv4 still allowed.
 """
 
 from __future__ import annotations
@@ -22,6 +21,9 @@ from src.alerts.notifiers.webhook_notifier import WebhookNotifier, is_safe_webho
         "https://[::ffff:169.254.169.254]/latest/meta-data/",
         "https://100.64.0.1/hook",
         "https://100.127.255.254/hook",
+        # CPython reports mapped CGNAT as is_global; connecting is still 100.64/10.
+        "https://[::ffff:100.64.0.1]/hook",
+        "https://[::ffff:100.127.255.254]/hook",
     ],
 )
 def test_is_safe_webhook_url_rejects_ipv4_mapped_and_cgnat(url: str) -> None:
@@ -53,6 +55,19 @@ def test_from_alert_rejects_cgnat_https() -> None:
             {
                 "id": "a1",
                 "webhook_url": "https://100.64.0.1/hooks/secret",
+                "notifications": ["webhook"],
+            }
+        )
+        is None
+    )
+
+
+def test_from_alert_rejects_ipv4_mapped_cgnat() -> None:
+    assert (
+        WebhookNotifier.from_alert(
+            {
+                "id": "a1",
+                "webhook_url": "https://[::ffff:100.64.0.1]/hooks/secret",
                 "notifications": ["webhook"],
             }
         )
