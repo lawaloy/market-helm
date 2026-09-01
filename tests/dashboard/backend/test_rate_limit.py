@@ -135,6 +135,39 @@ def test_invalid_enabled_value_falls_back_to_hosted_default(monkeypatch) -> None
     assert rate_limit.rate_limiting_enabled() is True
 
 
+def test_hosted_false_override_skips_limits_and_does_not_503(monkeypatch) -> None:
+    """MARKET_HELM_RATE_LIMIT_ENABLED=false must disable hosted limiting.
+
+    Database mode turns limits on by default, and a broken consume_rate_limit
+    fail-closes every /api/ request with 503. An explicit false override must
+    skip consume so a limit-1 rule cannot 429 and a failing backend cannot 503.
+    """
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setattr(
+        rate_limit,
+        "configured_rules",
+        lambda: (RateLimitRule("test", 1, 60),),
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(rate_limit, "consume_rate_limit", fail)
+    client = TestClient(_app())
+
+    first = client.get("/api/test")
+    second = client.get("/api/test")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json() == {"ok": True}
+    assert second.json() == {"ok": True}
+    assert "x-ratelimit-limit" not in first.headers
+    assert "retry-after" not in first.headers
+    assert "x-ratelimit-limit" not in second.headers
+
+
 def test_invalid_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
     """Garbage X-Forwarded-For from a trusted proxy must not skip to a later hop."""
     monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
