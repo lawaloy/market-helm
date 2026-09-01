@@ -129,6 +129,40 @@ def test_backend_failure_returns_503(monkeypatch) -> None:
     assert response.json() == {"detail": "Rate-limit service unavailable."}
 
 
+def test_hosted_check_rate_limits_uses_database_usage_not_memory(monkeypatch) -> None:
+    """Hosted limiting must apply consume_rate_limit's count to the decision.
+
+    Multi-worker deploys share ``api_rate_limits``. The 503-on-failure test
+    only proves consume is *called*; a process-local ``_MemoryCounters``
+    fallback would still 429 in a single TestClient and still raise on
+    consume errors. If the returned usage is ignored, the first request
+    would be allowed from an empty memory bucket even when the database
+    already counted past the limit.
+    """
+    from src.storage.rate_limits import RateLimitUsage
+
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
+    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
+
+    def fake_consume(key, *, now, window_seconds):
+        return RateLimitUsage(count=3, reset_at=now + window_seconds)
+
+    monkeypatch.setattr(rate_limit, "consume_rate_limit", fake_consume)
+    rules = (RateLimitRule("test", 2, 60),)
+    now = 1_700_000_000
+
+    decision = check_rate_limits(
+        _api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules
+    )
+
+    assert decision is not None
+    assert decision.allowed is False
+    assert decision.limit == 2
+    assert decision.remaining == 0
+    assert decision.reset_at == now + 60
+
+
 def test_invalid_enabled_value_falls_back_to_hosted_default(monkeypatch) -> None:
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
     monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "maybe")
