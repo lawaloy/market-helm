@@ -6,6 +6,7 @@ import os
 import uuid
 from urllib.parse import quote
 
+import psycopg
 import pytest
 
 from src.storage.alert_jobs import (
@@ -37,9 +38,8 @@ pytestmark = pytest.mark.integration
 def postgresql_database(monkeypatch):
     base_url = os.environ.get("MARKET_HELM_POSTGRES_TEST_URL", "").strip()
     if not base_url:
-        pytest.skip("MARKET_HELM_POSTGRES_TEST_URL is not configured")
+        raise RuntimeError("MARKET_HELM_POSTGRES_TEST_URL must be configured")
 
-    psycopg = pytest.importorskip("psycopg")
     schema = f"markethelm_test_{uuid.uuid4().hex}"
     with psycopg.connect(base_url, autocommit=True) as admin:
         admin.execute(

@@ -72,11 +72,15 @@ git checkout -b fix/your-bug-fix
 ### 3. Run Tests
 
 ```bash
-# Run all tests
-python -m pytest tests/ -v
+# Run the database-free suite
+python -m pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py
+
+# Run the PostgreSQL integration test against a disposable test database
+MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
+  python -m pytest tests/integration/test_postgresql_storage.py -v
 
 # Run with coverage
-python -m pytest tests/ --cov=src --cov-report=html
+python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --cov=src --cov-report=html
 
 # Run specific test file
 python -m pytest tests/core/test_config.py -v
@@ -128,7 +132,7 @@ repo template format:
 
 ## Checks
 - [ ] `dashboard/frontend`: `npm ci` and `npm run build`
-- [ ] `pytest tests/` (repo root)
+- [ ] `pytest tests/ --ignore=tests/integration/test_postgresql_storage.py` (repo root)
 
 <!-- AUTO:START -->
 <!-- AUTO:END -->
