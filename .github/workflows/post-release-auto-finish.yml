@@ -1,12 +1,13 @@
 # Auto-merge chore/post-release-sync-* PRs after required checks complete.
-# Required on main (ruleset "Merging"): Python, Dashboard frontend, Curl + Playwright.
+# The dedicated final gate waits for repository checks, optional external checks,
+# and review feedback against the current PR head before this workflow can merge.
 # Use workflow_dispatch to retry a specific open PR manually.
 
 name: Post-release Auto Finish
 
 on:
   workflow_run:
-    workflows: ["PR E2E"]
+    workflows: ["Post-release Final Gate"]
     types: [completed]
   workflow_dispatch:
     inputs:

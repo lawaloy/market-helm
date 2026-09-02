@@ -1,3 +1,9 @@
+const {
+  describeFeedbackBlockers,
+  hasFeedbackBlockers,
+  inspectFeedback,
+} = require('./pr-feedback.cjs');
+
 module.exports = async ({ github, context, core }) => {
   const lane = process.env.LANE;
   const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
@@ -6,8 +12,10 @@ module.exports = async ({ github, context, core }) => {
   const { owner, repo } = context.repo;
   const pollProfiles = {
     default: { maxAttempts: 10, delayMs: 15000 },
-    // workflow_run fires after a check workflow completes; short poll for mergeable lag only.
-    after_checks: { maxAttempts: 6, delayMs: 5000 },
+    // External checks can start after a repository workflow completes and may not
+    // emit a workflow_run event when they finish. Keep a bounded three-minute
+    // finalization window so a present Cursor run can become neutral/terminal.
+    after_checks: { maxAttempts: 36, delayMs: 5000 },
   };
   const { maxAttempts, delayMs } =
     pollProfiles[process.env.POLL_PROFILE] || pollProfiles.default;
@@ -194,19 +202,60 @@ module.exports = async ({ github, context, core }) => {
     if (canTryMerge) {
       if (await hasPendingBlockingChecks(pullRequest.head.sha)) {
         if (attempt === maxAttempts) {
-          core.info(
-            'Mergeable but checks are still pending. A later workflow_run completion will retry.',
+          core.setFailed(
+            'Mergeable, but checks remained pending after the final wait. ' +
+              'Retry this trusted PR with the workflow_dispatch recovery path.',
           );
           return;
         }
         await sleep(delayMs);
         continue;
       }
+
+      const mergeCandidate = (
+        await github.rest.pulls.get({ owner, repo, pull_number })
+      ).data;
+      if (
+        mergeCandidate.state !== 'open' ||
+        mergeCandidate.head.sha !== pullRequest.head.sha
+      ) {
+        core.setFailed(
+          'PR state or head changed immediately before merge. Wait for checks ' +
+            'on the latest head, then use the workflow_dispatch recovery path.',
+        );
+        return;
+      }
+      if (
+        mergeCandidate.labels.some(
+          (label) => label.name === 'automerge-blocked',
+        )
+      ) {
+        core.info('Skipping because automerge-blocked was added before merge.');
+        return;
+      }
+
+      if (lane === 'post-release') {
+        const blockers = await inspectFeedback({
+          github,
+          owner,
+          repo,
+          pull_number,
+        });
+        if (hasFeedbackBlockers(blockers)) {
+          core.setFailed(
+            'Post-release merge blocked by feedback received before merge: ' +
+              `${describeFeedbackBlockers(blockers)}.`,
+          );
+          return;
+        }
+      }
+
       await github.rest.pulls.merge({
         owner,
         repo,
         pull_number,
         merge_method: 'squash',
+        sha: mergeCandidate.head.sha,
       });
       core.info(`Merged PR #${pull_number}.`);
       return;
@@ -232,7 +281,10 @@ module.exports = async ({ github, context, core }) => {
     }
 
     if (attempt === maxAttempts) {
-      core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
+      core.setFailed(
+        'PR did not become mergeable during the final wait. ' +
+          'Retry this trusted PR with the workflow_dispatch recovery path.',
+      );
       return;
     }
 
