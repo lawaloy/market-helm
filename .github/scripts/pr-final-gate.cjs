@@ -10,6 +10,14 @@ const REQUIRED_CHECKS = [
   'update-description',
 ];
 
+const {
+  describeFeedbackBlockers,
+  feedbackBlockers,
+  hasFeedbackBlockers,
+  inspectFeedback,
+  isInformationalConversationComment,
+} = require('./pr-feedback.cjs');
+
 const CURSOR_PREFIX = 'Cursor Automation:';
 const ACCEPTABLE_CURSOR_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
 const OWN_CHECKS = new Set([
@@ -51,36 +59,6 @@ const classifyCheckRuns = (checkRuns) => {
   return { missing, pending, unacceptable, cursor };
 };
 
-const isInformationalConversationComment = (comment) => {
-  const login = comment.user?.login || '';
-  const body = comment.body || '';
-  return (
-    ['github-actions[bot]', 'app/github-actions'].includes(login) &&
-    body.includes('<!-- Sticky Pull Request Commente2e-smoke-PR E2E -->')
-  );
-};
-
-const feedbackBlockers = ({ comments, reviews, threads }) => {
-  const latestReviews = new Map();
-  for (const review of reviews) {
-    const login = review.user?.login || `review-${review.id}`;
-    const previous = latestReviews.get(login);
-    if (!previous || String(review.submitted_at) > String(previous.submitted_at)) {
-      latestReviews.set(login, review);
-    }
-  }
-
-  const changeRequests = [...latestReviews.values()].filter(
-    (review) => review.state === 'CHANGES_REQUESTED',
-  );
-  const unresolvedThreads = threads.filter((thread) => !thread.isResolved);
-  const conversation = comments.filter(
-    (comment) => !isInformationalConversationComment(comment),
-  );
-
-  return { changeRequests, unresolvedThreads, conversation };
-};
-
 const sleep = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -90,18 +68,6 @@ const checkRunsFromPage = (response) => {
   if (data && Array.isArray(data.check_runs)) return data.check_runs;
   return [];
 };
-
-const threadQuery = `
-  query($owner: String!, $repo: String!, $number: Int!) {
-    repository(owner: $owner, name: $repo) {
-      pullRequest(number: $number) {
-        reviewThreads(first: 100) {
-          nodes { isResolved }
-        }
-      }
-    }
-  }
-`;
 
 const runGate = async ({ github, context, core }) => {
   const pull_number = Number(process.env.PULL_NUMBER || 0);
@@ -165,37 +131,17 @@ const runGate = async ({ github, context, core }) => {
           )}s for optional Cursor checks to appear.`,
         );
       } else {
-        const comments = await github.paginate(github.rest.issues.listComments, {
-          owner,
-          repo,
-          issue_number: pull_number,
-          per_page: 100,
-        });
-        const reviews = await github.paginate(github.rest.pulls.listReviews, {
+        const blockers = await inspectFeedback({
+          github,
           owner,
           repo,
           pull_number,
-          per_page: 100,
         });
-        const threadResult = await github.graphql(threadQuery, {
-          owner,
-          repo,
-          number: pull_number,
-        });
-        const threads =
-          threadResult.repository.pullRequest.reviewThreads.nodes || [];
-        const blockers = feedbackBlockers({ comments, reviews, threads });
 
-        if (
-          blockers.changeRequests.length > 0 ||
-          blockers.unresolvedThreads.length > 0 ||
-          blockers.conversation.length > 0
-        ) {
+        if (hasFeedbackBlockers(blockers)) {
           core.setFailed(
             'Feedback requires manual resolution: ' +
-              `${blockers.changeRequests.length} change request(s), ` +
-              `${blockers.unresolvedThreads.length} unresolved thread(s), ` +
-              `${blockers.conversation.length} non-informational conversation comment(s).`,
+              `${describeFeedbackBlockers(blockers)}.`,
           );
           return;
         }

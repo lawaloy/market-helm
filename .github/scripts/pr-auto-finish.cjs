@@ -1,3 +1,9 @@
+const {
+  describeFeedbackBlockers,
+  hasFeedbackBlockers,
+  inspectFeedback,
+} = require('./pr-feedback.cjs');
+
 module.exports = async ({ github, context, core }) => {
   const lane = process.env.LANE;
   const eventPullNumber = context.payload.workflow_run?.pull_requests?.[0]?.number;
@@ -205,11 +211,51 @@ module.exports = async ({ github, context, core }) => {
         await sleep(delayMs);
         continue;
       }
+
+      const mergeCandidate = (
+        await github.rest.pulls.get({ owner, repo, pull_number })
+      ).data;
+      if (
+        mergeCandidate.state !== 'open' ||
+        mergeCandidate.head.sha !== pullRequest.head.sha
+      ) {
+        core.setFailed(
+          'PR state or head changed immediately before merge. Wait for checks ' +
+            'on the latest head, then use the workflow_dispatch recovery path.',
+        );
+        return;
+      }
+      if (
+        mergeCandidate.labels.some(
+          (label) => label.name === 'automerge-blocked',
+        )
+      ) {
+        core.info('Skipping because automerge-blocked was added before merge.');
+        return;
+      }
+
+      if (lane === 'post-release') {
+        const blockers = await inspectFeedback({
+          github,
+          owner,
+          repo,
+          pull_number,
+        });
+        if (hasFeedbackBlockers(blockers)) {
+          core.setFailed(
+            'Post-release merge blocked by feedback received before merge: ' +
+              `${describeFeedbackBlockers(blockers)}.`,
+          );
+          return;
+        }
+      }
+
       await github.rest.pulls.merge({
         owner,
         repo,
         pull_number,
         merge_method: 'squash',
+        sha: mergeCandidate.head.sha,
       });
       core.info(`Merged PR #${pull_number}.`);
       return;
