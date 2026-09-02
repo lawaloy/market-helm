@@ -84,6 +84,7 @@ jobs:
           cache-dependency-path: dashboard/frontend/package-lock.json
       - name: Install and build
         run: |
+          node --test .github/scripts/pr-final-gate.test.cjs
           cd dashboard/frontend
           npm ci
           npm audit --audit-level=high

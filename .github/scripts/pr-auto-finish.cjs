@@ -6,8 +6,10 @@ module.exports = async ({ github, context, core }) => {
   const { owner, repo } = context.repo;
   const pollProfiles = {
     default: { maxAttempts: 10, delayMs: 15000 },
-    // workflow_run fires after a check workflow completes; short poll for mergeable lag only.
-    after_checks: { maxAttempts: 6, delayMs: 5000 },
+    // External checks can start after a repository workflow completes and may not
+    // emit a workflow_run event when they finish. Keep a bounded three-minute
+    // finalization window so a present Cursor run can become neutral/terminal.
+    after_checks: { maxAttempts: 36, delayMs: 5000 },
   };
   const { maxAttempts, delayMs } =
     pollProfiles[process.env.POLL_PROFILE] || pollProfiles.default;
@@ -194,8 +196,9 @@ module.exports = async ({ github, context, core }) => {
     if (canTryMerge) {
       if (await hasPendingBlockingChecks(pullRequest.head.sha)) {
         if (attempt === maxAttempts) {
-          core.info(
-            'Mergeable but checks are still pending. A later workflow_run completion will retry.',
+          core.setFailed(
+            'Mergeable, but checks remained pending after the final wait. ' +
+              'Retry this trusted PR with the workflow_dispatch recovery path.',
           );
           return;
         }
@@ -232,7 +235,10 @@ module.exports = async ({ github, context, core }) => {
     }
 
     if (attempt === maxAttempts) {
-      core.info('PR is not yet fully ready to merge. A later workflow_run will retry.');
+      core.setFailed(
+        'PR did not become mergeable during the final wait. ' +
+          'Retry this trusted PR with the workflow_dispatch recovery path.',
+      );
       return;
     }
 
