@@ -8,7 +8,7 @@ import ipaddress
 import os
 import socket
 from typing import Any, Dict, Optional, Union
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import requests
 
@@ -24,6 +24,25 @@ _BLOCKED_WEBHOOK_HOSTS = frozenset(
         "metadata",
     }
 )
+
+# requests.PreparedRequest percent-decodes the host before connecting.
+# Bound the unwrap so a crafted ``%25%25...`` chain cannot spin.
+_MAX_HOST_UNQUOTE_ROUNDS = 4
+
+
+def _unquote_hostname(host: str) -> str:
+    """Unwrap percent-encoded host labels the way HTTP clients do.
+
+    ``urlparse().hostname`` leaves ``%31%32%37.%30.%30.%31`` encoded, but
+    ``requests`` prepares that URL as ``127.0.0.1`` and connects to loopback.
+    """
+    current = host
+    for _ in range(_MAX_HOST_UNQUOTE_ROUNDS):
+        decoded = unquote(current)
+        if decoded == current:
+            break
+        current = decoded
+    return current.lower().rstrip(".")
 
 
 def _literal_ip(
@@ -65,8 +84,8 @@ def is_safe_webhook_url(url: str) -> bool:
     Checks the literal hostname/IP only (no DNS resolution) so validation stays
     deterministic. Rejects non-HTTPS schemes, credentials in the URL, loopback /
     private / link-local / unspecified / CGNAT IP literals (including IPv4-mapped,
-    decimal/hex/octal/short IPv4 forms, and DNS-style trailing dots), and a small
-    set of well-known metadata hostnames.
+    decimal/hex/octal/short IPv4 forms, percent-encoded host labels, and DNS-style
+    trailing dots), and a small set of well-known metadata hostnames.
     """
     cleaned = (url or "").strip()
     if not cleaned:
@@ -82,8 +101,9 @@ def is_safe_webhook_url(url: str) -> bool:
     # A terminal dot denotes the same absolute DNS name, but makes inet_aton reject
     # otherwise literal IPv4 (for example 127.0.0.1.). Normalize it before both the
     # blocked-host and literal-IP checks so it cannot turn a private target into a
-    # seemingly ordinary hostname.
-    host = (parsed.hostname or "").lower().rstrip(".")
+    # seemingly ordinary hostname. Percent-decode as well: urlparse leaves
+    # ``%31%32%37.%30.%30.%31`` encoded while requests connects to 127.0.0.1.
+    host = _unquote_hostname((parsed.hostname or "").lower().rstrip("."))
     if not host:
         return False
     if host in _BLOCKED_WEBHOOK_HOSTS or host.endswith(".localhost"):
