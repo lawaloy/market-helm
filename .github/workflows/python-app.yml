@@ -87,5 +87,5 @@ jobs:
           node --test .github/scripts/*.test.cjs
           cd dashboard/frontend
           npm ci
-          npm audit --audit-level=high
+          node ../../.github/scripts/npm-audit-ci.cjs
           npm run build
