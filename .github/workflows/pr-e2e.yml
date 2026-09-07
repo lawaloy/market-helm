@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install Python deps
         run: |
@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: dashboard/frontend/package-lock.json
 
@@ -56,7 +56,7 @@ jobs:
         run: |
           cd "${{ github.workspace }}"
           python -m uvicorn dashboard.backend.main:app --host 127.0.0.1 --port 8000 &
-          for i in $(seq 1 45); do
+          for _ in $(seq 1 45); do
             if curl -fsS "http://127.0.0.1:8000/health" | jq -e '.status == "healthy"' >/dev/null; then
               echo "API is up"
               exit 0
@@ -77,14 +77,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
       - id: playwright
         name: Install Playwright & run tests
         env:
-          CI: "true"
+          CI: 'true'
           E2E_BASE_URL: http://127.0.0.1:8000
         run: |
           cd e2e

@@ -1,10 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
-import {
-  BellAlertIcon,
-  ChatBubbleLeftRightIcon,
-  EnvelopeIcon,
-} from '@heroicons/react/24/outline';
+import { BellAlertIcon, ChatBubbleLeftRightIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import { AlertComposer } from '../components/alerts/AlertComposer';
 import { AlertsToast, PlatformChip } from '../components/alerts/AlertsUi';
 import { DeliveryChannel } from '../components/alerts/DeliveryChannel';
@@ -81,7 +77,8 @@ const AlertsSettings: React.FC = () => {
         notify_email: data.defaults?.notify_email ?? Boolean(data.defaults?.email_to),
         notify_webhook:
           data.defaults?.notify_webhook ??
-          (channelStatus.webhook_url || alerts.some((rule) => rule.notifications.includes('webhook'))),
+          (channelStatus.webhook_url ||
+            alerts.some((rule) => rule.notifications.includes('webhook'))),
       },
       alerts,
     };
@@ -157,7 +154,9 @@ const AlertsSettings: React.FC = () => {
           const initial =
             preferred.find((symbol) => options.some((option) => option.value === symbol)) ??
             options[0].value;
-          setNewSymbol((prev) => (options.some((option) => option.value === prev) ? prev : initial));
+          setNewSymbol((prev) =>
+            options.some((option) => option.value === prev) ? prev : initial,
+          );
         }
       } catch {
         if (!cancelled) {
@@ -263,7 +262,7 @@ const AlertsSettings: React.FC = () => {
       } catch (err) {
         setError(
           axios.isAxiosError(err)
-            ? (err.response?.data as { detail?: string })?.detail ?? err.message
+            ? ((err.response?.data as { detail?: string })?.detail ?? err.message)
             : 'Save failed.',
         );
         return false;
@@ -304,7 +303,7 @@ const AlertsSettings: React.FC = () => {
     } catch (err) {
       setError(
         axios.isAxiosError(err)
-          ? (err.response?.data as { detail?: string })?.detail ?? err.message
+          ? ((err.response?.data as { detail?: string })?.detail ?? err.message)
           : 'Setup failed.',
       );
     } finally {
@@ -327,7 +326,7 @@ const AlertsSettings: React.FC = () => {
     } catch (err) {
       setError(
         axios.isAxiosError(err)
-          ? (err.response?.data as { detail?: string })?.detail ?? err.message
+          ? ((err.response?.data as { detail?: string })?.detail ?? err.message)
           : 'Test failed.',
       );
     } finally {
@@ -356,7 +355,7 @@ const AlertsSettings: React.FC = () => {
     } catch (err) {
       setError(
         axios.isAxiosError(err)
-          ? (err.response?.data as { detail?: string })?.detail ?? err.message
+          ? ((err.response?.data as { detail?: string })?.detail ?? err.message)
           : 'Check failed.',
       );
     } finally {
@@ -488,7 +487,10 @@ const AlertsSettings: React.FC = () => {
 
   return (
     <div className={`alerts-page ${dirty ? 'pb-28' : ''}`}>
-      <div className="alerts-page-glow pointer-events-none absolute inset-x-0 top-0 h-80" aria-hidden />
+      <div
+        className="alerts-page-glow pointer-events-none absolute inset-x-0 top-0 h-80"
+        aria-hidden
+      />
       <AlertsToast error={error} success={success} />
 
       <div className="relative mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
@@ -634,7 +636,10 @@ const AlertsSettings: React.FC = () => {
                       onClick={() =>
                         setConfig((prev) => ({
                           ...prev,
-                          defaults: { ...prev.defaults, webhook_format: 'discord' as WebhookFormat },
+                          defaults: {
+                            ...prev.defaults,
+                            webhook_format: 'discord' as WebhookFormat,
+                          },
                         }))
                       }
                     />

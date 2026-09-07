@@ -211,8 +211,6 @@ describe('HistoricalTrends fetch races', () => {
 
     // Latest days=7 history wins; stale empty/error path must not stick.
     expect(screen.queryByText(/No historical data for/)).toBeNull();
-    expect(apiMocks.getHistorical.mock.calls.some((c) => c[0] === 'AAPL' && c[1] === 7)).toBe(
-      true,
-    );
+    expect(apiMocks.getHistorical.mock.calls.some((c) => c[0] === 'AAPL' && c[1] === 7)).toBe(true);
   });
 });

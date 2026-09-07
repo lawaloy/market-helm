@@ -99,91 +99,101 @@ function App() {
 
   return (
     <ThemeProvider>
-    <AuthProvider>
-    <BrowserRouter>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-        <Header
-          dataDate={dataDate}
-          onRefreshComplete={handleRefreshComplete}
-          onQuickRefresh={handleQuickRefresh}
-          backgroundFetching={backgroundFetching}
-        />
-        <div className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <nav className="flex gap-6">
-              <NavLink
-                to="/"
-                end
-                className={({ isActive }) =>
-                  `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                  }`
+      <AuthProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+            <Header
+              dataDate={dataDate}
+              onRefreshComplete={handleRefreshComplete}
+              onQuickRefresh={handleQuickRefresh}
+              backgroundFetching={backgroundFetching}
+            />
+            <div className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav className="flex gap-6">
+                  <NavLink
+                    to="/"
+                    end
+                    className={({ isActive }) =>
+                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+                      }`
+                    }
+                  >
+                    Dashboard
+                  </NavLink>
+                  <NavLink
+                    to="/historical"
+                    className={({ isActive }) =>
+                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+                      }`
+                    }
+                  >
+                    Historical Trends
+                  </NavLink>
+                  <NavLink
+                    to="/summary"
+                    className={({ isActive }) =>
+                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+                      }`
+                    }
+                  >
+                    Summary
+                  </NavLink>
+                  <NavLink
+                    to="/alerts"
+                    className={({ isActive }) =>
+                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'border-teal-500 text-teal-600 dark:text-teal-400'
+                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
+                      }`
+                    }
+                  >
+                    Helmtower
+                  </NavLink>
+                </nav>
+              </div>
+            </div>
+            <Routes>
+              <Route
+                path="/"
+                element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />}
+              />
+              <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
+              <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
+              <Route path="/sign-in" element={<SignIn />} />
+              <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
+              <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
+              <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
+              <Route
+                path="/account"
+                element={
+                  <RequireAuth>
+                    <AccountSettings />
+                  </RequireAuth>
                 }
-              >
-                Dashboard
-              </NavLink>
-              <NavLink
-                to="/historical"
-                className={({ isActive }) =>
-                  `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                  }`
+              />
+              <Route
+                path="/alerts"
+                element={
+                  <RequireAuth>
+                    <AlertsSettings />
+                  </RequireAuth>
                 }
-              >
-                Historical Trends
-              </NavLink>
-              <NavLink
-                to="/summary"
-                className={({ isActive }) =>
-                  `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                  }`
-                }
-              >
-                Summary
-              </NavLink>
-              <NavLink
-                to="/alerts"
-                className={({ isActive }) =>
-                  `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                  }`
-                }
-              >
-                Helmtower
-              </NavLink>
-            </nav>
+              />
+            </Routes>
           </div>
-        </div>
-        <Routes>
-          <Route path="/" element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />} />
-          <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
-          <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
-          <Route path="/sign-in" element={<SignIn />} />
-          <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
-          <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
-          <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
-          <Route path="/account" element={<RequireAuth><AccountSettings /></RequireAuth>} />
-          <Route
-            path="/alerts"
-            element={
-              <RequireAuth>
-                <AlertsSettings />
-              </RequireAuth>
-            }
-          />
-        </Routes>
-      </div>
-    </BrowserRouter>
-    </AuthProvider>
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

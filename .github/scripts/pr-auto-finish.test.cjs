@@ -33,6 +33,54 @@ const codexWrapperReview = {
   submitted_at: '2026-01-01T00:00:00Z',
 };
 
+test('already-merged trusted PR is an idempotent success', async () => {
+  const originalLane = process.env.LANE;
+  const originalPullNumber = process.env.PULL_NUMBER;
+  process.env.LANE = 'dependabot';
+  process.env.PULL_NUMBER = '611';
+
+  let mergeCalled = false;
+  let failure = '';
+  const info = [];
+  try {
+    await finish({
+      github: {
+        rest: {
+          pulls: {
+            get: async () => ({
+              data: {
+                state: 'closed',
+                merged: true,
+                mergeable_state: 'unknown',
+                labels: [],
+              },
+            }),
+            merge: async () => {
+              mergeCalled = true;
+            },
+          },
+        },
+      },
+      context: { payload: {}, repo: { owner: 'lawaloy', repo: 'market-helm' } },
+      core: {
+        info: (message) => info.push(message),
+        setFailed: (message) => {
+          failure = message;
+        },
+      },
+    });
+  } finally {
+    if (originalLane === undefined) delete process.env.LANE;
+    else process.env.LANE = originalLane;
+    if (originalPullNumber === undefined) delete process.env.PULL_NUMBER;
+    else process.env.PULL_NUMBER = originalPullNumber;
+  }
+
+  assert.equal(mergeCalled, false);
+  assert.equal(failure, '');
+  assert.deepEqual(info, ['PR #611 is already merged; nothing to do.']);
+});
+
 const runPostReleaseFinish = async ({ comments, reviews, threads }) => {
   const originalLane = process.env.LANE;
   const originalPullNumber = process.env.PULL_NUMBER;
@@ -129,4 +177,3 @@ test('post-release lane merges when only informational feedback remains', async 
   assert.equal(failure, '');
   assert.equal(mergeCalled, true);
 });
-

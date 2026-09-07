@@ -143,7 +143,12 @@ describe('AlertsSettings dual-channel composer add defer', () => {
       },
     });
     apiMocks.getSymbols.mockResolvedValue({
-      data: { symbols: ['AAPL', 'MSFT'], names: { AAPL: 'Apple', MSFT: 'Microsoft' }, count: 2, prices: {} },
+      data: {
+        symbols: ['AAPL', 'MSFT'],
+        names: { AAPL: 'Apple', MSFT: 'Microsoft' },
+        count: 2,
+        prices: {},
+      },
     });
     apiMocks.historyGetSymbols.mockRejectedValue(new Error('unused'));
     apiMocks.getQuotes.mockResolvedValue({ data: { prices: {} } });
@@ -195,9 +200,9 @@ describe('AlertsSettings dual-channel composer add defer', () => {
     expect(screen.getByRole('switch', { name: 'Enable AAPL price alert' })).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Enable MSFT price alert' })).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Email' }).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByRole('switch', { name: 'Discord or Slack' }).getAttribute('aria-checked')).toBe(
-      'true',
-    );
+    expect(
+      screen.getByRole('switch', { name: 'Discord or Slack' }).getAttribute('aria-checked'),
+    ).toBe('true');
     expect(apiMocks.saveConfig).not.toHaveBeenCalled();
   });
 

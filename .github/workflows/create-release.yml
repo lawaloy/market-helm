@@ -19,7 +19,7 @@ on:
           Leave blank unless bump type is manual. Then enter v0.10.0 or 0.10.0 (MAJOR.MINOR.PATCH only).
         required: false
         type: string
-        default: ""
+        default: ''
 
 permissions:
   contents: read

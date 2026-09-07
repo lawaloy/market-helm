@@ -2,8 +2,8 @@
 # (setup.cfg, version_sync targets, CHANGELOG stub). Separate from publish.yml so
 # Publish only ships artifacts; this workflow runs when that workflow completes.
 #
-# Same auth pattern as deps-maintenance.yml: app token first, then checkout with
-# that token so git push uses the installation (not GITHUB_TOKEN / github-actions[bot]).
+# Use an app token for checkout so git push uses the installation rather than
+# GITHUB_TOKEN / github-actions[bot].
 
 name: Post-release sync to main
 
@@ -58,7 +58,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Apply released version and sync tracked files
         id: align

@@ -234,9 +234,7 @@ describe('AuthProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('auth-state').textContent).toBe(
-        'multi-user:user@example.com',
-      );
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:user@example.com');
     });
     expect(me).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('good-token');
@@ -274,9 +272,7 @@ describe('AuthProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('auth-state').textContent).toBe(
-        'multi-user:user@example.com',
-      );
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:user@example.com');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'logout' }));
@@ -297,12 +293,22 @@ describe('AuthProvider', () => {
 
     function LogoutProbe() {
       const { loading, user, logout } = useAuth();
-      return <button type="button" disabled={loading} onClick={() => void logout().catch(() => undefined)}>
-        {user?.email ?? 'anonymous'}
-      </button>;
+      return (
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void logout().catch(() => undefined)}
+        >
+          {user?.email ?? 'anonymous'}
+        </button>
+      );
     }
 
-    render(<AuthProvider><LogoutProbe /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <LogoutProbe />
+      </AuthProvider>,
+    );
     await waitFor(() => expect(screen.getByRole('button').textContent).toBe('user@example.com'));
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => expect(authApi.logout).toHaveBeenCalledTimes(1));
@@ -339,9 +345,7 @@ describe('AuthProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('auth-state').textContent).toBe(
-        'multi-user:user@example.com',
-      );
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:user@example.com');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'clear-session' }));
@@ -380,9 +384,7 @@ describe('AuthProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('auth-state').textContent).toBe(
-        'multi-user:user@example.com',
-      );
+      expect(screen.getByTestId('auth-state').textContent).toBe('multi-user:user@example.com');
     });
 
     fireEvent.click(screen.getByRole('button', { name: 'logout' }));

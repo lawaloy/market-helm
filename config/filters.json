@@ -6,11 +6,10 @@
   "market_cap_min": 1000000000,
   "top_n": 20,
   "weights": {
-    "volume": 0.30,
+    "volume": 0.3,
     "price_change": 0.35,
     "price_range": 0.15,
-    "market_cap": 0.20
+    "market_cap": 0.2
   },
   "comment": "Flexible scoring system - stocks are ranked by weighted score. Top N stocks are selected for tracking."
 }
-

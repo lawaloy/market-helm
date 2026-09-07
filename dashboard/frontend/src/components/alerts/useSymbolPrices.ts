@@ -76,7 +76,9 @@ export function useSymbolPrices() {
     async (symbols: string[]) => {
       if (!apiReady || quotesUnavailable) return;
 
-      const unique = [...new Set(symbols.map((symbol) => symbol.toUpperCase().trim()).filter(Boolean))];
+      const unique = [
+        ...new Set(symbols.map((symbol) => symbol.toUpperCase().trim()).filter(Boolean)),
+      ];
       let pending = unique.filter(
         (symbol) => pricesRef.current[symbol] === undefined && !isFetchBlocked(symbol),
       );

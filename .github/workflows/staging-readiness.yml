@@ -21,13 +21,13 @@ jobs:
       COMPOSE_PROJECT_NAME: markethelm-readiness-ci
       POSTGRES_PASSWORD: local-ci-postgres-only
       MARKET_HELM_ENV_FILE: ${{ github.workspace }}/.env.staging.ci
-      MARKET_HELM_PORT: "8012"
+      MARKET_HELM_PORT: '8012'
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Create isolated staging configuration
         shell: bash

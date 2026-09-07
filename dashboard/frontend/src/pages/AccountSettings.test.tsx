@@ -7,7 +7,10 @@ import { authApi } from '../services/api';
 const mocks = vi.hoisted(() => ({ clearSession: vi.fn(), navigate: vi.fn() }));
 
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'u1', email: 'user@example.com' }, clearSession: mocks.clearSession }),
+  useAuth: () => ({
+    user: { id: 'u1', email: 'user@example.com' },
+    clearSession: mocks.clearSession,
+  }),
 }));
 vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router');
@@ -33,9 +36,17 @@ describe('AccountSettings', () => {
     const change = vi.spyOn(authApi, 'changePassword').mockResolvedValueOnce({
       data: { message: 'Password changed.' },
     } as never);
-    render(<MemoryRouter><AccountSettings /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'new-password-123' } });
+    render(
+      <MemoryRouter>
+        <AccountSettings />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Current password'), {
+      target: { value: 'password123' },
+    });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'new-password-123' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
     await waitFor(() => expect(change).toHaveBeenCalledWith('password123', 'new-password-123'));
     expect(mocks.clearSession).toHaveBeenCalled();
@@ -46,12 +57,24 @@ describe('AccountSettings', () => {
     const remove = vi.spyOn(authApi, 'deleteAccount').mockResolvedValueOnce({
       data: { message: 'Account permanently deleted.' },
     } as never);
-    render(<MemoryRouter><AccountSettings /></MemoryRouter>);
-    const button = screen.getByRole('button', { name: 'Delete account permanently' }) as HTMLButtonElement;
-    fireEvent.change(screen.getByLabelText('Password for deletion'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'delete' } });
+    render(
+      <MemoryRouter>
+        <AccountSettings />
+      </MemoryRouter>,
+    );
+    const button = screen.getByRole('button', {
+      name: 'Delete account permanently',
+    }) as HTMLButtonElement;
+    fireEvent.change(screen.getByLabelText('Password for deletion'), {
+      target: { value: 'password123' },
+    });
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), {
+      target: { value: 'delete' },
+    });
     expect(button.disabled).toBe(true);
-    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), {
+      target: { value: 'DELETE' },
+    });
     expect(button.disabled).toBe(false);
     fireEvent.click(button);
     await waitFor(() => expect(remove).toHaveBeenCalledWith('password123', 'DELETE'));
@@ -63,9 +86,17 @@ describe('AccountSettings', () => {
     vi.spyOn(authApi, 'changePassword').mockRejectedValueOnce(
       axiosDetail('Current password is incorrect.'),
     );
-    render(<MemoryRouter><AccountSettings /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'wrong-password' } });
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'new-password-123' } });
+    render(
+      <MemoryRouter>
+        <AccountSettings />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Current password'), {
+      target: { value: 'wrong-password' },
+    });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'new-password-123' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toBe('Current password is incorrect.');
@@ -78,9 +109,17 @@ describe('AccountSettings', () => {
     vi.spyOn(authApi, 'deleteAccount').mockRejectedValueOnce(
       axiosDetail('Current password is incorrect.'),
     );
-    render(<MemoryRouter><AccountSettings /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Password for deletion'), { target: { value: 'wrong-password' } });
-    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    render(
+      <MemoryRouter>
+        <AccountSettings />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Password for deletion'), {
+      target: { value: 'wrong-password' },
+    });
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), {
+      target: { value: 'DELETE' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Delete account permanently' }));
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toBe('Current password is incorrect.');
@@ -91,9 +130,17 @@ describe('AccountSettings', () => {
 
   it('falls back to a generic error for non-Axios failures without navigating', async () => {
     vi.spyOn(authApi, 'changePassword').mockRejectedValueOnce(new Error('network down'));
-    render(<MemoryRouter><AccountSettings /></MemoryRouter>);
-    fireEvent.change(screen.getByLabelText('Current password'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText('New password'), { target: { value: 'new-password-123' } });
+    render(
+      <MemoryRouter>
+        <AccountSettings />
+      </MemoryRouter>,
+    );
+    fireEvent.change(screen.getByLabelText('Current password'), {
+      target: { value: 'password123' },
+    });
+    fireEvent.change(screen.getByLabelText('New password'), {
+      target: { value: 'new-password-123' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Change password' }));
     await waitFor(() => {
       expect(screen.getByRole('alert').textContent).toBe('Request failed. Please try again.');

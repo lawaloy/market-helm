@@ -107,19 +107,19 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 
 ## Test Coverage
 
-| Module | Tests |
-|--------|-------|
-| `src/core/config.py` | Configuration loading and defaults |
-| `src/core/logger.py` | Logging setup and handlers |
-| `src/services/api_client.py` | Rate limiting and Finnhub API |
-| `src/analysis/analyzer.py` | Stock data analysis |
-| `src/analysis/ai_summarizer.py` | Demo summary, fallback when no API key |
-| `src/analysis/projector.py` | Stock projections and recommendations |
-| `src/storage/data_storage.py` | Data persistence |
-| `src/workflows/tracker.py` | Workflow integration with mocked deps |
-| `src/alerts/notifiers/webhook_notifier.py` | Webhook URL resolution, POST payload |
-| `dashboard/backend/api` | Market, summary, health, history (incl. accuracy) |
-| `dashboard/backend/services/data_loader.py` | Data loading, projection accuracy computation |
+| Module                                      | Tests                                             |
+| ------------------------------------------- | ------------------------------------------------- |
+| `src/core/config.py`                        | Configuration loading and defaults                |
+| `src/core/logger.py`                        | Logging setup and handlers                        |
+| `src/services/api_client.py`                | Rate limiting and Finnhub API                     |
+| `src/analysis/analyzer.py`                  | Stock data analysis                               |
+| `src/analysis/ai_summarizer.py`             | Demo summary, fallback when no API key            |
+| `src/analysis/projector.py`                 | Stock projections and recommendations             |
+| `src/storage/data_storage.py`               | Data persistence                                  |
+| `src/workflows/tracker.py`                  | Workflow integration with mocked deps             |
+| `src/alerts/notifiers/webhook_notifier.py`  | Webhook URL resolution, POST payload              |
+| `dashboard/backend/api`                     | Market, summary, health, history (incl. accuracy) |
+| `dashboard/backend/services/data_loader.py` | Data loading, projection accuracy computation     |
 
 ## Writing New Tests
 

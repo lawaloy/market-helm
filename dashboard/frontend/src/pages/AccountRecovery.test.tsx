@@ -25,7 +25,9 @@ describe('AccountRecovery', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith('user@example.com'));
-    expect(screen.getByText('If the account exists, a password reset email has been sent.')).toBeTruthy();
+    expect(
+      screen.getByText('If the account exists, a password reset email has been sent.'),
+    ).toBeTruthy();
   });
 
   it('disables reset and verify continue without a token', () => {
@@ -34,14 +36,18 @@ describe('AccountRecovery', () => {
         <AccountRecovery mode="reset" />
       </MemoryRouter>,
     );
-    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
 
     rerender(
       <MemoryRouter>
         <AccountRecovery mode="verify" />
       </MemoryRouter>,
     );
-    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Continue' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('confirms a password reset from the token query param', async () => {
@@ -57,7 +63,9 @@ describe('AccountRecovery', () => {
     expect(password.getAttribute('maxLength')).toBe(String(MAX_PASSWORD_LENGTH));
     fireEvent.change(password, { target: { value: 'new-password-123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    await waitFor(() => expect(confirm).toHaveBeenCalledWith('reset-token-value', 'new-password-123'));
+    await waitFor(() =>
+      expect(confirm).toHaveBeenCalledWith('reset-token-value', 'new-password-123'),
+    );
     expect(screen.getByText('Password updated. You can now sign in.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Continue' })).toBeNull();
   });
@@ -75,7 +83,9 @@ describe('AccountRecovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => {
       expect(
-        screen.getByText('This request could not be completed. The link may be invalid or expired.'),
+        screen.getByText(
+          'This request could not be completed. The link may be invalid or expired.',
+        ),
       ).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
@@ -94,15 +104,17 @@ describe('AccountRecovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await waitFor(() => {
       expect(
-        screen.getByText('This request could not be completed. The link may be invalid or expired.'),
+        screen.getByText(
+          'This request could not be completed. The link may be invalid or expired.',
+        ),
       ).toBeTruthy();
     });
   });
 
   it('confirms email verification and surfaces expired-link errors', async () => {
-    const confirm = vi.spyOn(authApi, 'confirmEmailVerification').mockRejectedValueOnce(
-      new Error('expired'),
-    );
+    const confirm = vi
+      .spyOn(authApi, 'confirmEmailVerification')
+      .mockRejectedValueOnce(new Error('expired'));
     render(
       <MemoryRouter initialEntries={['/verify-email?token=verify-token-value']}>
         <AccountRecovery mode="verify" />

@@ -26,9 +26,7 @@ describe('CompanyLogo dirty symbols', () => {
   });
 
   it('shows ? for nullish symbol without calling trim on null', () => {
-    expect(() =>
-      render(<CompanyLogo symbol={null as unknown as string} />),
-    ).not.toThrow();
+    expect(() => render(<CompanyLogo symbol={null as unknown as string} />)).not.toThrow();
     expect(screen.getByLabelText('?').querySelector('span')?.textContent).toBe('?');
   });
 });

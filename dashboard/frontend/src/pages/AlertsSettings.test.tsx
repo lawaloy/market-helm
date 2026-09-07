@@ -172,7 +172,9 @@ describe('AlertsSettings dirty guards', () => {
       expect(apiMocks.runCheck.mock.calls.length).toBeGreaterThanOrEqual(runCheckCallsAtMount + 2);
     });
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/No watches triggered|watch\(es\) triggered/);
+      expect(screen.getByRole('status').textContent).toMatch(
+        /No watches triggered|watch\(es\) triggered/,
+      );
     });
   });
 

@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: markethelm
       POSTGRES_PASSWORD: markethelm-test
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U markethelm -d markethelm"]
+      test: ['CMD-SHELL', 'pg_isready -U markethelm -d markethelm']
       interval: 2s
       timeout: 5s
       retries: 15

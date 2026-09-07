@@ -13,7 +13,12 @@ interface HeaderProps {
   backgroundFetching?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRefresh, backgroundFetching }) => {
+const Header: React.FC<HeaderProps> = ({
+  dataDate,
+  onRefreshComplete,
+  onQuickRefresh,
+  backgroundFetching,
+}) => {
   const { theme, toggleTheme } = useTheme();
   const { user, multiUserEnabled, logout } = useAuth();
   const [isRefreshing, setIsRefreshingState] = useState(false);
@@ -133,7 +138,6 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
           console.error('Status poll error:', err);
         }
       }, pollMs);
-
     } catch (error) {
       console.error('Refresh error:', error);
       if (generation !== pollGenerationRef.current) return;
@@ -190,9 +194,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              📊 MarketHelm
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 MarketHelm</h1>
             {dataDate && (
               <div className="text-sm text-slate-600 dark:text-slate-400">
                 <span className="font-medium">Data from:</span>{' '}
@@ -250,8 +252,8 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
                 <MoonIcon className="h-5 w-5" />
               )}
             </button>
-            {multiUserEnabled && (
-              user ? (
+            {multiUserEnabled &&
+              (user ? (
                 <div className="flex items-center gap-2">
                   {logoutError && (
                     <span className="max-w-xs text-sm text-red-600 dark:text-red-400" role="alert">
@@ -286,8 +288,7 @@ const Header: React.FC<HeaderProps> = ({ dataDate, onRefreshComplete, onQuickRef
                 >
                   Sign in
                 </Link>
-              )
-            )}
+              ))}
           </div>
         </div>
       </div>

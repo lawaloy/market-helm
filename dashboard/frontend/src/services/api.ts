@@ -68,7 +68,7 @@ if (import.meta.env.DEV) {
     (err) => {
       console.error('[API] Request failed:', err.config?.url, err.response?.status, err.message);
       return Promise.reject(err);
-    }
+    },
   );
 }
 
@@ -101,14 +101,15 @@ export const historyApi = {
   getAccuracy: (days: number = 90) =>
     api.get<ProjectionAccuracyResponse>('/api/history/accuracy', { params: { days } }),
   getSymbols: () =>
-    api.get<{ symbols: string[]; names: Record<string, string>; date: string }>('/api/history/symbols'),
+    api.get<{ symbols: string[]; names: Record<string, string>; date: string }>(
+      '/api/history/symbols',
+    ),
 };
 
 // Stocks endpoints — encode path segments so class-share tickers like BRK/B
 // cannot split the route or inject query/fragment characters.
 export const stocksApi = {
-  getDetail: (symbol: string) =>
-    api.get<StockDetail>(`/api/stocks/${encodeURIComponent(symbol)}`),
+  getDetail: (symbol: string) => api.get<StockDetail>(`/api/stocks/${encodeURIComponent(symbol)}`),
   getHistorical: (symbol: string, days: number = 30) =>
     api.get<HistoricalData>(`/api/stocks/${encodeURIComponent(symbol)}/historical`, {
       params: { days },
@@ -123,11 +124,7 @@ export const alertsApi = {
       params: force ? { force: true } : undefined,
     }),
   testAlert: (id: string, dryRun = false) =>
-    api.post<AlertTestResponse>(
-      '/api/alerts/test',
-      { id, dry_run: dryRun },
-      { timeout: 30000 },
-    ),
+    api.post<AlertTestResponse>('/api/alerts/test', { id, dry_run: dryRun }, { timeout: 30000 }),
   getSymbols: () =>
     api.get<{
       symbols: string[];

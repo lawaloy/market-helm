@@ -232,20 +232,20 @@ Put secrets in `~/.market-helm/.env` (SMTP password, webhook URL, SendGrid key).
 
 **Developers (git clone):** may use `config/alerts.json` in the repo instead; user config takes precedence when present.
 
-| Variable | Purpose |
-|----------|---------|
-| `ALERT_EMAIL_PROVIDER` | `smtp` (default), `sendgrid`, or `mailgun` — see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#transactional-alert-email) |
-| `ALERT_WEBHOOK_URL` | Default webhook URL when a rule uses `"notifications": ["webhook"]` without per-rule `webhook_url` |
-| `ALERT_WEBHOOK_FORMAT` | `json` (default), `slack`, or `discord` for incoming-webhook payload shape |
-| `DISCORD_WEBHOOK_URL` | Optional default Discord webhook URL |
-| `SMTP_HOST` | SMTP server hostname (e.g. `smtp.gmail.com`) — dev/self-host or SES SMTP |
-| `SMTP_PORT` | SMTP port (default `587`; use `465` for implicit SSL) |
-| `SMTP_USER` | SMTP login username |
-| `SMTP_PASSWORD` | SMTP login password or app password |
-| `SENDGRID_API_KEY` | SendGrid API key when using SendGrid |
-| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Mailgun credentials when using Mailgun |
-| `ALERT_EMAIL_TO` | Default comma-separated recipients when a rule uses `"email"` without `email_to` |
-| `ALERT_EMAIL_FROM` | Platform **From** address; required for SendGrid/Mailgun |
+| Variable                             | Purpose                                                                                                                |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `ALERT_EMAIL_PROVIDER`               | `smtp` (default), `sendgrid`, or `mailgun` — see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#transactional-alert-email) |
+| `ALERT_WEBHOOK_URL`                  | Default webhook URL when a rule uses `"notifications": ["webhook"]` without per-rule `webhook_url`                     |
+| `ALERT_WEBHOOK_FORMAT`               | `json` (default), `slack`, or `discord` for incoming-webhook payload shape                                             |
+| `DISCORD_WEBHOOK_URL`                | Optional default Discord webhook URL                                                                                   |
+| `SMTP_HOST`                          | SMTP server hostname (e.g. `smtp.gmail.com`) — dev/self-host or SES SMTP                                               |
+| `SMTP_PORT`                          | SMTP port (default `587`; use `465` for implicit SSL)                                                                  |
+| `SMTP_USER`                          | SMTP login username                                                                                                    |
+| `SMTP_PASSWORD`                      | SMTP login password or app password                                                                                    |
+| `SENDGRID_API_KEY`                   | SendGrid API key when using SendGrid                                                                                   |
+| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Mailgun credentials when using Mailgun                                                                                 |
+| `ALERT_EMAIL_TO`                     | Default comma-separated recipients when a rule uses `"email"` without `email_to`                                       |
+| `ALERT_EMAIL_FROM`                   | Platform **From** address; required for SendGrid/Mailgun                                                               |
 
 Per-rule overrides in alerts config: `webhook_url`, `webhook_format` (`json`, `slack`, or `discord`), `email_to`, optional SMTP fields.
 

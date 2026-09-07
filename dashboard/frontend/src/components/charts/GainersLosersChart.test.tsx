@@ -50,12 +50,7 @@ describe('GainersLosersChart dirty changePercent', () => {
   });
 
   it('renders finite mover percents in the legend list', () => {
-    render(
-      <GainersLosersChart
-        gainers={[mover('AAPL', 1.5)]}
-        losers={[mover('MSFT', -2)]}
-      />,
-    );
+    render(<GainersLosersChart gainers={[mover('AAPL', 1.5)]} losers={[mover('MSFT', -2)]} />);
 
     expect(screen.getByText('+1.50%')).toBeTruthy();
     expect(screen.getByText('-2.00%')).toBeTruthy();
@@ -119,4 +114,3 @@ describe('GainersLosersChart dirty changePercent', () => {
     expect(screen.queryByText('INF')).toBeNull();
   });
 });
-

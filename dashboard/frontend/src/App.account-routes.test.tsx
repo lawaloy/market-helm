@@ -37,19 +37,35 @@ vi.mock('./components/layout/Header', () => ({
 }));
 
 vi.mock('./pages/Dashboard', () => ({
-  default: () => <main><h1>Dashboard route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Dashboard route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./pages/HistoricalTrends', () => ({
-  default: () => <main><h1>Historical Trends route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Historical Trends route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./pages/Summary', () => ({
-  default: () => <main><h1>Summary route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Summary route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./pages/AlertsSettings', () => ({
-  default: () => <main><h1>Helmtower route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Helmtower route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./services/api', () => ({

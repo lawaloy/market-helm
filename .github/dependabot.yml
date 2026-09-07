@@ -5,30 +5,30 @@
 
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/dashboard/frontend" # Location of package manifests
+  - package-ecosystem: 'npm' # See documentation for possible values
+    directory: '/dashboard/frontend' # Location of package manifests
     schedule:
-      interval: "cron"
-      cronjob: "0 13 * * *"
+      interval: 'cron'
+      cronjob: '0 13 * * *'
     groups:
       npm-all:
         patterns:
-          - "*"
-  - package-ecosystem: "pip"
-    directory: "/"
+          - '*'
+  - package-ecosystem: 'pip'
+    directory: '/'
     schedule:
-      interval: "cron"
-      cronjob: "0 13 * * *"
+      interval: 'cron'
+      cronjob: '0 13 * * *'
     groups:
       pip-all:
         patterns:
-          - "*"
-  - package-ecosystem: "pip"
-    directory: "/dashboard/backend"
+          - '*'
+  - package-ecosystem: 'pip'
+    directory: '/dashboard/backend'
     schedule:
-      interval: "cron"
-      cronjob: "0 13 * * *"
+      interval: 'cron'
+      cronjob: '0 13 * * *'
     groups:
       pip-all:
         patterns:
-          - "*"
+          - '*'

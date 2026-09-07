@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ['main']
   pull_request:
-    branches: ["main"]
+    branches: ['main']
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -61,7 +61,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
       - name: Install integration dependencies
         run: |
           python -m pip install --upgrade pip
@@ -79,13 +79,33 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version-file: .nvmrc
+          cache: 'npm'
           cache-dependency-path: dashboard/frontend/package-lock.json
-      - name: Install and build
+
+      - name: Test CI automation scripts
+        run: node --test .github/scripts/*.test.cjs
+
+      - name: Install locked dashboard dependencies
+        working-directory: dashboard/frontend
+        run: npm ci
+
+      - name: Audit dashboard dependencies
+        working-directory: dashboard/frontend
+        run: node ../../.github/scripts/npm-audit-ci.cjs
+
+      - name: Build and test dashboard
+        working-directory: dashboard/frontend
         run: |
-          node --test .github/scripts/*.test.cjs
-          cd dashboard/frontend
-          npm ci
-          node ../../.github/scripts/npm-audit-ci.cjs
+          npm run format:check
           npm run build
+          npm test
+
+      - name: Upload npm debug logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-ci-npm-logs
+          path: ~/.npm/_logs/*-debug-0.log
+          if-no-files-found: ignore
+          retention-days: 7

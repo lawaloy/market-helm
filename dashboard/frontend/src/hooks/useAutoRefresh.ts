@@ -27,7 +27,7 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
   const getNextScheduledTime = useCallback((): Date | null => {
     const now = new Date();
     const dayOfWeek = now.getDay();
-    
+
     // Only on weekdays (1-5)
     if (dayOfWeek === 0 || dayOfWeek === 6) {
       return null; // Weekend - no scheduled updates
@@ -37,12 +37,12 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
       const [hours, minutes] = time.split(':').map(Number);
       const scheduledTime = new Date();
       scheduledTime.setHours(hours, minutes, 0, 0);
-      
+
       if (scheduledTime > now) {
         return scheduledTime;
       }
     }
-    
+
     // All times passed today, next is tomorrow 9am
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -53,23 +53,23 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
   const checkForNewData = useCallback(async () => {
     if (!enabled || state.isChecking) return;
 
-    setState(prev => ({ ...prev, isChecking: true }));
+    setState((prev) => ({ ...prev, isChecking: true }));
 
     try {
       const response = await api.get('/api/market/overview');
       const dataDate = response.data.date;
-      
+
       // Check if we have new data
       const currentDate = new Date().toISOString().split('T')[0];
       if (dataDate === currentDate) {
         const lastFetch = localStorage.getItem('lastDataFetch');
         const lastFetchDate = lastFetch ? new Date(lastFetch) : null;
         const now = new Date();
-        
+
         // If we haven't seen this data yet, or it's been > 2 hours
-        if (!lastFetch || (now.getTime() - (lastFetchDate?.getTime() || 0)) > 7200000) {
+        if (!lastFetch || now.getTime() - (lastFetchDate?.getTime() || 0) > 7200000) {
           localStorage.setItem('lastDataFetch', now.toISOString());
-          setState(prev => ({
+          setState((prev) => ({
             ...prev,
             shouldRefresh: true,
             lastUpdate: now,
@@ -78,15 +78,15 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
           return;
         }
       }
-      
-      setState(prev => ({
+
+      setState((prev) => ({
         ...prev,
         isChecking: false,
         nextScheduled: getNextScheduledTime(),
       }));
     } catch (error) {
       console.error('Auto-refresh check failed:', error);
-      setState(prev => ({ ...prev, isChecking: false }));
+      setState((prev) => ({ ...prev, isChecking: false }));
     }
   }, [enabled, state.isChecking, getNextScheduledTime]);
 
@@ -101,7 +101,7 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
 
     // Update next scheduled time every minute
     const scheduleInterval = setInterval(() => {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         nextScheduled: getNextScheduledTime(),
       }));
@@ -114,7 +114,7 @@ export const useAutoRefresh = (config: AutoRefreshConfig = {}) => {
   }, [enabled, checkInterval, checkForNewData, getNextScheduledTime]);
 
   const resetRefreshFlag = useCallback(() => {
-    setState(prev => ({ ...prev, shouldRefresh: false }));
+    setState((prev) => ({ ...prev, shouldRefresh: false }));
   }, []);
 
   return {

@@ -53,8 +53,7 @@ const SignIn: React.FC = () => {
     } catch (err) {
       if (!mountedRef.current) return;
       const detail =
-        axios.isAxiosError(err) &&
-        (err.response?.data as { detail?: string } | undefined)?.detail;
+        axios.isAxiosError(err) && (err.response?.data as { detail?: string } | undefined)?.detail;
       setError(typeof detail === 'string' ? detail : 'Authentication failed. Please try again.');
     } finally {
       if (mountedRef.current) {
@@ -136,9 +135,16 @@ const SignIn: React.FC = () => {
           </button>
         </div>
 
-        <form className="mt-6 space-y-4" aria-label="Authentication form" onSubmit={(event) => void handleSubmit(event)}>
+        <form
+          className="mt-6 space-y-4"
+          aria-label="Authentication form"
+          onSubmit={(event) => void handleSubmit(event)}
+        >
           <div>
-            <label htmlFor="auth-email" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+            <label
+              htmlFor="auth-email"
+              className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
+            >
               Email
             </label>
             <input
@@ -186,7 +192,10 @@ const SignIn: React.FC = () => {
             {submitting ? 'Please wait…' : mode === 'sign-in' ? 'Sign in' : 'Create account'}
           </button>
           {mode === 'sign-in' && (
-            <Link to="/forgot-password" className="block text-center text-sm text-teal-600 hover:underline">
+            <Link
+              to="/forgot-password"
+              className="block text-center text-sm text-teal-600 hover:underline"
+            >
               Forgot your password?
             </Link>
           )}

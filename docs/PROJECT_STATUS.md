@@ -25,12 +25,12 @@ MarketHelm does not provide investment, legal, or tax advice.
 
 ## Status definitions
 
-| Label | Meaning |
-|-------|---------|
-| **Shipped and tested** | Implemented with automated coverage in this repository |
+| Label                                        | Meaning                                                                                                        |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Shipped and tested**                       | Implemented with automated coverage in this repository                                                         |
 | **Shipped; operational verification needed** | Implemented and tested in isolation, but requires a real provider or hosted environment to validate end to end |
-| **Partial** | A useful first version exists, with material scope still open |
-| **Not implemented** | Design or roadmap only |
+| **Partial**                                  | A useful first version exists, with material scope still open                                                  |
+| **Not implemented**                          | Design or roadmap only                                                                                         |
 
 Automated coverage does not mean every production integration has been exercised.
 For example, tests mock Finnhub and notification providers; managed PostgreSQL,
@@ -38,17 +38,17 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 ## Current capability matrix
 
-| Area | Status | What exists | Important remaining work |
-|------|--------|-------------|--------------------------|
-| CLI and daily tracker | **Shipped and tested** | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output | Live Finnhub smoke testing and broader service-level failure tests |
-| Web dashboard | **Shipped and tested** | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
-| Projection model | **Partial** | Five-day heuristic targets, confidence, risk, and recommendations | Backtesting, calibration, business-day targets, confidence-band analytics, fundamentals/news/ML |
-| Historical accuracy | **Partial** | API and UI compare past projections with later closes | Richer metrics, confidence cohorts, risk-adjusted views, clearer market-calendar handling |
-| Alerts | **Shipped and tested** | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI | Technical-indicator and compound rules; SMS/push; real-provider staging tests |
-| Accounts and tenant isolation | **Shipped and tested** | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data | Account export and stronger administrative/support tooling |
-| Hosted persistence | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
-| Production controls | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks | Connect a real staging ingress/provider/monitor and record external sign-off evidence |
-| Automated trading | **Not implemented** | No broker connection or order execution | Broker integration, order/risk model, audit trail, compliance and safety controls |
+| Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                 |
+| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                             | Live Finnhub smoke testing and broader service-level failure tests                                       |
+| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
+| Projection model              | **Partial**                                  | Five-day heuristic targets, confidence, risk, and recommendations                                                                                                 | Backtesting, calibration, business-day targets, confidence-band analytics, fundamentals/news/ML          |
+| Historical accuracy           | **Partial**                                  | API and UI compare past projections with later closes                                                                                                             | Richer metrics, confidence cohorts, risk-adjusted views, clearer market-calendar handling                |
+| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                            |
+| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                               |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                |
+| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                    |
+| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Broker integration, order/risk model, audit trail, compliance and safety controls                        |
 
 ## Hosted alerts and accounts
 
@@ -113,13 +113,13 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Explicitly deferred
 
-| Item | Reason |
-|------|--------|
-| Automated trading | Requires a separate risk, compliance, broker, and audit design |
-| SMS and push notifications | Email/webhook production operation should be proven first |
+| Item                                    | Reason                                                            |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| Automated trading                       | Requires a separate risk, compliance, broker, and audit design    |
+| SMS and push notifications              | Email/webhook production operation should be proven first         |
 | Advanced technical/compound alert rules | Current price and screening rules cover the initial alert product |
-| International exchanges | Current screening is centered on S&P 500 and NASDAQ-100 |
-| ML/fundamental/news projections | Current projection engine is intentionally heuristic |
+| International exchanges                 | Current screening is centered on S&P 500 and NASDAQ-100           |
+| ML/fundamental/news projections         | Current projection engine is intentionally heuristic              |
 
 ## Keeping this document current
 

@@ -112,7 +112,12 @@ describe('AlertsSettings Email-on keep-Discord persist', () => {
       data: { alert_id: webhookOnlyRule.id, status: 'ok', notifiers: ['webhook'] },
     });
     apiMocks.getSymbols.mockResolvedValue({
-      data: { symbols: ['AAPL', 'MSFT'], names: { AAPL: 'Apple', MSFT: 'Microsoft' }, count: 2, prices: {} },
+      data: {
+        symbols: ['AAPL', 'MSFT'],
+        names: { AAPL: 'Apple', MSFT: 'Microsoft' },
+        count: 2,
+        prices: {},
+      },
     });
     apiMocks.historyGetSymbols.mockRejectedValue(new Error('unused'));
     apiMocks.getQuotes.mockResolvedValue({ data: { prices: {} } });

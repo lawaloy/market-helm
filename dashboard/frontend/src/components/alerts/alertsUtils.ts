@@ -195,7 +195,10 @@ export function canPersistConfig(
   return null;
 }
 
-export function buildSymbolOptions(symbols: string[], names: Record<string, string>): SymbolOption[] {
+export function buildSymbolOptions(
+  symbols: string[],
+  names: Record<string, string>,
+): SymbolOption[] {
   return symbols
     .map((symbol) => {
       const name = getCompanyName(symbol, names[symbol]);

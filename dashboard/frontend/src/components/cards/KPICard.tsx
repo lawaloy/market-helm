@@ -26,9 +26,7 @@ const KPICard: React.FC<KPICardProps> = ({ title, value, subtitle, icon, trend }
         <div className="flex-1">
           <p className="text-sm font-medium text-slate-600 dark:text-slate-400">{title}</p>
           <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{value}</p>
-          {subtitle && (
-            <p className={`mt-2 text-sm ${getTrendColor()}`}>{subtitle}</p>
-          )}
+          {subtitle && <p className={`mt-2 text-sm ${getTrendColor()}`}>{subtitle}</p>}
         </div>
         {icon && <div className="text-slate-400 dark:text-slate-500">{icon}</div>}
       </div>

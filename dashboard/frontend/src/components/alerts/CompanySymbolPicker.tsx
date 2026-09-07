@@ -236,9 +236,7 @@ function PickerPanel({
                     <div
                       data-symbol={option.value.toUpperCase()}
                       title={
-                        quote !== '—' && quote !== '…'
-                          ? `${option.label} · ${quote}`
-                          : option.label
+                        quote !== '—' && quote !== '…' ? `${option.label} · ${quote}` : option.label
                       }
                       className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm ${
                         focus || isSelected || option.value === value

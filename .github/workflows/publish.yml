@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Publish to"
+        description: 'Publish to'
         required: true
         type: choice
         options:
@@ -22,13 +22,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
       - name: Verify package version is synced
         run: python scripts/version_sync.py check
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -54,7 +59,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Set version from release tag
         if: github.event_name == 'release'
@@ -77,8 +82,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version-file: .nvmrc
+          cache: 'npm'
           cache-dependency-path: dashboard/frontend/package-lock.json
 
       - name: Build dashboard SPA (into dashboard/backend/static)

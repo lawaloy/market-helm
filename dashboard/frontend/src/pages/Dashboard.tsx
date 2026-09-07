@@ -37,9 +37,7 @@ export function dashboardLoadErrorMessage(err: unknown): string {
       return 'Service is temporarily unavailable. Please try again later.';
     }
     if (!err.response) {
-      return (
-        'Cannot reach the API. Start the backend (port 8000), or if you use the Vite dev server, ensure it can proxy /api.'
-      );
+      return 'Cannot reach the API. Start the backend (port 8000), or if you use the Vite dev server, ensure it can proxy /api.';
     }
     const data = err.response.data as { detail?: unknown } | undefined;
     const detail = data?.detail;
@@ -110,23 +108,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
       // Phase 2: secondary data loads in background
       if (!silent) setSecondaryLoading(true);
       try {
-        const [
-          gainersRes,
-          losersRes,
-          strongBuyRes,
-          buyRes,
-          holdRes,
-          sellRes,
-          strongSellRes,
-        ] = await Promise.all([
-          marketApi.getMovers('gainers', 10),
-          marketApi.getMovers('losers', 10),
-          projectionsApi.getOpportunities('STRONG_BUY', 50),
-          projectionsApi.getOpportunities('BUY', 50),
-          projectionsApi.getOpportunities('HOLD', 50),
-          projectionsApi.getOpportunities('SELL', 50),
-          projectionsApi.getOpportunities('STRONG_SELL', 50),
-        ]);
+        const [gainersRes, losersRes, strongBuyRes, buyRes, holdRes, sellRes, strongSellRes] =
+          await Promise.all([
+            marketApi.getMovers('gainers', 10),
+            marketApi.getMovers('losers', 10),
+            projectionsApi.getOpportunities('STRONG_BUY', 50),
+            projectionsApi.getOpportunities('BUY', 50),
+            projectionsApi.getOpportunities('HOLD', 50),
+            projectionsApi.getOpportunities('SELL', 50),
+            projectionsApi.getOpportunities('STRONG_SELL', 50),
+          ]);
 
         if (generation !== loadGenerationRef.current) return;
 
@@ -152,7 +143,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
           setSecondaryLoading(false);
         }
       }
-
     } catch (err) {
       if (generation !== loadGenerationRef.current) return;
       console.error('Error fetching dashboard data:', err);
@@ -180,10 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
           {error}
-          <button
-            onClick={() => fetchDashboardData(false)}
-            className="ml-4 underline"
-          >
+          <button onClick={() => fetchDashboardData(false)} className="ml-4 underline">
             Retry
           </button>
         </div>
@@ -223,8 +210,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
             (projectionsSummary?.expectedMarketMove || 0) > 0
               ? 'up'
               : (projectionsSummary?.expectedMarketMove || 0) < 0
-              ? 'down'
-              : 'neutral'
+                ? 'down'
+                : 'neutral'
           }
         />
         <KPICard
@@ -244,16 +231,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
         ) : (
           <GainersLosersChart gainers={gainers} losers={losers} />
         )}
-        {projectionsSummary?.recommendations && (
-          secondaryLoading ? (
+        {projectionsSummary?.recommendations &&
+          (secondaryLoading ? (
             <div className="card p-6 animate-pulse">
               <div className="h-5 w-44 bg-slate-200 dark:bg-slate-600 rounded mb-4"></div>
               <div className="h-48 bg-slate-200 dark:bg-slate-600 rounded-full mx-auto w-48"></div>
             </div>
           ) : (
             <SentimentPieChart recommendations={projectionsSummary.recommendations} />
-          )
-        )}
+          ))}
       </div>
 
       {/* Strong Buy Opportunities */}
@@ -313,10 +299,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
           </div>
         </div>
       ) : (
-        <StockTable
-          stocks={allOpportunities}
-          onStockClick={(symbol) => setSelectedStock(symbol)}
-        />
+        <StockTable stocks={allOpportunities} onStockClick={(symbol) => setSelectedStock(symbol)} />
       )}
 
       {/* Stock Detail Modal */}

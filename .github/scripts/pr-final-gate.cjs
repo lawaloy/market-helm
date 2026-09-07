@@ -36,17 +36,12 @@ const hasSuccessfulAdvancedCodeQl = (checkRuns) =>
   );
 
 const isIgnoredCheck = (run, checkRuns) =>
-  OWN_CHECKS.has(run.name) ||
-  (run.name === 'CodeQL' && hasSuccessfulAdvancedCodeQl(checkRuns));
+  OWN_CHECKS.has(run.name) || (run.name === 'CodeQL' && hasSuccessfulAdvancedCodeQl(checkRuns));
 
 const classifyCheckRuns = (checkRuns) => {
   const relevant = checkRuns.filter((run) => !isIgnoredCheck(run, checkRuns));
-  const missing = REQUIRED_CHECKS.filter(
-    (name) => !relevant.some((run) => run.name === name),
-  );
-  const pending = relevant.filter(
-    (run) => run.status === 'queued' || run.status === 'in_progress',
-  );
+  const missing = REQUIRED_CHECKS.filter((name) => !relevant.some((run) => run.name === name));
+  const pending = relevant.filter((run) => run.status === 'queued' || run.status === 'in_progress');
   const unacceptable = relevant.filter((run) => {
     if (run.status !== 'completed') return false;
     if (run.name?.startsWith(CURSOR_PREFIX)) {
@@ -59,8 +54,7 @@ const classifyCheckRuns = (checkRuns) => {
   return { missing, pending, unacceptable, cursor };
 };
 
-const sleep = (milliseconds) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 const checkRunsFromPage = (response) => {
   const data = response.data;
@@ -79,9 +73,7 @@ const runGate = async ({ github, context, core }) => {
   let requiredReadyAt = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const pullRequest = (
-      await github.rest.pulls.get({ owner, repo, pull_number })
-    ).data;
+    const pullRequest = (await github.rest.pulls.get({ owner, repo, pull_number })).data;
     const author = pullRequest.user?.login || '';
     const trusted =
       pullRequest.state === 'open' &&
@@ -140,8 +132,7 @@ const runGate = async ({ github, context, core }) => {
 
         if (hasFeedbackBlockers(blockers)) {
           core.setFailed(
-            'Feedback requires manual resolution: ' +
-              `${describeFeedbackBlockers(blockers)}.`,
+            'Feedback requires manual resolution: ' + `${describeFeedbackBlockers(blockers)}.`,
           );
           return;
         }

@@ -83,7 +83,7 @@ Create a `.env` file where you will run the tool:
 FINNHUB_API_KEY=your-api-key-here
 ```
 
-*(Get your free key from [finnhub.io/register](https://finnhub.io/register))*
+_(Get your free key from [finnhub.io/register](https://finnhub.io/register))_
 
 ### Step 3: Run It
 
@@ -100,11 +100,11 @@ Each tracker run screens ~201 stocks, selects the top movers, fetches detailed d
 
 ## What You Get
 
-| Output | Description |
-|--------|-------------|
-| `data/daily_data_YYYY-MM-DD.csv` | Prices, volume, daily changes |
-| `data/summary_YYYY-MM-DD.json` | Gainers, losers, statistics |
-| `logs/market_helm_YYYY-MM-DD.log` | Execution logs |
+| Output                            | Description                   |
+| --------------------------------- | ----------------------------- |
+| `data/daily_data_YYYY-MM-DD.csv`  | Prices, volume, daily changes |
+| `data/summary_YYYY-MM-DD.json`    | Gainers, losers, statistics   |
+| `logs/market_helm_YYYY-MM-DD.log` | Execution logs                |
 
 More entry points, console examples, and programmatic use: [docs/USAGE.md](docs/USAGE.md).
 
@@ -114,14 +114,14 @@ More entry points, console examples, and programmatic use: [docs/USAGE.md](docs/
 
 Full index: **[docs/README.md](docs/README.md)**
 
-| Guide | Topics |
-|-------|--------|
-| [USAGE.md](docs/USAGE.md) | CLI options, dashboard, output files |
-| [CONFIGURATION.md](docs/CONFIGURATION.md) | Screening, performance, optional AI, custom providers |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Hosted mode, PostgreSQL, workers, persistence, secrets |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Operating modes, workflows, auth/alert boundaries |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors, FAQ |
-| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Roadmap, alerts, product vision |
+| Guide                                         | Topics                                                 |
+| --------------------------------------------- | ------------------------------------------------------ |
+| [USAGE.md](docs/USAGE.md)                     | CLI options, dashboard, output files                   |
+| [CONFIGURATION.md](docs/CONFIGURATION.md)     | Screening, performance, optional AI, custom providers  |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Hosted mode, PostgreSQL, workers, persistence, secrets |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Operating modes, workflows, auth/alert boundaries      |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common errors, FAQ                                     |
+| [PROJECT_STATUS.md](docs/PROJECT_STATUS.md)   | Roadmap, alerts, product vision                        |
 
 ---
 

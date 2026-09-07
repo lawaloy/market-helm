@@ -32,9 +32,10 @@ test('waits for a present Cursor check', () => {
       conclusion: null,
     },
   ]);
-  assert.deepEqual(state.pending.map((run) => run.name), [
-    'Cursor Automation: Find critical bugs',
-  ]);
+  assert.deepEqual(
+    state.pending.map((run) => run.name),
+    ['Cursor Automation: Find critical bugs'],
+  );
 });
 
 test('accepts neutral Cursor and rejects failed repository checks', () => {
@@ -62,7 +63,10 @@ test('accepts neutral Cursor and rejects failed repository checks', () => {
     ...requiredSuccesses.filter((run) => run.name !== 'Python'),
     { name: 'Python', status: 'completed', conclusion: 'failure' },
   ]);
-  assert.deepEqual(failed.unacceptable.map((run) => run.name), ['Python']);
+  assert.deepEqual(
+    failed.unacceptable.map((run) => run.name),
+    ['Python'],
+  );
 });
 
 test('reports missing required checks', () => {

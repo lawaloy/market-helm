@@ -136,9 +136,7 @@ describe('AlertsSettings onboarding init', () => {
     await waitFor(() => {
       expect(apiMocks.getConfig.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
-    expect(
-      await screen.findByRole('status'),
-    ).toBeTruthy();
+    expect(await screen.findByRole('status')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain(
       'Helmtower is ready — pick how you want to be notified.',
     );
@@ -147,8 +145,7 @@ describe('AlertsSettings onboarding init', () => {
   });
 
   it('surfaces init 409 detail and stays on onboarding', async () => {
-    const detail =
-      "alerts.json already exists. Pass ?force=true to overwrite.";
+    const detail = 'alerts.json already exists. Pass ?force=true to overwrite.';
     apiMocks.initConfig.mockRejectedValueOnce(axiosError(409, detail));
 
     render(<AlertsSettings />);

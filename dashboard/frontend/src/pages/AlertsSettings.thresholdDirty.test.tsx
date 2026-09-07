@@ -133,7 +133,12 @@ describe('AlertsSettings dual-channel threshold dirty guards', () => {
       },
     });
     apiMocks.getSymbols.mockResolvedValue({
-      data: { symbols: ['AAPL', 'MSFT'], names: { AAPL: 'Apple', MSFT: 'Microsoft' }, count: 2, prices: {} },
+      data: {
+        symbols: ['AAPL', 'MSFT'],
+        names: { AAPL: 'Apple', MSFT: 'Microsoft' },
+        count: 2,
+        prices: {},
+      },
     });
     apiMocks.historyGetSymbols.mockRejectedValue(new Error('unused'));
     apiMocks.getQuotes.mockResolvedValue({ data: { prices: {} } });

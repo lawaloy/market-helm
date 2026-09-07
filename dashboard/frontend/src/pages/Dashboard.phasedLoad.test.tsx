@@ -151,9 +151,7 @@ describe('Dashboard phased load and fetch races', () => {
 
     render(<Dashboard />);
 
-    expect(
-      await screen.findByText('Some sections failed to load. You can retry.'),
-    ).toBeTruthy();
+    expect(await screen.findByText('Some sections failed to load. You can retry.')).toBeTruthy();
     expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('100');
     // Phase-1 KPIs stay up; phase-2 sections stay empty until Retry.
     expect(screen.getByTestId('stock-table').textContent).toBe('');
@@ -201,9 +199,7 @@ describe('Dashboard phased load and fetch races', () => {
     mockPhase1('2026-08-05', 100);
     mockPhase2Success('AAPL');
 
-    const view = render(
-      <Dashboard refreshKey={0} onDataLoaded={onDataLoaded} />,
-    );
+    const view = render(<Dashboard refreshKey={0} onDataLoaded={onDataLoaded} />);
     expect(await screen.findByTestId('kpi-Stocks Tracked')).toBeTruthy();
     expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('100');
     expect(await screen.findByTestId('opp-AAPL')).toBeTruthy();

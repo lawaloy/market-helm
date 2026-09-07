@@ -84,7 +84,9 @@ describe('AlertsSettings verification load errors', () => {
   });
 
   it('does not treat a 403 config failure as a missing sign-in', async () => {
-    apiMocks.getConfig.mockRejectedValueOnce(axiosStatus(403, 'Request failed with status code 403'));
+    apiMocks.getConfig.mockRejectedValueOnce(
+      axiosStatus(403, 'Request failed with status code 403'),
+    );
 
     render(<AlertsSettings />);
 

@@ -72,11 +72,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       </button>
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-            aria-hidden="true"
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
           <div className="absolute right-0 mt-1 w-56 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg z-20 py-1">
             {formats.includes('csv') && (
               <button

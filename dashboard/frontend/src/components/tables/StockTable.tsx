@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { formatPrice, formatPercentage, getCompanyName, getRecommendationColor, getRiskColor } from '../../utils/formatters';
+import {
+  formatPrice,
+  formatPercentage,
+  getCompanyName,
+  getRecommendationColor,
+  getRiskColor,
+} from '../../utils/formatters';
 import CompanyLogo from '../common/CompanyLogo';
 import ExportButton from '../common/ExportButton';
 import type { Opportunity } from '../../types';
@@ -16,7 +22,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
   const itemsPerPage = 20;
 
   // Filter stocks (names come from API - saved at write time)
-  const filteredStocks = stocks.filter(stock => {
+  const filteredStocks = stocks.filter((stock) => {
     // Dirty rows can omit symbol; calling toLowerCase on non-strings blanks the table.
     if (typeof stock.symbol !== 'string' || !stock.symbol.trim()) {
       return false;
@@ -24,9 +30,8 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
     const displayName = getCompanyName(stock.symbol, stock.name);
     const needle = searchTerm.toLowerCase();
     const matchesSearch =
-      stock.symbol.toLowerCase().includes(needle) ||
-      displayName.toLowerCase().includes(needle);
-    
+      stock.symbol.toLowerCase().includes(needle) || displayName.toLowerCase().includes(needle);
+
     const rating = stock.recommendation || '';
     const matchesFilter =
       filterRec === 'All' ||
@@ -73,15 +78,33 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
         <table className="w-full min-w-[640px]">
           <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-600">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">#</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Symbol</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Name</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Price</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Target</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Change</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Conf</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Risk</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">Rec</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                #
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Symbol
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Name
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Price
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Target
+              </th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Change
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Conf
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Risk
+              </th>
+              <th className="px-4 py-3 text-center text-xs font-medium text-slate-600 dark:text-slate-400 uppercase">
+                Rec
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-600">
@@ -96,7 +119,11 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                 </td>
                 <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-slate-100">
                   <div className="flex items-center gap-2">
-                    <CompanyLogo symbol={stock.symbol} name={getCompanyName(stock.symbol, stock.name)} size={20} />
+                    <CompanyLogo
+                      symbol={stock.symbol}
+                      name={getCompanyName(stock.symbol, stock.name)}
+                      size={20}
+                    />
                     <span>{stock.symbol}</span>
                   </div>
                 </td>
@@ -109,11 +136,13 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                 <td className="px-4 py-3 text-sm text-right">
                   {Number.isFinite(stock.targetPrice) ? formatPrice(stock.targetPrice) : '—'}
                 </td>
-                <td className={`px-4 py-3 text-sm text-right font-medium ${
-                  Number.isFinite(stock.expectedChange) && stock.expectedChange >= 0
-                    ? 'text-green-600'
-                    : 'text-red-600'
-                } dark:text-green-400 dark:text-red-400`}>
+                <td
+                  className={`px-4 py-3 text-sm text-right font-medium ${
+                    Number.isFinite(stock.expectedChange) && stock.expectedChange >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
+                  } dark:text-green-400 dark:text-red-400`}
+                >
                   {Number.isFinite(stock.expectedChange)
                     ? formatPercentage(stock.expectedChange)
                     : '—'}
@@ -122,9 +151,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick }) => {
                   {Number.isFinite(stock.confidence) ? `${stock.confidence}%` : '—'}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`badge ${getRiskColor(stock.risk)}`}>
-                    {stock.risk}
-                  </span>
+                  <span className={`badge ${getRiskColor(stock.risk)}`}>{stock.risk}</span>
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`badge ${getRecommendationColor(stock.recommendation)}`}>
