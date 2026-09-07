@@ -176,6 +176,14 @@ module.exports = async ({ github, context, core }) => {
         pull_number,
       })
     ).data;
+    if (pullRequest.merged === true) {
+      core.info(`PR #${pull_number} is already merged; nothing to do.`);
+      return;
+    }
+    if (pullRequest.state !== 'open') {
+      core.info(`PR #${pull_number} is already closed; nothing to do.`);
+      return;
+    }
     const labels = pullRequest.labels.map((label) => label.name);
     const trusted =
       lane === 'dependabot'
@@ -215,12 +223,17 @@ module.exports = async ({ github, context, core }) => {
       const mergeCandidate = (
         await github.rest.pulls.get({ owner, repo, pull_number })
       ).data;
-      if (
-        mergeCandidate.state !== 'open' ||
-        mergeCandidate.head.sha !== pullRequest.head.sha
-      ) {
+      if (mergeCandidate.merged === true) {
+        core.info(`PR #${pull_number} was merged by another run; nothing to do.`);
+        return;
+      }
+      if (mergeCandidate.state !== 'open') {
+        core.info(`PR #${pull_number} was closed by another run; nothing to do.`);
+        return;
+      }
+      if (mergeCandidate.head.sha !== pullRequest.head.sha) {
         core.setFailed(
-          'PR state or head changed immediately before merge. Wait for checks ' +
+          'PR head changed immediately before merge. Wait for checks ' +
             'on the latest head, then use the workflow_dispatch recovery path.',
         );
         return;

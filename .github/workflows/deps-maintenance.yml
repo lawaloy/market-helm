@@ -1,4 +1,4 @@
-name: Dependency Maintenance
+name: Dependency Audit
 
 on:
   schedule:
@@ -7,68 +7,44 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: dependency-maintenance
   cancel-in-progress: false
 
 jobs:
-  maintain:
+  audit:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: dashboard/frontend/package-lock.json
 
-      - name: Install dashboard frontend dependencies
+      - name: Show Node.js toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Install locked dashboard dependencies
         working-directory: dashboard/frontend
         run: npm ci
 
-      - name: Update lockfile and patch vulnerabilities
+      - name: Audit dashboard dependencies
         working-directory: dashboard/frontend
-        run: |
-          npm update
-          npm audit fix || true
+        run: node ../../.github/scripts/npm-audit-ci.cjs
 
-      - name: Audit report (non-blocking)
-        working-directory: dashboard/frontend
-        run: npm audit --audit-level=moderate || true
-
-      - name: Create or update maintenance PR
-        uses: peter-evans/create-pull-request@v7
+      - name: Upload npm debug logs
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          author: "lawaloy <40930161+lawaloy@users.noreply.github.com>"
-          committer: "market-helm[bot] <market-helm[bot]@users.noreply.github.com>"
-          branch: security/deps-maintenance
-          delete-branch: true
-          title: 'chore(deps): automated dependency maintenance'
-          commit-message: 'chore(deps): automated dependency maintenance'
-          body: |
-            Automated dependency maintenance run for the dashboard SPA (`dashboard/frontend`):
-            - `npm update`, `npm audit fix`, `npm audit --audit-level=moderate` (non-blocking report)
-
-            This updates the same PR while it is still open. If that PR is merged, the action deletes the branch and the next run will create a new branch/PR named `security/deps-maintenance`.
-          labels: |
-            dependencies
-            security
-          add-paths: |
-            dashboard/frontend/package.json
-            dashboard/frontend/package-lock.json
+          name: dependency-audit-npm-logs
+          path: ~/.npm/_logs/*-debug-0.log
+          if-no-files-found: ignore
+          retention-days: 7

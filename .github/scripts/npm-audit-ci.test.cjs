@@ -15,6 +15,9 @@ test('registry 503 and audit endpoint errors are retryable', () => {
     true,
   );
   assert.equal(isRetryableAuditFailure('npm error ETIMEDOUT'), true);
+  assert.equal(isRetryableAuditFailure('npm error EAI_AGAIN'), true);
+  assert.equal(isRetryableAuditFailure('npm error 429 Too Many Requests'), true);
+  assert.equal(isRetryableAuditFailure('npm error 502 Bad Gateway'), true);
 });
 
 test('high-severity findings are not retryable', () => {

@@ -2,14 +2,14 @@
 /**
  * Run ``npm audit --audit-level=high`` with retries for registry outages.
  *
- * A 503 / "audit endpoint returned an error" must not fail the frontend job.
- * High-severity findings still fail immediately (no retry).
+ * Transient registry/network failures are retried, but a persistent outage fails
+ * closed. High-severity findings also fail immediately (without a retry).
  */
 
 const { spawnSync } = require('node:child_process');
 
 const isRetryableAuditFailure = (output) =>
-  /503|service unavailable|audit endpoint returned an error|econnreset|etimedout|enotfound|socket hang up/i.test(
+  /\b429\b|\b5\d\d\b|service unavailable|audit endpoint returned an error|eai_again|econnrefused|econnreset|etimedout|enotfound|socket hang up/i.test(
     output || '',
   );
 
@@ -43,6 +43,10 @@ if (require.main === module) {
   const result = runNpmAudit();
   process.stdout.write(result.output);
   if (!result.ok) {
+    const title = isRetryableAuditFailure(result.output)
+      ? 'npm registry unavailable after retries'
+      : 'npm audit found vulnerabilities or failed';
+    process.stderr.write(`::error title=${title}::See the npm audit output and uploaded debug log.\n`);
     process.exit(result.status || 1);
   }
 }
