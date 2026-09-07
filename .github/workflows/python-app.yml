@@ -97,6 +97,7 @@ jobs:
       - name: Build and test dashboard
         working-directory: dashboard/frontend
         run: |
+          npm run format:check
           npm run build
           npm test
 

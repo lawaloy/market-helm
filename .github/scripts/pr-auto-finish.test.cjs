@@ -177,4 +177,3 @@ test('post-release lane merges when only informational feedback remains', async 
   assert.equal(failure, '');
   assert.equal(mergeCalled, true);
 });
-

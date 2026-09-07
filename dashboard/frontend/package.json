@@ -27,6 +27,7 @@
     "autoprefixer": "^10.5.3",
     "jsdom": "^30.0.1",
     "postcss": "^8.5.28",
+    "prettier": "3.9.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",
@@ -40,6 +41,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "format": "prettier --write \"../../.github/scripts/*.cjs\"",
+    "format:check": "prettier --check \"../../.github/scripts/*.cjs\"",
     "ci": "npm audit --audit-level=high && npm run build && npm test"
   },
   "eslintConfig": {

@@ -11,7 +11,9 @@ test('registry 503 and audit endpoint errors are retryable', () => {
     true,
   );
   assert.equal(
-    isRetryableAuditFailure('{ error: \'Service Unavailable\' }\nnpm error audit endpoint returned an error'),
+    isRetryableAuditFailure(
+      "{ error: 'Service Unavailable' }\nnpm error audit endpoint returned an error",
+    ),
     true,
   );
   assert.equal(isRetryableAuditFailure('npm error ETIMEDOUT'), true);
@@ -36,7 +38,8 @@ test('runNpmAudit retries a 503 then succeeds', () => {
       return {
         status: 1,
         stdout: '',
-        stderr: 'npm warn audit 503 Service Unavailable\nnpm error audit endpoint returned an error',
+        stderr:
+          'npm warn audit 503 Service Unavailable\nnpm error audit endpoint returned an error',
       };
     }
     return { status: 0, stdout: 'found 0 vulnerabilities\n', stderr: '' };

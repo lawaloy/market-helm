@@ -32,11 +32,21 @@ const runNpmAudit = ({
       return { ok: true, output: lastOutput, attempts: attempt };
     }
     if (!isRetryableAuditFailure(lastOutput) || attempt === maxAttempts) {
-      return { ok: false, output: lastOutput, attempts: attempt, status: lastStatus };
+      return {
+        ok: false,
+        output: lastOutput,
+        attempts: attempt,
+        status: lastStatus,
+      };
     }
     sleep(attempt * 15000);
   }
-  return { ok: false, output: lastOutput, attempts: maxAttempts, status: lastStatus };
+  return {
+    ok: false,
+    output: lastOutput,
+    attempts: maxAttempts,
+    status: lastStatus,
+  };
 };
 
 if (require.main === module) {
@@ -46,7 +56,9 @@ if (require.main === module) {
     const title = isRetryableAuditFailure(result.output)
       ? 'npm registry unavailable after retries'
       : 'npm audit found vulnerabilities or failed';
-    process.stderr.write(`::error title=${title}::See the npm audit output and uploaded debug log.\n`);
+    process.stderr.write(
+      `::error title=${title}::See the npm audit output and uploaded debug log.\n`,
+    );
     process.exit(result.status || 1);
   }
 }

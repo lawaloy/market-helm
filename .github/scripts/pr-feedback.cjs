@@ -1,8 +1,4 @@
-const DECISIVE_REVIEW_STATES = new Set([
-  'APPROVED',
-  'CHANGES_REQUESTED',
-  'DISMISSED',
-]);
+const DECISIVE_REVIEW_STATES = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
 
 const isInformationalConversationComment = (comment) => {
   const login = comment.user?.login || '';
@@ -46,9 +42,7 @@ const feedbackBlockers = ({ comments, reviews, threads }) => {
       !isInformationalReviewBody(review),
   );
   const unresolvedThreads = threads.filter((thread) => !thread.isResolved);
-  const conversation = comments.filter(
-    (comment) => !isInformationalConversationComment(comment),
-  );
+  const conversation = comments.filter((comment) => !isInformationalConversationComment(comment));
 
   return { changeRequests, reviewBodies, unresolvedThreads, conversation };
 };
@@ -83,8 +77,7 @@ const inspectFeedback = async ({ github, owner, repo, pull_number }) => {
     repo,
     number: pull_number,
   });
-  const threads =
-    threadResult.repository.pullRequest.reviewThreads.nodes || [];
+  const threads = threadResult.repository.pullRequest.reviewThreads.nodes || [];
 
   return feedbackBlockers({ comments, reviews, threads });
 };
