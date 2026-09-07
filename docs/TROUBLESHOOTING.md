@@ -44,7 +44,9 @@ Yes. Edit `config/exchanges.json` to add symbols or change indices — see [CONF
 Rerun the tracker. Each run is independent; data is saved with the date.
 
 **Can I backtest strategies?**  
-This tool focuses on daily snapshots. Backtesting would require historical data (not included).
+MarketHelm can validate its saved projections with `market-helm backtest`. It is
+not a general trading-strategy simulator, and it needs dated daily/projection CSV
+snapshots in the configured data directory.
 
 **Is my data private?**  
 Yes. Data stays on your machine. API keys never leave your environment.

@@ -51,3 +51,17 @@ def test_main_dispatches_alerts_subcommand_without_daily_workflow(monkeypatch):
 
     alerts_main.assert_called_once_with(["run", "--loop", "--interval", "120"])
     ctor.assert_not_called()
+
+
+def test_main_dispatches_backtest_subcommand_without_daily_workflow(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["market-helm", "backtest", "--days", "30"])
+
+    with patch("src.cli.backtest_commands.main", return_value=0) as backtest_main:
+        with patch("src.cli.commands.StockTrackerWorkflow") as ctor:
+            from src.cli.commands import main
+
+            with pytest.raises(SystemExit, match="0"):
+                main()
+
+    backtest_main.assert_called_once_with(["--days", "30"])
+    ctor.assert_not_called()

@@ -14,7 +14,7 @@ This tool automatically:
 1. **Screens** major stock indices (S&P 500, NASDAQ-100) to find active, high-volume stocks
 2. **Fetches** real-time market data using official APIs (no scraping!)
 3. **Analyzes** daily changes, identifies top gainers/losers
-4. **Projects** 5-day price targets with buy/sell/hold recommendations
+4. **Projects** 5-session price targets with buy/sell/hold recommendations
 5. **Saves** results to CSV files and generates summary reports
 6. **Logs** everything for troubleshooting and monitoring
 
@@ -96,6 +96,12 @@ If you cloned the repo, you can also run **`python main.py`** from the project r
 
 Each tracker run screens ~201 stocks, selects the top movers, fetches detailed data, and saves `data/daily_data_YYYY-MM-DD.csv`.
 
+Evaluate saved projections against exact NYSE trading sessions:
+
+```bash
+market-helm backtest --data-dir data --days 365 --output data/backtest.json
+```
+
 ---
 
 ## What You Get
@@ -116,7 +122,7 @@ Full index: **[docs/README.md](docs/README.md)**
 
 | Guide                                         | Topics                                                 |
 | --------------------------------------------- | ------------------------------------------------------ |
-| [USAGE.md](docs/USAGE.md)                     | CLI options, dashboard, output files                   |
+| [USAGE.md](docs/USAGE.md)                     | CLI options, backtesting, dashboard, output files      |
 | [CONFIGURATION.md](docs/CONFIGURATION.md)     | Screening, performance, optional AI, custom providers  |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Hosted mode, PostgreSQL, workers, persistence, secrets |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Operating modes, workflows, auth/alert boundaries      |
@@ -129,7 +135,7 @@ Full index: **[docs/README.md](docs/README.md)**
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Next priorities:** projection validation/backtesting, external staging sign-off, deeper alert
+**Next priorities:** projection backtest baselines and calibration, external staging sign-off, deeper alert
 rules, and dashboard quality — details in
 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 

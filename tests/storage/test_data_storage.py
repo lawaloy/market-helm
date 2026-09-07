@@ -127,6 +127,8 @@ class TestDataStorage(unittest.TestCase):
                 "risk_level": "medium",
                 "reason": "momentum",
                 "projection_date": "2026-05-25",
+                "projection_horizon_sessions": 5,
+                "projection_calendar": "XNYS",
                 "generated_at": "2026-05-20T12:00:00",
                 "extra_ignored": True,
             }
@@ -153,6 +155,8 @@ class TestDataStorage(unittest.TestCase):
                 "risk_level",
                 "reason",
                 "projection_date",
+                "projection_horizon_sessions",
+                "projection_calendar",
                 "generated_at",
             ],
         )

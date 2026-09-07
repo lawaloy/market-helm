@@ -6,7 +6,7 @@ Tests the projection generation, recommendation logic, and confidence scoring.
 
 import math
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from src.analysis.projector import StockProjector
 
@@ -373,6 +373,8 @@ class TestStockProjector:
         summary = projector.generate_projection_summary(projections)
         assert summary['total_projections'] == 3
         assert 'recommendations' in summary
+        assert summary['projection_horizon_sessions'] == 5
+        assert summary['projection_calendar'] == 'XNYS'
 
     def test_projection_summary_empty(self, projector):
         """Test projection summary with no projections."""
@@ -464,12 +466,17 @@ class TestStockProjector:
         projection = projector._project_stock(sample_stock_bullish)
         assert 'projection_date' in projection and 'generated_at' in projection
 
-    def test_projection_date_is_5_days_ahead(self, projector, sample_stock_bullish):
-        """Test that projection date is 5 days in the future."""
+    def test_projection_date_is_5_market_sessions_ahead(self, projector, sample_stock_bullish):
+        """Projection target uses the configured exchange-session horizon."""
         projection = projector._project_stock(sample_stock_bullish)
-        proj_date = datetime.fromisoformat(projection['projection_date'])
-        expected_date = datetime.now() + timedelta(days=5)
-        assert proj_date.date() == expected_date.date()
+        from src.analysis.market_calendar import trading_session_after
+
+        generated = datetime.fromisoformat(projection['generated_at'])
+        assert projection['projection_date'] == trading_session_after(
+            generated.date(), 5
+        ).isoformat()
+        assert projection['projection_horizon_sessions'] == 5
+        assert projection['projection_calendar'] == 'XNYS'
 
     # ========== Edge Cases ==========
 

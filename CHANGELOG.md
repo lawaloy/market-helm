@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Projection validation:** XNYS trading-session targets plus a deterministic
+  backtest CLI with error, direction, target-band, confidence, and cohort metrics.
 - **Alerts product:** Helmtower configuration, live quote picker, test sends,
   looping and database-backed workers, retry/backoff, and delivery history.
 - **Notification channels:** SMTP, SendGrid, and Mailgun email plus generic, Slack,

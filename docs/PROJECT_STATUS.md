@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-08-28
+**Last updated:** 2026-09-07
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -38,17 +38,17 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 ## Current capability matrix
 
-| Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                 |
-| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                             | Live Finnhub smoke testing and broader service-level failure tests                                       |
-| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
-| Projection model              | **Partial**                                  | Five-day heuristic targets, confidence, risk, and recommendations                                                                                                 | Backtesting, calibration, business-day targets, confidence-band analytics, fundamentals/news/ML          |
-| Historical accuracy           | **Partial**                                  | API and UI compare past projections with later closes                                                                                                             | Richer metrics, confidence cohorts, risk-adjusted views, clearer market-calendar handling                |
-| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                            |
-| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                               |
-| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                |
-| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                    |
-| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Broker integration, order/risk model, audit trail, compliance and safety controls                        |
+| Area                          | Status                                       | What exists                                                                                                                                                        | Important remaining work                                                                                 |
+| ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                              | Live Finnhub smoke testing and broader service-level failure tests                                       |
+| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                       | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
+| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                      | Representative baselines, calibration changes, dashboard report integration, fundamentals/news/ML        |
+| Historical accuracy           | **Partial**                                  | Exact-session evaluator reports error, direction, target-band coverage, and confidence/recommendation cohorts; the API and UI retain their earlier comparison view | Migrate the dashboard to the shared evaluator; add risk-adjusted and longer-horizon views                |
+| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                        | Technical-indicator and compound rules; SMS/push; real-provider staging tests                            |
+| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                      | Account export and stronger administrative/support tooling                                               |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills  | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                |
+| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                       | Connect a real staging ingress/provider/monitor and record external sign-off evidence                    |
+| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                            | Broker integration, order/risk model, audit trail, compliance and safety controls                        |
 
 ## Hosted alerts and accounts
 
@@ -96,9 +96,9 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Projection validation:** the next repository engineering milestone is
-   repeatable backtests, confidence calibration, confidence-band reports, and
-   explicit market-calendar semantics.
+1. **Projection validation:** run and preserve representative backtest baselines,
+   migrate dashboard accuracy to the shared exact-session evaluator, and change
+   confidence scoring only after cohort results demonstrate stable bias.
 2. **External staging sign-off:** in parallel, complete the ordered
    [external staging execution TODO](DEPLOYMENT.md#external-staging-execution-todo)
    against the chosen managed PostgreSQL, ingress, monitoring, and

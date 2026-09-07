@@ -230,6 +230,11 @@ def main():
         alerts_main(sys.argv[2:])
         return
 
+    if len(sys.argv) > 1 and sys.argv[1] == "backtest":
+        from .backtest_commands import main as backtest_main
+
+        raise SystemExit(backtest_main(sys.argv[2:]))
+
     def _positive_top_n(value: str) -> int:
         """Reject non-positive --top-n before negative slices invert ranking."""
         try:
