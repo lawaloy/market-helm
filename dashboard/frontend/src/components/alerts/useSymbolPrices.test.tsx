@@ -15,14 +15,8 @@ vi.mock('../../services/api', () => ({
 import api, { alertsApi } from '../../services/api';
 
 function ProbeHarness({ symbols }: { symbols?: string[] }) {
-  const {
-    apiReady,
-    quotesUnavailable,
-    symbolPrices,
-    fetchPricesFor,
-    pricingPending,
-    mergePrices,
-  } = useSymbolPrices();
+  const { apiReady, quotesUnavailable, symbolPrices, fetchPricesFor, pricingPending, mergePrices } =
+    useSymbolPrices();
 
   return (
     <div>

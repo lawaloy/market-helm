@@ -1,5 +1,14 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from 'recharts';
 import type { StockMover } from '../../types';
 import { coerceTooltipNumber } from '../../utils/formatters';
 import CompanyLogo from '../common/CompanyLogo';
@@ -15,10 +24,7 @@ type MoverRow = {
   type: 'gainer' | 'loser';
 };
 
-function toMoverRow(
-  mover: StockMover,
-  type: 'gainer' | 'loser',
-): MoverRow | null {
+function toMoverRow(mover: StockMover, type: 'gainer' | 'loser'): MoverRow | null {
   const change = coerceTooltipNumber(mover.changePercent);
   if (change == null) return null;
   return { symbol: mover.symbol, change, type };
@@ -38,7 +44,6 @@ const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers
 
   const data: MoverRow[] = [...topGainers, ...topLosers];
 
-
   return (
     <div className="card p-6">
       <h3 className="text-lg font-semibold mb-4 dark:text-slate-100">Top Movers</h3>
@@ -55,10 +60,7 @@ const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers
           />
           <Bar dataKey="change" radius={[0, 4, 4, 0]}>
             {data.map((entry, index) => (
-              <Cell
-                key={`cell-${index}`}
-                fill={entry.change >= 0 ? '#10B981' : '#EF4444'}
-              />
+              <Cell key={`cell-${index}`} fill={entry.change >= 0 ? '#10B981' : '#EF4444'} />
             ))}
           </Bar>
         </BarChart>
@@ -73,7 +75,13 @@ const GainersLosersChart: React.FC<GainersLosersChartProps> = ({ gainers, losers
               <CompanyLogo symbol={item.symbol} size={20} />
               <span className="font-medium text-slate-900 dark:text-slate-100">{item.symbol}</span>
             </div>
-            <span className={item.change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+            <span
+              className={
+                item.change >= 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+              }
+            >
               {item.change >= 0 ? '+' : ''}
               {item.change.toFixed(2)}%
             </span>

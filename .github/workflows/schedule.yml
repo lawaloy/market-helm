@@ -5,7 +5,7 @@ permissions:
 
 on:
   schedule:
-    - cron: "0 16 * * *" # runs daily at 16:00 UTC
+    - cron: '0 16 * * *' # runs daily at 16:00 UTC
   workflow_dispatch: {}
 
 jobs:
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies (editable)
         run: |

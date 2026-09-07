@@ -128,9 +128,11 @@ repo template format:
 
 ```markdown
 ## What + Why
+
 - Why this change exists (at least one bullet)
 
 ## Checks
+
 - [ ] `dashboard/frontend`: `npm ci` and `npm run build`
 - [ ] `pytest tests/ --ignore=tests/integration/test_postgresql_storage.py` (repo root)
 
@@ -201,14 +203,14 @@ from .api_client import FinnhubClient
 def function_name(param1: str, param2: int) -> bool:
     """
     Brief description of function.
-    
+
     Args:
         param1: Description of param1
         param2: Description of param2
-    
+
     Returns:
         Description of return value
-    
+
     Raises:
         ValueError: When something goes wrong
     """
@@ -226,10 +228,10 @@ def test_function_returns_expected_value_when_given_valid_input(self):
     """Test that function returns correct value with valid input."""
     # Arrange
     input_data = create_test_data()
-    
+
     # Act
     result = function_under_test(input_data)
-    
+
     # Assert
     self.assertEqual(result, expected_value)
 ```
@@ -273,7 +275,7 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 **Next:**
 
 - [ ] Record managed PostgreSQL, real email/webhook, ingress, and monitoring
-  evidence using the staging runbook
+      evidence using the staging runbook
 - [ ] Technical/compound rules; later, SMS/push
 
 ---

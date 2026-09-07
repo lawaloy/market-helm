@@ -127,8 +127,10 @@ describe('AlertsSettings webhook draft when Discord/Slack is off', () => {
     const payload = apiMocks.saveConfig.mock.calls[0][0];
     expect(payload.defaults.notify_webhook).toBe(false);
     expect(payload.defaults).not.toHaveProperty('webhook_url');
-    expect(payload.alerts.every((rule: { notifications: string[] }) =>
-      !rule.notifications.includes('webhook'),
-    )).toBe(true);
+    expect(
+      payload.alerts.every(
+        (rule: { notifications: string[] }) => !rule.notifications.includes('webhook'),
+      ),
+    ).toBe(true);
   });
 });

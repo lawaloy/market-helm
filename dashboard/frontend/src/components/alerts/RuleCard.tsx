@@ -136,7 +136,11 @@ export function RuleCard({
                   className="alerts-inline-input w-24 text-sm"
                 />
               </span>
-              <button type="button" onClick={saveEdit} className="text-xs font-medium text-teal-600 hover:underline">
+              <button
+                type="button"
+                onClick={saveEdit}
+                className="text-xs font-medium text-teal-600 hover:underline"
+              >
                 Save
               </button>
               <button
@@ -172,7 +176,9 @@ export function RuleCard({
             )
           )}
           {!isPrice && (
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{formatCondition(rule)}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              {formatCondition(rule)}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center">

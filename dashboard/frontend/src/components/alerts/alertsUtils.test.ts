@@ -84,17 +84,17 @@ describe('canPersistConfig', () => {
 
   it('rejects email-on without an address', () => {
     expect(
-      canPersistConfig(config({ notify_email: true, notify_webhook: false, email_to: '  ' }), null, ''),
+      canPersistConfig(
+        config({ notify_email: true, notify_webhook: false, email_to: '  ' }),
+        null,
+        '',
+      ),
     ).toBe('Enter your email address, or turn off email notifications.');
   });
 
   it('rejects webhook-on without a saved URL or draft', () => {
     expect(
-      canPersistConfig(
-        config({ notify_email: false, notify_webhook: true }),
-        channelsOff,
-        '   ',
-      ),
+      canPersistConfig(config({ notify_email: false, notify_webhook: true }), channelsOff, '   '),
     ).toBe('Paste a webhook URL, or turn off Discord/Slack notifications.');
   });
 
@@ -140,7 +140,12 @@ describe('priceAlertKey', () => {
       priceAlertKey({ type: 'price_threshold', symbol: 'AAPL', operator: undefined, value: 10 }),
     ).toBeNull();
     expect(
-      priceAlertKey({ type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: Number.NaN }),
+      priceAlertKey({
+        type: 'price_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: Number.NaN,
+      }),
     ).toBeNull();
     expect(
       priceAlertKey({

@@ -82,11 +82,11 @@ For React development (Vite on port 3000, hot reload), see [dashboard/README.md]
 
 Each run writes:
 
-| File | Contents |
-|------|----------|
-| `data/daily_data_YYYY-MM-DD.csv` | Full stock data (prices, volume, changes) |
-| `data/summary_YYYY-MM-DD.json` | Analysis summary (gainers, losers, statistics) |
-| `logs/market_helm_YYYY-MM-DD.log` | Detailed execution logs |
+| File                              | Contents                                       |
+| --------------------------------- | ---------------------------------------------- |
+| `data/daily_data_YYYY-MM-DD.csv`  | Full stock data (prices, volume, changes)      |
+| `data/summary_YYYY-MM-DD.json`    | Analysis summary (gainers, losers, statistics) |
+| `logs/market_helm_YYYY-MM-DD.log` | Detailed execution logs                        |
 
 Set `DATA_DIR` to change the output location — see [DEPLOYMENT.md](DEPLOYMENT.md).
 

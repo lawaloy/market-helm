@@ -7,7 +7,7 @@ name: Post-release Auto Finish
 
 on:
   workflow_run:
-    workflows: ["Post-release Final Gate"]
+    workflows: ['Post-release Final Gate']
     types: [completed]
   workflow_dispatch:
     inputs:

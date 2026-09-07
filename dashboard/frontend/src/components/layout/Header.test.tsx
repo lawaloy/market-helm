@@ -50,7 +50,11 @@ describe('Header refresh controls', () => {
     apiMocks.authUser = { id: 'u1', email: 'user@example.com' };
     apiMocks.multiUserEnabled = true;
 
-    render(<MemoryRouter><Header /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByRole('link', { name: 'Account' }).getAttribute('href')).toBe('/account');
     expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
@@ -59,7 +63,11 @@ describe('Header refresh controls', () => {
   it('links hosted anonymous users to sign-in with a same-app alerts return', () => {
     apiMocks.multiUserEnabled = true;
 
-    render(<MemoryRouter><Header /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
 
     expect(screen.getByRole('link', { name: 'Sign in' }).getAttribute('href')).toBe(
       '/sign-in?return=%2Falerts',
@@ -111,7 +119,11 @@ describe('Header refresh controls', () => {
     apiMocks.multiUserEnabled = true;
     apiMocks.logout.mockRejectedValueOnce(new Error('network unavailable'));
 
-    render(<MemoryRouter><Header /></MemoryRouter>);
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe(
@@ -270,9 +282,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(
-      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
-    );
+    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -323,9 +333,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(
-      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
-    );
+    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {
@@ -397,9 +405,7 @@ describe('Header refresh controls', () => {
 
     // Prior cancel timer must not wipe the newer refresh generation's status.
     expect(screen.queryByText('Refresh cancelled.')).toBeNull();
-    expect(
-      screen.getByText(/Refresh started in background|Fetching quotes/),
-    ).toBeTruthy();
+    expect(screen.getByText(/Refresh started in background|Fetching quotes/)).toBeTruthy();
   });
 
   it('stops polling after max wait without calling onRefreshComplete', async () => {
@@ -409,9 +415,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(
-      <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />,
-    );
+    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -443,9 +447,7 @@ describe('Header refresh controls', () => {
     });
     const onQuickRefresh = vi.fn();
 
-    render(
-      <Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />,
-    );
+    render(<Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(onQuickRefresh).toHaveBeenCalledTimes(1);

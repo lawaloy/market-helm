@@ -40,7 +40,9 @@ async function run() {
 
   // Enable Discord/Slack to show webhook field
   const webhookSection = page.locator('text=Discord or Slack').first();
-  const webhookToggle = webhookSection.locator('xpath=ancestor::div[contains(@class,"alerts-channel")]//button[@role="switch"]').first();
+  const webhookToggle = webhookSection
+    .locator('xpath=ancestor::div[contains(@class,"alerts-channel")]//button[@role="switch"]')
+    .first();
   if (!(await webhookToggle.getAttribute('aria-checked'))) {
     await webhookToggle.click();
   }

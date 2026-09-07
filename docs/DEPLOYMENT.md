@@ -165,67 +165,67 @@ file; use the selected platform's secret manager.
 - [ ] Choose SendGrid, Mailgun, or SES and the sender domain/address.
 - [ ] Choose the monitoring service and its email/Slack/PagerDuty destination.
 - [ ] Record the availability target, database RPO/RTO, backup retention, and
-  person responsible for acknowledging staging incidents.
+      person responsible for acknowledging staging incidents.
 
 ##### 2. Add and provision the target deployment
 
 - [ ] Add provider-specific deployment configuration or infrastructure-as-code;
-  the checked-in compose stack is the portable reference, not proof of a managed
-  deployment.
+      the checked-in compose stack is the portable reference, not proof of a managed
+      deployment.
 - [ ] Provision secret storage and inject credentials without committing them.
 - [ ] Provision persistent shared `DATA_DIR` storage for the API and worker.
 - [ ] Deploy the same reviewed application image as separate API and worker
-  services, then record the image digest and application version.
+      services, then record the image digest and application version.
 
 ##### 3. Sign off managed PostgreSQL
 
 - [ ] Provision PostgreSQL 16 with encryption at rest, TLS required, restricted
-  networking, least-privilege application credentials, and pooling/connection
-  limits appropriate for the host.
+      networking, least-privilege application credentials, and pooling/connection
+      limits appropriate for the host.
 - [ ] Enable automated snapshots and point-in-time recovery with the recorded
-  retention policy.
+      retention policy.
 - [ ] Run migrations and the staging acceptance/tenant checks against the managed
-  database.
+      database.
 - [ ] Restore a snapshot/PITR point into a newly named database, compare schema and
-  critical record counts, and record the measured RPO/RTO.
+      critical record counts, and record the measured RPO/RTO.
 - [ ] Perform a controlled provider failover, rerun acceptance, and save provider
-  event IDs and recovery timings.
+      event IDs and recovery timings.
 
 ##### 4. Sign off public DNS and TLS
 
 - [ ] Create the staging DNS record pointing only to the intended ingress.
 - [ ] Install or enable a trusted, hostname-matching certificate with automatic
-  renewal; enforce HTTP-to-HTTPS redirects and HSTS.
+      renewal; enforce HTTP-to-HTTPS redirects and HSTS.
 - [ ] Set `MARKET_HELM_PUBLIC_URL`, `CORS_ORIGINS`, and the exact trusted-proxy
-  CIDRs for the deployed ingress.
+      CIDRs for the deployed ingress.
 - [ ] Run `staging_acceptance.py --ingress-origin ...` against the public HTTPS URL
-  and save its JSON report plus certificate/DNS evidence.
+      and save its JSON report plus certificate/DNS evidence.
 
 ##### 5. Sign off transactional email
 
 - [ ] Authenticate the sender domain with provider-supplied SPF/DKIM records and
-  publish a DMARC policy.
+      publish a DMARC policy.
 - [ ] Store a restricted provider key and configure `ALERT_EMAIL_PROVIDER` plus
-  `ALERT_EMAIL_FROM`.
+      `ALERT_EMAIL_FROM`.
 - [ ] Receive and complete registration verification and password-reset links;
-  confirm both use `MARKET_HELM_PUBLIC_URL`.
+      confirm both use `MARKET_HELM_PUBLIC_URL`.
 - [ ] Deliver a real alert while the dashboard is closed and record the provider
-  message ID and inbox authentication results.
+      message ID and inbox authentication results.
 - [ ] Trigger a controlled rejection and confirm retries/failure details appear in
-  MarketHelm delivery history without leaking credentials.
+      MarketHelm delivery history without leaking credentials.
 
 ##### 6. Sign off external monitoring and release evidence
 
 - [ ] Probe `/health/live`, `/health/ready`, and `/health/worker` from outside the
-  host and collect `/metrics` through an appropriately restricted path.
+      host and collect `/metrics` through an appropriately restricted path.
 - [ ] Configure the runbook thresholds and notification destination.
 - [ ] Stop the staging worker and API in controlled drills; confirm alerts arrive,
-  are acknowledged, and send recovery notifications after restoration.
+      are acknowledged, and send recovery notifications after restoration.
 - [ ] Attach DNS/TLS results, database restore/failover evidence, email message IDs,
-  monitoring incident IDs, image digest, and acceptance/load JSON reports to the
-  staging release record.
+      monitoring incident IDs, image digest, and acceptance/load JSON reports to the
+      staging release record.
 - [ ] Review least privilege, secret rotation, backup retention, and rollback;
-  obtain the named operator's final staging sign-off.
+      obtain the named operator's final staging sign-off.
 
 Until those artifacts exist for a specific environment, the code is staging-ready
 but that environment is not approved for production.
@@ -263,11 +263,11 @@ This project runs **locally** and can run **on a host** (VPS, PaaS, containers) 
 
 ## What gets deployed vs what stays private
 
-| | In git | On the server (never in git) |
-|---|--------|------------------------------|
-| Application code | Yes | Built from git |
-| `data/*.csv`, `data/*.json` | **No** (see `.gitignore`) | Written at runtime by the tracker / dashboard |
-| API keys (`FINNHUB_API_KEY`, broker keys, etc.) | **No** | Injected env vars or host secret store |
+|                                                 | In git                    | On the server (never in git)                  |
+| ----------------------------------------------- | ------------------------- | --------------------------------------------- |
+| Application code                                | Yes                       | Built from git                                |
+| `data/*.csv`, `data/*.json`                     | **No** (see `.gitignore`) | Written at runtime by the tracker / dashboard |
+| API keys (`FINNHUB_API_KEY`, broker keys, etc.) | **No**                    | Injected env vars or host secret store        |
 
 ---
 
@@ -294,41 +294,41 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 
 ## Environment variables (reference)
 
-| Variable | Used by | Purpose |
-|----------|---------|---------|
-| `DATA_DIR` | Tracker, dashboard backend | Path to `daily_data_*.csv`, `projections_*.csv`, `summary_*.json` |
-| `FINNHUB_API_KEY` | Tracker CLI | Market data (required for live fetches) |
-| `CORS_ORIGINS` | Dashboard backend | Comma-separated origins allowed in browser (e.g. `https://app.example.com`) |
-| `VITE_API_URL` | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`) |
-| `MARKET_HELM_DATABASE_URL` | API, worker | Enables hosted mode; SQLite for development or PostgreSQL for hosted use |
-| `MARKET_HELM_AUTH_SECRET` | Dashboard backend | Required hosted session-signing secret; minimum 16 characters |
-| `MARKET_HELM_PUBLIC_URL` | Dashboard backend | Safe public base URL for email verification and password-reset links |
-| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend | Require verified email before protected hosted operations |
-| `MARKET_HELM_RATE_LIMIT_ENABLED` | Dashboard backend | Enables API rate limiting; defaults on when database mode is enabled |
-| `MARKET_HELM_RATE_LIMIT_GLOBAL` | Dashboard backend | Per-client API requests/minute (default `120`) |
-| `MARKET_HELM_RATE_LIMIT_LOGIN` | Dashboard backend | Login attempts/client/minute (default `10`) |
-| `MARKET_HELM_RATE_LIMIT_REGISTER` | Dashboard backend | Registrations/client/hour (default `5`) |
-| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL` | Dashboard backend | Verification/reset email requests/client/hour (default `5`) |
-| `MARKET_HELM_RATE_LIMIT_EXPENSIVE` | Dashboard backend | Expensive write requests/client/minute (default `10`) |
-| `MARKET_HELM_TRUSTED_PROXY_CIDRS` | Dashboard backend | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For` |
-| `ALERT_WEBHOOK_URL` | Tracker (alerts) | Default webhook when rules use `webhook` without per-rule `url` |
-| `ALERT_WEBHOOK_FORMAT` | Tracker (alerts) | `json`, `slack`, or `discord` webhook body format |
-| `DISCORD_WEBHOOK_URL` | Tracker (alerts) | Default Discord incoming webhook URL when a rule has no `webhook_url` |
-| `MARKET_HELM_ALERTS_CONFIG` | Tracker (alerts) | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`) |
-| `SMTP_HOST` | Tracker (alerts) | SMTP server for `email` notifications |
-| `SMTP_PORT` | Tracker (alerts) | SMTP port (default `587`) |
-| `SMTP_USER` | Tracker (alerts) | SMTP username |
-| `SMTP_PASSWORD` | Tracker (alerts) | SMTP password or app password |
-| `ALERT_EMAIL_TO` | Tracker (alerts) | Default recipients for `email` notifications |
-| `ALERT_EMAIL_FROM` | Tracker (alerts) | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun |
-| `ALERT_EMAIL_PROVIDER` | Tracker (alerts) | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set |
-| `SENDGRID_API_KEY` | Tracker (alerts) | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid` |
-| `MAILGUN_API_KEY` | Tracker (alerts) | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun` |
-| `ALERT_DELIVERY_MAX_ATTEMPTS` | Tracker (alerts) | Total send attempts per notification (default `3`) |
-| `ALERT_DELIVERY_RETRY_BASE_SECONDS` | Tracker (alerts) | Initial backoff delay between retries (default `1`) |
-| `ALERT_DELIVERY_RETRY_MAX_SECONDS` | Tracker (alerts) | Max backoff delay cap (default `8`) |
-| `MAILGUN_DOMAIN` | Tracker (alerts) | Mailgun sending domain (e.g. `mg.yourdomain.com`) |
-| `MAILGUN_API_BASE` | Tracker (alerts) | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`) |
+| Variable                                 | Used by                         | Purpose                                                                            |
+| ---------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| `DATA_DIR`                               | Tracker, dashboard backend      | Path to `daily_data_*.csv`, `projections_*.csv`, `summary_*.json`                  |
+| `FINNHUB_API_KEY`                        | Tracker CLI                     | Market data (required for live fetches)                                            |
+| `CORS_ORIGINS`                           | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)        |
+| `VITE_API_URL`                           | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                             |
+| `MARKET_HELM_DATABASE_URL`               | API, worker                     | Enables hosted mode; SQLite for development or PostgreSQL for hosted use           |
+| `MARKET_HELM_AUTH_SECRET`                | Dashboard backend               | Required hosted session-signing secret; minimum 16 characters                      |
+| `MARKET_HELM_PUBLIC_URL`                 | Dashboard backend               | Safe public base URL for email verification and password-reset links               |
+| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend               | Require verified email before protected hosted operations                          |
+| `MARKET_HELM_RATE_LIMIT_ENABLED`         | Dashboard backend               | Enables API rate limiting; defaults on when database mode is enabled               |
+| `MARKET_HELM_RATE_LIMIT_GLOBAL`          | Dashboard backend               | Per-client API requests/minute (default `120`)                                     |
+| `MARKET_HELM_RATE_LIMIT_LOGIN`           | Dashboard backend               | Login attempts/client/minute (default `10`)                                        |
+| `MARKET_HELM_RATE_LIMIT_REGISTER`        | Dashboard backend               | Registrations/client/hour (default `5`)                                            |
+| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL`      | Dashboard backend               | Verification/reset email requests/client/hour (default `5`)                        |
+| `MARKET_HELM_RATE_LIMIT_EXPENSIVE`       | Dashboard backend               | Expensive write requests/client/minute (default `10`)                              |
+| `MARKET_HELM_TRUSTED_PROXY_CIDRS`        | Dashboard backend               | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For`                    |
+| `ALERT_WEBHOOK_URL`                      | Tracker (alerts)                | Default webhook when rules use `webhook` without per-rule `url`                    |
+| `ALERT_WEBHOOK_FORMAT`                   | Tracker (alerts)                | `json`, `slack`, or `discord` webhook body format                                  |
+| `DISCORD_WEBHOOK_URL`                    | Tracker (alerts)                | Default Discord incoming webhook URL when a rule has no `webhook_url`              |
+| `MARKET_HELM_ALERTS_CONFIG`              | Tracker (alerts)                | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`)              |
+| `SMTP_HOST`                              | Tracker (alerts)                | SMTP server for `email` notifications                                              |
+| `SMTP_PORT`                              | Tracker (alerts)                | SMTP port (default `587`)                                                          |
+| `SMTP_USER`                              | Tracker (alerts)                | SMTP username                                                                      |
+| `SMTP_PASSWORD`                          | Tracker (alerts)                | SMTP password or app password                                                      |
+| `ALERT_EMAIL_TO`                         | Tracker (alerts)                | Default recipients for `email` notifications                                       |
+| `ALERT_EMAIL_FROM`                       | Tracker (alerts)                | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun |
+| `ALERT_EMAIL_PROVIDER`                   | Tracker (alerts)                | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set    |
+| `SENDGRID_API_KEY`                       | Tracker (alerts)                | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid`                              |
+| `MAILGUN_API_KEY`                        | Tracker (alerts)                | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun`                                |
+| `ALERT_DELIVERY_MAX_ATTEMPTS`            | Tracker (alerts)                | Total send attempts per notification (default `3`)                                 |
+| `ALERT_DELIVERY_RETRY_BASE_SECONDS`      | Tracker (alerts)                | Initial backoff delay between retries (default `1`)                                |
+| `ALERT_DELIVERY_RETRY_MAX_SECONDS`       | Tracker (alerts)                | Max backoff delay cap (default `8`)                                                |
+| `MAILGUN_DOMAIN`                         | Tracker (alerts)                | Mailgun sending domain (e.g. `mg.yourdomain.com`)                                  |
+| `MAILGUN_API_BASE`                       | Tracker (alerts)                | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`)     |
 
 **Dev vs product email:** SMTP env vars suit **self-host / operator** mail (e.g. personal Gmail). For production, use a transactional provider with a verified domain — see [Transactional alert email](#transactional-alert-email) below.
 
@@ -361,11 +361,11 @@ Helmtower users only enter their **To** address. The platform operator configure
 
 Set `ALERT_EMAIL_PROVIDER` explicitly, or omit it and let MarketHelm auto-detect from API keys:
 
-| Provider | When to use | Required env |
-|----------|-------------|--------------|
-| **SMTP** (default) | Dev, self-host, or **AWS SES SMTP relay** | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM` or `SMTP_USER` |
-| **SendGrid** | Hosted product with verified sender domain | `SENDGRID_API_KEY`, `ALERT_EMAIL_FROM` |
-| **Mailgun** | Hosted product with Mailgun domain | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `ALERT_EMAIL_FROM` |
+| Provider           | When to use                                | Required env                                                                 |
+| ------------------ | ------------------------------------------ | ---------------------------------------------------------------------------- |
+| **SMTP** (default) | Dev, self-host, or **AWS SES SMTP relay**  | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_EMAIL_FROM` or `SMTP_USER` |
+| **SendGrid**       | Hosted product with verified sender domain | `SENDGRID_API_KEY`, `ALERT_EMAIL_FROM`                                       |
+| **Mailgun**        | Hosted product with Mailgun domain         | `MAILGUN_API_KEY`, `MAILGUN_DOMAIN`, `ALERT_EMAIL_FROM`                      |
 
 Users still set `email_to` in Helmtower (or `ALERT_EMAIL_TO` as a default). Secrets stay in the host environment only.
 
@@ -546,7 +546,7 @@ Store API keys in the platform secret manager; never bake them into images.
 
 ## Related
 
-- [PROJECT_STATUS.md](PROJECT_STATUS.md) — roadmap and future execution notes  
-- [Dashboard README](../dashboard/README.md) — local dev, env vars  
-- [USAGE.md](USAGE.md) — CLI entry points and output files  
+- [PROJECT_STATUS.md](PROJECT_STATUS.md) — roadmap and future execution notes
+- [Dashboard README](../dashboard/README.md) — local dev, env vars
+- [USAGE.md](USAGE.md) — CLI entry points and output files
 - [Contributing](../CONTRIBUTING.md) — development workflow

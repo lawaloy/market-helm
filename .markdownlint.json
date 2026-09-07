@@ -8,7 +8,22 @@
     "siblings_only": true
   },
   "MD040": {
-    "allowed_languages": ["python", "bash", "json", "yaml", "text", "csv", "markdown", "shell", "sql", "javascript", "typescript", "ini", "http", "css", "dockerfile"]
+    "allowed_languages": [
+      "python",
+      "bash",
+      "json",
+      "yaml",
+      "text",
+      "csv",
+      "markdown",
+      "shell",
+      "sql",
+      "javascript",
+      "typescript",
+      "ini",
+      "http",
+      "css",
+      "dockerfile"
+    ]
   }
 }
-

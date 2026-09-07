@@ -16,7 +16,13 @@ import {
   Bar,
 } from 'recharts';
 import { historyApi, stocksApi } from '../services/api';
-import { coerceTooltipNumber, formatPercentage, formatDate, formatPrice, getCompanyName } from '../utils/formatters';
+import {
+  coerceTooltipNumber,
+  formatPercentage,
+  formatDate,
+  formatPrice,
+  getCompanyName,
+} from '../utils/formatters';
 import type { DailySummaryPoint, HistoricalPoint, ProjectionAccuracyResponse } from '../types';
 
 const DAY_OPTIONS = [7, 14, 30, 90];
@@ -172,7 +178,9 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-8 text-center">
-          <p className="text-slate-600 dark:text-slate-400">No historical data available for the selected period.</p>
+          <p className="text-slate-600 dark:text-slate-400">
+            No historical data available for the selected period.
+          </p>
           <p className="text-sm text-slate-500 dark:text-slate-500 mt-2">
             Use Fetch New regularly to build up historical data over time.
           </p>
@@ -184,7 +192,9 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">Historical Trends</h2>
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
+          Historical Trends
+        </h2>
         <p className="mt-1 text-slate-600 dark:text-slate-400 text-sm">
           How your stock projections have changed over time — market-wide and by company.
         </p>
@@ -218,95 +228,149 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
       <div className="space-y-8">
         {/* Market overview section */}
         <section>
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">Market overview</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">
+            Market overview
+          </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
             Aggregated across all tracked stocks for each day.
           </p>
           <div className="space-y-8">
-        <div className="card p-6">
-          <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">Projection confidence</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">How confident the model was in its price targets (0–100%).</p>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
-              <Tooltip
-                formatter={(value) => {
-                  const n = coerceTooltipNumber(value);
-                  return n != null ? [`${n}%`, 'Avg Confidence'] : ['', 'Avg Confidence'];
-                }}
-                labelFormatter={(label) => `Date: ${label}`}
-              />
-              <Line
-                type="monotone"
-                dataKey="averageConfidence"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                name="Avg Confidence"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            <div className="card p-6">
+              <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                Projection confidence
+              </h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                How confident the model was in its price targets (0–100%).
+              </p>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value) => {
+                      const n = coerceTooltipNumber(value);
+                      return n != null ? [`${n}%`, 'Avg Confidence'] : ['', 'Avg Confidence'];
+                    }}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="averageConfidence"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Avg Confidence"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-        <div className="card p-6">
-          <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">Expected price change</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Average expected % move across all stocks.</p>
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
-              <Tooltip
-                formatter={(value) => {
-                  const n = coerceTooltipNumber(value);
-                  return n != null ? [formatPercentage(n), 'Expected Move'] : ['', 'Expected Move'];
-                }}
-                labelFormatter={(label) => `Date: ${label}`}
-              />
-              <Line
-                type="monotone"
-                dataKey="expectedMarketMove"
-                stroke="#10B981"
-                strokeWidth={2}
-                dot={{ r: 3 }}
-                name="Expected Move"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+            <div className="card p-6">
+              <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                Expected price change
+              </h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Average expected % move across all stocks.
+              </p>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    formatter={(value) => {
+                      const n = coerceTooltipNumber(value);
+                      return n != null
+                        ? [formatPercentage(n), 'Expected Move']
+                        : ['', 'Expected Move'];
+                    }}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="expectedMarketMove"
+                    stroke="#10B981"
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                    name="Expected Move"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-        <div className="card p-6">
-          <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">Buy vs sell recommendations</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">How many stocks were rated STRONG BUY, BUY, HOLD, etc.</p>
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip
-                contentStyle={{ maxWidth: 300 }}
-                labelFormatter={(label) => `Date: ${label}`}
-              />
-              <Legend />
-              <Area type="monotone" dataKey="strongBuy" stackId="1" stroke="#10B981" fill="#10B981" name="STRONG BUY" />
-              <Area type="monotone" dataKey="buy" stackId="1" stroke="#34D399" fill="#34D399" name="BUY" />
-              <Area type="monotone" dataKey="hold" stackId="1" stroke="#64748B" fill="#64748B" name="HOLD" />
-              <Area type="monotone" dataKey="sell" stackId="1" stroke="#F59E0B" fill="#F59E0B" name="SELL" />
-              <Area type="monotone" dataKey="strongSell" stackId="1" stroke="#EF4444" fill="#EF4444" name="STRONG SELL" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+            <div className="card p-6">
+              <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                Buy vs sell recommendations
+              </h4>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                How many stocks were rated STRONG BUY, BUY, HOLD, etc.
+              </p>
+              <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ maxWidth: 300 }}
+                    labelFormatter={(label) => `Date: ${label}`}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="strongBuy"
+                    stackId="1"
+                    stroke="#10B981"
+                    fill="#10B981"
+                    name="STRONG BUY"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="buy"
+                    stackId="1"
+                    stroke="#34D399"
+                    fill="#34D399"
+                    name="BUY"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="hold"
+                    stackId="1"
+                    stroke="#64748B"
+                    fill="#64748B"
+                    name="HOLD"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="sell"
+                    stackId="1"
+                    stroke="#F59E0B"
+                    fill="#F59E0B"
+                    name="SELL"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="strongSell"
+                    stackId="1"
+                    stroke="#EF4444"
+                    fill="#EF4444"
+                    name="STRONG SELL"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </section>
 
         {/* Projection vs actual (target date) */}
         <section>
-          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Projection accuracy</h3>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
+            Projection accuracy
+          </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            For each past run, compares the projected 5-day target price to the first available closing price on or after
-            the target date. Lower mean error is better. Needs enough history (daily + projections) after targets mature.
+            For each past run, compares the projected 5-day target price to the first available
+            closing price on or after the target date. Lower mean error is better. Needs enough
+            history (daily + projections) after targets mature.
           </p>
           {accuracyLoading ? (
             <div className="flex justify-center py-12">
@@ -314,20 +378,24 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
             </div>
           ) : !accuracy || accuracy.summary.sampleCount === 0 ? (
             <div className="card p-6 text-sm text-slate-600 dark:text-slate-400">
-              No scored projections yet for this range. Keep running Fetch New so target dates can pass and actual
-              prices exist.
+              No scored projections yet for this range. Keep running Fetch New so target dates can
+              pass and actual prices exist.
             </div>
           ) : (
             <div className="space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="card p-6">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Samples (projections scored)</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Samples (projections scored)
+                  </p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                     {accuracy.summary.sampleCount}
                   </p>
                 </div>
                 <div className="card p-6">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Mean absolute error (price)</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Mean absolute error (price)
+                  </p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                     {accuracy.summary.meanAbsErrorPct != null
                       ? `${accuracy.summary.meanAbsErrorPct.toFixed(2)}%`
@@ -337,8 +405,12 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
               </div>
               {Object.keys(accuracy.summary.byRecommendation).length > 0 && (
                 <div className="card p-6">
-                  <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">Error by recommendation</h4>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Mean absolute % error vs target price.</p>
+                  <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                    Error by recommendation
+                  </h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    Mean absolute % error vs target price.
+                  </p>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart
                       data={Object.entries(accuracy.summary.byRecommendation).map(([rec, v]) => ({
@@ -348,7 +420,14 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                       margin={{ top: 8, right: 8, left: 8, bottom: 48 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="recommendation" tick={{ fontSize: 11 }} interval={0} angle={-25} textAnchor="end" height={60} />
+                      <XAxis
+                        dataKey="recommendation"
+                        tick={{ fontSize: 11 }}
+                        interval={0}
+                        angle={-25}
+                        textAnchor="end"
+                        height={60}
+                      />
                       <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
                       <Tooltip
                         formatter={(value) => {
@@ -356,14 +435,21 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                           return n != null ? [`${n.toFixed(2)}%`, 'Mean error'] : ['', ''];
                         }}
                       />
-                      <Bar dataKey="meanAbsErrorPct" fill="#6366F1" name="Mean error %" radius={[4, 4, 0, 0]} />
+                      <Bar
+                        dataKey="meanAbsErrorPct"
+                        fill="#6366F1"
+                        name="Mean error %"
+                        radius={[4, 4, 0, 0]}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               )}
               {accuracy.samples.length > 0 && (
                 <div className="card p-6 overflow-x-auto">
-                  <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">Recent scores</h4>
+                  <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                    Recent scores
+                  </h4>
                   <table className="min-w-full text-sm text-left">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400">
@@ -379,11 +465,18 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                     </thead>
                     <tbody>
                       {accuracy.samples.map((row) => (
-                        <tr key={`${row.symbol}-${row.runDate}-${row.targetDate}`} className="border-b border-slate-100 dark:border-slate-700">
+                        <tr
+                          key={`${row.symbol}-${row.runDate}-${row.targetDate}`}
+                          className="border-b border-slate-100 dark:border-slate-700"
+                        >
                           <td className="py-2 pr-4 font-medium">{row.symbol}</td>
                           <td className="py-2 pr-4 whitespace-nowrap">{formatDate(row.runDate)}</td>
-                          <td className="py-2 pr-4 whitespace-nowrap">{formatDate(row.targetDate)}</td>
-                          <td className="py-2 pr-4 whitespace-nowrap">{formatDate(row.actualDate)}</td>
+                          <td className="py-2 pr-4 whitespace-nowrap">
+                            {formatDate(row.targetDate)}
+                          </td>
+                          <td className="py-2 pr-4 whitespace-nowrap">
+                            {formatDate(row.actualDate)}
+                          </td>
                           <td className="py-2 pr-4">{formatPrice(row.predicted)}</td>
                           <td className="py-2 pr-4">{formatPrice(row.actual)}</td>
                           <td className="py-2 pr-4">{row.absErrorPct.toFixed(2)}%</td>
@@ -405,104 +498,125 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
             Pick a company to see its price and 5-day target over time.
           </p>
           <div className="card p-6">
-          <div className="flex flex-wrap items-center gap-4 mb-6">
-            <label htmlFor="symbol" className="text-sm font-medium text-slate-700">
-              Company:
-            </label>
-            <Listbox value={selectedSymbol} onChange={setSelectedSymbol}>
-              <div className="relative w-52">
-                <ListboxButton
-                  id="symbol"
-                  title={selectedSymbol ? (symbols.find((x) => x.value === selectedSymbol)?.label ?? selectedSymbol) : undefined}
-                  className="relative w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2 pl-3 pr-10 text-left text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                >
-                  <span className="block truncate">
-                    {selectedSymbol ? symbols.find((x) => x.value === selectedSymbol)?.label ?? selectedSymbol : 'Select a company...'}
-                  </span>
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <ChevronDownIcon className="h-5 w-5 text-slate-400" aria-hidden="true" />
-                  </span>
-                </ListboxButton>
-                <ListboxOptions
-                  anchor="bottom start"
-                  className="mt-1 max-h-60 w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg focus:outline-none"
-                >
-                  <ListboxOption value="">
-                    {({ focus }) => (
-                      <div
-                        className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${focus ? 'bg-blue-50' : ''}`}
-                      >
-                        Select a company...
-                      </div>
-                    )}
-                  </ListboxOption>
-                  {symbols.map((s) => (
-                    <ListboxOption key={s.value} value={s.value}>
+            <div className="flex flex-wrap items-center gap-4 mb-6">
+              <label htmlFor="symbol" className="text-sm font-medium text-slate-700">
+                Company:
+              </label>
+              <Listbox value={selectedSymbol} onChange={setSelectedSymbol}>
+                <div className="relative w-52">
+                  <ListboxButton
+                    id="symbol"
+                    title={
+                      selectedSymbol
+                        ? (symbols.find((x) => x.value === selectedSymbol)?.label ?? selectedSymbol)
+                        : undefined
+                    }
+                    className="relative w-full cursor-pointer rounded-md border border-slate-300 bg-white py-2 pl-3 pr-10 text-left text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  >
+                    <span className="block truncate">
+                      {selectedSymbol
+                        ? (symbols.find((x) => x.value === selectedSymbol)?.label ?? selectedSymbol)
+                        : 'Select a company...'}
+                    </span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronDownIcon className="h-5 w-5 text-slate-400" aria-hidden="true" />
+                    </span>
+                  </ListboxButton>
+                  <ListboxOptions
+                    anchor="bottom start"
+                    className="mt-1 max-h-60 w-56 overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg focus:outline-none"
+                  >
+                    <ListboxOption value="">
                       {({ focus }) => (
                         <div
-                          title={s.label}
                           className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${focus ? 'bg-blue-50' : ''}`}
                         >
-                          <span className="block truncate">{s.label}</span>
+                          Select a company...
                         </div>
                       )}
                     </ListboxOption>
-                  ))}
-                </ListboxOptions>
+                    {symbols.map((s) => (
+                      <ListboxOption key={s.value} value={s.value}>
+                        {({ focus }) => (
+                          <div
+                            title={s.label}
+                            className={`relative cursor-pointer select-none py-2 pl-3 pr-9 ${focus ? 'bg-blue-50' : ''}`}
+                          >
+                            <span className="block truncate">{s.label}</span>
+                          </div>
+                        )}
+                      </ListboxOption>
+                    ))}
+                  </ListboxOptions>
+                </div>
+              </Listbox>
+            </div>
+
+            {stockLoading && (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
               </div>
-            </Listbox>
+            )}
+
+            {!stockLoading && selectedSymbol && stockHistory.length > 0 && (
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={[...stockHistory]
+                      .sort((a, b) => (a.date < b.date ? -1 : 1))
+                      .map((p) => ({
+                        date: p.date,
+                        close: p.close,
+                        target: p.projection?.targetPrice,
+                        change: p.change,
+                      }))}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v.toFixed(0)}`} />
+                    <Tooltip
+                      formatter={(value, name) => {
+                        const n = coerceTooltipNumber(value);
+                        const label = name != null ? String(name) : '';
+                        return n != null ? [formatPrice(n), label] : ['', label];
+                      }}
+                      labelFormatter={(label) => `Date: ${label}`}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="close"
+                      stroke="#3B82F6"
+                      name="Price"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      stroke="#10B981"
+                      name="Target (5d)"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      strokeDasharray="5 5"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </>
+            )}
+
+            {!stockLoading && selectedSymbol && stockHistory.length === 0 && (
+              <div className="py-8 text-center text-slate-600">
+                No historical data for <strong>{selectedSymbol}</strong> in this period
+              </div>
+            )}
+
+            {!selectedSymbol && (
+              <div className="py-8 text-center text-slate-500 text-sm">
+                Select a company to see its chart
+              </div>
+            )}
           </div>
-
-          {stockLoading && (
-            <div className="flex justify-center py-12">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
-            </div>
-          )}
-
-          {!stockLoading && selectedSymbol && stockHistory.length > 0 && (
-            <>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={[...stockHistory]
-                    .sort((a, b) => (a.date < b.date ? -1 : 1))
-                    .map((p) => ({
-                    date: p.date,
-                    close: p.close,
-                    target: p.projection?.targetPrice,
-                    change: p.change,
-                  }))}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `$${v.toFixed(0)}`} />
-                  <Tooltip
-                    formatter={(value, name) => {
-                      const n = coerceTooltipNumber(value);
-                      const label = name != null ? String(name) : '';
-                      return n != null ? [formatPrice(n), label] : ['', label];
-                    }}
-                    labelFormatter={(label) => `Date: ${label}`}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="close" stroke="#3B82F6" name="Price" strokeWidth={2} dot={{ r: 3 }} />
-                  <Line type="monotone" dataKey="target" stroke="#10B981" name="Target (5d)" strokeWidth={2} dot={{ r: 3 }} strokeDasharray="5 5" />
-                </LineChart>
-              </ResponsiveContainer>
-            </>
-          )}
-
-          {!stockLoading && selectedSymbol && stockHistory.length === 0 && (
-            <div className="py-8 text-center text-slate-600">
-              No historical data for <strong>{selectedSymbol}</strong> in this period
-            </div>
-          )}
-
-          {!selectedSymbol && (
-            <div className="py-8 text-center text-slate-500 text-sm">
-              Select a company to see its chart
-            </div>
-          )}
-        </div>
         </section>
       </div>
     </div>

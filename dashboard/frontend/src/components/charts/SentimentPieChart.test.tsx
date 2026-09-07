@@ -1,9 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SentimentPieChart, {
-  colorForRecommendation,
-  formatSliceLabel,
-} from './SentimentPieChart';
+import SentimentPieChart, { colorForRecommendation, formatSliceLabel } from './SentimentPieChart';
 
 vi.mock('recharts', () => {
   const Passthrough = ({ children }: { children?: React.ReactNode }) => (
@@ -43,9 +40,7 @@ vi.mock('recharts', () => {
         {children}
       </div>
     ),
-    Cell: ({ fill }: { fill?: string }) => (
-      <span data-testid="pie-cell" data-fill={fill ?? ''} />
-    ),
+    Cell: ({ fill }: { fill?: string }) => <span data-testid="pie-cell" data-fill={fill ?? ''} />,
     Legend: () => null,
     Tooltip: () => null,
   };

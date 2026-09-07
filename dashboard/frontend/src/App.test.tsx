@@ -29,9 +29,7 @@ vi.mock('./components/layout/Header', () => ({
   default: ({ backgroundFetching }: { backgroundFetching: boolean }) => (
     <header>
       MarketHelm
-      <span data-testid="background-fetching">
-        {backgroundFetching ? 'fetching' : 'idle'}
-      </span>
+      <span data-testid="background-fetching">{backgroundFetching ? 'fetching' : 'idle'}</span>
     </header>
   ),
 }));
@@ -46,15 +44,27 @@ vi.mock('./pages/Dashboard', () => ({
 }));
 
 vi.mock('./pages/HistoricalTrends', () => ({
-  default: () => <main><h1>Historical Trends route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Historical Trends route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./pages/Summary', () => ({
-  default: () => <main><h1>Summary route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Summary route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./pages/AlertsSettings', () => ({
-  default: () => <main><h1>Helmtower route</h1></main>,
+  default: () => (
+    <main>
+      <h1>Helmtower route</h1>
+    </main>
+  ),
 }));
 
 vi.mock('./services/api', () => ({
@@ -103,7 +113,9 @@ describe('App routing', () => {
     expect(window.location.pathname).toBe('/summary');
     expect(screen.getByRole('heading', { name: 'Summary route' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Summary' }).className).toContain('border-blue-500');
-    expect(screen.getByRole('link', { name: 'Dashboard' }).className).toContain('border-transparent');
+    expect(screen.getByRole('link', { name: 'Dashboard' }).className).toContain(
+      'border-transparent',
+    );
   });
 
   it('auto-fetches missing data, polls refresh status, and rechecks alerts after success', async () => {
@@ -118,9 +130,10 @@ describe('App routing', () => {
       if (url === '/api/refresh/status') {
         statusCalls += 1;
         return Promise.resolve({
-          data: statusCalls === 1
-            ? { is_running: true, last_status: 'running' }
-            : { is_running: false, last_status: 'success' },
+          data:
+            statusCalls === 1
+              ? { is_running: true, last_status: 'running' }
+              : { is_running: false, last_status: 'success' },
         });
       }
 

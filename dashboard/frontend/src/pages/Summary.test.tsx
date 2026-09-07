@@ -63,15 +63,13 @@ describe('Summary refresh controls', () => {
       .mockResolvedValueOnce({
         data: { is_running: false, last_status: 'success' },
       });
-    apiMocks.getSummary
-      .mockRejectedValueOnce(notFoundError())
-      .mockResolvedValueOnce({
-        data: {
-          summary: 'Markets firmed into the close.',
-          date: '2026-08-05',
-          source: 'demo',
-        },
-      });
+    apiMocks.getSummary.mockRejectedValueOnce(notFoundError()).mockResolvedValueOnce({
+      data: {
+        summary: 'Markets firmed into the close.',
+        date: '2026-08-05',
+        source: 'demo',
+      },
+    });
 
     await renderEmptySummary();
 
@@ -187,15 +185,13 @@ describe('Summary refresh controls', () => {
       }
       return { data: { message: 'Refresh started' } };
     });
-    apiMocks.getSummary
-      .mockRejectedValueOnce(notFoundError())
-      .mockResolvedValue({
-        data: {
-          summary: 'Late success must not replace the empty state.',
-          date: '2026-08-05',
-          source: 'demo',
-        },
-      });
+    apiMocks.getSummary.mockRejectedValueOnce(notFoundError()).mockResolvedValue({
+      data: {
+        summary: 'Late success must not replace the empty state.',
+        date: '2026-08-05',
+        source: 'demo',
+      },
+    });
 
     await renderEmptySummary();
     const summaryLoadsBefore = apiMocks.getSummary.mock.calls.length;
@@ -228,9 +224,7 @@ describe('Summary refresh controls', () => {
 
     expect(apiMocks.getSummary.mock.calls.length).toBe(summaryLoadsBefore);
     expect(screen.getByText('Refresh cancelled.')).toBeTruthy();
-    expect(
-      screen.queryByText('Late success must not replace the empty state.'),
-    ).toBeNull();
+    expect(screen.queryByText('Late success must not replace the empty state.')).toBeNull();
     expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
   });
 
@@ -253,9 +247,7 @@ describe('Summary refresh controls', () => {
       await vi.advanceTimersByTimeAsync(15 * 60 * 1000 + 2000);
     });
 
-    expect(
-      screen.getByText('Refresh is taking too long. Please try again.'),
-    ).toBeTruthy();
+    expect(screen.getByText('Refresh is taking too long. Please try again.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Fetch New' })).toBeTruthy();
     expect(apiMocks.getSummary.mock.calls.length).toBe(summaryLoadsBefore);
 

@@ -1,13 +1,13 @@
-import { defineConfig, loadEnv } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig, loadEnv } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const devPort = Number(env.VITE_DEV_PORT || 3000)
+  const env = loadEnv(mode, process.cwd(), '');
+  const devPort = Number(env.VITE_DEV_PORT || 3000);
   const apiTarget =
     env.VITE_DEV_API_TARGET ||
-    (devPort === 3001 ? 'http://127.0.0.1:8001' : 'http://127.0.0.1:8000')
+    (devPort === 3001 ? 'http://127.0.0.1:8001' : 'http://127.0.0.1:8000');
 
   return {
     plugins: [react()],
@@ -37,5 +37,5 @@ export default defineConfig(({ mode }) => {
       testTimeout: 10_000,
       hookTimeout: 10_000,
     },
-  }
-})
+  };
+});

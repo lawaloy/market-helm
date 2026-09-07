@@ -10,10 +10,7 @@ Edit `config/exchanges.json`:
 
 ```json
 {
-  "indices_to_track": [
-    "S&P 500",
-    "NASDAQ-100"
-  ]
+  "indices_to_track": ["S&P 500", "NASDAQ-100"]
 }
 ```
 
@@ -34,13 +31,13 @@ Edit `config/filters.json`:
 }
 ```
 
-| Field | Purpose |
-|-------|---------|
-| `volume_threshold` | Minimum daily volume |
-| `price_min` / `price_max` | Acceptable price range |
-| `min_daily_change_pct` | Minimum % move (filters quiet stocks) |
-| `market_cap_min` | Minimum market cap (e.g. $1B) |
-| `top_n` | How many stocks to track after screening |
+| Field                     | Purpose                                  |
+| ------------------------- | ---------------------------------------- |
+| `volume_threshold`        | Minimum daily volume                     |
+| `price_min` / `price_max` | Acceptable price range                   |
+| `min_daily_change_pct`    | Minimum % move (filters quiet stocks)    |
+| `market_cap_min`          | Minimum market cap (e.g. $1B)            |
+| `top_n`                   | How many stocks to track after screening |
 
 **Tip:** Lower `top_n` to run faster (default effective target is ~20 for ~4 minute runs on the free tier).
 

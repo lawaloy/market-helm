@@ -41,8 +41,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "format": "prettier --write \"../../.github/scripts/*.cjs\"",
-    "format:check": "prettier --check \"../../.github/scripts/*.cjs\"",
+    "format": "prettier --ignore-path ../../.prettierignore --write ../..",
+    "format:check": "prettier --ignore-path ../../.prettierignore --check ../..",
     "ci": "npm audit --audit-level=high && npm run build && npm test"
   },
   "eslintConfig": {

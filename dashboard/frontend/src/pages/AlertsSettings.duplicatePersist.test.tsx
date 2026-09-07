@@ -99,7 +99,12 @@ describe('AlertsSettings duplicate watch persist', () => {
       data: { alert_id: existingRule.id, status: 'ok', notifiers: ['email'] },
     });
     apiMocks.getSymbols.mockResolvedValue({
-      data: { symbols: ['AAPL', 'MSFT'], names: { AAPL: 'Apple', MSFT: 'Microsoft' }, count: 2, prices: {} },
+      data: {
+        symbols: ['AAPL', 'MSFT'],
+        names: { AAPL: 'Apple', MSFT: 'Microsoft' },
+        count: 2,
+        prices: {},
+      },
     });
     apiMocks.historyGetSymbols.mockRejectedValue(new Error('unused'));
     apiMocks.getQuotes.mockResolvedValue({ data: { prices: {} } });

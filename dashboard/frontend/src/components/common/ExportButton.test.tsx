@@ -49,13 +49,7 @@ describe('ExportButton', () => {
         }),
     );
 
-    render(
-      <ExportButton
-        captureRef={captureRefWithHost()}
-        formats={['png']}
-        label="Summary"
-      />,
-    );
+    render(<ExportButton captureRef={captureRefWithHost()} formats={['png']} label="Summary" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export' }));
     const pngButton = screen.getByRole('button', { name: 'Summary as image (PNG)' });
@@ -80,13 +74,7 @@ describe('ExportButton', () => {
         }),
     );
 
-    render(
-      <ExportButton
-        captureRef={captureRefWithHost()}
-        formats={['png']}
-        label="Dashboard"
-      />,
-    );
+    render(<ExportButton captureRef={captureRefWithHost()} formats={['png']} label="Dashboard" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export' }));
     fireEvent.click(screen.getByRole('button', { name: 'Dashboard as image (PNG)' }));
@@ -106,9 +94,7 @@ describe('ExportButton', () => {
   });
 
   it('exports CSV once for a stock table', () => {
-    render(
-      <ExportButton stocks={[sampleStock]} formats={['csv']} label="Stock table" />,
-    );
+    render(<ExportButton stocks={[sampleStock]} formats={['csv']} label="Stock table" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Export' }));
     fireEvent.click(screen.getByRole('button', { name: 'Stock table as CSV' }));

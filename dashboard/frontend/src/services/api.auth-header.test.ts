@@ -1,11 +1,6 @@
 import type { InternalAxiosRequestConfig } from 'axios';
 import { afterEach, describe, expect, it } from 'vitest';
-import api, {
-  AUTH_TOKEN_KEY,
-  clearAuthToken,
-  getAuthToken,
-  setAuthToken,
-} from './api';
+import api, { AUTH_TOKEN_KEY, clearAuthToken, getAuthToken, setAuthToken } from './api';
 
 type RequestHandlers = {
   handlers: Array<{

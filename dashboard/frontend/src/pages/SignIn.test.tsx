@@ -104,4 +104,3 @@ describe('SignIn', () => {
     expect(MAX_PASSWORD_LENGTH).toBe(128);
   });
 });
-

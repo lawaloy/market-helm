@@ -26,7 +26,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install Python deps
         run: |
@@ -84,7 +84,7 @@ jobs:
       - id: playwright
         name: Install Playwright & run tests
         env:
-          CI: "true"
+          CI: 'true'
           E2E_BASE_URL: http://127.0.0.1:8000
         run: |
           cd e2e

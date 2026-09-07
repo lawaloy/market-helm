@@ -1,5 +1,11 @@
 import React from 'react';
-import { formatPrice, formatPercentage, getCompanyName, getRiskColor, getTrendIcon } from '../../utils/formatters';
+import {
+  formatPrice,
+  formatPercentage,
+  getCompanyName,
+  getRiskColor,
+  getTrendIcon,
+} from '../../utils/formatters';
 import CompanyLogo from '../common/CompanyLogo';
 import type { Opportunity } from '../../types';
 
@@ -35,15 +41,29 @@ const OpportunityCard: React.FC<OpportunityCardProps> = ({ opportunity, onClick 
         <div className="flex items-center space-x-3 min-w-0">
           <div>
             <div className="flex items-center space-x-2 flex-wrap">
-              <CompanyLogo symbol={opportunity.symbol} name={getCompanyName(opportunity.symbol, opportunity.name)} size={24} />
-              <span className="font-semibold text-lg dark:text-slate-100">{opportunity.symbol}</span>
-              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">{getCompanyName(opportunity.symbol, opportunity.name)}</span>
+              <CompanyLogo
+                symbol={opportunity.symbol}
+                name={getCompanyName(opportunity.symbol, opportunity.name)}
+                size={24}
+              />
+              <span className="font-semibold text-lg dark:text-slate-100">
+                {opportunity.symbol}
+              </span>
+              <span className="text-sm text-slate-600 dark:text-slate-400 truncate">
+                {getCompanyName(opportunity.symbol, opportunity.name)}
+              </span>
             </div>
             <div className="flex items-center space-x-2 mt-1 text-sm flex-wrap">
               <span className="dark:text-slate-300">{currentPriceLabel}</span>
               <span className="text-slate-400 dark:text-slate-500">→</span>
               <span className="font-medium dark:text-slate-200">{targetPriceLabel}</span>
-              <span className={changePositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+              <span
+                className={
+                  changePositive
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }
+              >
                 ({expectedChangeLabel})
               </span>
             </div>

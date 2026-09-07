@@ -1,35 +1,44 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Class-based dark mode (toggle via .dark on html) */
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-strong-buy: #10B981;
-  --color-buy: #34D399;
-  --color-hold: #64748B;
-  --color-sell: #F59E0B;
-  --color-strong-sell: #EF4444;
-  --color-risk-low: #10B981;
-  --color-risk-medium: #F59E0B;
-  --color-risk-high: #EF4444;
-  --color-bullish: #10B981;
-  --color-neutral: #64748B;
-  --color-bearish: #EF4444;
+  --color-strong-buy: #10b981;
+  --color-buy: #34d399;
+  --color-hold: #64748b;
+  --color-sell: #f59e0b;
+  --color-strong-sell: #ef4444;
+  --color-risk-low: #10b981;
+  --color-risk-medium: #f59e0b;
+  --color-risk-high: #ef4444;
+  --color-bullish: #10b981;
+  --color-neutral: #64748b;
+  --color-bearish: #ef4444;
 }
 
 @layer base {
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    font-family:
+      'Inter',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Roboto',
+      'Oxygen',
+      'Ubuntu',
+      'Cantarell',
+      'Fira Sans',
+      'Droid Sans',
+      'Helvetica Neue',
       sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-      monospace;
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
   }
 }
 

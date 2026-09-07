@@ -121,11 +121,11 @@ Includes complete projection data:
   "projections": {
     "AAPL": {
       "symbol": "AAPL",
-      "current_price": 150.50,
-      "target_low": 148.20,
-      "target_mid": 152.30,
-      "target_high": 156.40,
-      "expected_change_percent": 1.20,
+      "current_price": 150.5,
+      "target_low": 148.2,
+      "target_mid": 152.3,
+      "target_high": 156.4,
+      "expected_change_percent": 1.2,
       "recommendation": "BUY",
       "confidence": 75,
       "trend": "Bullish",
@@ -188,7 +188,7 @@ if result['success']:
     # Access projections
     projections = result['projections']
     projection_summary = result['projection_summary']
-    
+
     # Get specific stock projection
     aapl_projection = projections.get('AAPL')
     if aapl_projection:
@@ -259,8 +259,8 @@ Potential improvements for future versions:
 - [ ] Sector correlation analysis
 - [ ] Backtesting framework
 - [ ] Technical/compound rules and SMS/push for high-confidence opportunities
-  (price/screening rules plus email/webhooks already ship; see
-  [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))
+      (price/screening rules plus email/webhooks already ship; see
+      [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))
 
 ## Architecture
 

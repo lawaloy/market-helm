@@ -189,9 +189,11 @@ describe('SignIn return navigation', () => {
     // Mode toggle is also named "Sign in"; the submit control must leave Please wait.
     expect(screen.queryByRole('button', { name: 'Please wait…' })).toBeNull();
     expect(
-      (screen.getByRole('form', { name: 'Authentication form' }).querySelector(
-        'button[type="submit"]',
-      ) as HTMLButtonElement).disabled,
+      (
+        screen
+          .getByRole('form', { name: 'Authentication form' })
+          .querySelector('button[type="submit"]') as HTMLButtonElement
+      ).disabled,
     ).toBe(false);
   });
 });

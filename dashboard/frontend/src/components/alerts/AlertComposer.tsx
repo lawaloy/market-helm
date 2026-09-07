@@ -47,8 +47,7 @@ export function AlertComposer({
   const previewPrice = hasFinitePrice ? formatPrice(parsedValue) : '—';
   const previewVerb = newOperator === 'greater_than' ? 'rises above' : 'falls below';
   const currentPrice = formatQuotePrice(prices[newSymbol.trim().toUpperCase()]);
-  const canSubmit =
-    !symbolsLoading && Boolean(newSymbol) && !submitting && hasFinitePrice;
+  const canSubmit = !symbolsLoading && Boolean(newSymbol) && !submitting && hasFinitePrice;
 
   return (
     <div className="alerts-composer">
@@ -100,7 +99,9 @@ export function AlertComposer({
         You&apos;ll be informed when{' '}
         <span className="font-semibold text-slate-700 dark:text-slate-200">{previewName}</span>{' '}
         {previewVerb}{' '}
-        <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">${previewPrice}</span>
+        <span className="font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+          ${previewPrice}
+        </span>
         {currentPrice ? (
           <>
             {' '}

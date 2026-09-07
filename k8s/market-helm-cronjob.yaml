@@ -4,7 +4,7 @@ metadata:
   name: market-helm
 spec:
   # Runs daily at 08:00 UTC
-  schedule: "0 8 * * *"
+  schedule: '0 8 * * *'
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -29,11 +29,11 @@ spec:
                   mountPath: /app/data
               resources:
                 requests:
-                  cpu: "100m"
-                  memory: "128Mi"
+                  cpu: '100m'
+                  memory: '128Mi'
                 limits:
-                  cpu: "500m"
-                  memory: "512Mi"
+                  cpu: '500m'
+                  memory: '512Mi'
           volumes:
             - name: data
               persistentVolumeClaim:

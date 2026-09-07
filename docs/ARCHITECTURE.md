@@ -118,24 +118,24 @@ are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Techni
 indicators, patterns, compound rules, SMS, push, and cloud queue-provider adapters
 are not implemented.
 
-| Module | Responsibility |
-|--------|----------------|
-| `alert_engine.py`, `alert_rules.py` | Parse and evaluate current rules |
-| `alert_storage.py`, `user_alert_storage.py` | Local and tenant-scoped persistence |
-| `alert_runner.py`, `alert_worker.py` | One-shot and looping evaluation |
-| `alert_orchestrator.py`, `job_processor.py` | Schedule, claim, and process hosted jobs |
-| `delivery_status.py` | Record per-channel outcomes |
-| `notifiers/` | Email/webhook delivery and retry classification |
+| Module                                      | Responsibility                                  |
+| ------------------------------------------- | ----------------------------------------------- |
+| `alert_engine.py`, `alert_rules.py`         | Parse and evaluate current rules                |
+| `alert_storage.py`, `user_alert_storage.py` | Local and tenant-scoped persistence             |
+| `alert_runner.py`, `alert_worker.py`        | One-shot and looping evaluation                 |
+| `alert_orchestrator.py`, `job_processor.py` | Schedule, claim, and process hosted jobs        |
+| `delivery_status.py`                        | Record per-channel outcomes                     |
+| `notifiers/`                                | Email/webhook delivery and retry classification |
 
 ## Data ownership
 
-| Data | Local mode | Hosted mode |
-|------|------------|-------------|
-| Market CSV/JSON/Markdown | `DATA_DIR` | Shared `DATA_DIR` |
-| Alert config and history | Local JSON/files | Per-user database records |
-| Accounts and sessions | Not used | Database |
-| Worker jobs and outcomes | Local run state/history | Database |
-| Provider credentials | Environment or local `.env` | Platform secret manager/environment |
+| Data                     | Local mode                  | Hosted mode                         |
+| ------------------------ | --------------------------- | ----------------------------------- |
+| Market CSV/JSON/Markdown | `DATA_DIR`                  | Shared `DATA_DIR`                   |
+| Alert config and history | Local JSON/files            | Per-user database records           |
+| Accounts and sessions    | Not used                    | Database                            |
+| Worker jobs and outcomes | Local run state/history     | Database                            |
+| Provider credentials     | Environment or local `.env` | Platform secret manager/environment |
 
 The database is not currently a market-data warehouse. Persistence for generated
 market history remains file based in both modes.

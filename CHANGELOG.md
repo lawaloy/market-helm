@@ -38,13 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository version metadata aligned with Git tag **`v0.3.5`** / PyPI **`0.3.5`** (automated post-release sync).
 
-
 ## [0.3.4] - 2026-08-21
 
 ### Changed
 
 - Repository version metadata aligned with Git tag **`v0.3.4`** / PyPI **`0.3.4`** (automated post-release sync).
-
 
 ## [0.3.3] - 2026-08-11
 
@@ -52,13 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository version metadata aligned with Git tag **`v0.3.3`** / PyPI **`0.3.3`** (automated post-release sync).
 
-
 ## [0.3.2] - 2026-07-29
 
 ### Changed
 
 - Repository version metadata aligned with Git tag **`v0.3.2`** / PyPI **`0.3.2`** (automated post-release sync).
-
 
 ## [0.2.16] - 2026-05-21
 
@@ -66,20 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository version metadata aligned with Git tag **`v0.2.16`** / PyPI **`0.2.16`** (automated post-release sync).
 
-
 ## [0.2.15] - 2026-05-21
 
 ### Changed
 
 - Repository version metadata aligned with Git tag **`v0.2.15`** / PyPI **`0.2.15`** (automated post-release sync).
 
-
 ## [0.2.14] - 2026-04-12
 
 ### Changed
 
 - Repository version metadata aligned with Git tag **`v0.2.14`** / PyPI **`0.2.14`** (automated post-release sync).
-
 
 ## [0.2.9] - 2026-04-12
 
@@ -109,8 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **PyPI distribution** evolved to **`market-desk`** to reflect scope beyond “tracking” (monitoring, dashboard, future alerts/execution).
-- **CLI commands:** primary names are **`market-desk`** (daily run) and **`market-desk-web`** (dashboard server). *(Superseded in [0.5.0] by **`market-helm`** / **`market-helm-web`**.)*
-- **User data/config (pip install), in 0.4.0 only:** new installs used **`~/.market-desk/`**. *(Superseded in [0.5.0] by **`~/.market-helm/`**; **`~/.market-desk`** may be auto-renamed.)*
+- **CLI commands:** primary names are **`market-desk`** (daily run) and **`market-desk-web`** (dashboard server). _(Superseded in [0.5.0] by **`market-helm`** / **`market-helm-web`**.)_
+- **User data/config (pip install), in 0.4.0 only:** new installs used **`~/.market-desk/`**. _(Superseded in [0.5.0] by **`~/.market-helm/`**; **`~/.market-desk`** may be auto-renamed.)_
 - **Product branding** in docs: **Market Desk** (repository URL later standardized as **`lawaloy/market-helm`** in [0.5.0]).
 
 ## [0.3.1] - 2026-02-10

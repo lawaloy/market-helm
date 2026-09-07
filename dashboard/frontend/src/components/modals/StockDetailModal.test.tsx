@@ -83,9 +83,7 @@ describe('StockDetailModal fetch races', () => {
       return Promise.resolve({ data: detail(symbol, 200) });
     });
 
-    const { rerender } = render(
-      <StockDetailModal symbol="AAPL" isOpen onClose={() => {}} />,
-    );
+    const { rerender } = render(<StockDetailModal symbol="AAPL" isOpen onClose={() => {}} />);
     await act(async () => {
       await Promise.resolve();
     });

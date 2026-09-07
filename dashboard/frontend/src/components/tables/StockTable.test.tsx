@@ -203,4 +203,3 @@ describe('StockTable non-finite display and pagination clamp', () => {
     expect(screen.queryByText('Page 2 of')).toBeNull();
   });
 });
-

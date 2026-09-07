@@ -100,10 +100,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
         }
 
         const statusRes = await api.get('/api/refresh/status');
-        if (
-          !refreshActiveRef.current ||
-          pollGeneration !== loadGenerationRef.current
-        ) {
+        if (!refreshActiveRef.current || pollGeneration !== loadGenerationRef.current) {
           return;
         }
 
@@ -130,10 +127,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
         return;
       }
     } catch {
-      if (
-        refreshActiveRef.current &&
-        pollGeneration === loadGenerationRef.current
-      ) {
+      if (refreshActiveRef.current && pollGeneration === loadGenerationRef.current) {
         stopRefresh('Failed to start refresh. Please try again.');
       }
     }
@@ -175,9 +169,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-6">
           <p className="text-slate-700 dark:text-slate-300 mb-4">
-            {showFetchButton
-              ? 'No summary available yet.'
-              : error}
+            {showFetchButton ? 'No summary available yet.' : error}
           </p>
           {refreshNote && (
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{refreshNote}</p>
@@ -212,7 +204,9 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
     <div ref={summaryRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="card">
         <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-600 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Market Summary</h1>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            Market Summary
+          </h1>
           <div className="flex items-center gap-3 flex-wrap">
             <ExportButton captureRef={summaryRef} formats={['png', 'pdf']} label="Summary" />
             <span className="text-sm text-slate-500 dark:text-slate-400">

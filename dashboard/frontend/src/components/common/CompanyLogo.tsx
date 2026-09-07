@@ -15,9 +15,7 @@ const CompanyLogo: React.FC<CompanyLogoProps> = ({ symbol, name, size = 24, clas
   const safeName = typeof name === 'string' ? name : undefined;
   const logoUrl = useMemo(() => getCompanyLogoUrl(safeSymbol), [safeSymbol]);
   const initials = safeSymbol.trim().toUpperCase().slice(0, 2) || '?';
-  const label = safeName
-    ? `${safeName} (${safeSymbol || '?'})`
-    : safeSymbol || '?';
+  const label = safeName ? `${safeName} (${safeSymbol || '?'})` : safeSymbol || '?';
 
   return (
     <div
