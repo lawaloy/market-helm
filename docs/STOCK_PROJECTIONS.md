@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Stock Projection system analyzes current market data and generates intelligent 5-day price projections with buy/sell/hold recommendations for all tracked stocks.
+The Stock Projection system analyzes current market data and generates heuristic five-session price projections with buy/sell/hold recommendations for all tracked stocks.
 
 ## Features
 
@@ -134,6 +134,8 @@ Includes complete projection data:
       "risk_level": "Low",
       "reason": "Positive +2.5% momentum; moderate momentum; high volume support",
       "projection_date": "2026-01-09",
+      "projection_horizon_sessions": 5,
+      "projection_calendar": "XNYS",
       "generated_at": "2026-01-04T10:30:00"
     }
   },
@@ -157,8 +159,8 @@ Includes complete projection data:
 Spreadsheet format for easy analysis:
 
 ```csv
-symbol,current_price,target_low,target_mid,target_high,expected_change_percent,recommendation,confidence,trend,momentum_score,volatility_score,risk_level,reason,projection_date,generated_at
-AAPL,150.50,148.20,152.30,156.40,1.20,BUY,75,Bullish,25.5,35.2,Low,"Positive +2.5% momentum; moderate momentum",2026-01-09,2026-01-04T10:30:00
+symbol,current_price,target_low,target_mid,target_high,expected_change_percent,recommendation,confidence,trend,momentum_score,volatility_score,risk_level,reason,projection_date,projection_horizon_sessions,projection_calendar,generated_at
+AAPL,150.50,148.20,152.30,156.40,1.20,BUY,75,Bullish,25.5,35.2,Low,"Positive +2.5% momentum; moderate momentum",2026-01-09,5,XNYS,2026-01-04T10:30:00
 ```
 
 ## Usage
@@ -229,7 +231,7 @@ summary = projector.generate_projection_summary(projections)
 
 ### Limitations
 
-1. **Short-term focus**: 5-day projections only
+1. **Short-term focus**: 5-session projections only
 2. **Technical only**: No fundamental analysis (earnings, news, etc.)
 3. **Historical data**: Requires at least 1 day of data
 4. **No guarantees**: Market conditions can change rapidly
@@ -247,17 +249,31 @@ summary = projector.generate_projection_summary(projections)
 
 The dashboard and backend compare past **`target_mid`** values to the first available **closing price** on or after the projection target date. Summary API: **`GET /api/history/accuracy`** (see [PROJECT_STATUS.md](PROJECT_STATUS.md)). This complements the projector: scoring lives in the dashboard data layer, not inside `StockProjector`.
 
+The projection files now record a five-session **XNYS** target, rather than adding
+five calendar days. A reusable backtester evaluates only the exact target
+session—it does not silently roll a missing close forward—and reports absolute
+error, direction accuracy, target-band coverage, and confidence calibration by
+confidence and recommendation cohort:
+
+```bash
+market-helm backtest --data-dir data --days 365 --output data/backtest.json
+```
+
+The dashboard accuracy endpoint retains its earlier first-close-on-or-after
+behavior for compatibility. Migrating it to the shared exact-session evaluator
+is the next integration slice.
+
 ## Future Enhancements
 
 Potential improvements for future versions:
 
 - [ ] Multi-timeframe projections (1-day, 5-day, 30-day)
-- [ ] Richer accuracy analytics (e.g. by confidence band, business-calendar targets — see [PROJECT_STATUS.md](PROJECT_STATUS.md))
+- [ ] Display the shared exact-session backtest report in the dashboard
+- [ ] Establish representative backtest baselines and calibrate confidence
 - [ ] Machine learning model integration
 - [ ] Fundamental analysis factors
 - [ ] News sentiment integration
 - [ ] Sector correlation analysis
-- [ ] Backtesting framework
 - [ ] Technical/compound rules and SMS/push for high-confidence opportunities
       (price/screening rules plus email/webhooks already ship; see
       [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))

@@ -9,12 +9,13 @@ This module analyzes historical stock data and generates:
 """
 
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 import math
 import pandas as pd
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
 from ..utils.tickers import normalize_ticker
+from .market_calendar import trading_session_after
 
 logger = setup_logger("projector")
 
@@ -163,6 +164,10 @@ class StockProjector:
             # Resolve company name - API often returns symbol when profile fetch fails
             raw_name = stock_data.get('name', symbol)
             company_name = resolve_company_name(symbol, raw_name)
+            generated_at = datetime.now()
+            target_session = trading_session_after(
+                generated_at.date(), self.projection_days
+            )
 
             projection = {
                 'symbol': symbol,
@@ -181,8 +186,10 @@ class StockProjector:
                 'volatility_score': round(volatility, 1),
                 'risk_level': self._assess_risk(volatility),
                 'reason': reason,
-                'projection_date': (datetime.now() + timedelta(days=self.projection_days)).date().isoformat(),
-                'generated_at': datetime.now().isoformat()
+                'projection_date': target_session.isoformat(),
+                'projection_horizon_sessions': self.projection_days,
+                'projection_calendar': 'XNYS',
+                'generated_at': generated_at.isoformat()
             }
             
             logger.debug(f"Projection for {symbol}: {recommendation} @ ${target_mid:.2f}")
@@ -498,6 +505,7 @@ class StockProjector:
             .iterrows()
         ]
         
+        generated_at = datetime.now()
         summary = {
             'total_projections': len(projections),
             'recommendations': rec_counts,
@@ -508,8 +516,12 @@ class StockProjector:
                 'strong_buys': strong_buys,
                 'strong_sells': strong_sells
             },
-            'projection_date': (datetime.now() + timedelta(days=self.projection_days)).date().isoformat(),
-            'generated_at': datetime.now().isoformat()
+            'projection_date': trading_session_after(
+                generated_at.date(), self.projection_days
+            ).isoformat(),
+            'projection_horizon_sessions': self.projection_days,
+            'projection_calendar': 'XNYS',
+            'generated_at': generated_at.isoformat()
         }
         
         logger.info(f"Projection summary: {rec_counts}")

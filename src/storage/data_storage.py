@@ -212,7 +212,8 @@ class DataStorage:
             'symbol', 'name', 'current_price', 'target_low', 'target_mid', 'target_high',
             'expected_change_percent', 'recommendation', 'confidence', 'trend',
             'momentum_score', 'volatility_score', 'risk_level', 'reason',
-            'projection_date', 'generated_at'
+            'projection_date', 'projection_horizon_sessions',
+            'projection_calendar', 'generated_at'
         ]
         
         # Only include columns that exist
@@ -266,7 +267,12 @@ class DataStorage:
         md = []
         md.append("# Stock Market Projections Report")
         md.append("")
-        md.append(f"**Projection Period:** 5 Days (Target Date: {projection_date})")
+        horizon = int(df.get('projection_horizon_sessions', pd.Series([5])).iloc[0])
+        calendar = str(df.get('projection_calendar', pd.Series(['XNYS'])).iloc[0])
+        md.append(
+            f"**Projection Period:** {horizon} {calendar} trading sessions "
+            f"(Target Date: {projection_date})"
+        )
         md.append("")
         md.append(f"**Generated:** {generated_date}")
         md.append("")

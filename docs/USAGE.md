@@ -34,6 +34,23 @@ python -m src.cli.commands
 
 Same as Option 1, invoked as a module.
 
+### Projection backtesting
+
+Evaluate saved projection files against closing prices on the exact fifth NYSE
+trading session after each run:
+
+```bash
+market-helm backtest --data-dir data --days 365
+market-helm backtest --data-dir data --days 365 --output data/backtest.json
+```
+
+The strict JSON report includes absolute error, directional accuracy, target-band
+coverage, confidence calibration, confidence cohorts, recommendation cohorts,
+and data-coverage counts. A projection is never rolled to a later close when its
+exact target-session close is missing. Use `--horizon-sessions` or `--calendar`
+to evaluate another explicit horizon, and `--all-samples` to include more than
+the default 300 sample rows.
+
 ### Option 3: Direct workflow (programmatic)
 
 ```bash

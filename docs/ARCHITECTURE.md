@@ -85,10 +85,10 @@ lightweight quote screening -- Finnhub rate limiter/retry
 detailed quote/profile fetch for selected symbols
         |
         v
-market analysis + heuristic five-day projections
+market analysis + heuristic five-session XNYS projections
         |
         +--> dated CSV/JSON/Markdown files
-        +--> dashboard history/accuracy APIs
+        +--> exact-session backtest CLI + dashboard history/accuracy APIs
         `--> alert evaluation snapshot
 ```
 

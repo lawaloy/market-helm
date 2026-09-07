@@ -1,0 +1,25 @@
+"""Exchange-session semantics for projection horizons."""
+
+from datetime import date
+
+import pytest
+
+from src.analysis.market_calendar import trading_session_after
+
+
+def test_five_sessions_skip_weekend_and_independence_day_holiday():
+    assert trading_session_after("2026-07-02", 5) == date(2026, 7, 10)
+
+
+def test_non_session_run_anchors_to_previous_session():
+    assert trading_session_after("2026-07-04", 5) == date(2026, 7, 10)
+
+
+def test_horizon_must_be_positive():
+    with pytest.raises(ValueError, match="at least 1"):
+        trading_session_after("2026-07-02", 0)
+
+
+def test_unknown_calendar_has_actionable_error():
+    with pytest.raises(ValueError, match="unknown or unavailable"):
+        trading_session_after("2026-07-02", 5, "NOT-A-CALENDAR")
