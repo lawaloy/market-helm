@@ -140,27 +140,54 @@ export interface HistoricalSummaryResponse {
   names?: Record<string, string>;
 }
 
-export interface AccuracyByRecommendation {
+export interface AccuracyAggregate {
   count: number;
   meanAbsErrorPct: number | null;
+  medianAbsErrorPct: number | null;
+  directionalAccuracyPct: number | null;
+  bandCoveragePct: number | null;
+  meanConfidence: number | null;
+  calibrationGapPct: number | null;
 }
 
 export interface ProjectionAccuracyResponse {
   summary: {
+    schemaVersion: number;
+    calendar: string;
+    horizonSessions: number;
+    projectionCount: number;
+    validProjectionCount: number;
     sampleCount: number;
+    invalidCount: number;
+    pendingCount: number;
+    missingActualCount: number;
+    evaluationCoveragePct: number | null;
     meanAbsErrorPct: number | null;
-    byRecommendation: Record<string, AccuracyByRecommendation>;
+    medianAbsErrorPct: number | null;
+    directionalAccuracyPct: number | null;
+    bandCoveragePct: number | null;
+    meanConfidence: number | null;
+    calibrationGapPct: number | null;
+    byRecommendation: Record<string, AccuracyAggregate>;
+    byConfidenceBand: Record<string, AccuracyAggregate>;
   };
   samples: Array<{
     symbol: string;
     runDate: string;
     targetDate: string;
     actualDate: string;
+    current: number | null;
     predicted: number;
     actual: number;
     absErrorPct: number;
+    signedErrorPct: number;
+    directionCorrect: boolean | null;
+    bandHit: boolean | null;
+    confidence: number | null;
+    confidenceBand: string;
     recommendation: string;
   }>;
+  samplesTruncated: boolean;
 }
 
 export interface MarketSummaryResponse {

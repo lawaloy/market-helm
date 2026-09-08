@@ -362,32 +362,30 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
           </div>
         </section>
 
-        {/* Projection vs actual (target date) */}
+        {/* Projection validation on the exact target session */}
         <section>
           <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
             Projection accuracy
           </h3>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            For each past run, compares the projected 5-day target price to the first available
-            closing price on or after the target date. Lower mean error is better. Needs enough
-            history (daily + projections) after targets mature.
+            Scores each projection against the close on its exact fifth XNYS trading session.
+            Missing target-session closes are reported as missing, never rolled forward. Lower error
+            is better; a calibration gap near zero means confidence is aligned with directional
+            accuracy.
           </p>
           {accuracyLoading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500" />
             </div>
-          ) : !accuracy || accuracy.summary.sampleCount === 0 ? (
+          ) : !accuracy ? (
             <div className="card p-6 text-sm text-slate-600 dark:text-slate-400">
-              No scored projections yet for this range. Keep running Fetch New so target dates can
-              pass and actual prices exist.
+              Projection validation is unavailable for this range.
             </div>
           ) : (
             <div className="space-y-8">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="card p-6">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    Samples (projections scored)
-                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Scored projections</p>
                   <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                     {accuracy.summary.sampleCount}
                   </p>
@@ -402,6 +400,51 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                       : '—'}
                   </p>
                 </div>
+                <div className="card p-6">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Directional accuracy</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    {accuracy.summary.directionalAccuracyPct != null
+                      ? `${accuracy.summary.directionalAccuracyPct.toFixed(2)}%`
+                      : '—'}
+                  </p>
+                </div>
+                <div className="card p-6">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Target-band coverage</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    {accuracy.summary.bandCoveragePct != null
+                      ? `${accuracy.summary.bandCoveragePct.toFixed(2)}%`
+                      : '—'}
+                  </p>
+                </div>
+                <div className="card p-6">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Mature-data coverage</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    {accuracy.summary.evaluationCoveragePct != null
+                      ? `${accuracy.summary.evaluationCoveragePct.toFixed(2)}%`
+                      : '—'}
+                  </p>
+                </div>
+                <div className="card p-6">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Calibration gap</p>
+                  <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                    {accuracy.summary.calibrationGapPct != null
+                      ? `${accuracy.summary.calibrationGapPct.toFixed(2)}%`
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="card p-4 text-sm text-slate-600 dark:text-slate-400">
+                {accuracy.summary.sampleCount === 0 ? (
+                  <p>
+                    No exact-session scores yet. Keep running Fetch New so projections mature and
+                    their target-session closes are captured.
+                  </p>
+                ) : null}
+                <p>
+                  {accuracy.summary.projectionCount} projections inspected ·{' '}
+                  {accuracy.summary.pendingCount} pending · {accuracy.summary.missingActualCount}{' '}
+                  missing target-session closes · {accuracy.summary.invalidCount} invalid
+                </p>
               </div>
               {Object.keys(accuracy.summary.byRecommendation).length > 0 && (
                 <div className="card p-6">
@@ -445,6 +488,51 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                   </ResponsiveContainer>
                 </div>
               )}
+              {Object.keys(accuracy.summary.byConfidenceBand).length > 0 && (
+                <div className="card p-6">
+                  <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
+                    Confidence calibration by cohort
+                  </h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    Mean stated confidence compared with observed directional accuracy.
+                  </p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart
+                      data={Object.entries(accuracy.summary.byConfidenceBand).map(
+                        ([confidenceBand, values]) => ({
+                          confidenceBand,
+                          meanConfidence: values.meanConfidence ?? 0,
+                          directionalAccuracyPct: values.directionalAccuracyPct ?? 0,
+                        }),
+                      )}
+                      margin={{ top: 8, right: 8, left: 8, bottom: 24 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="confidenceBand" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fontSize: 12 }}
+                        tickFormatter={(value) => `${value}%`}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => {
+                          const number = coerceTooltipNumber(value);
+                          return number != null
+                            ? [`${number.toFixed(2)}%`, String(name)]
+                            : ['', ''];
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="meanConfidence" fill="#6366F1" name="Mean confidence" />
+                      <Bar
+                        dataKey="directionalAccuracyPct"
+                        fill="#10B981"
+                        name="Directional accuracy"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               {accuracy.samples.length > 0 && (
                 <div className="card p-6 overflow-x-auto">
                   <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
@@ -456,10 +544,12 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                         <th className="py-2 pr-4">Symbol</th>
                         <th className="py-2 pr-4">Run</th>
                         <th className="py-2 pr-4">Target</th>
-                        <th className="py-2 pr-4">Actual @</th>
                         <th className="py-2 pr-4">Pred</th>
                         <th className="py-2 pr-4">Close</th>
                         <th className="py-2 pr-4">|Err|%</th>
+                        <th className="py-2 pr-4">Confidence</th>
+                        <th className="py-2 pr-4">Direction</th>
+                        <th className="py-2 pr-4">Band</th>
                         <th className="py-2">Rec</th>
                       </tr>
                     </thead>
@@ -474,12 +564,22 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                           <td className="py-2 pr-4 whitespace-nowrap">
                             {formatDate(row.targetDate)}
                           </td>
-                          <td className="py-2 pr-4 whitespace-nowrap">
-                            {formatDate(row.actualDate)}
-                          </td>
                           <td className="py-2 pr-4">{formatPrice(row.predicted)}</td>
                           <td className="py-2 pr-4">{formatPrice(row.actual)}</td>
                           <td className="py-2 pr-4">{row.absErrorPct.toFixed(2)}%</td>
+                          <td className="py-2 pr-4">
+                            {row.confidence != null ? `${row.confidence.toFixed(1)}%` : '—'}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.directionCorrect == null
+                              ? '—'
+                              : row.directionCorrect
+                                ? 'Correct'
+                                : 'Miss'}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {row.bandHit == null ? '—' : row.bandHit ? 'Hit' : 'Miss'}
+                          </td>
                           <td className="py-2">{row.recommendation}</td>
                         </tr>
                       ))}
@@ -495,7 +595,7 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
         <section>
           <h3 className="text-lg font-semibold text-slate-800 mb-4">Single stock view</h3>
           <p className="text-sm text-slate-600 mb-6">
-            Pick a company to see its price and 5-day target over time.
+            Pick a company to see its price and five-session target over time.
           </p>
           <div className="card p-6">
             <div className="flex flex-wrap items-center gap-4 mb-6">

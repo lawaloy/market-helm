@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -58,4 +59,31 @@ def test_update_user_env_vars_atomic_replace_leaves_no_tmp(
 
     assert env_file.read_text(encoding="utf-8") == "ALERT_EMAIL_TO=new@example.com\n"
     assert not (user_dir / ".env.tmp").exists()
+    assert list(user_dir.glob("*.tmp")) == []
+
+
+def test_update_user_env_vars_retries_transient_replace_lock(
+    tmp_path: Path, monkeypatch
+) -> None:
+    user_dir = tmp_path / ".market-helm"
+    user_dir.mkdir()
+    monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
+    real_replace = os.replace
+    attempts = 0
+
+    def transiently_locked(source, target):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError("temporarily locked")
+        real_replace(source, target)
+
+    monkeypatch.setattr("src.alerts.alert_paths.os.replace", transiently_locked)
+
+    update_user_env_vars({"ALERT_EMAIL_TO": "new@example.com"})
+
+    assert attempts == 3
+    assert (user_dir / ".env").read_text(encoding="utf-8") == (
+        "ALERT_EMAIL_TO=new@example.com\n"
+    )
     assert list(user_dir.glob("*.tmp")) == []

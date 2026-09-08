@@ -4,7 +4,7 @@ Historical trends API endpoints
 import logging
 import math
 from fastapi import APIRouter, HTTPException, Query
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from pydantic import BaseModel
@@ -145,18 +145,51 @@ class AccuracySample(BaseModel):
     runDate: str
     targetDate: str
     actualDate: str
+    current: Optional[float] = None
     predicted: float
     actual: float
     absErrorPct: float
+    signedErrorPct: float
+    directionCorrect: Optional[bool] = None
+    bandHit: Optional[bool] = None
+    confidence: Optional[float] = None
+    confidenceBand: str
     recommendation: str
+
+
+class AccuracyAggregate(BaseModel):
+    """Metrics for one report or cohort."""
+
+    count: int
+    meanAbsErrorPct: Optional[float] = None
+    medianAbsErrorPct: Optional[float] = None
+    directionalAccuracyPct: Optional[float] = None
+    bandCoveragePct: Optional[float] = None
+    meanConfidence: Optional[float] = None
+    calibrationGapPct: Optional[float] = None
 
 
 class AccuracySummary(BaseModel):
     """Rollups for projection accuracy."""
 
+    schemaVersion: int
+    calendar: str
+    horizonSessions: int
+    projectionCount: int
+    validProjectionCount: int
     sampleCount: int
+    invalidCount: int
+    pendingCount: int
+    missingActualCount: int
+    evaluationCoveragePct: Optional[float] = None
     meanAbsErrorPct: Optional[float] = None
-    byRecommendation: dict = {}
+    medianAbsErrorPct: Optional[float] = None
+    directionalAccuracyPct: Optional[float] = None
+    bandCoveragePct: Optional[float] = None
+    meanConfidence: Optional[float] = None
+    calibrationGapPct: Optional[float] = None
+    byRecommendation: Dict[str, AccuracyAggregate]
+    byConfidenceBand: Dict[str, AccuracyAggregate]
 
 
 class ProjectionAccuracyResponse(BaseModel):
@@ -164,6 +197,7 @@ class ProjectionAccuracyResponse(BaseModel):
 
     summary: AccuracySummary
     samples: List[AccuracySample]
+    samplesTruncated: bool
 
 
 @router.get("/dates")
@@ -316,8 +350,8 @@ async def get_projection_accuracy(
     days: int = Query(90, ge=7, le=365, description="Look back this many days of projection runs"),
 ):
     """
-    Compare each run's target_mid to the first available actual close on/after the target date.
-    Requires overlapping daily_data and projections files across time.
+    Compare each run's target_mid to the close on its exact fifth XNYS session.
+    Missing target-session closes remain explicit and are not rolled forward.
     """
     try:
         loader = get_data_loader()
@@ -325,6 +359,7 @@ async def get_projection_accuracy(
         return ProjectionAccuracyResponse(
             summary=AccuracySummary(**raw["summary"]),
             samples=[AccuracySample(**s) for s in raw["samples"]],
+            samplesTruncated=raw["samplesTruncated"],
         )
     except HTTPException:
         raise

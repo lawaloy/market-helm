@@ -23,53 +23,25 @@ def loader(temp_data_dir):
     return DataLoader(data_dir=temp_data_dir)
 
 
-class TestProjectionTargetDateEdges:
-    @pytest.mark.parametrize(
-        "raw",
-        [
-            "not-a-date",
-            "01/15/2026",
-            "2026-13-40",
-            "",
-            "   ",
-            float("nan"),
-        ],
-    )
-    def test_invalid_projection_date_falls_back_to_run_plus_five(self, loader, raw):
-        """Dirty CSV projection_date cells must not crash; use run date + 5 days."""
-        assert loader._projection_target_date(
-            {"projection_date": raw}, "2026-01-01"
-        ) == "2026-01-06"
-
-    def test_datetime_prefix_is_accepted(self, loader):
-        """ISO datetime strings keep the YYYY-MM-DD prefix."""
-        assert (
-            loader._projection_target_date(
-                {"projection_date": "2026-02-01T15:30:00"}, "2026-01-01"
-            )
-            == "2026-02-01"
-        )
-
-
 class TestProjectionAccuracyInvalidDates:
-    def test_compute_projection_accuracy_falls_back_on_bad_projection_date(
+    def test_compute_projection_accuracy_ignores_legacy_bad_projection_date(
         self, loader, temp_data_dir
     ):
-        """Invalid projection_date scores against run_date + 5 when that close exists."""
+        """The shared evaluator derives the exact session instead of trusting a dirty field."""
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
                 "close": [100.0],
                 "change_percent": [0.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-01.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
                 "close": [110.0],
                 "change_percent": [1.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-06.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -77,15 +49,15 @@ class TestProjectionAccuracyInvalidDates:
                 "recommendation": ["HOLD"],
                 "projection_date": ["not-a-date"],
             }
-        ).to_csv(temp_data_dir / "projections_2026-01-01.csv", index=False)
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
 
         assert out["summary"]["sampleCount"] == 1
         sample = out["samples"][0]
-        assert sample["targetDate"] == "2026-01-06"
-        assert sample["actualDate"] == "2026-01-06"
-        assert sample["absErrorPct"] == 10.0
+        assert sample["targetDate"] == "2026-01-12"
+        assert sample["actualDate"] == "2026-01-12"
+        assert sample["absErrorPct"] == 9.091
 
 
 class TestProjectionAccuracyRecommendationSentinels:
@@ -97,22 +69,22 @@ class TestProjectionAccuracyRecommendationSentinels:
                 "close": [100.0],
                 "change_percent": [0.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-01.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
                 "close": [110.0],
                 "change_percent": [1.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-06.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
                 "target_mid": [100.0],
                 "recommendation": [float("nan")],
-                "projection_date": ["2026-01-06"],
+                "projection_date": ["2026-01-12"],
             }
-        ).to_csv(temp_data_dir / "projections_2026-01-01.csv", index=False)
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
 
