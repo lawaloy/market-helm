@@ -51,6 +51,16 @@ exact target-session close is missing. Use `--horizon-sessions` or `--calendar`
 to evaluate another explicit horizon, and `--all-samples` to include more than
 the default 300 sample rows.
 
+The repository also preserves a synthetic scenario baseline that detects changes
+to evaluator semantics:
+
+```bash
+python scripts/projection_baseline.py check
+```
+
+Do not use its synthetic metrics to tune confidence; calibration requires a
+representative baseline of real projections generated before their outcomes.
+
 ### Option 3: Direct workflow (programmatic)
 
 ```bash

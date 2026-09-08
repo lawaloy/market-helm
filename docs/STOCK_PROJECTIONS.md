@@ -263,12 +263,25 @@ The dashboard and **`GET /api/history/accuracy`** use the same evaluator and sho
 the headline metrics, data coverage, confidence cohorts, recommendation cohorts,
 and individual sample outcomes.
 
+A versioned scenario baseline is committed under
+**`baselines/projection-v1/`**. It spans all confidence cohorts, multiple market
+session anchors, correct and incorrect directions, band hits and misses, and
+pending/missing/invalid rows. Verify it with:
+
+```bash
+python scripts/projection_baseline.py check
+```
+
+This synthetic baseline protects evaluator semantics; it is not evidence of model
+quality. Confidence must remain unchanged until enough real, forward-generated
+projections mature into a representative out-of-sample report.
+
 ## Future Enhancements
 
 Potential improvements for future versions:
 
 - [ ] Multi-timeframe projections (1-day, 5-day, 30-day)
-- [ ] Establish representative backtest baselines and calibrate confidence
+- [ ] Preserve a representative real out-of-sample baseline, then calibrate confidence
 - [ ] Machine learning model integration
 - [ ] Fundamental analysis factors
 - [ ] News sentiment integration

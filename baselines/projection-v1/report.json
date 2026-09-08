@@ -1,0 +1,256 @@
+{
+  "samples": [
+    {
+      "absErrorPct": 3.571,
+      "actual": 140.0,
+      "actualDate": "2026-07-16",
+      "bandHit": true,
+      "confidence": 85.0,
+      "confidenceBand": "80-89",
+      "current": 150.0,
+      "directionCorrect": true,
+      "predicted": 145.0,
+      "recommendation": "SELL",
+      "runDate": "2026-07-10",
+      "signedErrorPct": 3.571,
+      "symbol": "AMZN",
+      "targetDate": "2026-07-16"
+    },
+    {
+      "absErrorPct": 0.0,
+      "actual": 120.0,
+      "actualDate": "2026-07-16",
+      "bandHit": true,
+      "confidence": 95.0,
+      "confidenceBand": "90-100",
+      "current": 100.0,
+      "directionCorrect": true,
+      "predicted": 120.0,
+      "recommendation": "STRONG BUY",
+      "runDate": "2026-07-10",
+      "signedErrorPct": 0.0,
+      "symbol": "NVDA",
+      "targetDate": "2026-07-16"
+    },
+    {
+      "absErrorPct": 5.263,
+      "actual": 95.0,
+      "actualDate": "2026-07-16",
+      "bandHit": null,
+      "confidence": null,
+      "confidenceBand": "UNKNOWN",
+      "current": 100.0,
+      "directionCorrect": true,
+      "predicted": 90.0,
+      "recommendation": "UNKNOWN",
+      "runDate": "2026-07-10",
+      "signedErrorPct": -5.263,
+      "symbol": "ORCL",
+      "targetDate": "2026-07-16"
+    },
+    {
+      "absErrorPct": 0.0,
+      "actual": 100.0,
+      "actualDate": "2026-07-13",
+      "bandHit": true,
+      "confidence": 65.0,
+      "confidenceBand": "60-69",
+      "current": 100.0,
+      "directionCorrect": true,
+      "predicted": 100.0,
+      "recommendation": "HOLD",
+      "runDate": "2026-07-06",
+      "signedErrorPct": 0.0,
+      "symbol": "GOOG",
+      "targetDate": "2026-07-13"
+    },
+    {
+      "absErrorPct": 14.583,
+      "actual": 240.0,
+      "actualDate": "2026-07-13",
+      "bandHit": false,
+      "confidence": 75.0,
+      "confidenceBand": "70-79",
+      "current": 250.0,
+      "directionCorrect": false,
+      "predicted": 275.0,
+      "recommendation": "STRONG BUY",
+      "runDate": "2026-07-06",
+      "signedErrorPct": 14.583,
+      "symbol": "TSLA",
+      "targetDate": "2026-07-13"
+    },
+    {
+      "absErrorPct": 1.852,
+      "actual": 108.0,
+      "actualDate": "2026-07-06",
+      "bandHit": true,
+      "confidence": 45.0,
+      "confidenceBand": "0-49",
+      "current": 100.0,
+      "directionCorrect": true,
+      "predicted": 110.0,
+      "recommendation": "BUY",
+      "runDate": "2026-06-29",
+      "signedErrorPct": 1.852,
+      "symbol": "AAPL",
+      "targetDate": "2026-07-06"
+    },
+    {
+      "absErrorPct": 7.317,
+      "actual": 205.0,
+      "actualDate": "2026-07-06",
+      "bandHit": false,
+      "confidence": 55.0,
+      "confidenceBand": "50-59",
+      "current": 200.0,
+      "directionCorrect": false,
+      "predicted": 190.0,
+      "recommendation": "STRONG SELL",
+      "runDate": "2026-06-29",
+      "signedErrorPct": -7.317,
+      "symbol": "MSFT",
+      "targetDate": "2026-07-06"
+    }
+  ],
+  "samplesTruncated": false,
+  "summary": {
+    "bandCoveragePct": 66.667,
+    "byConfidenceBand": {
+      "0-49": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -55.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 1.852,
+        "meanConfidence": 45.0,
+        "medianAbsErrorPct": 1.852
+      },
+      "50-59": {
+        "bandCoveragePct": 0.0,
+        "calibrationGapPct": 55.0,
+        "count": 1,
+        "directionalAccuracyPct": 0.0,
+        "meanAbsErrorPct": 7.317,
+        "meanConfidence": 55.0,
+        "medianAbsErrorPct": 7.317
+      },
+      "60-69": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -35.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 0.0,
+        "meanConfidence": 65.0,
+        "medianAbsErrorPct": 0.0
+      },
+      "70-79": {
+        "bandCoveragePct": 0.0,
+        "calibrationGapPct": 75.0,
+        "count": 1,
+        "directionalAccuracyPct": 0.0,
+        "meanAbsErrorPct": 14.583,
+        "meanConfidence": 75.0,
+        "medianAbsErrorPct": 14.583
+      },
+      "80-89": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -15.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 3.571,
+        "meanConfidence": 85.0,
+        "medianAbsErrorPct": 3.571
+      },
+      "90-100": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -5.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 0.0,
+        "meanConfidence": 95.0,
+        "medianAbsErrorPct": 0.0
+      },
+      "UNKNOWN": {
+        "bandCoveragePct": null,
+        "calibrationGapPct": null,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 5.263,
+        "meanConfidence": null,
+        "medianAbsErrorPct": 5.263
+      }
+    },
+    "byRecommendation": {
+      "BUY": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -55.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 1.852,
+        "meanConfidence": 45.0,
+        "medianAbsErrorPct": 1.852
+      },
+      "HOLD": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -35.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 0.0,
+        "meanConfidence": 65.0,
+        "medianAbsErrorPct": 0.0
+      },
+      "SELL": {
+        "bandCoveragePct": 100.0,
+        "calibrationGapPct": -15.0,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 3.571,
+        "meanConfidence": 85.0,
+        "medianAbsErrorPct": 3.571
+      },
+      "STRONG BUY": {
+        "bandCoveragePct": 50.0,
+        "calibrationGapPct": 35.0,
+        "count": 2,
+        "directionalAccuracyPct": 50.0,
+        "meanAbsErrorPct": 7.292,
+        "meanConfidence": 85.0,
+        "medianAbsErrorPct": 7.292
+      },
+      "STRONG SELL": {
+        "bandCoveragePct": 0.0,
+        "calibrationGapPct": 55.0,
+        "count": 1,
+        "directionalAccuracyPct": 0.0,
+        "meanAbsErrorPct": 7.317,
+        "meanConfidence": 55.0,
+        "medianAbsErrorPct": 7.317
+      },
+      "UNKNOWN": {
+        "bandCoveragePct": null,
+        "calibrationGapPct": null,
+        "count": 1,
+        "directionalAccuracyPct": 100.0,
+        "meanAbsErrorPct": 5.263,
+        "meanConfidence": null,
+        "medianAbsErrorPct": 5.263
+      }
+    },
+    "calendar": "XNYS",
+    "calibrationGapPct": 3.333,
+    "directionalAccuracyPct": 71.429,
+    "evaluationCoveragePct": 87.5,
+    "horizonSessions": 5,
+    "invalidCount": 1,
+    "meanAbsErrorPct": 4.655,
+    "meanConfidence": 70.0,
+    "medianAbsErrorPct": 3.571,
+    "missingActualCount": 1,
+    "pendingCount": 1,
+    "projectionCount": 10,
+    "sampleCount": 7,
+    "schemaVersion": 1,
+    "validProjectionCount": 9
+  }
+}

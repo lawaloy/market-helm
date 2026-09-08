@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
+  verification command, and regression gate for projection-evaluator semantics.
 - **Projection validation:** XNYS trading-session targets plus a shared CLI, API,
   and dashboard evaluator with error, direction, target-band, data-coverage,
   confidence, and cohort metrics.
