@@ -10,12 +10,13 @@ import os
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import deque
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from ..core.logger import setup_logger
+from ..analysis.market_calendar import completed_session_for_quote
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -36,6 +37,19 @@ def _finite_number(value: Any, default: Optional[float] = 0.0) -> Optional[float
     if not math.isfinite(number):
         return default
     return number
+
+
+def _quote_outcome_provenance(value: Any) -> Tuple[Optional[str], Optional[str], bool]:
+    """Return UTC timestamp/session metadata only for a completed XNYS close."""
+    timestamp = _finite_number(value, default=None)
+    if timestamp is None or timestamp < 0:
+        return None, None, False
+    try:
+        observed_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        session = completed_session_for_quote(observed_at)
+    except (OSError, OverflowError, ValueError):
+        return None, None, False
+    return observed_at.isoformat(), session.isoformat() if session else None, session is not None
 
 
 class RateLimiter:
@@ -395,6 +409,9 @@ class FinnhubClient:
             market_cap = _finite_number(
                 profile.get("marketCapitalization", 0), default=0.0
             ) or 0.0
+            quote_timestamp, outcome_session, outcome_final = _quote_outcome_provenance(
+                quote.get("t")
+            )
 
             return {
                 "symbol": symbol,
@@ -410,6 +427,9 @@ class FinnhubClient:
                 "name": name,
                 "exchange": profile.get("exchange", "Unknown"),
                 "market_cap": market_cap,
+                "quote_timestamp": quote_timestamp,
+                "outcome_session": outcome_session,
+                "outcome_final": outcome_final,
             }
         
         except Exception as e:

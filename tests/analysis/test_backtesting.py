@@ -81,6 +81,54 @@ def test_data_dir_loader_reads_dated_csvs(tmp_path):
 
     assert report["summary"]["sampleCount"] == 1
     assert report["samples"][0]["actual"] == 108.0
+    assert report["samples"][0]["actualProvenance"] == "legacy_filename"
+
+
+def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
+    pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "close": 108.0,
+                "outcome_session": "2026-07-10",
+                "outcome_final": True,
+            }
+        ]
+    ).to_csv(tmp_path / "daily_data_2026-07-12.csv", index=False)
+    pd.DataFrame(
+        [_projection(generated_at="2026-07-02T21:00:00+00:00")]
+    ).drop(columns=["run_date"]).to_csv(
+        tmp_path / "projections_2026-07-02.csv", index=False
+    )
+
+    report = backtest_data_dir(tmp_path)
+
+    assert report["summary"]["sampleCount"] == 1
+    assert report["summary"]["verifiedOutcomeCount"] == 1
+    assert report["summary"]["timestampedProjectionCount"] == 1
+    assert report["samples"][0]["actualDate"] == "2026-07-10"
+    assert report["samples"][0]["actualProvenance"] == "verified_quote_session"
+
+
+def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path):
+    pd.DataFrame(
+        [
+            {
+                "symbol": "AAPL",
+                "close": 108.0,
+                "outcome_session": "",
+                "outcome_final": False,
+            }
+        ]
+    ).to_csv(tmp_path / "daily_data_2026-07-10.csv", index=False)
+    pd.DataFrame([_projection()]).drop(columns=["run_date"]).to_csv(
+        tmp_path / "projections_2026-07-02.csv", index=False
+    )
+
+    report = backtest_data_dir(tmp_path)
+
+    assert report["summary"]["sampleCount"] == 0
+    assert report["summary"]["pendingCount"] == 1
 
 
 def test_timezone_aware_generation_time_controls_exact_target_session():

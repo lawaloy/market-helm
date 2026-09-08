@@ -201,6 +201,37 @@ class TestFinnhubClient(unittest.TestCase):
         self.assertEqual(data["change_percent"], 0.0)
         self.assertEqual(data["name"], "X")
 
+    def test_get_stock_data_records_completed_quote_session(self):
+        session = Mock()
+        client = self._client_with_session(session)
+        # 2026-07-02 21:00 UTC is after the XNYS close.
+        quote_time = 1783026000
+        with patch.object(
+            client,
+            "get_quote",
+            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": quote_time},
+        ):
+            data = client.get_stock_data("AAPL", include_profile=False)
+
+        self.assertEqual(data["quote_timestamp"], "2026-07-02T21:00:00+00:00")
+        self.assertEqual(data["outcome_session"], "2026-07-02")
+        self.assertIs(data["outcome_final"], True)
+
+    def test_get_stock_data_does_not_mark_intraday_quote_as_close(self):
+        session = Mock()
+        client = self._client_with_session(session)
+        # 2026-07-02 19:00 UTC is before the XNYS close.
+        quote_time = 1783018800
+        with patch.object(
+            client,
+            "get_quote",
+            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": quote_time},
+        ):
+            data = client.get_stock_data("AAPL", include_profile=False)
+
+        self.assertIsNone(data["outcome_session"])
+        self.assertIs(data["outcome_final"], False)
+
     def test_get_stock_data_profile_failure_falls_back_to_symbol_name(self):
         """Profile fetch errors keep the quote and fall back to the ticker."""
         session = Mock()

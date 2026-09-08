@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from functools import lru_cache
-from typing import Union
+from typing import Optional, Union
 
 import exchange_calendars as exchange_calendars
 import pandas as pd
@@ -62,6 +62,28 @@ def last_completed_session(
     if calendar.session_close(candidate) <= timestamp:
         return candidate.date()
     return calendar.previous_session(candidate).date()
+
+
+def completed_session_for_quote(
+    value: datetime,
+    calendar_name: str = DEFAULT_CALENDAR,
+) -> Optional[date]:
+    """Return the session closed at ``value``, or ``None`` for an intraday tick.
+
+    Quote timestamps describe the price observation, not when MarketHelm fetched
+    it. A timestamp on a weekend, holiday, or before the session close must not
+    be relabeled as that calendar day's official close.
+    """
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must include a timezone")
+    calendar = get_market_calendar(calendar_name)
+    timestamp = pd.Timestamp(value).tz_convert("UTC")
+    local_date = timestamp.tz_convert(calendar.tz).date().isoformat()
+    try:
+        candidate = calendar.date_to_session(local_date, direction="none")
+    except ValueError:
+        return None
+    return candidate.date() if calendar.session_close(candidate) <= timestamp else None
 
 
 def trading_session_after_timestamp(

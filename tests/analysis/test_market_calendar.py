@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 import pytest
 
 from src.analysis.market_calendar import (
+    completed_session_for_quote,
     last_completed_session,
     trading_session_after,
     trading_session_after_timestamp,
@@ -37,6 +38,18 @@ def test_timestamp_horizon_anchors_to_last_completed_session(
 def test_timestamp_horizon_rejects_ambiguous_naive_datetime():
     with pytest.raises(ValueError, match="timezone"):
         trading_session_after_timestamp(datetime(2026, 7, 6, 8), 5)
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "session"),
+    [
+        (datetime(2026, 7, 6, 19, tzinfo=timezone.utc), None),
+        (datetime(2026, 7, 6, 21, tzinfo=timezone.utc), date(2026, 7, 6)),
+        (datetime(2026, 7, 4, 21, tzinfo=timezone.utc), None),
+    ],
+)
+def test_quote_outcome_requires_same_day_completed_session(timestamp, session):
+    assert completed_session_for_quote(timestamp) == session
 
 
 def test_horizon_must_be_positive():

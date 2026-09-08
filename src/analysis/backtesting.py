@@ -48,6 +48,10 @@ def _label(value: Any, default: str = "UNKNOWN") -> str:
     return default if text.lower() in _INVALID_LABELS else text
 
 
+def _truthy(value: Any) -> bool:
+    return value is True or str(value).strip().lower() in {"1", "true", "yes"}
+
+
 def _direction(value: float, origin: float) -> int:
     return 1 if value > origin else -1 if value < origin else 0
 
@@ -88,6 +92,16 @@ def _target_session(
         except (TypeError, ValueError):
             pass
     return trading_session_after(run_date, horizon_sessions, calendar_name)
+
+
+def _has_timestamped_generation(row: Mapping[str, Any]) -> bool:
+    try:
+        timestamp = datetime.fromisoformat(
+            str(row.get("generated_at")).replace("Z", "+00:00")
+        )
+    except (TypeError, ValueError):
+        return False
+    return timestamp.tzinfo is not None and timestamp.utcoffset() is not None
 
 
 def _aggregate(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -137,17 +151,24 @@ def evaluate_projections(
     get_market_calendar(calendar_name)
 
     projection_rows = list(projections)
-    close_map: Dict[Tuple[str, str], float] = {}
+    close_map: Dict[Tuple[str, str], Tuple[float, str]] = {}
     observed_dates = set()
     for row in closes:
         symbol = normalize_ticker(row.get("symbol"))
         close = _finite_positive(row.get("close"))
+        has_provenance = "outcome_final" in row or "outcome_session" in row
+        if has_provenance and not (
+            _truthy(row.get("outcome_final")) and row.get("outcome_session")
+        ):
+            continue
+        actual_date_value = row.get("outcome_session") if has_provenance else row.get("date")
         try:
-            actual_date = datetime.strptime(str(row.get("date"))[:10], "%Y-%m-%d").date()
+            actual_date = datetime.strptime(str(actual_date_value)[:10], "%Y-%m-%d").date()
         except (TypeError, ValueError):
             continue
         if symbol and close is not None:
-            close_map[(actual_date.isoformat(), symbol)] = close
+            provenance = "verified_quote_session" if has_provenance else "legacy_filename"
+            close_map[(actual_date.isoformat(), symbol)] = (close, provenance)
             observed_dates.add(actual_date)
 
     latest_observed = max(observed_dates) if observed_dates else None
@@ -174,10 +195,11 @@ def evaluate_projections(
             pending_count += 1
             continue
 
-        actual = close_map.get((target_date.isoformat(), symbol))
-        if actual is None:
+        actual_entry = close_map.get((target_date.isoformat(), symbol))
+        if actual_entry is None:
             missing_actual_count += 1
             continue
+        actual, actual_provenance = actual_entry
 
         current = _finite_positive(row.get("current_price"))
         target_low = _finite_positive(row.get("target_low"))
@@ -196,6 +218,10 @@ def evaluate_projections(
                 "runDate": run_date.isoformat(),
                 "targetDate": target_date.isoformat(),
                 "actualDate": target_date.isoformat(),
+                "actualProvenance": actual_provenance,
+                "generationProvenance": (
+                    "timestamped" if _has_timestamped_generation(row) else "legacy_run_date"
+                ),
                 "current": _rounded(current, 4),
                 "predicted": round(predicted, 4),
                 "actual": round(actual, 4),
@@ -216,6 +242,12 @@ def evaluate_projections(
         by_confidence[sample["confidenceBand"]].append(sample)
 
     mature_count = len(samples) + missing_actual_count
+    verified_outcome_count = sum(
+        sample["actualProvenance"] == "verified_quote_session" for sample in samples
+    )
+    timestamped_projection_count = sum(
+        sample["generationProvenance"] == "timestamped" for sample in samples
+    )
     summary = {
         "schemaVersion": 1,
         "calendar": calendar_name,
@@ -223,6 +255,10 @@ def evaluate_projections(
         "projectionCount": len(projection_rows),
         "validProjectionCount": len(projection_rows) - invalid_count,
         "sampleCount": len(samples),
+        "verifiedOutcomeCount": verified_outcome_count,
+        "legacyOutcomeCount": len(samples) - verified_outcome_count,
+        "timestampedProjectionCount": timestamped_projection_count,
+        "legacyProjectionCount": len(samples) - timestamped_projection_count,
         "invalidCount": invalid_count,
         "pendingCount": pending_count,
         "missingActualCount": missing_actual_count,

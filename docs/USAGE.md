@@ -61,6 +61,33 @@ python3 scripts/projection_baseline.py check
 Do not use its synthetic metrics to tune confidence; calibration requires a
 representative baseline of real projections generated before their outcomes.
 
+Newly fetched quote rows record the provider timestamp, verified completed XNYS
+session, and whether the observation is eligible as an official close. This keeps
+premarket, intraday, holiday, and weekend fetches from being mislabeled by the
+snapshot filename. Legacy snapshots remain readable, but they cannot qualify as
+calibration evidence.
+
+Assess the local forward archive against the documented minimum evidence gate:
+
+```bash
+python3 scripts/projection_baseline.py assess --data-dir data --days 365
+```
+
+The default gate requires at least 200 scored projections, 90% mature-outcome
+coverage, 20 distinct run dates, 25 symbols, and two confidence cohorts with at
+least 30 samples each. Every scored projection must have a timezone-aware
+generation timestamp and every outcome must identify a verified completed quote
+session. Thresholds are minimum evidence hygiene, not proof of model quality.
+
+Once the assessment passes, preserve the exact report plus hashes of every input:
+
+```bash
+python3 scripts/projection_baseline.py capture --data-dir data --days 365 \
+  --output-dir baselines/observed/projection-YYYY-MM-DD
+```
+
+Capture refuses to create an output directory when any qualification fails.
+
 ### Option 3: Direct workflow (programmatic)
 
 ```bash

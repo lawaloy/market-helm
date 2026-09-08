@@ -60,3 +60,66 @@ def test_projection_baseline_check_reports_drift(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(projection_baseline, "REPORT_PATH", stale_report)
 
     assert projection_baseline.check() == 1
+
+
+def _qualified_report() -> dict:
+    samples = [
+        {
+            "runDate": f"2026-01-{index % 20 + 1:02d}",
+            "symbol": f"S{index % 25:02d}",
+            "actualProvenance": "verified_quote_session",
+            "generationProvenance": "timestamped",
+        }
+        for index in range(200)
+    ]
+    return {
+        "summary": {
+            "sampleCount": 200,
+            "verifiedOutcomeCount": 200,
+            "timestampedProjectionCount": 200,
+            "evaluationCoveragePct": 95.0,
+            "byConfidenceBand": {
+                "60-69": {"count": 100},
+                "70-79": {"count": 100},
+            },
+        },
+        "samples": samples,
+        "samplesTruncated": False,
+    }
+
+
+def test_observed_baseline_qualification_requires_provenance_and_diversity() -> None:
+    assessment = projection_baseline.qualify_report(_qualified_report())
+
+    assert assessment["qualified"] is True
+    assert assessment["failures"] == []
+
+
+def test_observed_baseline_qualification_fails_closed() -> None:
+    report = _qualified_report()
+    report["summary"]["verifiedOutcomeCount"] = 199
+    report["samplesTruncated"] = True
+
+    assessment = projection_baseline.qualify_report(report)
+
+    assert assessment["qualified"] is False
+    assert "report samples are truncated" in assessment["failures"]
+    assert any("verified quote-session" in failure for failure in assessment["failures"])
+
+
+def test_capture_refuses_unqualified_data_without_creating_output(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        projection_baseline,
+        "observed_report",
+        lambda *_args, **_kwargs: {
+            "summary": {"sampleCount": 0, "evaluationCoveragePct": None},
+            "samples": [],
+            "samplesTruncated": False,
+        },
+    )
+    output = tmp_path / "observed-v1"
+
+    assert projection_baseline.capture(tmp_path, output, 365) == 1
+    assert not output.exists()

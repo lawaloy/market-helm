@@ -108,6 +108,13 @@ Verify the committed projection-evaluator scenario baseline:
 python3 scripts/projection_baseline.py check
 ```
 
+Check whether forward-generated local observations meet the minimum real-data
+evidence gate (this fails closed until they do):
+
+```bash
+python3 scripts/projection_baseline.py assess --data-dir data --days 365
+```
+
 ---
 
 ## What You Get
