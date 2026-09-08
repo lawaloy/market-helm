@@ -394,6 +394,7 @@ class FinnhubClient:
         try:
             # Get quote (real-time price) - 1 API call
             quote = self.get_quote(symbol)
+            quote_captured_at = datetime.now(timezone.utc)
             
             if not quote or quote.get("c") is None:
                 logger.debug(f"No quote data for {symbol}")
@@ -427,7 +428,7 @@ class FinnhubClient:
                 profile.get("marketCapitalization", 0), default=0.0
             ) or 0.0
             quote_timestamp, outcome_session, outcome_final = _quote_outcome_provenance(
-                quote.get("t")
+                quote.get("t"), quote_captured_at
             )
             outcome_final = (
                 outcome_final

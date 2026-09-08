@@ -212,13 +212,15 @@ class TestFinnhubClient(unittest.TestCase):
         ), patch(
             "src.services.api_client._quote_outcome_provenance",
             return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
-        ):
+        ) as provenance:
             data = client.get_stock_data("AAPL", include_profile=False)
 
         self.assertEqual(data["quote_timestamp"], "2026-07-06T20:00:00+00:00")
         self.assertEqual(data["outcome_session"], "2026-07-06")
         self.assertEqual(data["outcome_close"], 99)
         self.assertIs(data["outcome_final"], True)
+        captured_at = provenance.call_args.args[1]
+        self.assertIsNotNone(captured_at.utcoffset())
 
     def test_get_stock_data_missing_previous_close_is_not_outcome(self):
         client = self._client_with_session(Mock())
