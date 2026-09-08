@@ -760,10 +760,43 @@ class TestHistoryAccuracyAPI:
         mock_data_loader.compute_projection_accuracy = MagicMock(
             return_value={
                 "summary": {
+                    "schemaVersion": 1,
+                    "calendar": "XNYS",
+                    "horizonSessions": 5,
+                    "projectionCount": 2,
+                    "validProjectionCount": 2,
                     "sampleCount": 1,
+                    "invalidCount": 0,
+                    "pendingCount": 0,
+                    "missingActualCount": 1,
+                    "evaluationCoveragePct": 50.0,
                     "meanAbsErrorPct": 3.0,
+                    "medianAbsErrorPct": 3.0,
+                    "directionalAccuracyPct": 100.0,
+                    "bandCoveragePct": 100.0,
+                    "meanConfidence": 70.0,
+                    "calibrationGapPct": -30.0,
                     "byRecommendation": {
-                        "HOLD": {"count": 1, "meanAbsErrorPct": 3.0},
+                        "HOLD": {
+                            "count": 1,
+                            "meanAbsErrorPct": 3.0,
+                            "medianAbsErrorPct": 3.0,
+                            "directionalAccuracyPct": 100.0,
+                            "bandCoveragePct": 100.0,
+                            "meanConfidence": 70.0,
+                            "calibrationGapPct": -30.0,
+                        },
+                    },
+                    "byConfidenceBand": {
+                        "70-79": {
+                            "count": 1,
+                            "meanAbsErrorPct": 3.0,
+                            "medianAbsErrorPct": 3.0,
+                            "directionalAccuracyPct": 100.0,
+                            "bandCoveragePct": 100.0,
+                            "meanConfidence": 70.0,
+                            "calibrationGapPct": -30.0,
+                        }
                     },
                 },
                 "samples": [
@@ -772,12 +805,19 @@ class TestHistoryAccuracyAPI:
                         "runDate": "2026-01-10",
                         "targetDate": "2026-01-15",
                         "actualDate": "2026-01-15",
+                        "current": 99.0,
                         "predicted": 100.0,
                         "actual": 103.0,
                         "absErrorPct": 3.0,
+                        "signedErrorPct": -3.0,
+                        "directionCorrect": True,
+                        "bandHit": True,
+                        "confidence": 70.0,
+                        "confidenceBand": "70-79",
                         "recommendation": "HOLD",
                     }
                 ],
+                "samplesTruncated": False,
             }
         )
         r = client.get("/api/history/accuracy", params={"days": 30})
@@ -785,6 +825,8 @@ class TestHistoryAccuracyAPI:
         data = r.json()
         assert data["summary"]["sampleCount"] == 1
         assert data["summary"]["meanAbsErrorPct"] == 3.0
+        assert data["summary"]["directionalAccuracyPct"] == 100.0
+        assert data["summary"]["byConfidenceBand"]["70-79"]["count"] == 1
         assert len(data["samples"]) == 1
         assert data["samples"][0]["symbol"] == "AAPL"
 

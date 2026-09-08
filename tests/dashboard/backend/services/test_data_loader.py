@@ -137,137 +137,86 @@ class TestDataLoader:
         result = loader.load_daily_data()
         assert result.iloc[0]["symbol"] == "NEW"
 
-    def test_projection_target_date_from_row(self, loader):
-        """Uses projection_date column when present."""
-        row = {"projection_date": "2026-02-01"}
-        assert loader._projection_target_date(row, "2026-01-01") == "2026-02-01"
-
-    def test_projection_target_date_fallback_run_plus_five(self, loader):
-        """Falls back to run date + 5 days when projection_date missing."""
-        assert loader._projection_target_date({}, "2026-01-01") == "2026-01-06"
-
     def test_compute_projection_accuracy_matches_actual(self, loader, temp_data_dir):
-        """Compares target_mid to close on target date."""
-        df_day = pd.DataFrame(
+        """Reports exact-session error, direction, band, and calibration metrics."""
+        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
+            temp_data_dir / "daily_data_2026-01-05.csv", index=False
+        )
+        pd.DataFrame({"symbol": ["AAPL"], "close": [105.0]}).to_csv(
+            temp_data_dir / "daily_data_2026-01-12.csv", index=False
+        )
+        pd.DataFrame(
             {
                 "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
+                "current_price": [100.0],
+                "target_low": [104.0],
+                "target_mid": [110.0],
+                "target_high": [112.0],
+                "recommendation": ["BUY"],
+                "confidence": [70],
             }
-        )
-        df_day.to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-        df_target = pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [105.0],
-                "change_percent": [1.0],
-            }
-        )
-        df_target.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
-
-        proj = pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [100.0],
-                "recommendation": ["HOLD"],
-                "projection_date": ["2026-01-15"],
-                "confidence": [50],
-                "expected_change_percent": [0.0],
-            }
-        )
-        proj.to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
-        assert out["summary"]["sampleCount"] == 1
-        assert out["summary"]["meanAbsErrorPct"] == 5.0
-        assert out["samples"][0]["absErrorPct"] == 5.0
+        summary = out["summary"]
+
+        assert summary["calendar"] == "XNYS"
+        assert summary["horizonSessions"] == 5
+        assert summary["sampleCount"] == 1
+        assert summary["meanAbsErrorPct"] == 4.762
+        assert summary["directionalAccuracyPct"] == 100.0
+        assert summary["bandCoveragePct"] == 100.0
+        assert summary["calibrationGapPct"] == -30.0
+        assert summary["evaluationCoveragePct"] == 100.0
+        assert out["samples"][0]["targetDate"] == "2026-01-12"
+        assert out["samples"][0]["actualDate"] == "2026-01-12"
         assert out["samples"][0]["symbol"] == "AAPL"
-        assert "HOLD" in out["summary"]["byRecommendation"]
+        assert "BUY" in summary["byRecommendation"]
+        assert "70-79" in summary["byConfidenceBand"]
 
-    def test_compute_projection_accuracy_uses_next_available_close(self, loader, temp_data_dir):
-        """Uses the first available close after the target date when target-day data is absent."""
+    def test_compute_projection_accuracy_does_not_roll_missing_close_forward(
+        self, loader, temp_data_dir
+    ):
+        """A later close cannot turn an exact-session gap into a variable-horizon score."""
+        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
+            temp_data_dir / "daily_data_2026-01-05.csv", index=False
+        )
+        pd.DataFrame({"symbol": ["AAPL"], "close": [108.0]}).to_csv(
+            temp_data_dir / "daily_data_2026-01-13.csv", index=False
+        )
         pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [108.0],
-                "change_percent": [1.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [100.0],
-                "recommendation": ["BUY"],
-                "projection_date": ["2026-01-15"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
-
-        out = loader.compute_projection_accuracy(days=90)
-
-        assert out["summary"]["sampleCount"] == 1
-        assert out["summary"]["meanAbsErrorPct"] == 8.0
-        assert out["samples"][0]["targetDate"] == "2026-01-15"
-        assert out["samples"][0]["actualDate"] == "2026-01-16"
-
-    def test_compute_projection_accuracy_skips_unmatured_targets(self, loader, temp_data_dir):
-        """Does not score projections whose target date is later than latest daily data."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [120.0],
-                "recommendation": ["BUY"],
-                "projection_date": ["2026-01-20"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+            {"symbol": ["AAPL"], "current_price": [100.0], "target_mid": [110.0]}
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
 
         assert out["summary"]["sampleCount"] == 0
-        assert out["summary"]["meanAbsErrorPct"] is None
+        assert out["summary"]["missingActualCount"] == 1
+        assert out["summary"]["evaluationCoveragePct"] == 0.0
         assert out["samples"] == []
 
-    def test_compute_projection_accuracy_skips_invalid_and_future_targets(self, loader, temp_data_dir):
-        """Excludes projections that cannot yet be measured or have invalid targets."""
+    def test_compute_projection_accuracy_counts_pending_and_invalid(
+        self, loader, temp_data_dir
+    ):
+        """Unmatured and malformed projections remain visible in report coverage."""
+        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
+            temp_data_dir / "daily_data_2026-01-05.csv", index=False
+        )
         pd.DataFrame(
             {
-                "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
+                "symbol": ["AAPL", "MSFT"],
+                "target_mid": [120.0, "not-a-number"],
+                "recommendation": ["BUY", "HOLD"],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "MSFT", "GOOGL"],
-                "target_mid": [0.0, "not-a-number", 120.0],
-                "recommendation": ["BUY", "HOLD", "SELL"],
-                "projection_date": ["2026-01-10", "2026-01-10", "2026-01-20"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
 
-        assert out == {
-            "summary": {
-                "sampleCount": 0,
-                "meanAbsErrorPct": None,
-                "byRecommendation": {},
-            },
-            "samples": [],
-        }
+        assert out["summary"]["projectionCount"] == 2
+        assert out["summary"]["validProjectionCount"] == 1
+        assert out["summary"]["pendingCount"] == 1
+        assert out["summary"]["invalidCount"] == 1
+        assert out["summary"]["sampleCount"] == 0
 
     def test_load_projections_raises_value_error_on_corrupt_csv(self, loader, temp_data_dir):
         """Unreadable projections CSV raises ValueError (not raw ParserError)."""
@@ -276,41 +225,6 @@ class TestDataLoader:
         )
         with pytest.raises(ValueError, match="Projections unreadable"):
             loader.load_projections()
-
-    def test_compute_projection_accuracy_skips_nan_close_and_predicted(
-        self, loader, temp_data_dir
-    ):
-        """NaN actual close or predicted target_mid must not produce null error pcts."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "MSFT"],
-                "close": [float("nan"), 200.0],
-                "change_percent": [0.0, 0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "MSFT", "GOOGL"],
-                "target_mid": [100.0, float("nan"), 120.0],
-                "recommendation": ["BUY", "HOLD", "SELL"],
-                "projection_date": ["2026-01-15", "2026-01-15", "2026-01-15"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
-        # Need a run-date daily file so run_dates includes the projection day.
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [95.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-
-        out = loader.compute_projection_accuracy(days=90)
-
-        # AAPL skipped (NaN close), MSFT skipped (NaN predicted), GOOGL has no close → 0
-        assert out["summary"]["sampleCount"] == 0
-        assert out["summary"]["meanAbsErrorPct"] is None
-        assert out["samples"] == []
 
     def test_compute_projection_accuracy_normalizes_padded_and_skips_sentinels(
         self, loader, temp_data_dir
@@ -322,28 +236,21 @@ class TestDataLoader:
                 "close": [100.0, 200.0],
                 "change_percent": [0.0, 0.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": [" aapl ", None, float("nan"), "  ", "MSFT"],
                 "target_mid": [110.0, 50.0, 60.0, 70.0, 210.0],
                 "recommendation": ["BUY", "HOLD", "HOLD", "HOLD", "SELL"],
-                "projection_date": [
-                    "2026-01-15",
-                    "2026-01-15",
-                    "2026-01-15",
-                    "2026-01-15",
-                    "2026-01-15",
-                ],
             }
-        ).to_csv(temp_data_dir / "projections_2026-01-10.csv", index=False)
+        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
                 "close": [95.0],
                 "change_percent": [0.0],
             }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
+        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -353,8 +260,10 @@ class TestDataLoader:
         assert "NONE" not in symbols
         assert "NAN" not in symbols
         by_sym = {s["symbol"]: s for s in out["samples"]}
-        assert by_sym["AAPL"]["absErrorPct"] == pytest.approx(9.091, abs=0.01)
-        assert by_sym["MSFT"]["absErrorPct"] == pytest.approx(4.762, abs=0.01)
+        assert by_sym["AAPL"]["absErrorPct"] == 10.0
+        assert by_sym["MSFT"]["absErrorPct"] == 5.0
+        assert out["summary"]["invalidCount"] == 3
+
     def test_load_historical_data_matches_padded_symbols_and_skips_sentinels(
         self, loader, temp_data_dir
     ):

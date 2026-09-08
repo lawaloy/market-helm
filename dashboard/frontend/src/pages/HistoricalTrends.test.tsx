@@ -42,15 +42,43 @@ function summaryPayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function accuracyPayload(
+  summaryOverrides: Record<string, unknown> = {},
+  samples: Array<Record<string, unknown>> = [],
+) {
+  return {
+    data: {
+      summary: {
+        schemaVersion: 1,
+        calendar: 'XNYS',
+        horizonSessions: 5,
+        projectionCount: 0,
+        validProjectionCount: 0,
+        sampleCount: 0,
+        invalidCount: 0,
+        pendingCount: 0,
+        missingActualCount: 0,
+        evaluationCoveragePct: null,
+        meanAbsErrorPct: null,
+        medianAbsErrorPct: null,
+        directionalAccuracyPct: null,
+        bandCoveragePct: null,
+        meanConfidence: null,
+        calibrationGapPct: null,
+        byRecommendation: {},
+        byConfidenceBand: {},
+        ...summaryOverrides,
+      },
+      samples,
+      samplesTruncated: false,
+    },
+  };
+}
+
 describe('HistoricalTrends fetch races', () => {
   beforeEach(() => {
     apiMocks.getSummary.mockResolvedValue(summaryPayload());
-    apiMocks.getAccuracy.mockResolvedValue({
-      data: {
-        summary: { sampleCount: 0, meanAbsErrorPct: null, byRecommendation: {} },
-        samples: [],
-      },
-    });
+    apiMocks.getAccuracy.mockResolvedValue(accuracyPayload());
     apiMocks.getHistorical.mockResolvedValue({ data: { data: [] } });
   });
 
@@ -97,16 +125,15 @@ describe('HistoricalTrends fetch races', () => {
           resolveFirstAccuracy = resolve;
         });
       }
-      return Promise.resolve({
-        data: {
-          summary: {
-            sampleCount: 2,
-            meanAbsErrorPct: 1.5,
-            byRecommendation: {},
-          },
-          samples: [],
-        },
-      });
+      return Promise.resolve(
+        accuracyPayload({
+          projectionCount: 2,
+          validProjectionCount: 2,
+          sampleCount: 2,
+          evaluationCoveragePct: 100,
+          meanAbsErrorPct: 1.5,
+        }),
+      );
     });
 
     render(<HistoricalTrends />);
@@ -129,16 +156,15 @@ describe('HistoricalTrends fetch races', () => {
     expect(apiMocks.getAccuracy.mock.calls.length).toBeGreaterThanOrEqual(2);
 
     await act(async () => {
-      resolveFirstAccuracy?.({
-        data: {
-          summary: {
-            sampleCount: 99,
-            meanAbsErrorPct: 99,
-            byRecommendation: {},
-          },
-          samples: [],
-        },
-      });
+      resolveFirstAccuracy?.(
+        accuracyPayload({
+          projectionCount: 99,
+          validProjectionCount: 99,
+          sampleCount: 99,
+          evaluationCoveragePct: 100,
+          meanAbsErrorPct: 99,
+        }),
+      );
       await Promise.resolve();
       await Promise.resolve();
     });
@@ -212,5 +238,77 @@ describe('HistoricalTrends fetch races', () => {
     // Latest days=7 history wins; stale empty/error path must not stick.
     expect(screen.queryByText(/No historical data for/)).toBeNull();
     expect(apiMocks.getHistorical.mock.calls.some((c) => c[0] === 'AAPL' && c[1] === 7)).toBe(true);
+  });
+
+  it('renders exact-session validation metrics and sample outcomes', async () => {
+    apiMocks.getAccuracy.mockResolvedValue(
+      accuracyPayload(
+        {
+          projectionCount: 3,
+          validProjectionCount: 3,
+          sampleCount: 1,
+          pendingCount: 1,
+          missingActualCount: 1,
+          evaluationCoveragePct: 50,
+          meanAbsErrorPct: 2.5,
+          medianAbsErrorPct: 2.5,
+          directionalAccuracyPct: 60,
+          bandCoveragePct: 80,
+          meanConfidence: 65,
+          calibrationGapPct: 5,
+          byRecommendation: {
+            BUY: {
+              count: 1,
+              meanAbsErrorPct: 2.5,
+              medianAbsErrorPct: 2.5,
+              directionalAccuracyPct: 100,
+              bandCoveragePct: 100,
+              meanConfidence: 70,
+              calibrationGapPct: -30,
+            },
+          },
+          byConfidenceBand: {
+            '70-79': {
+              count: 1,
+              meanAbsErrorPct: 2.5,
+              medianAbsErrorPct: 2.5,
+              directionalAccuracyPct: 100,
+              bandCoveragePct: 100,
+              meanConfidence: 70,
+              calibrationGapPct: -30,
+            },
+          },
+        },
+        [
+          {
+            symbol: 'AAPL',
+            runDate: '2026-07-02',
+            targetDate: '2026-07-10',
+            actualDate: '2026-07-10',
+            current: 100,
+            predicted: 110,
+            actual: 108,
+            absErrorPct: 1.852,
+            signedErrorPct: 1.852,
+            directionCorrect: true,
+            bandHit: true,
+            confidence: 70,
+            confidenceBand: '70-79',
+            recommendation: 'BUY',
+          },
+        ],
+      ),
+    );
+
+    render(<HistoricalTrends />);
+
+    expect(await screen.findByText('Directional accuracy')).toBeTruthy();
+    expect(screen.getByText('60.00%')).toBeTruthy();
+    expect(screen.getByText('80.00%')).toBeTruthy();
+    expect(screen.getByText('50.00%')).toBeTruthy();
+    expect(screen.getByText('5.00%')).toBeTruthy();
+    expect(screen.getByText('Confidence calibration by cohort')).toBeTruthy();
+    expect(screen.getByText('Correct')).toBeTruthy();
+    expect(screen.getByText('Hit')).toBeTruthy();
   });
 });

@@ -1,35 +1,19 @@
 """
 Data loading service for reading CSV and JSON files
 """
-import math
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import pandas as pd
 import json
 from datetime import datetime, timedelta
 from functools import lru_cache
 
+from src.analysis.backtesting import backtest_data_dir
 from src.utils.tickers import normalize_ticker
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_INVALID_LABEL_SENTINELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
-
-
-def _safe_recommendation(value: Any, default: str = "UNKNOWN") -> str:
-    """Coerce blank/NaN recommendation cells to a stable label for accuracy rollups."""
-    if value is None:
-        return default
-    if isinstance(value, float) and not math.isfinite(value):
-        return default
-    try:
-        text = str(value).strip()
-    except Exception:
-        return default
-    if not text or text.lower() in _INVALID_LABEL_SENTINELS:
-        return default
-    return text
 
 
 def _default_data_dir() -> Path:
@@ -273,139 +257,9 @@ class DataLoader:
         
         return historical_data
 
-    @staticmethod
-    def _projection_target_date(row: Dict[str, Any], run_date: str) -> str:
-        """Target calendar date for the 5-day price target (from CSV or run date + 5 days)."""
-        raw = row.get("projection_date")
-        if raw is not None and str(raw).strip():
-            try:
-                return datetime.strptime(str(raw)[:10], "%Y-%m-%d").strftime("%Y-%m-%d")
-            except ValueError:
-                pass
-        rd = datetime.strptime(run_date, "%Y-%m-%d")
-        return (rd + timedelta(days=5)).strftime("%Y-%m-%d")
-
-    def get_actual_close_on_or_after(
-        self, symbol: str, target_date: str
-    ) -> Optional[Tuple[str, float]]:
-        """First available daily close for symbol on or after target_date."""
-        sym = normalize_ticker(symbol)
-        if not sym:
-            return None
-        for d in sorted(self.get_available_dates()):
-            if d < target_date:
-                continue
-            try:
-                daily_df = self.load_daily_data(d)
-                # Match padded / mixed-case daily symbols to the normalized key.
-                stock_data = daily_df[
-                    daily_df["symbol"].map(normalize_ticker) == sym
-                ]
-                if stock_data.empty:
-                    continue
-                close = float(stock_data.iloc[0]["close"])
-                # Skip non-finite closes so accuracy samples stay JSON-safe.
-                if not math.isfinite(close):
-                    continue
-                return d, close
-            except Exception:
-                continue
-        return None
-
     def compute_projection_accuracy(self, days: int = 90) -> Dict[str, Any]:
-        """
-        Compare projected target_mid to actual close on/after the projection target date.
-        Only includes rows where the target date is not after our latest daily data.
-        """
-        dates = self.get_available_dates()
-        if not dates:
-            return {
-                "summary": {
-                    "sampleCount": 0,
-                    "meanAbsErrorPct": None,
-                    "byRecommendation": {},
-                },
-                "samples": [],
-            }
-
-        latest = max(dates)
-        cutoff = (datetime.strptime(latest, "%Y-%m-%d") - timedelta(days=days)).strftime("%Y-%m-%d")
-        run_dates = [d for d in dates if d >= cutoff]
-
-        samples: List[Dict[str, Any]] = []
-        for run_date in run_dates:
-            try:
-                proj_df = self.load_projections(run_date)
-            except Exception:
-                continue
-            if proj_df.empty:
-                continue
-
-            for _, row in proj_df.iterrows():
-                row_dict = row.to_dict()
-                # Skip None/NaN/blank so accuracy never reports fake NONE/NAN tickers.
-                symbol = normalize_ticker(row_dict.get("symbol"))
-                if not symbol:
-                    continue
-                try:
-                    predicted = float(row_dict["target_mid"])
-                except (KeyError, TypeError, ValueError):
-                    continue
-                if not math.isfinite(predicted) or predicted <= 0:
-                    continue
-
-                target_date = self._projection_target_date(row_dict, run_date)
-                if target_date > latest:
-                    continue
-
-                actual = self.get_actual_close_on_or_after(symbol, target_date)
-                if not actual:
-                    continue
-                actual_date, actual_close = actual
-                abs_err_pct = abs(actual_close - predicted) / predicted * 100.0
-                rec = _safe_recommendation(row_dict.get("recommendation", "UNKNOWN"))
-
-                samples.append(
-                    {
-                        "symbol": symbol,
-                        "runDate": run_date,
-                        "targetDate": target_date,
-                        "actualDate": actual_date,
-                        "predicted": round(predicted, 4),
-                        "actual": round(actual_close, 4),
-                        "absErrorPct": round(abs_err_pct, 3),
-                        "recommendation": rec,
-                    }
-                )
-
-        by_rec: Dict[str, Dict[str, float]] = {}
-        for s in samples:
-            rec = s["recommendation"]
-            if rec not in by_rec:
-                by_rec[rec] = {"count": 0, "sumAbs": 0.0}
-            by_rec[rec]["count"] += 1
-            by_rec[rec]["sumAbs"] += s["absErrorPct"]
-
-        by_recommendation: Dict[str, Dict[str, Any]] = {}
-        for rec, agg in by_rec.items():
-            c = agg["count"]
-            by_recommendation[rec] = {
-                "count": c,
-                "meanAbsErrorPct": round(agg["sumAbs"] / c, 3) if c else None,
-            }
-
-        mean_abs: Optional[float] = None
-        if samples:
-            mean_abs = round(sum(s["absErrorPct"] for s in samples) / len(samples), 3)
-
-        return {
-            "summary": {
-                "sampleCount": len(samples),
-                "meanAbsErrorPct": mean_abs,
-                "byRecommendation": by_recommendation,
-            },
-            "samples": samples[:300],
-        }
+        """Evaluate saved projections on an exact five-session XNYS horizon."""
+        return backtest_data_dir(self.data_dir, days=days)
 
 
 # Singleton instance with caching

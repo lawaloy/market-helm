@@ -88,11 +88,14 @@ Navigate to **<http://localhost:3000>** in your browser (Vite dev server).
 The **Historical Trends** page is shipped. It includes:
 
 - Multi-day market summary charts (confidence, expected move, recommendations over time)
-- **Single-stock** view: price vs 5-day target over your selected range
-- **Projection accuracy**: compares older projections’ target prices to the **actual closing price** on or after each projection’s target date; shows rollups by recommendation and a table of recent scores
+- **Single-stock** view: price vs five-session target over your selected range
+- **Projection accuracy**: scores older projections against the **actual close on the exact fifth XNYS trading session**; shows error, direction, target-band and data coverage, confidence calibration, cohorts, and recent samples
 
 **Why “projection accuracy” can look empty:**  
-Nothing is wrong with the UI. The accuracy block only has numbers to show when **both** are true: (1) you have saved runs in the `data/` folder across multiple dates (`daily_data_*.csv` and `projections_*.csv`), and (2) enough **calendar time has passed** that each projection’s **target date** is in the past, so there is a real close to compare. Until then you may still see the market charts, while accuracy stays in its empty state. Keep running **Fetch New** on successive days (or add historical files) and it will fill in over time.
+Nothing is wrong with the UI. Scored metrics require saved `daily_data_*.csv` and
+`projections_*.csv` runs plus a close captured on each projection’s exact fifth
+XNYS session. The dashboard reports pending, missing, and invalid counts while
+samples mature; it never substitutes a later close for a missing target session.
 
 ### Hosted accounts and Helmtower (implemented)
 

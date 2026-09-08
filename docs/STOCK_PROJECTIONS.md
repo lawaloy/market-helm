@@ -247,8 +247,6 @@ summary = projector.generate_projection_summary(projections)
 
 ## Projection accuracy (shipped)
 
-The dashboard and backend compare past **`target_mid`** values to the first available **closing price** on or after the projection target date. Summary API: **`GET /api/history/accuracy`** (see [PROJECT_STATUS.md](PROJECT_STATUS.md)). This complements the projector: scoring lives in the dashboard data layer, not inside `StockProjector`.
-
 The projection files now record a five-session **XNYS** target, rather than adding
 five calendar days. A reusable backtester evaluates only the exact target
 session—it does not silently roll a missing close forward—and reports absolute
@@ -259,16 +257,15 @@ confidence and recommendation cohort:
 market-helm backtest --data-dir data --days 365 --output data/backtest.json
 ```
 
-The dashboard accuracy endpoint retains its earlier first-close-on-or-after
-behavior for compatibility. Migrating it to the shared exact-session evaluator
-is the next integration slice.
+The dashboard and **`GET /api/history/accuracy`** use the same evaluator and show
+the headline metrics, data coverage, confidence cohorts, recommendation cohorts,
+and individual sample outcomes.
 
 ## Future Enhancements
 
 Potential improvements for future versions:
 
 - [ ] Multi-timeframe projections (1-day, 5-day, 30-day)
-- [ ] Display the shared exact-session backtest report in the dashboard
 - [ ] Establish representative backtest baselines and calibrate confidence
 - [ ] Machine learning model integration
 - [ ] Fundamental analysis factors

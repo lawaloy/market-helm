@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -292,6 +294,19 @@ def _is_safe_env_assignment(key: str, value: str) -> bool:
     return True
 
 
+def _replace_env_file_with_retry(source: Path, target: Path) -> None:
+    """Atomically replace an env file, tolerating brief Windows file locks."""
+    attempts = 6
+    for attempt in range(attempts):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.01 * (attempt + 1))
+
+
 def update_user_env_vars(updates: Dict[str, str]) -> None:
     """Update ~/.market-helm/.env without logging or returning secret values.
 
@@ -330,6 +345,18 @@ def update_user_env_vars(updates: Dict[str, str]) -> None:
             if str(key) not in order:
                 order.append(str(key))
         content = "\n".join(f"{key}={existing[key]}" for key in order)
-        tmp = env_path.with_suffix(".env.tmp")
-        tmp.write_text(f"{content}\n" if content else "", encoding="utf-8")
-        tmp.replace(env_path)
+        fd, tmp_name = tempfile.mkstemp(
+            dir=env_path.parent,
+            prefix=f".{env_path.name}.",
+            suffix=".tmp",
+        )
+        os.close(fd)
+        tmp = Path(tmp_name)
+        try:
+            tmp.write_text(f"{content}\n" if content else "", encoding="utf-8")
+            _replace_env_file_with_retry(tmp, env_path)
+        finally:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
