@@ -1,0 +1,2 @@
+symbol,current_price,target_low,target_mid,target_high,confidence,recommendation,generated_at
+NFLX,400,410,420,430,80,BUY,2026-07-13T21:00:00+00:00

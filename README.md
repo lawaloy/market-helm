@@ -102,6 +102,12 @@ Evaluate saved projections against exact NYSE trading sessions:
 market-helm backtest --data-dir data --days 365 --output data/backtest.json
 ```
 
+Verify the committed projection-evaluator scenario baseline:
+
+```bash
+python3 scripts/projection_baseline.py check
+```
+
 ---
 
 ## What You Get
@@ -135,8 +141,8 @@ Full index: **[docs/README.md](docs/README.md)**
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-**Next priorities:** projection backtest baselines and calibration, external staging sign-off, deeper alert
-rules, and dashboard quality — details in
+**Next priorities:** qualified real-data projection baselines before calibration,
+external staging sign-off, deeper alert rules, and dashboard quality — details in
 [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
 
 ---

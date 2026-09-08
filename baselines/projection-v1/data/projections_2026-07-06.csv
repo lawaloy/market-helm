@@ -1,0 +1,3 @@
+symbol,current_price,target_low,target_mid,target_high,confidence,recommendation,generated_at
+GOOG,100,99,100,101,65,HOLD,2026-07-06T21:00:00+00:00
+TSLA,250,265,275,285,75,STRONG BUY,2026-07-06T21:00:00+00:00
