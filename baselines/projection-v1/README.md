@@ -18,15 +18,15 @@ out-of-sample production projections and exact target-session closes.
 Verify the committed report:
 
 ```bash
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py check
 ```
 
 After an intentional evaluator contract change, review the semantic impact and
 regenerate the report explicitly:
 
 ```bash
-python scripts/projection_baseline.py update
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py update
+python3 scripts/projection_baseline.py check
 ```
 
 The check is also exercised by the Python test suite.

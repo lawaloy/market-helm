@@ -269,7 +269,7 @@ session anchors, correct and incorrect directions, band hits and misses, and
 pending/missing/invalid rows. Verify it with:
 
 ```bash
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py check
 ```
 
 This synthetic baseline protects evaluator semantics; it is not evidence of model

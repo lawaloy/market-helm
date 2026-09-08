@@ -55,7 +55,7 @@ The repository also preserves a synthetic scenario baseline that detects changes
 to evaluator semantics:
 
 ```bash
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py check
 ```
 
 Do not use its synthetic metrics to tune confidence; calibration requires a

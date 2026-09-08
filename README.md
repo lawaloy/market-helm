@@ -105,7 +105,7 @@ market-helm backtest --data-dir data --days 365 --output data/backtest.json
 Verify the committed projection-evaluator scenario baseline:
 
 ```bash
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py check
 ```
 
 ---
