@@ -83,24 +83,60 @@ def test_data_dir_loader_reads_dated_csvs(tmp_path):
     assert report["samples"][0]["actual"] == 108.0
 
 
+def test_timezone_aware_generation_time_controls_exact_target_session():
+    projection = _projection(generated_at="2026-07-06T12:00:00+00:00")
+    closes = [
+        {"date": "2026-07-10", "symbol": "AAPL", "close": 108.0},
+        {"date": "2026-07-13", "symbol": "AAPL", "close": 109.0},
+    ]
+
+    report = evaluate_projections([projection], closes)
+
+    assert report["samples"][0]["targetDate"] == "2026-07-10"
+    assert report["samples"][0]["actual"] == 108.0
+
+
+def test_projection_only_archive_preserves_counts(tmp_path):
+    pd.DataFrame(
+        [
+            _projection(),
+            _projection(symbol="", target_mid=120.0),
+        ]
+    ).drop(columns=["run_date"]).to_csv(
+        tmp_path / "projections_2026-07-02.csv", index=False
+    )
+
+    report = backtest_data_dir(tmp_path)
+
+    assert report["summary"]["projectionCount"] == 2
+    assert report["summary"]["validProjectionCount"] == 1
+    assert report["summary"]["pendingCount"] == 1
+    assert report["summary"]["invalidCount"] == 1
+    assert report["summary"]["sampleCount"] == 0
+
+
 def test_empty_data_dir_still_validates_calendar(tmp_path):
     with pytest.raises(ValueError, match="unknown or unavailable"):
         backtest_data_dir(tmp_path, calendar_name="NOT-A-CALENDAR")
 
 
-def test_sample_limit_is_explicit_and_json_safe():
+def test_sample_limit_returns_newest_rows_and_is_json_safe():
     projections = [
         _projection(symbol="AAPL"),
-        _projection(symbol="MSFT", confidence=float("nan")),
+        _projection(
+            run_date="2026-07-06", symbol="MSFT", confidence=float("nan")
+        ),
     ]
     closes = [
         {"date": "2026-07-10", "symbol": "AAPL", "close": 108.0},
-        {"date": "2026-07-10", "symbol": "MSFT", "close": 108.0},
+        {"date": "2026-07-13", "symbol": "MSFT", "close": 108.0},
     ]
 
     report = evaluate_projections(projections, closes, max_samples=1)
 
     assert report["summary"]["sampleCount"] == 2
     assert len(report["samples"]) == 1
+    assert report["samples"][0]["symbol"] == "MSFT"
+    assert report["samples"][0]["runDate"] == "2026-07-06"
     assert report["samplesTruncated"] is True
     json.dumps(report, allow_nan=False)

@@ -45,6 +45,7 @@ function summaryPayload(overrides: Record<string, unknown> = {}) {
 function accuracyPayload(
   summaryOverrides: Record<string, unknown> = {},
   samples: Array<Record<string, unknown>> = [],
+  samplesTruncated = false,
 ) {
   return {
     data: {
@@ -70,7 +71,7 @@ function accuracyPayload(
         ...summaryOverrides,
       },
       samples,
-      samplesTruncated: false,
+      samplesTruncated,
     },
   };
 }
@@ -244,11 +245,11 @@ describe('HistoricalTrends fetch races', () => {
     apiMocks.getAccuracy.mockResolvedValue(
       accuracyPayload(
         {
-          projectionCount: 3,
-          validProjectionCount: 3,
-          sampleCount: 1,
+          projectionCount: 5,
+          validProjectionCount: 5,
+          sampleCount: 2,
           pendingCount: 1,
-          missingActualCount: 1,
+          missingActualCount: 2,
           evaluationCoveragePct: 50,
           meanAbsErrorPct: 2.5,
           medianAbsErrorPct: 2.5,
@@ -297,6 +298,7 @@ describe('HistoricalTrends fetch races', () => {
             recommendation: 'BUY',
           },
         ],
+        true,
       ),
     );
 
@@ -308,6 +310,7 @@ describe('HistoricalTrends fetch races', () => {
     expect(screen.getByText('50.00%')).toBeTruthy();
     expect(screen.getByText('5.00%')).toBeTruthy();
     expect(screen.getByText('Confidence calibration by cohort')).toBeTruthy();
+    expect(screen.getByText('Recent scores (newest 1 of 2)')).toBeTruthy();
     expect(screen.getByText('Correct')).toBeTruthy();
     expect(screen.getByText('Hit')).toBeTruthy();
   });

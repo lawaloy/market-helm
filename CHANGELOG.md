@@ -29,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Projection horizons:** Anchor premarket and intraday forecasts to the last
+  completed XNYS session, retain projection-only archive counts, and return the
+  newest samples when backtest output is limited.
 - **Windows alert settings:** Use unique temporary files and retry atomic `.env`
   replacement when a short-lived file lock interrupts a settings save.
 

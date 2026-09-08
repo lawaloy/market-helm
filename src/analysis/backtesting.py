@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import math
 from pathlib import Path
 import re
@@ -16,6 +16,7 @@ from .market_calendar import (
     DEFAULT_CALENDAR,
     get_market_calendar,
     trading_session_after,
+    trading_session_after_timestamp,
 )
 from ..utils.tickers import normalize_ticker
 
@@ -67,6 +68,26 @@ def _confidence_band(confidence: Optional[float]) -> str:
     if lower < 50:
         return "0-49"
     return f"{lower}-{lower + 9 if lower < 90 else 100}"
+
+
+def _target_session(
+    row: Mapping[str, Any],
+    run_date: date,
+    horizon_sessions: int,
+    calendar_name: str,
+) -> date:
+    """Derive a target from generation time, with a legacy run-date fallback."""
+    generated_at = row.get("generated_at")
+    if generated_at is not None:
+        try:
+            timestamp = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
+            if timestamp.tzinfo is not None and timestamp.utcoffset() is not None:
+                return trading_session_after_timestamp(
+                    timestamp, horizon_sessions, calendar_name
+                )
+        except (TypeError, ValueError):
+            pass
+    return trading_session_after(run_date, horizon_sessions, calendar_name)
 
 
 def _aggregate(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -140,7 +161,9 @@ def evaluate_projections(
         predicted = _finite_positive(row.get("target_mid"))
         try:
             run_date = datetime.strptime(str(row.get("run_date"))[:10], "%Y-%m-%d").date()
-            target_date = trading_session_after(run_date, horizon_sessions, calendar_name)
+            target_date = _target_session(
+                row, run_date, horizon_sessions, calendar_name
+            )
         except (TypeError, ValueError):
             invalid_count += 1
             continue
@@ -214,6 +237,10 @@ def evaluate_projections(
             key: _aggregate(value) for key, value in sorted(by_confidence.items())
         },
     }
+    samples.sort(key=lambda sample: sample["symbol"])
+    samples.sort(
+        key=lambda sample: (sample["runDate"], sample["targetDate"]), reverse=True
+    )
     visible_samples = samples if max_samples is None else samples[:max_samples]
     return {
         "summary": summary,
@@ -248,7 +275,11 @@ def backtest_data_dir(
             dated_files.append((match.group(1), match.group(2), path))
     dated_files.sort(key=lambda item: (item[1], item[0], item[2].name))
     daily_files = [(day, path) for kind, day, path in dated_files if kind == "daily_data"]
-    if not daily_files:
+    projection_files = [
+        (day, path) for kind, day, path in dated_files if kind == "projections"
+    ]
+    dated_inputs = daily_files or projection_files
+    if not dated_inputs:
         return evaluate_projections(
             [],
             [],
@@ -257,7 +288,7 @@ def backtest_data_dir(
             max_samples=max_samples,
         )
 
-    latest = max(datetime.strptime(day, "%Y-%m-%d").date() for day, _ in daily_files)
+    latest = max(datetime.strptime(day, "%Y-%m-%d").date() for day, _ in dated_inputs)
     cutoff = latest - timedelta(days=days)
     projections: List[Dict[str, Any]] = []
     closes: List[Dict[str, Any]] = []
@@ -270,8 +301,8 @@ def backtest_data_dir(
         for row in frame.to_dict("records"):
             closes.append({**row, "date": day})
 
-    for kind, day, path in dated_files:
-        if kind != "projections" or datetime.strptime(day, "%Y-%m-%d").date() < cutoff:
+    for day, path in projection_files:
+        if datetime.strptime(day, "%Y-%m-%d").date() < cutoff:
             continue
         try:
             frame = pd.read_csv(path)
