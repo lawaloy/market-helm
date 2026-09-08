@@ -155,8 +155,10 @@ def evaluate_projections(
     observed_dates = set()
     for row in closes:
         symbol = normalize_ticker(row.get("symbol"))
-        close = _finite_positive(row.get("close"))
         has_provenance = "outcome_final" in row or "outcome_session" in row
+        close = _finite_positive(
+            row.get("outcome_close") if has_provenance else row.get("close")
+        )
         if has_provenance and not (
             _truthy(row.get("outcome_final")) and row.get("outcome_session")
         ):
@@ -167,7 +169,7 @@ def evaluate_projections(
         except (TypeError, ValueError):
             continue
         if symbol and close is not None:
-            provenance = "verified_quote_session" if has_provenance else "legacy_filename"
+            provenance = "verified_previous_close" if has_provenance else "legacy_filename"
             close_map[(actual_date.isoformat(), symbol)] = (close, provenance)
             observed_dates.add(actual_date)
 
@@ -243,7 +245,7 @@ def evaluate_projections(
 
     mature_count = len(samples) + missing_actual_count
     verified_outcome_count = sum(
-        sample["actualProvenance"] == "verified_quote_session" for sample in samples
+        sample["actualProvenance"] == "verified_previous_close" for sample in samples
     )
     timestamped_projection_count = sum(
         sample["generationProvenance"] == "timestamped" for sample in samples

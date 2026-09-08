@@ -67,7 +67,7 @@ def _qualified_report() -> dict:
         {
             "runDate": f"2026-01-{index % 20 + 1:02d}",
             "symbol": f"S{index % 25:02d}",
-            "actualProvenance": "verified_quote_session",
+            "actualProvenance": "verified_previous_close",
             "generationProvenance": "timestamped",
         }
         for index in range(200)
@@ -104,7 +104,7 @@ def test_observed_baseline_qualification_fails_closed() -> None:
 
     assert assessment["qualified"] is False
     assert "report samples are truncated" in assessment["failures"]
-    assert any("verified quote-session" in failure for failure in assessment["failures"])
+    assert any("verified previous-close" in failure for failure in assessment["failures"])
 
 
 def test_capture_refuses_unqualified_data_without_creating_output(

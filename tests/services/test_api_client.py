@@ -1,11 +1,12 @@
 """Tests for services API client module."""
 
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 import requests
 
-from src.services.api_client import RateLimiter, FinnhubClient
+from src.services.api_client import RateLimiter, FinnhubClient, _quote_outcome_provenance
 
 
 class TestRateLimiter(unittest.TestCase):
@@ -201,36 +202,70 @@ class TestFinnhubClient(unittest.TestCase):
         self.assertEqual(data["change_percent"], 0.0)
         self.assertEqual(data["name"], "X")
 
-    def test_get_stock_data_records_completed_quote_session(self):
+    def test_get_stock_data_records_previous_close_outcome(self):
         session = Mock()
         client = self._client_with_session(session)
-        # 2026-07-02 21:00 UTC is after the XNYS close.
-        quote_time = 1783026000
         with patch.object(
             client,
             "get_quote",
-            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": quote_time},
+            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": 1783368000},
+        ), patch(
+            "src.services.api_client._quote_outcome_provenance",
+            return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
         ):
             data = client.get_stock_data("AAPL", include_profile=False)
 
-        self.assertEqual(data["quote_timestamp"], "2026-07-02T21:00:00+00:00")
-        self.assertEqual(data["outcome_session"], "2026-07-02")
+        self.assertEqual(data["quote_timestamp"], "2026-07-06T20:00:00+00:00")
+        self.assertEqual(data["outcome_session"], "2026-07-06")
+        self.assertEqual(data["outcome_close"], 99)
         self.assertIs(data["outcome_final"], True)
 
-    def test_get_stock_data_does_not_mark_intraday_quote_as_close(self):
-        session = Mock()
-        client = self._client_with_session(session)
-        # 2026-07-02 19:00 UTC is before the XNYS close.
-        quote_time = 1783018800
+    def test_get_stock_data_missing_previous_close_is_not_outcome(self):
+        client = self._client_with_session(Mock())
         with patch.object(
             client,
             "get_quote",
-            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": quote_time},
+            return_value={"c": 100, "o": 99, "h": 101, "l": 98, "t": 1783368000},
+        ), patch(
+            "src.services.api_client._quote_outcome_provenance",
+            return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
         ):
             data = client.get_stock_data("AAPL", include_profile=False)
 
         self.assertIsNone(data["outcome_session"])
+        self.assertIsNone(data["outcome_close"])
         self.assertIs(data["outcome_final"], False)
+
+    def test_quote_outcome_maps_previous_close_from_intraday_collection(self):
+        quote_time = int(datetime(2026, 7, 7, 15, tzinfo=timezone.utc).timestamp())
+
+        timestamp, session, final = _quote_outcome_provenance(
+            quote_time, datetime(2026, 7, 7, 16, tzinfo=timezone.utc)
+        )
+
+        self.assertEqual(timestamp, "2026-07-07T15:00:00+00:00")
+        self.assertEqual(session, "2026-07-06")
+        self.assertIs(final, True)
+
+    def test_quote_outcome_rejects_holiday_collection(self):
+        quote_time = int(datetime(2026, 7, 2, 20, tzinfo=timezone.utc).timestamp())
+
+        _, session, final = _quote_outcome_provenance(
+            quote_time, datetime(2026, 7, 4, 16, tzinfo=timezone.utc)
+        )
+
+        self.assertIsNone(session)
+        self.assertIs(final, False)
+
+    def test_quote_outcome_rejects_stale_provider_timestamp(self):
+        quote_time = int(datetime(2026, 7, 2, 20, tzinfo=timezone.utc).timestamp())
+
+        _, session, final = _quote_outcome_provenance(
+            quote_time, datetime(2026, 7, 8, 16, tzinfo=timezone.utc)
+        )
+
+        self.assertIsNone(session)
+        self.assertIs(final, False)
 
     def test_get_stock_data_profile_failure_falls_back_to_symbol_name(self):
         """Profile fetch errors keep the quote and fall back to the ticker."""

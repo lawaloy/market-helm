@@ -117,7 +117,7 @@ def qualify_report(
     if report.get("samplesTruncated"):
         failures.append("report samples are truncated")
     if int(summary.get("verifiedOutcomeCount", 0)) != sample_count:
-        failures.append("every scored outcome must have verified quote-session provenance")
+        failures.append("every scored outcome must have verified previous-close provenance")
     if int(summary.get("timestampedProjectionCount", 0)) != sample_count:
         failures.append("every scored projection must have timezone-aware generation provenance")
     return {

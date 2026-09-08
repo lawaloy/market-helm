@@ -91,6 +91,7 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
                 "symbol": "AAPL",
                 "close": 108.0,
                 "outcome_session": "2026-07-10",
+                "outcome_close": 107.5,
                 "outcome_final": True,
             }
         ]
@@ -107,7 +108,8 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
     assert report["summary"]["verifiedOutcomeCount"] == 1
     assert report["summary"]["timestampedProjectionCount"] == 1
     assert report["samples"][0]["actualDate"] == "2026-07-10"
-    assert report["samples"][0]["actualProvenance"] == "verified_quote_session"
+    assert report["samples"][0]["actual"] == 107.5
+    assert report["samples"][0]["actualProvenance"] == "verified_previous_close"
 
 
 def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path):
@@ -117,6 +119,7 @@ def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path):
                 "symbol": "AAPL",
                 "close": 108.0,
                 "outcome_session": "",
+                "outcome_close": "",
                 "outcome_final": False,
             }
         ]

@@ -276,9 +276,9 @@ This synthetic baseline protects evaluator semantics; it is not evidence of mode
 quality. Confidence must remain unchanged until enough real, forward-generated
 projections mature into a representative out-of-sample report.
 
-Real outcome collection is provenance-aware: each new daily row retains the
-provider quote timestamp and is eligible for calibration only when that timestamp
-maps to a completed XNYS session. Run `python3 scripts/projection_baseline.py
+Real outcome collection is provenance-aware: each new daily row retains Finnhub's
+explicit previous close (`pc`) and provider timestamp, and maps that close to the
+preceding XNYS session only on an exchange session day. Run `python3 scripts/projection_baseline.py
 assess --data-dir data --days 365` to see the evidence shortfall. The gate requires
 200 scored samples across 20 run dates and 25 symbols, at least 90% coverage, and
 two confidence cohorts of 30 or more samples. `capture` writes a report and input

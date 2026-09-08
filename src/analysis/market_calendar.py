@@ -64,15 +64,15 @@ def last_completed_session(
     return calendar.previous_session(candidate).date()
 
 
-def completed_session_for_quote(
+def previous_close_session_at(
     value: datetime,
     calendar_name: str = DEFAULT_CALENDAR,
 ) -> Optional[date]:
-    """Return the session closed at ``value``, or ``None`` for an intraday tick.
+    """Return the session represented by a quote's ``previous close`` field.
 
-    Quote timestamps describe the price observation, not when MarketHelm fetched
-    it. A timestamp on a weekend, holiday, or before the session close must not
-    be relabeled as that calendar day's official close.
+    Finnhub defines ``pc`` relative to the current market session. Fetches on a
+    weekend or exchange holiday have no unambiguous current session and are
+    therefore ineligible as outcome evidence.
     """
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp must include a timezone")
@@ -83,7 +83,7 @@ def completed_session_for_quote(
         candidate = calendar.date_to_session(local_date, direction="none")
     except ValueError:
         return None
-    return candidate.date() if calendar.session_close(candidate) <= timestamp else None
+    return calendar.previous_session(candidate).date()
 
 
 def trading_session_after_timestamp(
