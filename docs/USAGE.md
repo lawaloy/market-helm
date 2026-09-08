@@ -66,6 +66,8 @@ previous-close value (`pc`) against its verified preceding XNYS session. This ke
 premarket, intraday, holiday, and weekend fetches from being mislabeled by the
 snapshot filename. Legacy snapshots remain readable, but they cannot qualify as
 calibration evidence and are excluded from observed-baseline metrics.
+Weekend and holiday runs use their actual collection date, so they cannot replace
+the preceding session's snapshot.
 
 Assess the local forward archive against the documented minimum evidence gate:
 
@@ -87,6 +89,8 @@ python3 scripts/projection_baseline.py capture --data-dir data --days 365 \
 ```
 
 Capture refuses to create an output directory when any qualification fails.
+It evaluates a private copy of the input CSVs and hashes that same copy, preventing
+a concurrent refresh from producing a report/manifest mismatch.
 
 ### Option 3: Direct workflow (programmatic)
 

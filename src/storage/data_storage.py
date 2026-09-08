@@ -80,13 +80,8 @@ def _atomic_replace(path: Path, write) -> None:
 
 
 def _data_date_for_filename() -> datetime.date:
-    """Use most recent trading day for filenames. If today is weekend, use last Friday."""
-    today = datetime.now().date()
-    if today.weekday() == 5:  # Saturday -> Friday
-        return today - timedelta(days=1)
-    if today.weekday() == 6:  # Sunday -> Friday
-        return today - timedelta(days=2)
-    return today
+    """Return the collection date used to keep each snapshot distinct."""
+    return datetime.now().date()
 
 
 class DataStorage:
@@ -507,4 +502,3 @@ class DataStorage:
         if all_data:
             return pd.concat(all_data, ignore_index=True)
         return pd.DataFrame()
-

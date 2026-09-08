@@ -14,7 +14,7 @@ from src.storage.data_storage import DataStorage, _data_date_for_filename
 
 
 class TestDataDateForFilename:
-    """Write-path trading-day stamp used when save callers omit an explicit date."""
+    """Write-path collection date used when save callers omit an explicit date."""
 
     def test_weekday_uses_today(self):
         # 2026-07-22 is a Wednesday.
@@ -22,15 +22,15 @@ class TestDataDateForFilename:
             mock_dt.now.return_value = datetime(2026, 7, 22, 12, 0, 0)
             assert _data_date_for_filename() == date(2026, 7, 22)
 
-    def test_saturday_rolls_back_to_friday(self):
+    def test_saturday_keeps_collection_date(self):
         with patch("src.storage.data_storage.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 7, 25, 9, 0, 0)
-            assert _data_date_for_filename() == date(2026, 7, 24)
+            assert _data_date_for_filename() == date(2026, 7, 25)
 
-    def test_sunday_rolls_back_to_friday(self):
+    def test_sunday_keeps_collection_date(self):
         with patch("src.storage.data_storage.datetime") as mock_dt:
             mock_dt.now.return_value = datetime(2026, 7, 26, 9, 0, 0)
-            assert _data_date_for_filename() == date(2026, 7, 24)
+            assert _data_date_for_filename() == date(2026, 7, 26)
 
     def test_save_daily_data_uses_trading_day_filename(self, tmp_path):
         storage = DataStorage(data_dir=str(tmp_path))

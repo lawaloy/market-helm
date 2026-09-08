@@ -9,7 +9,9 @@ from difflib import unified_diff
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 from typing import Optional, Sequence
 
 
@@ -156,10 +158,21 @@ def _input_manifest(data_dir: Path) -> list[dict]:
     return inputs
 
 
+def _snapshot_inputs(data_dir: Path, snapshot_dir: Path) -> None:
+    """Copy each atomic CSV snapshot so evaluation and hashes share one version."""
+    for path in sorted(data_dir.glob("*.csv")):
+        if path.name.startswith(("daily_data_", "projections_")):
+            shutil.copy2(path, snapshot_dir / path.name)
+
+
 def capture(data_dir: Path, output_dir: Path, days: int, **thresholds: object) -> int:
     """Write an immutable observed report only after qualification succeeds."""
-    report = observed_report(data_dir, days)
-    assessment = qualify_report(report, **thresholds)
+    with tempfile.TemporaryDirectory(prefix="market-helm-baseline-") as temporary:
+        snapshot_dir = Path(temporary)
+        _snapshot_inputs(data_dir, snapshot_dir)
+        report = observed_report(snapshot_dir, days)
+        assessment = qualify_report(report, **thresholds)
+        inputs = _input_manifest(snapshot_dir)
     if not assessment["qualified"]:
         print(json.dumps(assessment, indent=2, allow_nan=False, sort_keys=True))
         print("Refusing to capture an unqualified observed baseline.", file=sys.stderr)
@@ -174,7 +187,7 @@ def capture(data_dir: Path, output_dir: Path, days: int, **thresholds: object) -
         "days": days,
         "reportSha256": hashlib.sha256(report_text.encode()).hexdigest(),
         "assessment": assessment,
-        "inputs": _input_manifest(data_dir),
+        "inputs": inputs,
     }
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, allow_nan=False, sort_keys=True) + "\n",
