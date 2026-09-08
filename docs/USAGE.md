@@ -61,6 +61,37 @@ python3 scripts/projection_baseline.py check
 Do not use its synthetic metrics to tune confidence; calibration requires a
 representative baseline of real projections generated before their outcomes.
 
+Newly fetched quote rows record the provider timestamp and Finnhub's explicit
+previous-close value (`pc`) against its verified preceding XNYS session. This keeps
+premarket, intraday, holiday, and weekend fetches from being mislabeled by the
+snapshot filename. Legacy snapshots remain readable, but they cannot qualify as
+calibration evidence and are excluded from observed-baseline metrics.
+Weekend and holiday runs use their actual collection date, so they cannot replace
+the preceding session's snapshot.
+
+Assess the local forward archive against the documented minimum evidence gate:
+
+```bash
+python3 scripts/projection_baseline.py assess --data-dir data --days 365
+```
+
+The default gate requires at least 200 scored projections, 90% mature-outcome
+coverage, 20 distinct run dates, 25 symbols, and two confidence cohorts with at
+least 30 samples each. Every scored projection must have a timezone-aware
+generation timestamp and every outcome must identify a verified previous-close
+session. Thresholds are minimum evidence hygiene, not proof of model quality.
+
+Once the assessment passes, preserve the exact report plus hashes of every input:
+
+```bash
+python3 scripts/projection_baseline.py capture --data-dir data --days 365 \
+  --output-dir baselines/observed/projection-YYYY-MM-DD
+```
+
+Capture refuses to create an output directory when any qualification fails.
+It evaluates a private copy of the input CSVs and hashes that same copy, preventing
+a concurrent refresh from producing a report/manifest mismatch.
+
 ### Option 3: Direct workflow (programmatic)
 
 ```bash

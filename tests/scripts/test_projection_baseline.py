@@ -60,3 +60,94 @@ def test_projection_baseline_check_reports_drift(tmp_path: Path, monkeypatch) ->
     monkeypatch.setattr(projection_baseline, "REPORT_PATH", stale_report)
 
     assert projection_baseline.check() == 1
+
+
+def _qualified_report() -> dict:
+    samples = [
+        {
+            "runDate": f"2026-01-{index % 20 + 1:02d}",
+            "symbol": f"S{index % 25:02d}",
+            "actualProvenance": "verified_previous_close",
+            "generationProvenance": "timestamped",
+        }
+        for index in range(200)
+    ]
+    return {
+        "summary": {
+            "sampleCount": 200,
+            "verifiedOutcomeCount": 200,
+            "timestampedProjectionCount": 200,
+            "evaluationCoveragePct": 95.0,
+            "byConfidenceBand": {
+                "60-69": {"count": 100},
+                "70-79": {"count": 100},
+            },
+        },
+        "samples": samples,
+        "samplesTruncated": False,
+    }
+
+
+def test_observed_baseline_qualification_requires_provenance_and_diversity() -> None:
+    assessment = projection_baseline.qualify_report(_qualified_report())
+
+    assert assessment["qualified"] is True
+    assert assessment["failures"] == []
+
+
+def test_observed_baseline_qualification_fails_closed() -> None:
+    report = _qualified_report()
+    report["summary"]["verifiedOutcomeCount"] = 199
+    report["samplesTruncated"] = True
+
+    assessment = projection_baseline.qualify_report(report)
+
+    assert assessment["qualified"] is False
+    assert "report samples are truncated" in assessment["failures"]
+    assert any("verified previous-close" in failure for failure in assessment["failures"])
+
+
+def test_capture_refuses_unqualified_data_without_creating_output(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        projection_baseline,
+        "observed_report",
+        lambda *_args, **_kwargs: {
+            "summary": {"sampleCount": 0, "evaluationCoveragePct": None},
+            "samples": [],
+            "samplesTruncated": False,
+        },
+    )
+    output = tmp_path / "observed-v1"
+
+    assert projection_baseline.capture(tmp_path, output, 365) == 1
+    assert not output.exists()
+
+
+def test_capture_hashes_the_same_private_snapshot_it_evaluates(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    input_path = source / "daily_data_2026-07-07.csv"
+    input_path.write_text("symbol,outcome_close\nAAPL,100\n", encoding="utf-8")
+    seen = {}
+
+    def evaluate(snapshot_dir: Path, _days: int) -> dict:
+        copied = snapshot_dir / input_path.name
+        seen["content"] = copied.read_bytes()
+        input_path.write_text("symbol,outcome_close\nAAPL,999\n", encoding="utf-8")
+        return _qualified_report()
+
+    monkeypatch.setattr(projection_baseline, "observed_report", evaluate)
+    output = tmp_path / "observed-v1"
+
+    assert projection_baseline.capture(source, output, 365) == 0
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["inputs"][0]["sha256"] == projection_baseline.hashlib.sha256(
+        seen["content"]
+    ).hexdigest()
+    assert manifest["inputs"][0]["sha256"] != projection_baseline.hashlib.sha256(
+        input_path.read_bytes()
+    ).hexdigest()

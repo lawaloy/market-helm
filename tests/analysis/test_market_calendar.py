@@ -6,6 +6,7 @@ import pytest
 
 from src.analysis.market_calendar import (
     last_completed_session,
+    previous_close_session_at,
     trading_session_after,
     trading_session_after_timestamp,
 )
@@ -37,6 +38,18 @@ def test_timestamp_horizon_anchors_to_last_completed_session(
 def test_timestamp_horizon_rejects_ambiguous_naive_datetime():
     with pytest.raises(ValueError, match="timezone"):
         trading_session_after_timestamp(datetime(2026, 7, 6, 8), 5)
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "session"),
+    [
+        (datetime(2026, 7, 6, 19, tzinfo=timezone.utc), date(2026, 7, 2)),
+        (datetime(2026, 7, 6, 21, tzinfo=timezone.utc), date(2026, 7, 2)),
+        (datetime(2026, 7, 4, 21, tzinfo=timezone.utc), None),
+    ],
+)
+def test_previous_close_maps_only_from_a_current_market_session(timestamp, session):
+    assert previous_close_session_at(timestamp) == session
 
 
 def test_horizon_must_be_positive():

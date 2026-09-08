@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from functools import lru_cache
-from typing import Union
+from typing import Optional, Union
 
 import exchange_calendars as exchange_calendars
 import pandas as pd
@@ -61,6 +61,28 @@ def last_completed_session(
     candidate = calendar.date_to_session(local_date, direction="previous")
     if calendar.session_close(candidate) <= timestamp:
         return candidate.date()
+    return calendar.previous_session(candidate).date()
+
+
+def previous_close_session_at(
+    value: datetime,
+    calendar_name: str = DEFAULT_CALENDAR,
+) -> Optional[date]:
+    """Return the session represented by a quote's ``previous close`` field.
+
+    Finnhub defines ``pc`` relative to the current market session. Fetches on a
+    weekend or exchange holiday have no unambiguous current session and are
+    therefore ineligible as outcome evidence.
+    """
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must include a timezone")
+    calendar = get_market_calendar(calendar_name)
+    timestamp = pd.Timestamp(value).tz_convert("UTC")
+    local_date = timestamp.tz_convert(calendar.tz).date().isoformat()
+    try:
+        candidate = calendar.date_to_session(local_date, direction="none")
+    except ValueError:
+        return None
     return calendar.previous_session(candidate).date()
 
 

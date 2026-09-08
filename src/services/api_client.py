@@ -10,12 +10,13 @@ import os
 import threading
 import time
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import deque
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from ..core.logger import setup_logger
+from ..analysis.market_calendar import get_market_calendar, previous_close_session_at
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -36,6 +37,35 @@ def _finite_number(value: Any, default: Optional[float] = 0.0) -> Optional[float
     if not math.isfinite(number):
         return default
     return number
+
+
+def _quote_outcome_provenance(
+    value: Any, captured_at: Optional[datetime] = None
+) -> Tuple[Optional[str], Optional[str], bool]:
+    """Qualify Finnhub ``pc`` as the prior XNYS session's official close."""
+    timestamp = _finite_number(value, default=None)
+    if timestamp is None or timestamp < 0:
+        return None, None, False
+    try:
+        quote_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        observed_at = captured_at or datetime.now(timezone.utc)
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            return quote_at.isoformat(), None, False
+        if quote_at > observed_at.astimezone(timezone.utc) + timedelta(minutes=5):
+            return quote_at.isoformat(), None, False
+        session = previous_close_session_at(observed_at)
+        if session is None:
+            return quote_at.isoformat(), None, False
+        calendar = get_market_calendar()
+        quote_date = quote_at.astimezone(calendar.tz).date()
+        collection_session = calendar.date_to_session(
+            observed_at.astimezone(calendar.tz).date().isoformat(), direction="none"
+        ).date()
+        if quote_date not in {session, collection_session}:
+            return quote_at.isoformat(), None, False
+    except (OSError, OverflowError, ValueError):
+        return None, None, False
+    return quote_at.isoformat(), session.isoformat(), True
 
 
 class RateLimiter:
@@ -364,6 +394,7 @@ class FinnhubClient:
         try:
             # Get quote (real-time price) - 1 API call
             quote = self.get_quote(symbol)
+            quote_captured_at = datetime.now(timezone.utc)
             
             if not quote or quote.get("c") is None:
                 logger.debug(f"No quote data for {symbol}")
@@ -386,7 +417,8 @@ class FinnhubClient:
                 logger.debug(f"Non-finite quote close for {symbol}")
                 return None
 
-            previous_close = _finite_number(quote.get("pc"), default=None)
+            official_previous_close = _finite_number(quote.get("pc"), default=None)
+            previous_close = official_previous_close
             if previous_close is None:
                 previous_close = current_price
             change = current_price - previous_close
@@ -395,6 +427,16 @@ class FinnhubClient:
             market_cap = _finite_number(
                 profile.get("marketCapitalization", 0), default=0.0
             ) or 0.0
+            quote_timestamp, outcome_session, outcome_final = _quote_outcome_provenance(
+                quote.get("t"), quote_captured_at
+            )
+            outcome_final = (
+                outcome_final
+                and official_previous_close is not None
+                and official_previous_close > 0
+            )
+            if not outcome_final:
+                outcome_session = None
 
             return {
                 "symbol": symbol,
@@ -410,6 +452,10 @@ class FinnhubClient:
                 "name": name,
                 "exchange": profile.get("exchange", "Unknown"),
                 "market_cap": market_cap,
+                "quote_timestamp": quote_timestamp,
+                "outcome_session": outcome_session,
+                "outcome_close": official_previous_close if outcome_final else None,
+                "outcome_final": outcome_final,
             }
         
         except Exception as e:
