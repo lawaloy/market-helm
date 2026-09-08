@@ -7,6 +7,7 @@ from functools import lru_cache
 from typing import Union
 
 import exchange_calendars as exchange_calendars
+import pandas as pd
 
 DateLike = Union[str, date, datetime]
 DEFAULT_CALENDAR = "XNYS"
@@ -45,3 +46,29 @@ def trading_session_after(
     calendar = get_market_calendar(calendar_name)
     anchor = calendar.date_to_session(_date_text(value), direction="previous")
     return calendar.sessions_window(anchor, sessions + 1)[-1].date()
+
+
+def last_completed_session(
+    value: datetime,
+    calendar_name: str = DEFAULT_CALENDAR,
+) -> date:
+    """Return the most recent session whose close is at or before ``value``."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must include a timezone")
+    calendar = get_market_calendar(calendar_name)
+    timestamp = pd.Timestamp(value).tz_convert("UTC")
+    local_date = timestamp.tz_convert(calendar.tz).date().isoformat()
+    candidate = calendar.date_to_session(local_date, direction="previous")
+    if calendar.session_close(candidate) <= timestamp:
+        return candidate.date()
+    return calendar.previous_session(candidate).date()
+
+
+def trading_session_after_timestamp(
+    value: datetime,
+    sessions: int = 5,
+    calendar_name: str = DEFAULT_CALENDAR,
+) -> date:
+    """Return a horizon measured from the last session completed at ``value``."""
+    anchor = last_completed_session(value, calendar_name)
+    return trading_session_after(anchor, sessions, calendar_name)

@@ -248,7 +248,9 @@ summary = projector.generate_projection_summary(projections)
 ## Projection accuracy (shipped)
 
 The projection files now record a five-session **XNYS** target, rather than adding
-five calendar days. A reusable backtester evaluates only the exact target
+five calendar days. Premarket and intraday runs anchor that horizon to the last
+completed exchange session, while post-close runs anchor to the session that just
+closed. A reusable backtester evaluates only the exact target
 session—it does not silently roll a missing close forward—and reports absolute
 error, direction accuracy, target-band coverage, and confidence calibration by
 confidence and recommendation cohort:

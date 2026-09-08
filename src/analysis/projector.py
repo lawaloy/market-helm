@@ -9,13 +9,13 @@ This module analyzes historical stock data and generates:
 """
 
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import math
 import pandas as pd
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
 from ..utils.tickers import normalize_ticker
-from .market_calendar import trading_session_after
+from .market_calendar import trading_session_after_timestamp
 
 logger = setup_logger("projector")
 
@@ -164,9 +164,9 @@ class StockProjector:
             # Resolve company name - API often returns symbol when profile fetch fails
             raw_name = stock_data.get('name', symbol)
             company_name = resolve_company_name(symbol, raw_name)
-            generated_at = datetime.now()
-            target_session = trading_session_after(
-                generated_at.date(), self.projection_days
+            generated_at = datetime.now(timezone.utc)
+            target_session = trading_session_after_timestamp(
+                generated_at, self.projection_days
             )
 
             projection = {
@@ -505,7 +505,7 @@ class StockProjector:
             .iterrows()
         ]
         
-        generated_at = datetime.now()
+        generated_at = datetime.now(timezone.utc)
         summary = {
             'total_projections': len(projections),
             'recommendations': rec_counts,
@@ -516,8 +516,8 @@ class StockProjector:
                 'strong_buys': strong_buys,
                 'strong_sells': strong_sells
             },
-            'projection_date': trading_session_after(
-                generated_at.date(), self.projection_days
+            'projection_date': trading_session_after_timestamp(
+                generated_at, self.projection_days
             ).isoformat(),
             'projection_horizon_sessions': self.projection_days,
             'projection_calendar': 'XNYS',
@@ -526,4 +526,3 @@ class StockProjector:
         
         logger.info(f"Projection summary: {rec_counts}")
         return summary
-

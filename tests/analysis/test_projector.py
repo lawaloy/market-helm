@@ -6,7 +6,7 @@ Tests the projection generation, recommendation logic, and confidence scoring.
 
 import math
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.analysis.projector import StockProjector
 
@@ -469,14 +469,32 @@ class TestStockProjector:
     def test_projection_date_is_5_market_sessions_ahead(self, projector, sample_stock_bullish):
         """Projection target uses the configured exchange-session horizon."""
         projection = projector._project_stock(sample_stock_bullish)
-        from src.analysis.market_calendar import trading_session_after
+        from src.analysis.market_calendar import trading_session_after_timestamp
 
         generated = datetime.fromisoformat(projection['generated_at'])
-        assert projection['projection_date'] == trading_session_after(
-            generated.date(), 5
+        assert generated.utcoffset() is not None
+        assert projection['projection_date'] == trading_session_after_timestamp(
+            generated, 5
         ).isoformat()
         assert projection['projection_horizon_sessions'] == 5
         assert projection['projection_calendar'] == 'XNYS'
+
+    def test_premarket_projection_includes_upcoming_session(
+        self, projector, sample_stock_bullish, monkeypatch
+    ):
+        """A premarket Monday run counts Monday as the first future session."""
+
+        class PremarketDateTime:
+            @classmethod
+            def now(cls, tz=None):
+                return datetime(2026, 7, 6, 12, tzinfo=timezone.utc)
+
+        monkeypatch.setattr("src.analysis.projector.datetime", PremarketDateTime)
+
+        projection = projector._project_stock(sample_stock_bullish)
+
+        assert projection['generated_at'] == "2026-07-06T12:00:00+00:00"
+        assert projection['projection_date'] == "2026-07-10"
 
     # ========== Edge Cases ==========
 

@@ -537,6 +537,9 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
                 <div className="card p-6 overflow-x-auto">
                   <h4 className="font-medium text-slate-800 dark:text-slate-100 mb-4">
                     Recent scores
+                    {accuracy.samplesTruncated
+                      ? ` (newest ${accuracy.samples.length} of ${accuracy.summary.sampleCount})`
+                      : ''}
                   </h4>
                   <table className="min-w-full text-sm text-left">
                     <thead>
