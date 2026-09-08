@@ -49,6 +49,10 @@ def _quote_outcome_provenance(
     try:
         quote_at = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         observed_at = captured_at or datetime.now(timezone.utc)
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            return quote_at.isoformat(), None, False
+        if quote_at > observed_at.astimezone(timezone.utc) + timedelta(minutes=5):
+            return quote_at.isoformat(), None, False
         session = previous_close_session_at(observed_at)
         if session is None:
             return quote_at.isoformat(), None, False

@@ -138,6 +138,7 @@ def evaluate_projections(
     horizon_sessions: int = 5,
     calendar_name: str = DEFAULT_CALENDAR,
     max_samples: Optional[int] = 300,
+    verified_outcomes_only: bool = False,
 ) -> Dict[str, Any]:
     """Evaluate projection rows against the exact target exchange session.
 
@@ -156,6 +157,8 @@ def evaluate_projections(
     for row in closes:
         symbol = normalize_ticker(row.get("symbol"))
         has_provenance = "outcome_final" in row or "outcome_session" in row
+        if verified_outcomes_only and not has_provenance:
+            continue
         close = _finite_positive(
             row.get("outcome_close") if has_provenance else row.get("close")
         )
@@ -294,6 +297,7 @@ def backtest_data_dir(
     horizon_sessions: int = 5,
     calendar_name: str = DEFAULT_CALENDAR,
     max_samples: Optional[int] = 300,
+    verified_outcomes_only: bool = False,
 ) -> Dict[str, Any]:
     """Load dated snapshot CSVs from ``data_dir`` and evaluate projections."""
     root = Path(data_dir).resolve()
@@ -324,6 +328,7 @@ def backtest_data_dir(
             horizon_sessions=horizon_sessions,
             calendar_name=calendar_name,
             max_samples=max_samples,
+            verified_outcomes_only=verified_outcomes_only,
         )
 
     latest = max(datetime.strptime(day, "%Y-%m-%d").date() for day, _ in dated_inputs)
@@ -355,4 +360,5 @@ def backtest_data_dir(
         horizon_sessions=horizon_sessions,
         calendar_name=calendar_name,
         max_samples=max_samples,
+        verified_outcomes_only=verified_outcomes_only,
     )

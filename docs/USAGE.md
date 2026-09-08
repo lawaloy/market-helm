@@ -65,7 +65,7 @@ Newly fetched quote rows record the provider timestamp and Finnhub's explicit
 previous-close value (`pc`) against its verified preceding XNYS session. This keeps
 premarket, intraday, holiday, and weekend fetches from being mislabeled by the
 snapshot filename. Legacy snapshots remain readable, but they cannot qualify as
-calibration evidence.
+calibration evidence and are excluded from observed-baseline metrics.
 
 Assess the local forward archive against the documented minimum evidence gate:
 

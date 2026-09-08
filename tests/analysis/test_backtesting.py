@@ -83,6 +83,10 @@ def test_data_dir_loader_reads_dated_csvs(tmp_path):
     assert report["samples"][0]["actual"] == 108.0
     assert report["samples"][0]["actualProvenance"] == "legacy_filename"
 
+    verified_report = backtest_data_dir(tmp_path, verified_outcomes_only=True)
+    assert verified_report["summary"]["sampleCount"] == 0
+    assert verified_report["summary"]["pendingCount"] == 1
+
 
 def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
     pd.DataFrame(

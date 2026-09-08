@@ -267,6 +267,16 @@ class TestFinnhubClient(unittest.TestCase):
         self.assertIsNone(session)
         self.assertIs(final, False)
 
+    def test_quote_outcome_rejects_future_provider_timestamp(self):
+        quote_time = int(datetime(2026, 7, 7, 17, tzinfo=timezone.utc).timestamp())
+
+        _, session, final = _quote_outcome_provenance(
+            quote_time, datetime(2026, 7, 7, 16, tzinfo=timezone.utc)
+        )
+
+        self.assertIsNone(session)
+        self.assertIs(final, False)
+
     def test_get_stock_data_profile_failure_falls_back_to_symbol_name(self):
         """Profile fetch errors keep the quote and fall back to the ticker."""
         session = Mock()

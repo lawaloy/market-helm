@@ -129,7 +129,9 @@ def qualify_report(
 
 
 def observed_report(data_dir: Path, days: int) -> dict:
-    return backtest_data_dir(data_dir, days=days, max_samples=None)
+    return backtest_data_dir(
+        data_dir, days=days, max_samples=None, verified_outcomes_only=True
+    )
 
 
 def assess(data_dir: Path, days: int, **thresholds: object) -> int:
