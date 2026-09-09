@@ -35,13 +35,19 @@ sign-off tasks in [Deployment and persistence](docs/DEPLOYMENT.md#external-stagi
 - Node.js is needed when running from a source checkout because the ignored
   React build output must be created locally. Published packages already include it.
 
-Create and activate a virtual environment:
+Create and activate a virtual environment.
+
+On Windows PowerShell:
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+On macOS, Linux, or Cursor Cloud:
 
 ```bash
-python -m venv .venv
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-# macOS/Linux
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -78,16 +84,19 @@ build, use the focused [dashboard development guide](dashboard/README.md).
 
 The dashboard can start without an API key or saved data, but its market views
 remain empty until data has been fetched. Create `.env` in the directory where
-you will run MarketHelm:
+you will run both `market-helm` and `market-helm-web`:
 
 ```text
 FINNHUB_API_KEY=your-api-key-here
+DATA_DIR=./data
 ```
 
-Run the tracker to fetch and save data:
+Run both commands from that same directory. `DATA_DIR` ensures the packaged CLI
+and dashboard use the same files:
 
 ```bash
 market-helm
+market-helm-web
 ```
 
 ## Projection validation

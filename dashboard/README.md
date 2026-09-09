@@ -37,7 +37,7 @@ cd ../..
 Start FastAPI from the repository root:
 
 ```bash
-python -m uvicorn dashboard.backend.main:app --reload --port 8000
+python3 -m uvicorn dashboard.backend.main:app --reload --port 8000
 ```
 
 In another terminal, start Vite:
@@ -50,9 +50,13 @@ npm run dev
 Open <http://localhost:3000>. The API documentation remains available at
 <http://localhost:8000/docs>.
 
-If port 3000 is occupied, set `VITE_DEV_PORT`. The Vite configuration uses port
-8001 as the API target when the development UI runs on port 3001; otherwise it
-uses port 8000. Override that behavior with `VITE_DEV_API_TARGET`.
+If port 3000 is occupied, use the repository's paired alternate ports. Start
+FastAPI with `python3 -m uvicorn dashboard.backend.main:app --reload --port 8001`,
+then run `npm run dev:3001` in `dashboard/frontend/` and open
+<http://localhost:3001>.
+
+On Windows PowerShell, replace `python3` in this guide with
+`.\.venv\Scripts\python.exe`.
 
 ## Build the integrated web application
 
@@ -86,7 +90,7 @@ npm run build
 Run backend tests from the repository root:
 
 ```bash
-python -m pytest tests/dashboard/ -v
+python3 -m pytest tests/dashboard/ -v
 ```
 
 The complete required checks and development workflow are documented in
