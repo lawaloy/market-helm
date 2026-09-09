@@ -137,6 +137,37 @@ For React development (Vite on port 3000, hot reload), see
 
 ---
 
+## Local alerts
+
+Create the user alert configuration from the bundled example, inspect its rule
+IDs, and validate a rule without delivering a notification:
+
+```bash
+market-helm alerts init
+market-helm alerts list
+market-helm alerts test --id <alert-id> --dry-run
+```
+
+After configuring a real notification channel, evaluate the rules once with
+`market-helm alerts run` or keep the local worker running:
+
+```bash
+market-helm alerts run --loop
+```
+
+Installed packages use `~/.market-helm/alerts.json`. Put notification secrets,
+such as SMTP passwords, provider keys, and webhook URLs, in
+`~/.market-helm/.env`, not in Git. Use `market-helm alerts --config PATH ...` to
+select a different configuration file. Alert provider variables and delivery
+testing are documented in
+[Transactional alert email](DEPLOYMENT.md#transactional-alert-email).
+
+The dashboard's Helmtower page can also manage alert rules. Hosted multi-user
+alerts require database mode and the separate worker described in
+[Deployment and persistence](DEPLOYMENT.md#hosted-staging-api--worker--postgresql).
+
+---
+
 ## Output files
 
 Each run writes:
