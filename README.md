@@ -101,14 +101,14 @@ market-helm backtest --data-dir data --days 365 --output data/backtest.json
 Verify the committed projection-evaluator scenario baseline:
 
 ```bash
-python scripts/projection_baseline.py check
+python3 scripts/projection_baseline.py check
 ```
 
 Assess whether local forward-generated outcomes meet the real-data evidence
 gate:
 
 ```bash
-python scripts/projection_baseline.py assess --data-dir data --days 365
+python3 scripts/projection_baseline.py assess --data-dir data --days 365
 ```
 
 ## Runtime data
