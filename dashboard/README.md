@@ -1,306 +1,107 @@
-# MarketHelm — web dashboard
+# MarketHelm web dashboard development
 
-Modern, interactive web dashboard for visualizing stock market data, projections, and recommendations.
+This guide is only for developing or rebuilding the React/FastAPI dashboard.
+For installing and running MarketHelm, start with the
+[main README](../README.md). For hosted configuration, persistence, and secrets,
+use the [deployment guide](../docs/DEPLOYMENT.md).
 
-## Install from PyPI (recommended)
+## Web architecture
 
-After **`pip install market-helm`** (from the [main README](../README.md)), run:
+- `dashboard/frontend/` contains the React and TypeScript application.
+- `dashboard/backend/` contains the FastAPI application and API routes.
+- During development, Vite serves the UI on port 3000 and proxies `/api` to
+  FastAPI on port 8000.
+- A production build is written to `dashboard/backend/static/`. FastAPI then
+  serves the compiled UI and API together on port 8000.
+
+The frontend is therefore part of the web application image; it is not normally
+deployed as an independent Vercel or Netlify application.
+
+## Development with hot reload
+
+### Requirements
+
+- Python 3.12 or newer
+- The Node.js version in [`.nvmrc`](../.nvmrc)
+- npm
+
+From the repository root, install the Python package and frontend dependencies:
+
+```bash
+pip install -e .
+cd dashboard/frontend
+npm ci
+cd ../..
+```
+
+Start FastAPI from the repository root:
+
+```bash
+python -m uvicorn dashboard.backend.main:app --reload --port 8000
+```
+
+In another terminal, start Vite:
+
+```bash
+cd dashboard/frontend
+npm run dev
+```
+
+Open <http://localhost:3000>. The API documentation remains available at
+<http://localhost:8000/docs>.
+
+If port 3000 is occupied, set `VITE_DEV_PORT`. The Vite configuration uses port
+8001 as the API target when the development UI runs on port 3001; otherwise it
+uses port 8000. Override that behavior with `VITE_DEV_API_TARGET`.
+
+## Build the integrated web application
+
+Build the React UI:
+
+```bash
+cd dashboard/frontend
+npm run build
+```
+
+The output goes to `dashboard/backend/static/`. Return to the repository root
+and start the integrated application:
 
 ```bash
 market-helm-web
 ```
 
-Then open **<http://localhost:8000>** — the API and the built React UI are served together. Data files are read from **`DATA_DIR`** if set, otherwise the repo’s **`data/`** folder when developing from a clone, or **`~/.market-helm/data`** when the package is installed from a wheel. On first run, if **`~/.market-helm`** does not exist but **`~/.market-desk`** does, it is **renamed** to **`~/.market-helm`** automatically.
+Open <http://localhost:8000>. Release automation performs the same frontend
+build before creating the Python package, and [`Dockerfile.web`](../Dockerfile.web)
+performs it in a Node build stage before constructing the Python runtime image.
 
-Optional: **`HOST`**, **`PORT`**, **`CORS_ORIGINS`**, **`UVICORN_RELOAD`** — see [Environment Variables](#environment-variables) below.
+## Verification
 
----
-
-## Development (clone + hot reload)
-
-Use this when you are changing React/TypeScript and want Vite’s dev server.
-
-### Prerequisites
-
-- Python 3.12+
-- Node.js 18+
-- npm or yarn
-
-### 1. Install the repo (editable) and frontend deps
-
-From the repository root:
+Run frontend checks from `dashboard/frontend/`:
 
 ```bash
-pip install -e .
-cd dashboard/frontend && npm install
-```
-
-### 2. Start the backend
-
-```bash
-cd dashboard/backend
-python main.py
-```
-
-Backend runs on **<http://localhost:8000>** (API only if you have not run `npm run build`; with a built `static/` bundle, `/` serves the SPA).
-
-### 3. Start the Vite dev server (frontend)
-
-```bash
-cd dashboard/frontend
-npm run dev
-```
-
-Vite defaults to **<http://localhost:3000>** and proxies `/api` to the backend.
-
-### Rebuild the SPA for pip packaging
-
-From `dashboard/frontend`:
-
-```bash
+npm test
 npm run build
 ```
 
-Output goes to **`dashboard/backend/static/`** (not committed; release wheels are built in CI with `npm run build` before packaging). For a local wheel/sdist, run this step before **`python -m build`**.
-
-### 4. Open the app (dev)
-
-Navigate to **<http://localhost:3000>** in your browser (Vite dev server).
-
-## Features
-
-### Phase 1 MVP (Implemented)
-
-✅ **Dashboard Overview**
-
-- Market overview with KPI cards
-- Top gainers/losers chart
-- Recommendation distribution pie chart
-- STRONG BUY opportunities section
-- Filterable/sortable stock table
-- Stock detail modal
-- Search, recommendation filters, pagination, and responsive layouts
-- Dark mode with saved/system preference
-- CSV, PNG, and PDF exports
-
-### Historical Trends (implemented)
-
-The **Historical Trends** page is shipped. It includes:
-
-- Multi-day market summary charts (confidence, expected move, recommendations over time)
-- **Single-stock** view: price vs five-session target over your selected range
-- **Projection accuracy**: scores older projections against the **actual close on the exact fifth XNYS trading session**; shows error, direction, target-band and data coverage, confidence calibration, cohorts, and recent samples
-
-**Why “projection accuracy” can look empty:**  
-Nothing is wrong with the UI. Scored metrics require saved `daily_data_*.csv` and
-`projections_*.csv` runs plus a close captured on each projection’s exact fifth
-XNYS session. The dashboard reports pending, missing, and invalid counts while
-samples mature; it never substitutes a later close for a missing target session.
-
-### Hosted accounts and Helmtower (implemented)
-
-The dashboard includes Helmtower alert settings, sign-in and registration, email
-verification and password recovery, account settings, per-user delivery history,
-and authenticated alert configuration when database mode is enabled. Local file
-mode remains available without authentication.
-
-Other dashboard ideas (watchlists, code splitting, keyboard shortcuts, etc.) are
-not finished. See **What's Next?** below and
-[docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md).
-
-### Current limitations
-
-- Historical charts and accuracy need multiple dated tracker runs.
-- Data refresh is explicit/batch based; there are no WebSocket quote updates.
-- File mode is operator-oriented and does not require authentication; hosted
-  database mode protects tenant data with sign-in.
-- Watchlists, portfolios, multi-stock comparison, Excel export, keyboard shortcuts,
-  sector views, and correlation heatmaps are not implemented.
-- Live providers, managed PostgreSQL, ingress, backups, accessibility, performance,
-  and broad browser/device behavior still need real-environment validation.
-
-### API Endpoints
-
-- `/api/market/overview` - Market statistics
-- `/api/market/movers` - Top gainers/losers
-- `/api/summary` - Market summary (Expert or Learner)
-- `/api/projections/summary` - Projections overview
-- `/api/projections/opportunities` - Buy/Sell opportunities
-- `/api/stocks/{symbol}` - Stock details
-- `/api/stocks/{symbol}/historical` - Historical data
-- `/api/history/summary` - Aggregated historical summary over time
-- `/api/history/accuracy` - Projection vs actual accuracy (see [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md))
-- `/api/alerts/*` - Alert configuration, quotes, status, execution, and test delivery
-- `/api/auth/*` - Hosted registration, sessions, verification, recovery, and account controls
-- `/api/refresh/*` - Start, inspect, or cancel a background data refresh
-- `/health`, `/health/live`, `/health/ready`, `/health/worker` - Operational health
-- `/metrics` - Prometheus-style service metrics
-
-### Technologies
-
-- FastAPI backend with pandas data loading
-- React 19 + TypeScript frontend
-- TailwindCSS 4 for styling
-- Recharts 3 for visualizations
-- Headless UI for modals
-
-## Project Structure
-
-```text
-dashboard/
-├── backend/              # FastAPI Backend
-│   ├── main.py          # Entry point
-│   ├── api/             # API endpoints
-│   ├── models/          # Pydantic models
-│   └── services/        # Data loading services
-│
-└── frontend/            # React Frontend
-    ├── src/
-    │   ├── components/  # React components
-    │   ├── pages/       # Page components
-    │   ├── services/    # API client
-    │   ├── types/       # TypeScript types
-    │   └── utils/       # Utilities
-    └── package.json
-```
-
-## API Documentation
-
-With the backend running, visit:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## Development
-
-### Backend Development
+Run backend tests from the repository root:
 
 ```bash
-cd dashboard/backend
-uvicorn main:app --reload --port 8000
+python -m pytest tests/dashboard/ -v
 ```
 
-### Frontend Development
+The complete required checks and development workflow are documented in
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
-```bash
-cd dashboard/frontend
-npm run dev
-```
+## Configuration and behavior
 
-### Build for Production
+- `DATA_DIR` selects the market-data directory. A source checkout defaults to
+  the repository's `data/`; an installed wheel defaults to the user data directory.
+- `HOST`, `PORT`, and `UVICORN_RELOAD` control `market-helm-web`.
+- `CORS_ORIGINS` configures allowed browser origins.
+- `VITE_DEV_PORT` and `VITE_DEV_API_TARGET` affect only the Vite development server.
+- Database, authentication, email, proxy, rate-limit, and alert-worker variables
+  are documented only in [Deployment and persistence](../docs/DEPLOYMENT.md).
 
-**Backend:**
-
-```bash
-cd dashboard/backend
-# Use the Dockerfile in the root or deploy to Railway/Render/Fly.io
-```
-
-**Frontend:**
-
-```bash
-cd dashboard/frontend
-npm run build
-# Deploy to Vercel/Netlify
-```
-
-## Environment Variables
-
-**Backend:**
-
-- `DATA_DIR` - Path to data directory (defaults to `../../data`). In production, set to a **persistent** absolute path (see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md)).
-- `CORS_ORIGINS` - Allowed CORS origins (defaults to localhost:3000)
-- `MARKET_HELM_DATABASE_URL` - Enables hosted mode with SQLite or PostgreSQL
-- `MARKET_HELM_AUTH_SECRET` - Required session-signing secret in hosted mode (minimum 16 characters)
-- `MARKET_HELM_PUBLIC_URL` - Public HTTPS base URL used in verification/reset links
-- `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` - Require verification before protected hosted operations
-
-Rate limits, trusted proxies, health checks, account email, and provider settings
-have additional production variables. Use the complete tables in
-[docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md) rather than copying a partial hosted
-configuration from this quick-start guide.
-
-**Alerts (Python tracker / `config/alerts.json`):**
-
-**End users (pip install, no repo clone):**
-
-```bash
-market-helm alerts init          # creates ~/.market-helm/alerts.json
-market-helm alerts list          # show rules
-market-helm alerts test --id alert_aapl_drop --dry-run
-market-helm alerts run --loop    # evaluate watches on a schedule (production)
-```
-
-Put secrets in `~/.market-helm/.env` (SMTP password, webhook URL, SendGrid key). Configure watches in **Helmtower** (`/alerts`) or edit `~/.market-helm/alerts.json`.
-
-**Developers (git clone):** may use `config/alerts.json` in the repo instead; user config takes precedence when present.
-
-| Variable                             | Purpose                                                                                                                |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `ALERT_EMAIL_PROVIDER`               | `smtp` (default), `sendgrid`, or `mailgun` — see [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#transactional-alert-email) |
-| `ALERT_WEBHOOK_URL`                  | Default webhook URL when a rule uses `"notifications": ["webhook"]` without per-rule `webhook_url`                     |
-| `ALERT_WEBHOOK_FORMAT`               | `json` (default), `slack`, or `discord` for incoming-webhook payload shape                                             |
-| `DISCORD_WEBHOOK_URL`                | Optional default Discord webhook URL                                                                                   |
-| `SMTP_HOST`                          | SMTP server hostname (e.g. `smtp.gmail.com`) — dev/self-host or SES SMTP                                               |
-| `SMTP_PORT`                          | SMTP port (default `587`; use `465` for implicit SSL)                                                                  |
-| `SMTP_USER`                          | SMTP login username                                                                                                    |
-| `SMTP_PASSWORD`                      | SMTP login password or app password                                                                                    |
-| `SENDGRID_API_KEY`                   | SendGrid API key when using SendGrid                                                                                   |
-| `MAILGUN_API_KEY` / `MAILGUN_DOMAIN` | Mailgun credentials when using Mailgun                                                                                 |
-| `ALERT_EMAIL_TO`                     | Default comma-separated recipients when a rule uses `"email"` without `email_to`                                       |
-| `ALERT_EMAIL_FROM`                   | Platform **From** address; required for SendGrid/Mailgun                                                               |
-
-Per-rule overrides in alerts config: `webhook_url`, `webhook_format` (`json`, `slack`, or `discord`), `email_to`, optional SMTP fields.
-
-**Frontend:**
-
-- `VITE_API_URL` - Backend API URL (defaults to `http://localhost:8000`)
-
-## Troubleshooting
-
-### Backend Issues
-
-#### "No data files found"
-
-- Make sure you've run **`market-helm`** (or `python main.py`) at least once to generate data files
-- Check that the `data/` directory exists in the project root
-
-#### CORS errors
-
-- Backend allows localhost:3000 by default
-- For production, update CORS settings in `backend/main.py`
-
-### Frontend Issues
-
-#### "Failed to fetch"
-
-- Make sure the backend is running on port 8000
-- Check browser console for specific errors
-
-#### Components not styling correctly
-
-- Run `npm install` to ensure all dependencies are installed
-- TailwindCSS requires PostCSS - check that postcss.config.js exists
-
-## What's Next?
-
-**Status:** See [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md) for repo-wide roadmap, skipped items, and how we plan to close gaps.
-
-**Dashboard-focused next steps:**
-
-1. **Performance** — Code splitting, lazy route loading (bundle size)
-2. **Watchlist** — Save favorite symbols (local persistence first)
-3. **Keyboard shortcuts** — Quick navigation
-4. **Quality validation** — Accessibility, browser/device, performance, and hosted end-to-end passes
-5. **Alert depth** — Technical/compound rules and, later, SMS/push channels
-
-Repo-wide priorities and deferred ideas are tracked only in
-[docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md).
-
-## Contributing
-
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT License - See [LICENSE](../LICENSE)
+Feature availability and unfinished work are tracked only in
+[Project status](../docs/PROJECT_STATUS.md). API groups and service boundaries
+are documented in [Architecture](../docs/ARCHITECTURE.md#webapi-boundaries).

@@ -11,5 +11,5 @@ Start with the [main README](../README.md) for install and quick start. Use this
 | **Troubleshooting & FAQ** | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common errors and answers                                                          |
 | **Roadmap & status**      | [PROJECT_STATUS.md](PROJECT_STATUS.md) — what shipped, what's next, go-live → [DEPLOYMENT.md](DEPLOYMENT.md#when-you-go-live) |
 | **Projections**           | [STOCK_PROJECTIONS.md](STOCK_PROJECTIONS.md) — five-session projection and validation logic                                   |
-| **Dashboard**             | [dashboard/README.md](../dashboard/README.md) — features, API surface, local development                                      |
+| **Dashboard development** | [dashboard/README.md](../dashboard/README.md) — React/FastAPI hot reload, integrated builds, and web-specific verification    |
 | **Contributing**          | [CONTRIBUTING.md](../CONTRIBUTING.md) — dev setup, tests, PR workflow                                                         |
