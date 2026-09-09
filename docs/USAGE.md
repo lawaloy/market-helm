@@ -1,6 +1,6 @@
 # Usage
 
-How to run the daily tracker after [install](../README.md#quick-start-beginners-welcome).
+How to run the daily tracker after [install](../README.md#quick-start).
 
 ---
 
@@ -132,7 +132,8 @@ market-helm-web
 
 Open **<http://localhost:8000>** — API docs at **/docs**.
 
-For React development (Vite on port 3000, hot reload), see [dashboard/README.md](../dashboard/README.md#development-clone-hot-reload).
+For React development (Vite on port 3000, hot reload), see
+[dashboard/README.md](../dashboard/README.md#development-with-hot-reload).
 
 ---
 
