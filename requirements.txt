@@ -3,6 +3,6 @@ exchange-calendars>=4.13.2
 requests>=2.34.2
 urllib3>=2.7.0
 python-dotenv>=1.2.3
-openai>=3.8.0
+openai>=3.10.0
 pytickersymbols>=1.17.10
 
