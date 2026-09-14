@@ -1,12 +1,18 @@
 name: Daily MarketHelm
 
 permissions:
+  actions: read
   contents: read
 
 on:
   schedule:
-    - cron: '0 16 * * *' # runs daily at 16:00 UTC
+    # 22:30 UTC is safely after the regular XNYS close throughout the year.
+    - cron: '30 22 * * 1-5'
   workflow_dispatch: {}
+
+concurrency:
+  group: projection-evidence-collection
+  cancel-in-progress: false
 
 jobs:
   run-daily-tracker:
@@ -20,6 +26,55 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Find latest projection evidence archive
+        id: previous-archive
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.paginate(
+              github.rest.actions.listWorkflowRuns,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'schedule.yml',
+                status: 'success',
+                per_page: 100,
+              },
+            );
+            for (const run of runs) {
+              if (run.id === context.runId) continue;
+              const artifacts = await github.paginate(
+                github.rest.actions.listWorkflowRunArtifacts,
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                  per_page: 100,
+                },
+              );
+              const archive = artifacts.find(
+                (artifact) =>
+                  artifact.name === 'projection-forward-archive' &&
+                  !artifact.expired,
+              );
+              if (archive) {
+                core.info(`Restoring archive from workflow run ${run.id}`);
+                core.setOutput('run-id', String(run.id));
+                return;
+              }
+            }
+            core.info('No previous projection evidence archive is available.');
+
+      - name: Restore projection evidence archive
+        if: steps.previous-archive.outputs.run-id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: projection-forward-archive
+          path: data
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.previous-archive.outputs.run-id }}
+          github-token: ${{ github.token }}
+
       - name: Install dependencies (editable)
         run: |
           python -m pip install --upgrade pip
@@ -29,6 +84,53 @@ jobs:
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: market-helm
+
+      - name: Assess cumulative projection evidence
+        id: assessment
+        shell: bash
         run: |
-          # Try console script, fallback to python shim
-          market-helm || python main.py
+          set +e
+          python scripts/projection_baseline.py assess \
+            --data-dir data \
+            --days 365 > data/projection-assessment.json
+          status=$?
+          set -e
+          cat data/projection-assessment.json
+          if [ "$status" -gt 1 ]; then
+            exit "$status"
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "qualified=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "qualified=false" >> "$GITHUB_OUTPUT"
+            echo "Evidence is still accumulating; qualification is not expected yet."
+          fi
+
+      - name: Capture qualified observed baseline
+        if: steps.assessment.outputs.qualified == 'true'
+        run: |
+          python scripts/projection_baseline.py capture \
+            --data-dir data \
+            --days 365 \
+            --output-dir observed-baseline
+
+      - name: Preserve cumulative projection evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: projection-forward-archive
+          path: |
+            data/daily_data_*.csv
+            data/projections_*.csv
+            data/projection-assessment.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Preserve qualified observed baseline
+        if: steps.assessment.outputs.qualified == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: projection-observed-baseline-${{ github.run_id }}
+          path: observed-baseline/
+          if-no-files-found: error
+          retention-days: 90

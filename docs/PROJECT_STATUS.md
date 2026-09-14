@@ -96,12 +96,14 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Projection validation:** keep collecting forward projections and exact target
-   closes until `projection_baseline.py assess` passes and a hashed observed
-   baseline can be preserved. New snapshots retain quote-session provenance;
-   legacy filename-dated closes are excluded from qualification. Do not
-   change confidence scoring until adequately sized cohorts demonstrate stable
-   bias; the committed synthetic baseline validates evaluator behavior only.
+1. **Projection validation:** the weekday post-close workflow preserves a
+   cumulative forward archive and its qualification report. Keep collecting exact
+   target closes until `projection_baseline.py assess` passes and the workflow
+   emits a hashed observed baseline. New snapshots retain quote-session
+   provenance; legacy filename-dated closes are excluded from qualification. Do
+   not change confidence scoring until adequately sized cohorts demonstrate
+   stable bias; the committed synthetic baseline validates evaluator behavior
+   only.
 2. **External staging sign-off:** in parallel, complete the ordered
    [external staging execution TODO](DEPLOYMENT.md#external-staging-execution-todo)
    against the chosen managed PostgreSQL, ingress, monitoring, and
