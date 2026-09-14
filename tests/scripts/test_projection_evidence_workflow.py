@@ -19,6 +19,8 @@ def test_projection_evidence_runs_weekdays_after_xnys_close() -> None:
     assert "cron: '30 22 * * 1-5'" in workflow
     assert "group: projection-evidence-collection" in workflow
     assert "cancel-in-progress: false" in workflow
+    assert "scripts/projection_collection_day.py" in workflow
+    assert workflow.count("steps.collection-day.outputs.run == 'true'") == 7
 
 
 def test_projection_evidence_restores_latest_unexpired_successful_archive() -> None:

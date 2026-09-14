@@ -81,13 +81,15 @@ least 30 samples each. Every scored projection must have a timezone-aware
 generation timestamp and every outcome must identify a verified previous-close
 session. Thresholds are minimum evidence hygiene, not proof of model quality.
 
-The `Daily MarketHelm` workflow collects a post-close snapshot on weekdays,
-restores the latest cumulative `projection-forward-archive` artifact, assesses
-the combined archive, and uploads it again with 90-day retention. An unqualified
-assessment is reported as normal progress while evidence matures; tracker,
-archive, or evaluator errors still fail the workflow. When the evidence gate
-passes, the workflow also uploads an immutable `projection-observed-baseline-*`
-artifact containing the qualified report and input hashes.
+The `Daily MarketHelm` workflow collects a post-close snapshot on weekdays. An
+exchange-calendar guard skips holidays and any manual run made before that day's
+XNYS close. Eligible runs restore the latest cumulative
+`projection-forward-archive` artifact, assess the combined archive, and upload it
+again with 90-day retention. An unqualified assessment is reported as normal
+progress while evidence matures; tracker, archive, or evaluator errors still fail
+the workflow. When the evidence gate passes, the workflow also uploads an
+immutable `projection-observed-baseline-*` artifact containing the qualified
+report and input hashes.
 
 Once the assessment passes, preserve the exact report plus hashes of every input:
 
