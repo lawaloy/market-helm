@@ -273,8 +273,12 @@ def main():
         
         # Display results
         display_results(result)
-        
+
+        if not result.get("success"):
+            return 1
+
         logger.debug("CLI completed successfully")
+        return 0
         
     except KeyboardInterrupt:
         logger.warning("Interrupted by user. Exiting.")
@@ -285,5 +289,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
-
+    raise SystemExit(main())

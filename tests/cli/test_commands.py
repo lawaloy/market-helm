@@ -29,10 +29,26 @@ def test_main_forwards_flags_to_workflow(argv, include_profile, use_screener, to
         with patch("src.cli.commands.display_results") as display:
             from src.cli.commands import main
 
-            main()
+            result = main()
 
     ctor.assert_called_once_with(include_profile=include_profile)
     workflow.run.assert_called_once_with(use_screener=use_screener, top_n_stocks=top_n)
+    display.assert_called_once_with(workflow.run.return_value)
+    assert result == 0
+
+
+def test_main_returns_failure_when_daily_workflow_fails(monkeypatch):
+    monkeypatch.setattr("sys.argv", ["market-helm"])
+    workflow = MagicMock()
+    workflow.run.return_value = {"success": False, "error": "No data fetched"}
+
+    with patch("src.cli.commands.StockTrackerWorkflow", return_value=workflow):
+        with patch("src.cli.commands.display_results") as display:
+            from src.cli.commands import main
+
+            result = main()
+
+    assert result == 1
     display.assert_called_once_with(workflow.run.return_value)
 
 

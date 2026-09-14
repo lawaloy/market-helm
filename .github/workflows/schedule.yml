@@ -16,7 +16,10 @@ concurrency:
 
 jobs:
   run-daily-tracker:
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
+    env:
+      TZ: America/New_York
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -48,6 +51,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: 'schedule.yml',
+                branch: context.payload.repository.default_branch,
                 status: 'success',
                 per_page: 100,
               },
@@ -93,7 +97,15 @@ jobs:
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: market-helm
+        shell: bash
+        run: |
+          snapshot_date="$(date +%F)"
+          rm -f \
+            "data/daily_data_${snapshot_date}.csv" \
+            "data/projections_${snapshot_date}.csv"
+          market-helm
+          test -s "data/daily_data_${snapshot_date}.csv"
+          test -s "data/projections_${snapshot_date}.csv"
 
       - name: Assess cumulative projection evidence
         if: steps.collection-day.outputs.run == 'true'
@@ -107,13 +119,16 @@ jobs:
           status=$?
           set -e
           cat data/projection-assessment.json
-          if [ "$status" -gt 1 ]; then
-            exit "$status"
+          qualified=$(python -c \
+            'import json; value = json.load(open("data/projection-assessment.json"))["qualified"]; assert type(value) is bool; print(str(value).lower())') || exit 2
+          if { [ "$status" -eq 0 ] && [ "$qualified" != "true" ]; } || \
+             { [ "$status" -eq 1 ] && [ "$qualified" != "false" ]; } || \
+             [ "$status" -gt 1 ]; then
+            echo "Evaluator status and assessment JSON are inconsistent." >&2
+            exit 2
           fi
-          if [ "$status" -eq 0 ]; then
-            echo "qualified=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "qualified=false" >> "$GITHUB_OUTPUT"
+          echo "qualified=$qualified" >> "$GITHUB_OUTPUT"
+          if [ "$qualified" = "false" ]; then
             echo "Evidence is still accumulating; qualification is not expected yet."
           fi
 

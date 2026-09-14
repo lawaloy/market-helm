@@ -19,6 +19,8 @@ def test_projection_evidence_runs_weekdays_after_xnys_close() -> None:
     assert "cron: '30 22 * * 1-5'" in workflow
     assert "group: projection-evidence-collection" in workflow
     assert "cancel-in-progress: false" in workflow
+    assert "if: github.ref_name == github.event.repository.default_branch" in workflow
+    assert "TZ: America/New_York" in workflow
     assert "scripts/projection_collection_day.py" in workflow
     assert workflow.count("steps.collection-day.outputs.run == 'true'") == 7
 
@@ -28,6 +30,7 @@ def test_projection_evidence_restores_latest_unexpired_successful_archive() -> N
 
     assert "actions: read" in workflow
     assert "workflow_id: 'schedule.yml'" in workflow
+    assert "branch: context.payload.repository.default_branch" in workflow
     assert "status: 'success'" in workflow
     assert "artifact.name === 'projection-forward-archive'" in workflow
     assert "!artifact.expired" in workflow
@@ -41,8 +44,9 @@ def test_projection_evidence_preserves_progress_and_qualified_capture() -> None:
     workflow = _workflow()
 
     assert "scripts/projection_baseline.py assess" in workflow
-    assert 'if [ "$status" -gt 1 ]; then' in workflow
-    assert 'echo "qualified=false" >> "$GITHUB_OUTPUT"' in workflow
+    assert 'json.load(open("data/projection-assessment.json"))' in workflow
+    assert 'assert type(value) is bool' in workflow
+    assert 'echo "qualified=$qualified" >> "$GITHUB_OUTPUT"' in workflow
     assert "scripts/projection_baseline.py capture" in workflow
     assert "name: projection-forward-archive" in workflow
     assert "data/daily_data_*.csv" in workflow
@@ -50,3 +54,13 @@ def test_projection_evidence_preserves_progress_and_qualified_capture() -> None:
     assert "data/projection-assessment.json" in workflow
     assert "name: projection-observed-baseline-${{ github.run_id }}" in workflow
     assert workflow.count("retention-days: 90") == 2
+
+
+def test_projection_evidence_requires_fresh_daily_and_projection_files() -> None:
+    workflow = _workflow()
+
+    assert 'rm -f \\' in workflow
+    assert '"data/daily_data_${snapshot_date}.csv"' in workflow
+    assert '"data/projections_${snapshot_date}.csv"' in workflow
+    assert 'test -s "data/daily_data_${snapshot_date}.csv"' in workflow
+    assert 'test -s "data/projections_${snapshot_date}.csv"' in workflow

@@ -83,13 +83,16 @@ session. Thresholds are minimum evidence hygiene, not proof of model quality.
 
 The `Daily MarketHelm` workflow collects a post-close snapshot on weekdays. An
 exchange-calendar guard skips holidays and any manual run made before that day's
-XNYS close. Eligible runs restore the latest cumulative
+XNYS close. Collection is restricted to the repository's default branch so
+feature-branch experiments cannot contaminate the evidence chain. Eligible runs
+restore the latest cumulative
 `projection-forward-archive` artifact, assess the combined archive, and upload it
 again with 90-day retention. An unqualified assessment is reported as normal
-progress while evidence matures; tracker, archive, or evaluator errors still fail
-the workflow. When the evidence gate passes, the workflow also uploads an
-immutable `projection-observed-baseline-*` artifact containing the qualified
-report and input hashes.
+progress while evidence matures. A tracker failure, missing fresh snapshot,
+malformed assessment, archive error, or evaluator error still fails the workflow.
+When the evidence gate passes, the workflow also uploads an immutable
+`projection-observed-baseline-*` artifact containing the qualified report and
+input hashes.
 
 Once the assessment passes, preserve the exact report plus hashes of every input:
 
