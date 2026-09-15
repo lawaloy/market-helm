@@ -20,4 +20,4 @@ sys.path.insert(0, str(project_root))
 from src.cli.commands import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

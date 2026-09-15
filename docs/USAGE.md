@@ -81,6 +81,25 @@ least 30 samples each. Every scored projection must have a timezone-aware
 generation timestamp and every outcome must identify a verified previous-close
 session. Thresholds are minimum evidence hygiene, not proof of model quality.
 
+The `Projection evidence collection` workflow collects one post-close snapshot
+on weekdays. One completed-session sample per run date avoids overweighting
+highly correlated intraday observations in the five-session calibration data. An
+exchange-calendar guard skips holidays and any manual run made before that day's
+XNYS close. Collection is restricted to the repository's default branch so
+feature-branch experiments cannot contaminate the evidence chain. Eligible runs
+restore the latest cumulative `projection-forward-archive` artifact, assess the
+combined archive, and upload it again with 90-day retention. An unqualified
+assessment is reported as normal progress while evidence matures. A tracker
+failure, missing fresh snapshot, malformed assessment, archive error, or evaluator
+error still fails the workflow. When the evidence gate passes, the workflow also
+uploads an immutable `projection-observed-baseline-*` artifact containing the
+qualified report and input hashes.
+
+This evidence cadence is not the intended operating cadence for future automated
+trading. Broker execution remains unimplemented and will require a separate
+intraday or event-driven loop with position state, idempotent orders, risk limits,
+a kill switch, and an auditable execution history.
+
 Once the assessment passes, preserve the exact report plus hashes of every input:
 
 ```bash

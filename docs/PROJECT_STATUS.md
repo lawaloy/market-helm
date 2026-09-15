@@ -20,8 +20,10 @@ The repository supports two operating modes:
   accounts, sessions, per-user alert settings, jobs, and delivery history use
   SQLite or PostgreSQL.
 
-Automated broker execution is a future direction, not a current capability.
-MarketHelm does not provide investment, legal, or tax advice.
+Automated broker execution is a future direction, not a current capability. Its
+runtime is expected to be intraday or event-driven and separate from the
+once-per-session projection-evidence collector. MarketHelm does not provide
+investment, legal, or tax advice.
 
 ## Status definitions
 
@@ -38,17 +40,17 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 ## Current capability matrix
 
-| Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                 |
-| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                             | Live Finnhub smoke testing and broader service-level failure tests                                       |
-| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes |
-| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                |
-| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                       |
-| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                            |
-| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                               |
-| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                |
-| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                    |
-| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Broker integration, order/risk model, audit trail, compliance and safety controls                        |
+| Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                               |
+| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                             | Live Finnhub smoke testing and broader service-level failure tests                                                     |
+| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes               |
+| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                              |
+| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                     |
+| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                                          |
+| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                                             |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                              |
+| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                  |
+| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls |
 
 ## Hosted alerts and accounts
 
@@ -96,12 +98,14 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Projection validation:** keep collecting forward projections and exact target
-   closes until `projection_baseline.py assess` passes and a hashed observed
-   baseline can be preserved. New snapshots retain quote-session provenance;
-   legacy filename-dated closes are excluded from qualification. Do not
-   change confidence scoring until adequately sized cohorts demonstrate stable
-   bias; the committed synthetic baseline validates evaluator behavior only.
+1. **Projection validation:** the weekday post-close workflow preserves a
+   cumulative forward archive and its qualification report. Keep collecting exact
+   target closes until `projection_baseline.py assess` passes and the workflow
+   emits a hashed observed baseline. New snapshots retain quote-session
+   provenance; legacy filename-dated closes are excluded from qualification. Do
+   not change confidence scoring until adequately sized cohorts demonstrate
+   stable bias; the committed synthetic baseline validates evaluator behavior
+   only.
 2. **External staging sign-off:** in parallel, complete the ordered
    [external staging execution TODO](DEPLOYMENT.md#external-staging-execution-todo)
    against the chosen managed PostgreSQL, ingress, monitoring, and
@@ -116,13 +120,13 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Explicitly deferred
 
-| Item                                    | Reason                                                            |
-| --------------------------------------- | ----------------------------------------------------------------- |
-| Automated trading                       | Requires a separate risk, compliance, broker, and audit design    |
-| SMS and push notifications              | Email/webhook production operation should be proven first         |
-| Advanced technical/compound alert rules | Current price and screening rules cover the initial alert product |
-| International exchanges                 | Current screening is centered on S&P 500 and NASDAQ-100           |
-| ML/fundamental/news projections         | Current projection engine is intentionally heuristic              |
+| Item                                    | Reason                                                                                   |
+| --------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Automated trading                       | Requires separate intraday orchestration plus risk, compliance, broker, and audit design |
+| SMS and push notifications              | Email/webhook production operation should be proven first                                |
+| Advanced technical/compound alert rules | Current price and screening rules cover the initial alert product                        |
+| International exchanges                 | Current screening is centered on S&P 500 and NASDAQ-100                                  |
+| ML/fundamental/news projections         | Current projection engine is intentionally heuristic                                     |
 
 ## Keeping this document current
 
