@@ -16,6 +16,7 @@ def _workflow() -> str:
 def test_projection_evidence_runs_weekdays_after_xnys_close() -> None:
     workflow = _workflow()
 
+    assert workflow.startswith("name: Projection evidence collection\n")
     assert "cron: '30 22 * * 1-5'" in workflow
     assert "group: projection-evidence-collection" in workflow
     assert "cancel-in-progress: false" in workflow

@@ -1,4 +1,4 @@
-name: Daily MarketHelm
+name: Projection evidence collection
 
 permissions:
   actions: read
@@ -6,6 +6,7 @@ permissions:
 
 on:
   schedule:
+    # One completed-session sample avoids overweighting correlated intraday runs.
     # 22:30 UTC is safely after the regular XNYS close throughout the year.
     - cron: '30 22 * * 1-5'
   workflow_dispatch: {}
