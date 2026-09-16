@@ -63,7 +63,7 @@ class _FinnhubHandler(BaseHTTPRequestHandler):
             return
 
         if symbol == "TIMEOUT":
-            time.sleep(0.2)
+            time.sleep(1.0)
 
         price = 125.0 if symbol == "THROTTLED" else 100.0
         payload = json.dumps(
@@ -135,7 +135,7 @@ def _workflow(monkeypatch, tmp_path: Path, server: _FinnhubStub, symbols: list[s
 
     def short_get(url, *, params, timeout):
         del timeout
-        return session_get(url, params=params, timeout=0.05)
+        return session_get(url, params=params, timeout=0.5)
 
     monkeypatch.setattr(client.session, "get", short_get)
     return workflow
