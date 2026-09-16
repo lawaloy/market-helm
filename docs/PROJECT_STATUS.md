@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-16
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -42,7 +42,7 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 | Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                               |
 | ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output                                                                             | Live Finnhub smoke testing and broader service-level failure tests                                                     |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output, and service-boundary resilience coverage                                   | Live Finnhub smoke testing and full-market run reliability                                                            |
 | Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes               |
 | Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                              |
 | Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                     |
@@ -80,9 +80,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries and
 
 The repository has broad Python and frontend unit/integration coverage, including
 auth lifecycle, tenant isolation, storage migrations, worker orchestration,
-delivery history, rate limits, security boundaries, API routes, and UI flows. CI
-also defines PostgreSQL 16 integration, browser smoke, and full container
-staging-readiness gates.
+delivery history, rate limits, security boundaries, API routes, UI flows, and a
+local HTTP provider harness that exercises tracker throttling, malformed JSON,
+connection loss, timeouts, partial success, total failure, persistence, and
+backtest ingestion. CI also defines PostgreSQL 16 integration, browser smoke, and
+full container staging-readiness gates.
 
 The following should not be inferred from those tests:
 
@@ -115,8 +117,6 @@ unit tests and container-only integration tests cannot fully reproduce.
    SMS/push only after hosted email is proven reliable.
 4. **Dashboard quality:** code-split routes, run accessibility/performance audits,
    and decide whether saved watchlists/views belong in the product.
-5. **Service integration coverage:** add controlled tests around fetcher errors,
-   provider throttling, malformed upstream data, and a complete tracker run.
 
 ## Explicitly deferred
 
