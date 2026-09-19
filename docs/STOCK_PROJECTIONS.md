@@ -110,11 +110,11 @@ Top 5 SELL Warnings:
   ...
 ```
 
-### Saved Files
+### Saved storage
 
-#### 1. **Summary JSON** (`data/summary_YYYY-MM-DD.json`)
+#### 1. **Daily summary** (`daily_summaries` in hosted DB or `DATA_DIR/market_bars.sqlite`)
 
-Includes complete projection data:
+Logical location: `summary:YYYY-MM-DD`. Payload includes complete projection data:
 
 ```json
 {
@@ -154,14 +154,11 @@ Includes complete projection data:
 }
 ```
 
-#### 2. **Projections CSV** (`data/projections_YYYY-MM-DD.csv`)
+#### 2. **Projections table** (`projections` in the same DB sidecar)
 
-Spreadsheet format for easy analysis:
+Logical location: `projections:YYYY-MM-DD`. No `projections_*.csv` / `summary_*.json` write path.
 
-```csv
-symbol,current_price,target_low,target_mid,target_high,expected_change_percent,recommendation,confidence,trend,momentum_score,volatility_score,risk_level,reason,projection_date,projection_horizon_sessions,projection_calendar,generated_at
-AAPL,150.50,148.20,152.30,156.40,1.20,BUY,75,Bullish,25.5,35.2,Low,"Positive +2.5% momentum; moderate momentum",2026-01-09,5,XNYS,2026-01-04T10:30:00
-```
+Optional human report: `data/projections_YYYY-MM-DD.md`.
 
 ## Usage
 

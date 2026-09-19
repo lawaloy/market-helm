@@ -262,10 +262,8 @@ class TestStockTrackerWorkflow:
 
         workflow = StockTrackerWorkflow.__new__(StockTrackerWorkflow)
         workflow.storage = MagicMock()
-        workflow.storage.save_summary.return_value = str(temp_data_dir / "summary.json")
-        workflow.storage.save_projections.return_value = str(
-            temp_data_dir / "projections.csv"
-        )
+        workflow.storage.save_summary.return_value = "summary:2026-09-18"
+        workflow.storage.save_projections.return_value = "projections:2026-09-18"
 
         ok = workflow._save_summary(
             analysis={"ok": True},
@@ -275,7 +273,7 @@ class TestStockTrackerWorkflow:
             projection_summary={},
         )
         assert ok["success"] is True
-        assert ok["projection_csv_path"].endswith("projections.csv")
+        assert ok["projection_location"] == "projections:2026-09-18"
         workflow.storage.save_projections.assert_called_once()
 
         workflow.storage.save_summary.side_effect = OSError("disk full")

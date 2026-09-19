@@ -376,7 +376,7 @@ class StockTrackerWorkflow:
         projections: Dict = None,
         projection_summary: Dict = None
     ) -> Dict[str, Any]:
-        """Save analysis summary and projections to JSON and CSV."""
+        """Persist analysis summary and projections to durable DB storage."""
         try:
             summary_data = {
                 "analysis": analysis,
@@ -393,19 +393,18 @@ class StockTrackerWorkflow:
             
             summary_path = self.storage.save_summary(summary_data)
             
-            # Also save projections as separate CSV for easier analysis
-            projection_csv_path = None
+            projection_location = None
             if projections:
-                projection_csv_path = self.storage.save_projections(projections)
-                if projection_csv_path:
-                    logger.info(f"Projections CSV saved to: {projection_csv_path}")
+                projection_location = self.storage.save_projections(projections)
+                if projection_location:
+                    logger.info(f"Projections saved to: {projection_location}")
             
             if summary_path:
                 logger.info(f"Summary saved to: {summary_path}")
                 return {
                     "success": True, 
                     "file_path": summary_path,
-                    "projection_csv_path": projection_csv_path
+                    "projection_location": projection_location,
                 }
             else:
                 return {"success": False, "error": "Failed to save summary"}
