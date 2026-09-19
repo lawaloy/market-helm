@@ -1,6 +1,5 @@
 """Demo /api/summary must soft-fail nested non-dict shapes instead of 500ing."""
 
-import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -9,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from dashboard.backend.api.market import _generate_demo_summary
-from tests.helpers.market_bars import seed_simple_bars
+from tests.helpers.market_bars import seed_simple_bars, seed_summary
 
 
 @pytest.fixture
@@ -22,10 +21,9 @@ def temp_data_dir(monkeypatch):
 
 @pytest.fixture
 def summary_client(temp_data_dir):
-    """TestClient with DataLoader pointed at temp_data_dir (summary JSON only)."""
+    """TestClient with DataLoader pointed at temp_data_dir."""
     from dashboard.backend.services.data_loader import DataLoader
 
-    # Seed bars so other endpoints stay happy if imported; summary path only needs JSON.
     seed_simple_bars(
         temp_data_dir,
         "2026-01-15",
@@ -112,14 +110,15 @@ def test_generate_demo_summary_skips_string_mover_rows() -> None:
 def test_api_summary_demo_survives_corrupt_nests(summary_client) -> None:
     """Blank ai_summary + poison analysis/exchange must still return source=demo."""
     client, data_dir = summary_client
-    payload = {
-        "date": "2026-01-15",
-        "ai_summary": "   ",
-        "analysis": "corrupt",
-        "exchange_comparison": ["NYSE"],
-    }
-    (data_dir / "summary_2026-01-15.json").write_text(
-        json.dumps(payload), encoding="utf-8"
+    seed_summary(
+        data_dir,
+        "2026-01-15",
+        {
+            "date": "2026-01-15",
+            "ai_summary": "   ",
+            "analysis": "corrupt",
+            "exchange_comparison": ["NYSE"],
+        },
     )
 
     response = client.get("/api/summary")
@@ -132,20 +131,21 @@ def test_api_summary_demo_survives_corrupt_nests(summary_client) -> None:
 
 def test_api_summary_demo_survives_string_movers(summary_client) -> None:
     client, data_dir = summary_client
-    payload = {
-        "date": "2026-01-15",
-        "analysis": {
-            "summary": {"gainers": 1, "losers": 1, "average_change_percent": 0.0},
-            "top_gainers": ["AAPL"],
-            "top_losers": [{"symbol": "GOOGL", "change_percent": -1.0}],
+    seed_summary(
+        data_dir,
+        "2026-01-15",
+        {
+            "date": "2026-01-15",
+            "analysis": {
+                "summary": {"gainers": 1, "losers": 1, "average_change_percent": 0.0},
+                "top_gainers": ["AAPL"],
+                "top_losers": [{"symbol": "GOOGL", "change_percent": -1.0}],
+            },
+            "exchange_comparison": {
+                "NASDAQ-100": "not-stats",
+                "S&P 500": {"average_change_percent": 0.5},
+            },
         },
-        "exchange_comparison": {
-            "NASDAQ-100": "not-stats",
-            "S&P 500": {"average_change_percent": 0.5},
-        },
-    }
-    (data_dir / "summary_2026-01-15.json").write_text(
-        json.dumps(payload), encoding="utf-8"
     )
 
     response = client.get("/api/summary")

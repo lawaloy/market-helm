@@ -163,10 +163,12 @@ def test_tracker_keeps_valid_symbols_and_writes_backtestable_snapshots(
     assert server.request_counts["TIMEOUT"] >= 3
 
     from src.storage.market_bars import list_market_bar_dates
+    from src.storage.projections_store import list_projection_dates
 
     assert list_market_bar_dates(data_dir=tmp_path, limit=10)
     assert (tmp_path / "market_bars.sqlite").is_file()
-    assert list(tmp_path.glob("projections_*.csv"))
+    assert list_projection_dates(data_dir=tmp_path, limit=10)
+    assert not list(tmp_path.glob("projections_*.csv"))
     report = backtest_data_dir(tmp_path)
     assert report["summary"]["projectionCount"] == 2
     assert report["summary"]["validProjectionCount"] == 2
@@ -184,9 +186,11 @@ def test_total_provider_failure_reaches_nonzero_cli_exit(monkeypatch, tmp_path):
             exit_code = cli_main()
 
     from src.storage.market_bars import list_market_bar_dates
+    from src.storage.projections_store import list_projection_dates
 
     assert exit_code == 1
     assert not list_market_bar_dates(data_dir=tmp_path, limit=10)
+    assert not list_projection_dates(data_dir=tmp_path, limit=10)
     assert not list(tmp_path.glob("projections_*.csv"))
     assert server.request_counts["MALFORMED"] >= 3
     assert server.request_counts["DROPPED"] >= 3

@@ -6,7 +6,6 @@ import tempfile
 import shutil
 from pathlib import Path
 import pandas as pd
-import json
 from datetime import date, datetime
 from unittest.mock import patch
 
@@ -84,10 +83,15 @@ class TestDataStorage(unittest.TestCase):
         self.assertEqual(list(Path(self.test_data_dir).glob("daily_data_*.csv")), [])
 
     def test_save_summary(self):
-        """Test saving summary to JSON."""
-        self.storage.save_summary(self.sample_summary)
-        json_files = list(Path(self.test_data_dir).glob("summary_*.json"))
-        self.assertEqual(len(json_files), 1)
+        """Test saving summary to durable daily_summaries storage."""
+        from src.storage.projections_store import load_daily_summary
+
+        location = self.storage.save_summary(self.sample_summary, date=date(2026, 1, 15))
+        self.assertEqual(location, "summary:2026-01-15")
+        self.assertEqual(list(Path(self.test_data_dir).glob("summary_*.json")), [])
+        loaded = load_daily_summary("2026-01-15", data_dir=self.test_data_dir)
+        self.assertIsInstance(loaded, dict)
+        self.assertEqual(loaded["total_stocks"], 2)
 
     def test_load_daily_data(self):
         """Test loading daily data from market_bars."""
@@ -99,17 +103,19 @@ class TestDataStorage(unittest.TestCase):
         self.assertIn('symbol', loaded_df.columns)
 
     def test_load_summary(self):
-        """Test loading summary from JSON."""
-        self.storage.save_summary(self.sample_summary)
-        json_files = list(Path(self.test_data_dir).glob("summary_*.json"))
-        self.assertEqual(len(json_files), 1)
-        with open(json_files[0], 'r') as f:
-            loaded_summary = json.load(f)
+        """Test loading summary from durable storage after save."""
+        from src.storage.projections_store import load_daily_summary
+
+        self.storage.save_summary(self.sample_summary, date=date(2026, 1, 15))
+        self.assertEqual(list(Path(self.test_data_dir).glob("summary_*.json")), [])
+        loaded_summary = load_daily_summary("2026-01-15", data_dir=self.test_data_dir)
         self.assertIsInstance(loaded_summary, dict)
         self.assertEqual(loaded_summary['total_stocks'], 2)
 
-    def test_save_projections_writes_ordered_csv_and_markdown(self):
-        """Projection CSV keeps the stable column order and still emits markdown."""
+    def test_save_projections_writes_db_and_markdown(self):
+        """Projections land in DB (no CSV) and still emit optional markdown."""
+        from src.storage.projections_store import load_projections, projections_frame
+
         projections = {
             "AAPL": {
                 "symbol": "AAPL",
@@ -134,39 +140,42 @@ class TestDataStorage(unittest.TestCase):
             }
         }
 
-        csv_path = Path(self.storage.save_projections(projections, date=date(2026, 5, 20)))
-        self.assertTrue(csv_path.exists())
-        df = pd.read_csv(csv_path)
-        self.assertEqual(
-            list(df.columns),
-            [
-                "symbol",
-                "name",
-                "current_price",
-                "target_low",
-                "target_mid",
-                "target_high",
-                "expected_change_percent",
-                "recommendation",
-                "confidence",
-                "trend",
-                "momentum_score",
-                "volatility_score",
-                "risk_level",
-                "reason",
-                "projection_date",
-                "projection_horizon_sessions",
-                "projection_calendar",
-                "generated_at",
-            ],
-        )
-        self.assertEqual(df.iloc[0]["symbol"], "AAPL")
-        md_path = csv_path.with_suffix(".md")
+        location = self.storage.save_projections(projections, date=date(2026, 5, 20))
+        self.assertEqual(location, "projections:2026-05-20")
+        self.assertEqual(list(Path(self.test_data_dir).glob("projections_*.csv")), [])
+        rows = load_projections("2026-05-20", data_dir=self.test_data_dir)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["symbol"], "AAPL")
+        df = projections_frame("2026-05-20", data_dir=self.test_data_dir)
+        for col in (
+            "symbol",
+            "name",
+            "current_price",
+            "target_low",
+            "target_mid",
+            "target_high",
+            "expected_change_percent",
+            "recommendation",
+            "confidence",
+            "trend",
+            "momentum_score",
+            "volatility_score",
+            "risk_level",
+            "reason",
+            "projection_date",
+            "projection_horizon_sessions",
+            "projection_calendar",
+            "generated_at",
+        ):
+            self.assertIn(col, df.columns)
+        md_path = Path(self.test_data_dir) / "projections_2026-05-20.md"
         self.assertTrue(md_path.exists())
         self.assertIn("Stock Market Projections Report", md_path.read_text(encoding="utf-8"))
 
-    def test_save_projections_still_returns_csv_when_markdown_fails(self):
-        """Markdown report failures must not block the projections CSV path."""
+    def test_save_projections_still_returns_key_when_markdown_fails(self):
+        """Markdown report failures must not block durable projection persistence."""
+        from src.storage.projections_store import load_projections
+
         projections = {
             "AAPL": {
                 "symbol": "AAPL",
@@ -183,13 +192,15 @@ class TestDataStorage(unittest.TestCase):
             "_generate_projection_markdown",
             side_effect=RuntimeError("markdown boom"),
         ):
-            csv_path = Path(
-                self.storage.save_projections(projections, date=date(2026, 5, 21))
-            )
+            location = self.storage.save_projections(projections, date=date(2026, 5, 21))
 
-        self.assertTrue(csv_path.exists())
-        self.assertFalse(csv_path.with_suffix(".md").exists())
-        self.assertEqual(pd.read_csv(csv_path).iloc[0]["symbol"], "AAPL")
+        self.assertEqual(location, "projections:2026-05-21")
+        self.assertFalse((Path(self.test_data_dir) / "projections_2026-05-21.md").exists())
+        self.assertEqual(list(Path(self.test_data_dir).glob("projections_*.csv")), [])
+        self.assertEqual(
+            load_projections("2026-05-21", data_dir=self.test_data_dir)[0]["symbol"],
+            "AAPL",
+        )
 
     def test_save_projections_empty_returns_none(self):
         self.assertIsNone(self.storage.save_projections({}))

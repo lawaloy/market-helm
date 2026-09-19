@@ -144,16 +144,12 @@ def assess(data_dir: Path, days: int, **thresholds: object) -> int:
 
 def _input_manifest(data_dir: Path) -> list[dict]:
     inputs = []
-    for path in sorted(data_dir.iterdir()):
-        if path.name == "market_bars.sqlite" or path.name.startswith("projections_"):
-            if not path.is_file():
-                continue
-        else:
-            continue
-        content = path.read_bytes()
+    bars = data_dir / "market_bars.sqlite"
+    if bars.is_file():
+        content = bars.read_bytes()
         inputs.append(
             {
-                "path": path.name,
+                "path": bars.name,
                 "bytes": len(content),
                 "sha256": hashlib.sha256(content).hexdigest(),
             }
@@ -162,12 +158,10 @@ def _input_manifest(data_dir: Path) -> list[dict]:
 
 
 def _snapshot_inputs(data_dir: Path, snapshot_dir: Path) -> None:
-    """Copy market_bars + projection CSVs so evaluation and hashes share one version."""
+    """Copy durable market_bars sidecar (bars + projections + summaries)."""
     bars = data_dir / "market_bars.sqlite"
     if bars.is_file():
         shutil.copy2(bars, snapshot_dir / bars.name)
-    for path in sorted(data_dir.glob("projections_*.csv")):
-        shutil.copy2(path, snapshot_dir / path.name)
 
 
 def capture(data_dir: Path, output_dir: Path, days: int, **thresholds: object) -> int:

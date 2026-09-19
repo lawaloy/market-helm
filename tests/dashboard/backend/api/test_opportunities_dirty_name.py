@@ -7,10 +7,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_simple_bars
+from tests.helpers.market_bars import seed_projections, seed_simple_bars
 
 
 @pytest.fixture
@@ -41,21 +40,25 @@ def test_opportunities_falls_back_when_name_and_reason_are_nan(
 ) -> None:
     """NaN name/reason previously failed Opportunity str validation → 500."""
     seed_simple_bars(temp_data_dir, "2026-01-15", close=150.0, volume=1_000)
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": [float("nan")],
-            "target_mid": [160.0],
-            "expected_change_percent": [5.0],
-            "confidence": [90],
-            "recommendation": ["STRONG BUY"],
-            "risk_level": ["Low"],
-            "trend": ["Bullish"],
-            "momentum_score": [1.2],
-            "volatility_score": [0.3],
-            "reason": [float("nan")],
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": float("nan"),
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": 90,
+                "recommendation": "STRONG BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.2,
+                "volatility_score": 0.3,
+                "reason": float("nan"),
+            }
+        ],
+    )
 
     r = client.get(
         "/api/projections/opportunities",

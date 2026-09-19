@@ -1,6 +1,5 @@
-"""/api/summary must not 500 on non-finite JSON or non-string ai_summary."""
+"""/api/summary must not 500 on missing summaries or non-string ai_summary."""
 
-import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -8,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from tests.helpers.market_bars import seed_simple_bars
+from tests.helpers.market_bars import seed_simple_bars, seed_summary
 
 
 @pytest.fixture
@@ -54,16 +53,9 @@ def summary_client(monkeypatch):
                         shutil.rmtree(tmp, ignore_errors=True)
 
 
-@pytest.mark.parametrize(
-    "raw",
-    [
-        '{"date":"2026-01-15","ai_summary":NaN}',
-        '{"date":"2026-01-15","ai_summary":Infinity}',
-    ],
-)
-def test_api_summary_nonfinite_json_returns_404(summary_client, raw: str) -> None:
-    client, data_dir = summary_client
-    (data_dir / "summary_2026-01-15.json").write_text(raw, encoding="utf-8")
+def test_api_summary_missing_returns_404(summary_client) -> None:
+    """No summary row for the day maps to the same API 404 as unreadable files."""
+    client, _data_dir = summary_client
 
     response = client.get("/api/summary")
     assert response.status_code == 404
@@ -83,9 +75,7 @@ def test_api_summary_non_string_ai_summary_falls_back_to_demo(summary_client) ->
         },
         "exchange_comparison": {},
     }
-    (data_dir / "summary_2026-01-15.json").write_text(
-        json.dumps(payload), encoding="utf-8"
-    )
+    seed_summary(data_dir, "2026-01-15", payload)
 
     response = client.get("/api/summary")
     assert response.status_code == 200

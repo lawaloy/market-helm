@@ -1,14 +1,13 @@
-"""Projection date coercion and corrupt-projection soft-fails for DataLoader."""
+"""Projection date coercion and missing-projection soft-fails for DataLoader."""
 
 from datetime import date, timedelta
 from pathlib import Path
 import shutil
 import tempfile
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections, seed_simple_bars
 
 
 @pytest.fixture
@@ -37,14 +36,18 @@ class TestProjectionAccuracyInvalidDates:
         seed_daily_bars(
             temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
         )
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [100.0],
-                "recommendation": ["HOLD"],
-                "projection_date": ["not-a-date"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {
+                    "symbol": "AAPL",
+                    "target_mid": 100.0,
+                    "recommendation": "HOLD",
+                    "projection_date": "not-a-date",
+                }
+            ],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -64,14 +67,18 @@ class TestProjectionAccuracyRecommendationSentinels:
         seed_daily_bars(
             temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
         )
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [100.0],
-                "recommendation": [float("nan")],
-                "projection_date": ["2026-01-12"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {
+                    "symbol": "AAPL",
+                    "target_mid": 100.0,
+                    "recommendation": float("nan"),
+                    "projection_date": "2026-01-12",
+                }
+            ],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -82,11 +89,11 @@ class TestProjectionAccuracyRecommendationSentinels:
         assert out["summary"]["byRecommendation"]["UNKNOWN"]["count"] == 1
 
 
-class TestHistoricalCorruptProjections:
-    def test_load_historical_data_keeps_daily_when_projections_unreadable(
+class TestHistoricalMissingProjections:
+    def test_load_historical_data_keeps_daily_when_projections_missing(
         self, loader, temp_data_dir
     ):
-        """A corrupt projections CSV must not hide valid daily history for the symbol."""
+        """Missing projections for a bar date must not hide valid daily history."""
         recent = (date.today() - timedelta(days=1)).isoformat()
         seed_simple_bars(
             temp_data_dir,
@@ -94,10 +101,6 @@ class TestHistoricalCorruptProjections:
             close=155.0,
             change_percent=0.5,
             volume=1_000,
-        )
-        (temp_data_dir / f"projections_{recent}.csv").write_text(
-            'col1,col2\n1,"unclosed',
-            encoding="utf-8",
         )
 
         rows = loader.load_historical_data("AAPL", days=7)

@@ -71,10 +71,10 @@ def test_save_projections_writes_markdown_with_null_reason_and_prices(tmp_path) 
         ),
     }
 
-    csv_path = Path(storage.save_projections(projections, date=date(2026, 5, 20)))
-    md_path = csv_path.with_suffix(".md")
-
-    assert csv_path.exists()
+    location = storage.save_projections(projections, date=date(2026, 5, 20))
+    assert location == "projections:2026-05-20"
+    assert list(tmp_path.glob("projections_*.csv")) == []
+    md_path = tmp_path / "projections_2026-05-20.md"
     assert md_path.exists()
     text = md_path.read_text(encoding="utf-8")
     assert "Stock Market Projections Report" in text

@@ -8,10 +8,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 @pytest.fixture
@@ -40,21 +39,26 @@ def client(temp_data_dir):
 def _write_fixtures(temp_data_dir: Path, confidence_values) -> None:
     n = len(confidence_values)
     symbols = [f"T{i}" for i in range(n)]
-    pd.DataFrame(
-        {
-            "symbol": symbols,
-            "name": [f"Ticker {i}" for i in range(n)],
-            "target_mid": [160.0] * n,
-            "expected_change_percent": [5.0] * n,
-            "confidence": list(confidence_values),
-            "recommendation": ["BUY"] * n,
-            "risk_level": ["Low"] * n,
-            "trend": ["Bullish"] * n,
-            "momentum_score": [1.2] * n,
-            "volatility_score": [0.3] * n,
-            "reason": ["momentum"] * n,
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": symbols[i],
+                "name": f"Ticker {i}",
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": confidence_values[i],
+                "recommendation": "BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.2,
+                "volatility_score": 0.3,
+                "reason": "momentum",
+            }
+            for i in range(n)
+        ],
+    )
     seed_daily_bars(
         temp_data_dir,
         "2026-01-15",

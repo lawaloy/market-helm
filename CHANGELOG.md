@@ -16,11 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Daily quotes leave CSV:** `save_daily_data` / dashboard loaders / backtests
   read and write only `market_bars` (hosted DB or `DATA_DIR/market_bars.sqlite`).
   `daily_data_*.csv` is no longer written or used as a fallback.
+- **Projections and summaries leave files:** `save_projections` / `save_summary`
+  and dashboard loaders use durable `projections` and `daily_summaries` tables
+  (migration 7 / same sidecar). `projections_*.csv` and `summary_*.json` are no
+  longer written or served; optional Markdown reports remain file-only.
 
 ### Added
 
 - **Market bars:** Durable daily quote storage via schema migration 6 when
   `MARKET_HELM_DATABASE_URL` is set, otherwise `DATA_DIR/market_bars.sqlite`.
+- **Projections / summaries store:** Schema migration 7 adds `projections` and
+  `daily_summaries` beside market bars in the hosted DB or sidecar sqlite.
 - **Alert depth:** RSI(14) threshold watches, shallow AND/OR compound conditions
   (price + RSI in Helmtower), provider candle history for RSI (CSV fallback), and
   hosted symbol-queue evaluation for single-symbol technical/compound rules.

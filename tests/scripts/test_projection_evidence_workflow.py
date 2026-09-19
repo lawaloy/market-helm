@@ -64,19 +64,21 @@ def test_projection_evidence_preserves_progress_and_qualified_capture() -> None:
     assert "scripts/projection_baseline.py capture" in workflow
     assert "name: projection-forward-archive" in workflow
     assert "data/market_bars.sqlite" in workflow
-    assert "data/projections_*.csv" in workflow
+    assert "data/projections_*.csv" not in workflow
     assert "data/projection-assessment.json" in workflow
     assert "name: projection-observed-baseline-${{ github.run_id }}" in workflow
     assert workflow.count("retention-days: 90") == 2
 
 
-def test_projection_evidence_requires_fresh_bars_and_projection_files() -> None:
+def test_projection_evidence_requires_fresh_bars_and_projection_rows() -> None:
     workflow = _workflow()
 
-    assert 'rm -f "data/projections_${snapshot_date}.csv"' in workflow
+    assert 'rm -f "data/projections_${snapshot_date}.csv"' not in workflow
     assert "scripts/assert_market_bar_date.py" in workflow
     assert "--trade-date" in workflow
-    assert 'test -s "data/projections_${snapshot_date}.csv"' in workflow
+    assert "scripts/assert_projection_date.py" in workflow
+    assert "--run-date" in workflow
+    assert 'test -s "data/projections_${snapshot_date}.csv"' not in workflow
 
 
 def test_assert_market_bar_date_script_reports_missing(tmp_path: Path) -> None:
@@ -89,6 +91,18 @@ def test_assert_market_bar_date_script_reports_missing(tmp_path: Path) -> None:
     spec.loader.exec_module(module)
 
     assert module.main(["--trade-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
+
+
+def test_assert_projection_date_script_reports_missing(tmp_path: Path) -> None:
+    import importlib.util
+
+    module_path = REPO_ROOT / "scripts" / "assert_projection_date.py"
+    spec = importlib.util.spec_from_file_location("assert_projection_date", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.main(["--run-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
 
 
 def test_print_qualified_reads_assessment_bool(tmp_path: Path) -> None:

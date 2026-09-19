@@ -193,6 +193,10 @@ def _sidecar_connection(data_dir: str | Path) -> Iterator[sqlite3.Connection]:
     conn.row_factory = sqlite3.Row
     try:
         ensure_market_bars_schema(conn)
+        # File-mode sidecar also hosts projections + daily_summaries.
+        from .projections_store import ensure_projections_schema
+
+        ensure_projections_schema(conn)
         yield conn
         conn.commit()
     except Exception:

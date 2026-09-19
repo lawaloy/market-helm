@@ -193,8 +193,8 @@ Each run writes:
 
 | File                              | Contents                                       |
 | --------------------------------- | ---------------------------------------------- |
-| `data/market_bars` (sqlite/DB) | Full stock data (prices, volume, changes)      |
-| `data/summary_YYYY-MM-DD.json`    | Analysis summary (gainers, losers, statistics) |
+| `data/market_bars` (sqlite/DB) | Quotes, projections, and analysis summaries |
+| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report |
 | `logs/market_helm_YYYY-MM-DD.log` | Detailed execution logs                        |
 
 Set `DATA_DIR` to change the output location — see [DEPLOYMENT.md](DEPLOYMENT.md).

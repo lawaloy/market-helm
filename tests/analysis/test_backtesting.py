@@ -2,11 +2,10 @@
 
 import json
 
-import pandas as pd
 import pytest
 
 from src.analysis.backtesting import backtest_data_dir, evaluate_projections
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 def _projection(**overrides):
@@ -71,9 +70,7 @@ def test_data_dir_loader_reads_market_bars(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])
     seed_daily_bars(tmp_path, "2026-07-10", [{"symbol": "AAPL", "close": 108.0}])
-    pd.DataFrame([_projection()]).drop(columns=["run_date"]).to_csv(
-        tmp_path / "projections_2026-07-02.csv", index=False
-    )
+    seed_projections(tmp_path, "2026-07-02", [_projection()])
 
     report = backtest_data_dir(tmp_path)
 
@@ -103,10 +100,10 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(
             }
         ],
     )
-    pd.DataFrame(
-        [_projection(generated_at="2026-07-02T21:00:00+00:00")]
-    ).drop(columns=["run_date"]).to_csv(
-        tmp_path / "projections_2026-07-02.csv", index=False
+    seed_projections(
+        tmp_path,
+        "2026-07-02",
+        [_projection(generated_at="2026-07-02T21:00:00+00:00")],
     )
 
     report = backtest_data_dir(tmp_path)
@@ -136,9 +133,7 @@ def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(
             }
         ],
     )
-    pd.DataFrame([_projection()]).drop(columns=["run_date"]).to_csv(
-        tmp_path / "projections_2026-07-02.csv", index=False
-    )
+    seed_projections(tmp_path, "2026-07-02", [_projection()])
 
     report = backtest_data_dir(tmp_path)
 
@@ -159,14 +154,16 @@ def test_timezone_aware_generation_time_controls_exact_target_session():
     assert report["samples"][0]["actual"] == 108.0
 
 
-def test_projection_only_archive_preserves_counts(tmp_path):
-    pd.DataFrame(
+def test_projection_only_archive_preserves_counts(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    # Empty-symbol rows are rejected by the store; seed an invalid target instead.
+    seed_projections(
+        tmp_path,
+        "2026-07-02",
         [
             _projection(),
-            _projection(symbol="", target_mid=120.0),
-        ]
-    ).drop(columns=["run_date"]).to_csv(
-        tmp_path / "projections_2026-07-02.csv", index=False
+            {"symbol": "MSFT", "target_mid": None},
+        ],
     )
 
     report = backtest_data_dir(tmp_path)

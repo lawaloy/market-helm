@@ -2,14 +2,18 @@
 
 import tempfile
 import shutil
-import json
 import pandas as pd
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+from tests.helpers.market_bars import (
+    seed_daily_bars,
+    seed_projections,
+    seed_simple_bars,
+    seed_summary,
+)
 
 
 @pytest.fixture
@@ -62,7 +66,7 @@ def sample_daily_data(temp_data_dir):
 
 @pytest.fixture
 def sample_summary(temp_data_dir):
-    """Create sample summary JSON."""
+    """Seed sample summary into durable daily_summaries storage."""
     summary = {
         "date": "2026-01-15",
         "analysis": {
@@ -86,10 +90,8 @@ def sample_summary(temp_data_dir):
             "NASDAQ-100": {"average_change_percent": -0.2, "gainers": 1, "losers": 1},
         },
     }
-    path = temp_data_dir / "summary_2026-01-15.json"
-    with open(path, "w") as f:
-        json.dump(summary, f)
-    return path
+    seed_summary(temp_data_dir, "2026-01-15", summary)
+    return summary
 
 
 @pytest.fixture
@@ -305,20 +307,15 @@ class TestSummaryAPI:
 
     def test_summary_uses_ai_when_non_blank(self, client, temp_data_dir, sample_summary):
         """Whitespace-only AI text falls back to demo; real AI text is preferred."""
-        path = temp_data_dir / "summary_2026-01-15.json"
-        with open(path) as f:
-            payload = json.load(f)
-
+        payload = dict(sample_summary)
         payload["ai_summary"] = "   "
-        with open(path, "w") as f:
-            json.dump(payload, f)
+        seed_summary(temp_data_dir, "2026-01-15", payload)
         blank = client.get("/api/summary").json()
         assert blank["source"] == "demo"
         assert "gainers" in blank["summary"]
 
         payload["ai_summary"] = "  Markets advanced on strong tech leadership.  "
-        with open(path, "w") as f:
-            json.dump(payload, f)
+        seed_summary(temp_data_dir, "2026-01-15", payload)
         ai = client.get("/api/summary").json()
         assert ai["source"] == "ai"
         assert ai["summary"] == "Markets advanced on strong tech leadership."
@@ -326,11 +323,8 @@ class TestSummaryAPI:
     def test_summary_demo_tolerates_partial_legacy_fields(
         self, client, temp_data_dir, sample_summary
     ):
-        """Partial/legacy summary JSON must soft-fail to a demo string, not 500."""
-        path = temp_data_dir / "summary_2026-01-15.json"
-        with open(path) as f:
-            payload = json.load(f)
-
+        """Partial/legacy summary payloads must soft-fail to a demo string, not 500."""
+        payload = dict(sample_summary)
         payload.pop("ai_summary", None)
         payload["analysis"] = {
             "summary": {
@@ -345,8 +339,7 @@ class TestSummaryAPI:
             "NYSE": {"average_change_percent": None},
             "NASDAQ": "legacy-non-dict",
         }
-        with open(path, "w") as f:
-            json.dump(payload, f)
+        seed_summary(temp_data_dir, "2026-01-15", payload)
 
         r = client.get("/api/summary")
         assert r.status_code == 200
@@ -359,25 +352,63 @@ class TestSummaryAPI:
 
 @pytest.fixture
 def sample_projections(temp_data_dir, sample_daily_data):
-    """Create sample projections CSV aligned with daily fixtures."""
-    df = pd.DataFrame(
+    """Seed sample projections aligned with daily fixtures."""
+    rows = [
         {
-            "symbol": ["AAPL", "GOOGL", "MSFT", "ORPHAN"],
-            "name": ["Apple", "Alphabet", "Microsoft", "Orphan Co"],
-            "target_mid": [160.0, 2700.0, 360.0, 50.0],
-            "expected_change_percent": [2.5, -1.5, 0.2, 3.0],
-            "confidence": [80, 70, 60, 90],
-            "recommendation": ["STRONG BUY", "SELL", "HOLD", "STRONG BUY"],
-            "risk_level": ["Low", "High", "Medium", "Medium"],
-            "trend": ["Bullish", "Bearish", "Neutral", "Bullish"],
-            "reason": ["momentum", "weakness", "range", "breakout"],
-            "momentum_score": [1.2, -0.8, 0.1, 1.5],
-            "volatility_score": [0.4, 0.9, 0.3, 0.5],
-        }
-    )
-    path = temp_data_dir / "projections_2026-01-15.csv"
-    df.to_csv(path, index=False)
-    return path
+            "symbol": "AAPL",
+            "name": "Apple",
+            "target_mid": 160.0,
+            "expected_change_percent": 2.5,
+            "confidence": 80,
+            "recommendation": "STRONG BUY",
+            "risk_level": "Low",
+            "trend": "Bullish",
+            "reason": "momentum",
+            "momentum_score": 1.2,
+            "volatility_score": 0.4,
+        },
+        {
+            "symbol": "GOOGL",
+            "name": "Alphabet",
+            "target_mid": 2700.0,
+            "expected_change_percent": -1.5,
+            "confidence": 70,
+            "recommendation": "SELL",
+            "risk_level": "High",
+            "trend": "Bearish",
+            "reason": "weakness",
+            "momentum_score": -0.8,
+            "volatility_score": 0.9,
+        },
+        {
+            "symbol": "MSFT",
+            "name": "Microsoft",
+            "target_mid": 360.0,
+            "expected_change_percent": 0.2,
+            "confidence": 60,
+            "recommendation": "HOLD",
+            "risk_level": "Medium",
+            "trend": "Neutral",
+            "reason": "range",
+            "momentum_score": 0.1,
+            "volatility_score": 0.3,
+        },
+        {
+            "symbol": "ORPHAN",
+            "name": "Orphan Co",
+            "target_mid": 50.0,
+            "expected_change_percent": 3.0,
+            "confidence": 90,
+            "recommendation": "STRONG BUY",
+            "risk_level": "Medium",
+            "trend": "Bullish",
+            "reason": "breakout",
+            "momentum_score": 1.5,
+            "volatility_score": 0.5,
+        },
+    ]
+    seed_projections(temp_data_dir, "2026-01-15", rows)
+    return rows
 
 
 class TestStocksAPI:
@@ -454,18 +485,22 @@ class TestStocksAPI:
         self, client, mock_data_loader, temp_data_dir
     ):
         """Finite daily prices with NaN projection fields soft-fail projection to null."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "target_mid": [float("nan")],
-                "expected_change_percent": [2.5],
-                "confidence": [80],
-                "recommendation": ["BUY"],
-                "risk_level": ["Low"],
-                "trend": ["Bullish"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "target_mid": float("nan"),
+                    "expected_change_percent": 2.5,
+                    "confidence": 80,
+                    "recommendation": "BUY",
+                    "risk_level": "Low",
+                    "trend": "Bullish",
+                }
+            ],
+        )
 
         r = client.get("/api/stocks/AAPL")
         assert r.status_code == 200
@@ -544,16 +579,20 @@ class TestStocksAPI:
                 }
             ],
         )
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "target_mid": [165.0],
-                "expected_change_percent": [2.0],
-                "confidence": [75],
-                "recommendation": ["BUY"],
-            }
-        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "target_mid": 165.0,
+                    "expected_change_percent": 2.0,
+                    "confidence": 75,
+                    "recommendation": "BUY",
+                }
+            ],
+        )
         # Stale bar outside the requested window should be ignored.
         seed_daily_bars(
             temp_data_dir,
@@ -598,20 +637,24 @@ class TestStocksAPI:
                 }
             ],
         )
-        pd.DataFrame(
-            {
-                "symbol": [" aapl "],
-                "name": ["Apple"],
-                "target_mid": [160.0],
-                "expected_change_percent": [2.0],
-                "confidence": [80],
-                "recommendation": ["BUY"],
-                "risk_level": ["Low"],
-                "trend": ["Bullish"],
-                "momentum_score": [1.1],
-                "volatility_score": [0.4],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": " aapl ",
+                    "name": "Apple",
+                    "target_mid": 160.0,
+                    "expected_change_percent": 2.0,
+                    "confidence": 80,
+                    "recommendation": "BUY",
+                    "risk_level": "Low",
+                    "trend": "Bullish",
+                    "momentum_score": 1.1,
+                    "volatility_score": 0.4,
+                }
+            ],
+        )
 
         r = client.get("/api/stocks/aapl")
         assert r.status_code == 200
@@ -642,15 +685,19 @@ class TestStocksAPI:
                 }
             ],
         )
-        pd.DataFrame(
-            {
-                "symbol": ["aapl"],
-                "target_mid": [165.0],
-                "confidence": [70],
-                "recommendation": ["BUY"],
-                "expected_change_percent": [3.0],
-            }
-        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": "aapl",
+                    "target_mid": 165.0,
+                    "confidence": 70,
+                    "recommendation": "BUY",
+                    "expected_change_percent": 3.0,
+                }
+            ],
+        )
 
         r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
         assert r.status_code == 200
@@ -745,21 +792,23 @@ class TestProjectionsSentimentBands:
     """Projections summary sentiment thresholds (±1.0)."""
 
     def _write_projections(self, temp_data_dir, changes):
-        df = pd.DataFrame(
-            {
-                "symbol": [f"S{i}" for i in range(len(changes))],
-                "name": [f"Stock {i}" for i in range(len(changes))],
-                "target_mid": [100.0] * len(changes),
-                "expected_change_percent": changes,
-                "confidence": [50] * len(changes),
-                "recommendation": ["HOLD"] * len(changes),
-                "risk_level": ["Medium"] * len(changes),
-                "trend": ["Neutral"] * len(changes),
-            }
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": f"S{i}",
+                    "name": f"Stock {i}",
+                    "target_mid": 100.0,
+                    "expected_change_percent": change,
+                    "confidence": 50,
+                    "recommendation": "HOLD",
+                    "risk_level": "Medium",
+                    "trend": "Neutral",
+                }
+                for i, change in enumerate(changes)
+            ],
         )
-        path = temp_data_dir / "projections_2026-01-15.csv"
-        df.to_csv(path, index=False)
-        return path
 
     def test_sentiment_neutral_and_bearish_bands(self, client, temp_data_dir):
         self._write_projections(temp_data_dir, [0.5, -0.5])
@@ -945,10 +994,12 @@ class TestMarketAPIErrors:
 
         assert r.status_code == 404
 
-    def test_summary_404_when_json_corrupt(self, client, mock_data_loader, temp_data_dir):
-        """Corrupt summary JSON must 404 via ValueError mapping, not generic 500."""
-        path = temp_data_dir / "summary_2026-01-15.json"
-        path.write_text("{not-valid-json", encoding="utf-8")
+    def test_summary_404_when_missing(self, client, mock_data_loader, temp_data_dir):
+        """Missing summary rows must 404 via ValueError mapping, not generic 500."""
+        # sample_summary seeded a row; overwrite loader to simulate empty summaries.
+        mock_data_loader.load_summary = MagicMock(
+            side_effect=ValueError("No summary files found")
+        )
 
         r = client.get("/api/summary")
         assert r.status_code == 404
@@ -962,18 +1013,32 @@ class TestHistorySummaryAPI:
         self, client, mock_data_loader, temp_data_dir
     ):
         """All-NaN confidence/expected means must serialize as finite 0.0 + Neutral."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "MSFT"],
-                "name": ["Apple", "Microsoft"],
-                "target_mid": [160.0, 360.0],
-                "expected_change_percent": [float("nan"), float("nan")],
-                "confidence": [float("nan"), float("nan")],
-                "recommendation": ["HOLD", "HOLD"],
-                "risk_level": ["Medium", "Medium"],
-                "trend": ["Neutral", "Neutral"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "target_mid": 160.0,
+                    "expected_change_percent": float("nan"),
+                    "confidence": float("nan"),
+                    "recommendation": "HOLD",
+                    "risk_level": "Medium",
+                    "trend": "Neutral",
+                },
+                {
+                    "symbol": "MSFT",
+                    "name": "Microsoft",
+                    "target_mid": 360.0,
+                    "expected_change_percent": float("nan"),
+                    "confidence": float("nan"),
+                    "recommendation": "HOLD",
+                    "risk_level": "Medium",
+                    "trend": "Neutral",
+                },
+            ],
+        )
 
         r = client.get("/api/history/summary", params={"days": 7})
         assert r.status_code == 200
@@ -986,16 +1051,28 @@ class TestHistorySummaryAPI:
 
     def test_dates_and_symbols_endpoints(self, client, mock_data_loader, temp_data_dir):
         """GET /api/history/dates and /symbols return catalog data."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "ZZZZ"],
-                "name": ["Apple Inc.", "Custom Co"],
-                "confidence": [50, 60],
-                "expected_change_percent": [0.5, -0.2],
-                "recommendation": ["HOLD", "BUY"],
-                "target_mid": [100.0, 10.0],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple Inc.",
+                    "confidence": 50,
+                    "expected_change_percent": 0.5,
+                    "recommendation": "HOLD",
+                    "target_mid": 100.0,
+                },
+                {
+                    "symbol": "ZZZZ",
+                    "name": "Custom Co",
+                    "confidence": 60,
+                    "expected_change_percent": -0.2,
+                    "recommendation": "BUY",
+                    "target_mid": 10.0,
+                },
+            ],
+        )
 
         with patch(
             "dashboard.backend.api.history.load_index_symbol_names",
@@ -1015,25 +1092,32 @@ class TestHistorySummaryAPI:
 
     def test_summary_skips_bad_dates_and_sets_sentiment(self, client, mock_data_loader, temp_data_dir):
         """Historical summary skips unloadable dates and classifies sentiment bands."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "confidence": [80],
-                "expected_change_percent": [2.5],
-                "recommendation": ["BUY"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "confidence": [40],
-                "expected_change_percent": [-1.5],
-                "recommendation": ["SELL"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
-        (temp_data_dir / "projections_2026-01-14.csv").write_text("broken")
-        # Bars so get_available_dates includes these days
+        seed_projections(
+            temp_data_dir,
+            "2026-01-16",
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "confidence": 80,
+                    "expected_change_percent": 2.5,
+                    "recommendation": "BUY",
+                }
+            ],
+        )
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": "AAPL",
+                    "confidence": 40,
+                    "expected_change_percent": -1.5,
+                    "recommendation": "SELL",
+                }
+            ],
+        )
+        # Bars so get_available_dates includes these days (no projections for 01-14)
         for d in ("2026-01-16", "2026-01-15", "2026-01-14"):
             seed_simple_bars(temp_data_dir, d, close=1.0, change_percent=0.0)
 

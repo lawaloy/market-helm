@@ -64,8 +64,8 @@ class TestStockTrackerWorkflow:
 
         mock_storage = MagicMock()
         mock_storage.save_daily_data.return_value = "market_bars:2026-01-15"
-        mock_storage.save_summary.return_value = str(temp_data_dir / "summary_2026-01-15.json")
-        mock_storage.save_projections.return_value = str(temp_data_dir / "projections_2026-01-15.csv")
+        mock_storage.save_summary.return_value = "summary:2026-01-15"
+        mock_storage.save_projections.return_value = "projections:2026-01-15"
         mock_storage_cls.return_value = mock_storage
 
         mock_alert.from_config.return_value = None
@@ -125,12 +125,8 @@ class TestStockTrackerWorkflow:
 
         mock_storage = MagicMock()
         mock_storage.save_daily_data.return_value = "market_bars:2026-01-15"
-        mock_storage.save_summary.return_value = str(
-            temp_data_dir / "summary_2026-01-15.json"
-        )
-        mock_storage.save_projections.return_value = str(
-            temp_data_dir / "projections_2026-01-15.csv"
-        )
+        mock_storage.save_summary.return_value = "summary:2026-01-15"
+        mock_storage.save_projections.return_value = "projections:2026-01-15"
         mock_storage_cls.return_value = mock_storage
         mock_alert.from_config.return_value = None
 
@@ -266,10 +262,8 @@ class TestStockTrackerWorkflow:
 
         workflow = StockTrackerWorkflow.__new__(StockTrackerWorkflow)
         workflow.storage = MagicMock()
-        workflow.storage.save_summary.return_value = str(temp_data_dir / "summary.json")
-        workflow.storage.save_projections.return_value = str(
-            temp_data_dir / "projections.csv"
-        )
+        workflow.storage.save_summary.return_value = "summary:2026-09-18"
+        workflow.storage.save_projections.return_value = "projections:2026-09-18"
 
         ok = workflow._save_summary(
             analysis={"ok": True},
@@ -279,7 +273,7 @@ class TestStockTrackerWorkflow:
             projection_summary={},
         )
         assert ok["success"] is True
-        assert ok["projection_csv_path"].endswith("projections.csv")
+        assert ok["projection_location"] == "projections:2026-09-18"
         workflow.storage.save_projections.assert_called_once()
 
         workflow.storage.save_summary.side_effect = OSError("disk full")

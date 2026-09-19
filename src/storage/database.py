@@ -184,6 +184,52 @@ _MIGRATIONS = (
     ON market_bars(trade_date DESC)""",
         ),
     ),
+    Migration(
+        version=7,
+        name="projections_and_summaries",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS projections (
+    run_date TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT,
+    current_price REAL,
+    target_low REAL,
+    target_mid REAL,
+    target_high REAL,
+    expected_change_percent REAL,
+    recommendation TEXT,
+    confidence REAL,
+    trend TEXT,
+    momentum_score REAL,
+    volatility_score REAL,
+    risk_level TEXT,
+    reason TEXT,
+    projection_date TEXT,
+    projection_horizon_sessions INTEGER,
+    projection_calendar TEXT,
+    generated_at TEXT,
+    source TEXT NOT NULL DEFAULT 'tracker',
+    written_at TEXT NOT NULL,
+    PRIMARY KEY (run_date, symbol)
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_projections_symbol_date
+    ON projections(symbol, run_date DESC)""",
+            """CREATE INDEX IF NOT EXISTS idx_projections_date
+    ON projections(run_date DESC)""",
+            """CREATE TABLE IF NOT EXISTS daily_summaries (
+    summary_date TEXT NOT NULL PRIMARY KEY,
+    ai_summary TEXT,
+    analysis_json TEXT NOT NULL DEFAULT '{}',
+    exchange_comparison_json TEXT NOT NULL DEFAULT '{}',
+    projection_summary_json TEXT NOT NULL DEFAULT '{}',
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    source TEXT NOT NULL DEFAULT 'tracker',
+    written_at TEXT NOT NULL
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_daily_summaries_date
+    ON daily_summaries(summary_date DESC)""",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version

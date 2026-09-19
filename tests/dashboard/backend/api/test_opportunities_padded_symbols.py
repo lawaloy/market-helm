@@ -7,10 +7,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 @pytest.fixture
@@ -52,21 +51,25 @@ def test_opportunities_joins_padded_mixed_case_daily_symbols(client, temp_data_d
             }
         ],
     )
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": ["Apple"],
-            "target_mid": [160.0],
-            "expected_change_percent": [5.0],
-            "confidence": [90],
-            "recommendation": ["STRONG BUY"],
-            "risk_level": ["Low"],
-            "trend": ["Bullish"],
-            "momentum_score": [1.2],
-            "volatility_score": [0.3],
-            "reason": "momentum",
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": 90,
+                "recommendation": "STRONG BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.2,
+                "volatility_score": 0.3,
+                "reason": "momentum",
+            }
+        ],
+    )
 
     r = client.get(
         "/api/projections/opportunities",
@@ -97,21 +100,38 @@ def test_opportunities_skips_sentinel_projection_symbols(client, temp_data_dir):
             }
         ],
     )
-    pd.DataFrame(
-        {
-            "symbol": ["nan", "AAPL"],
-            "name": ["Bogus", "Apple"],
-            "target_mid": [160.0, 160.0],
-            "expected_change_percent": [5.0, 4.0],
-            "confidence": [99, 80],
-            "recommendation": ["STRONG BUY", "STRONG BUY"],
-            "risk_level": ["Low", "Low"],
-            "trend": ["Bullish", "Bullish"],
-            "momentum_score": [1.0, 1.0],
-            "volatility_score": [0.2, 0.2],
-            "reason": ["x", "y"],
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "nan",
+                "name": "Bogus",
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": 99,
+                "recommendation": "STRONG BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.0,
+                "volatility_score": 0.2,
+                "reason": "x",
+            },
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "target_mid": 160.0,
+                "expected_change_percent": 4.0,
+                "confidence": 80,
+                "recommendation": "STRONG BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.0,
+                "volatility_score": 0.2,
+                "reason": "y",
+            },
+        ],
+    )
 
     r = client.get(
         "/api/projections/opportunities",

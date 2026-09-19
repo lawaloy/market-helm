@@ -304,34 +304,27 @@ def backtest_data_dir(
     max_samples: Optional[int] = 300,
     verified_outcomes_only: bool = False,
 ) -> Dict[str, Any]:
-    """Load market_bars closes and dated projection CSVs from ``data_dir``."""
+    """Load market_bars closes and durable projections from ``data_dir``."""
     root = Path(data_dir).resolve()
     if not root.is_dir():
         raise ValueError(f"Data directory not found: {root}")
     if days < 1:
         raise ValueError("days must be at least 1")
 
-    projection_files: List[Tuple[str, Path]] = []
-    for path in root.glob("projections_*.csv"):
-        match = _DATED_FILE.fullmatch(path.name)
-        if not match or match.group(1) != "projections":
-            continue
-        try:
-            datetime.strptime(match.group(2), "%Y-%m-%d")
-        except ValueError:
-            continue
-        projection_files.append((match.group(2), path))
-    projection_files.sort(key=lambda item: (item[0], item[1].name))
-
     from src.storage.market_bars import list_market_bar_dates, load_market_bars
+    from src.storage.projections_store import list_projection_dates, load_projections
 
     try:
         bar_dates = list_market_bar_dates(data_dir=root, limit=3650)
     except Exception:
         bar_dates = []
+    try:
+        projection_dates = list_projection_dates(data_dir=root, limit=3650)
+    except Exception:
+        projection_dates = []
 
     dated_inputs = [(day, None) for day in bar_dates] or [
-        (day, None) for day, _ in projection_files
+        (day, None) for day in projection_dates
     ]
     if not dated_inputs:
         return evaluate_projections(
@@ -355,14 +348,10 @@ def backtest_data_dir(
         for row in load_market_bars(day, data_dir=root):
             closes.append({**row, "date": day})
 
-    for day, path in projection_files:
+    for day in projection_dates:
         if datetime.strptime(day, "%Y-%m-%d").date() < cutoff:
             continue
-        try:
-            frame = pd.read_csv(path)
-        except Exception:
-            continue
-        for row in frame.to_dict("records"):
+        for row in load_projections(day, data_dir=root):
             projections.append({**row, "run_date": day})
 
     return evaluate_projections(
