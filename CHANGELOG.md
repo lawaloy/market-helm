@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Market bars (slice 1):** Persist daily quote rows to durable `market_bars`
+  (schema migration 6 when `MARKET_HELM_DATABASE_URL` is set, otherwise
+  `DATA_DIR/market_bars.sqlite`) on every successful CSV `save_daily_data` write.
+  Readers still use CSV; this starts the path off flat files for production scale.
 - **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
   verification command, and regression gate for projection-evaluator semantics.
 - **Projection validation:** XNYS trading-session targets plus a shared CLI, API,

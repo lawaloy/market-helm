@@ -113,6 +113,7 @@ class DataStorage:
         """
         Save daily stock data to CSV.
         Enriches company names at save time (pytickersymbols) when name==symbol.
+        Also dual-writes durable rows into market_bars (app DB or DATA_DIR sidecar).
         
         Args:
             data: List of stock data dictionaries
@@ -125,9 +126,23 @@ class DataStorage:
             return None
         
         enrich_stock_data_with_names(data)
+        if date is None:
+            date = _data_date_for_filename()
         df = pd.DataFrame(data)
         file_path = self._get_daily_file_path(date)
         _atomic_replace(file_path, lambda tmp: df.to_csv(tmp, index=False))
+        try:
+            from .market_bars import dual_write_market_bars
+
+            dual_write_market_bars(
+                data,
+                date,
+                data_dir=self.data_dir,
+                source="fetch",
+            )
+        except Exception as exc:
+            # CSV remains source of truth for slice 1; never fail the fetch on DB.
+            print(f"Warning: market bars dual-write skipped: {exc}")
         return str(file_path)
     
     def load_daily_data(self, date: datetime.date = None) -> Optional[pd.DataFrame]:

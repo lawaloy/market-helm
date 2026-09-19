@@ -236,7 +236,7 @@ class TestDatabaseMigrations:
             }
 
         assert migration["version"] == LATEST_SCHEMA_VERSION
-        assert migration["name"] == "session_revocation"
+        assert migration["name"] == "market_bars"
         assert migration["applied_at"]
         assert {"users", "alert_watches", "alert_jobs"}.issubset(tables)
 

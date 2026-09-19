@@ -151,6 +151,39 @@ _MIGRATIONS = (
             "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1",
         ),
     ),
+    Migration(
+        version=6,
+        name="market_bars",
+        statements=(
+            """CREATE TABLE IF NOT EXISTS market_bars (
+    trade_date TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT,
+    open REAL,
+    high REAL,
+    low REAL,
+    close REAL NOT NULL,
+    volume REAL,
+    previous_close REAL,
+    change REAL,
+    change_percent REAL,
+    market_cap REAL,
+    exchange TEXT,
+    index_name TEXT,
+    quote_timestamp TEXT,
+    outcome_session TEXT,
+    outcome_close REAL,
+    outcome_final INTEGER,
+    source TEXT NOT NULL DEFAULT 'fetch',
+    written_at TEXT NOT NULL,
+    PRIMARY KEY (trade_date, symbol)
+)""",
+            """CREATE INDEX IF NOT EXISTS idx_market_bars_symbol_date
+    ON market_bars(symbol, trade_date DESC)""",
+            """CREATE INDEX IF NOT EXISTS idx_market_bars_date
+    ON market_bars(trade_date DESC)""",
+        ),
+    ),
 )
 
 LATEST_SCHEMA_VERSION = _MIGRATIONS[-1].version

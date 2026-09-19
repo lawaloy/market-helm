@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-09-16
+**Last updated:** 2026-09-18
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -48,7 +48,7 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 | Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                     |
 | Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                                          |
 | Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                                             |
-| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations, queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off                              |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Cut dashboard/alert reads over to `market_bars`; environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
 | Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                  |
 | Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls |
 
@@ -100,7 +100,11 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Projection validation:** the weekday post-close workflow preserves a
+1. **Market data DB cutover:** slice 1 dual-writes daily bars into `market_bars`
+   (app DB or `DATA_DIR/market_bars.sqlite`). Next: backfill from existing CSVs,
+   then point `DataLoader` / alert snapshots at DB reads before dropping CSV as
+   the serving path.
+2. **Projection validation:** the weekday post-close workflow preserves a
    cumulative forward archive and its qualification report. Keep collecting exact
    target closes until `projection_baseline.py assess` passes and the workflow
    emits a hashed observed baseline. New snapshots retain quote-session
@@ -108,15 +112,13 @@ unit tests and container-only integration tests cannot fully reproduce.
    not change confidence scoring until adequately sized cohorts demonstrate
    stable bias; the committed synthetic baseline validates evaluator behavior
    only.
-2. **External staging sign-off:** in parallel, complete the ordered
+3. **External staging sign-off:** in parallel, complete the ordered
    [external staging execution TODO](DEPLOYMENT.md#external-staging-execution-todo)
    against the chosen managed PostgreSQL, ingress, monitoring, and
    transactional-email providers. This is an operator-owned release gate requiring
    credentials/evidence, not unfinished repository automation.
-3. **Alert depth:** add technical-indicator and compound conditions; consider
-   SMS/push only after hosted email is proven reliable.
-4. **Dashboard quality:** code-split routes, run accessibility/performance audits,
-   and decide whether saved watchlists/views belong in the product.
+4. **Alert depth / dashboard quality:** see remaining gaps in the capability
+   matrix (compound depth, SMS/push, code-splitting, watchlists).
 
 ## Explicitly deferred
 
