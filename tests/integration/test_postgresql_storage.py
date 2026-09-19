@@ -17,7 +17,14 @@ from src.storage.alert_jobs import (
     enqueue_job,
 )
 from src.storage.alert_watches import get_watch
-from src.storage.database import get_connection, init_database
+from src.storage.database import LATEST_SCHEMA_VERSION, get_connection, init_database
+from src.storage.projections_store import (
+    list_projection_dates,
+    load_daily_summary,
+    upsert_daily_summary,
+    upsert_projections,
+)
+from src.storage.market_bars import list_market_bar_dates, upsert_market_bars
 from src.storage.rate_limits import consume_rate_limit
 from src.storage.account_tokens import RESET_PASSWORD, consume_token, issue_token
 from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
@@ -104,7 +111,37 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == [1, 2, 3, 4, 5, 6]
+    assert [row["version"] for row in versions] == list(
+        range(1, LATEST_SCHEMA_VERSION + 1)
+    )
+
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 201.0, "name": "Apple"}],
+        "2026-07-10",
+        source="integration",
+    )
+    upsert_projections(
+        [
+            {
+                "symbol": "AAPL",
+                "target_mid": 210.0,
+                "recommendation": "BUY",
+                "confidence": 80,
+            }
+        ],
+        "2026-07-10",
+        source="integration",
+    )
+    upsert_daily_summary(
+        {"date": "2026-07-10", "analysis": {"summary": {"total_stocks": 1}}},
+        "2026-07-10",
+        source="integration",
+    )
+    assert list_market_bar_dates(limit=5)[0] == "2026-07-10"
+    assert list_projection_dates(limit=5)[0] == "2026-07-10"
+    summary = load_daily_summary("2026-07-10")
+    assert summary is not None
+    assert summary["analysis"]["summary"]["total_stocks"] == 1
 
     reset_token = issue_token(user["id"], RESET_PASSWORD)
     assert consume_token(reset_token, RESET_PASSWORD) == user["id"]
