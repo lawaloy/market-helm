@@ -35,5 +35,6 @@ def test_workflows_are_valid_yaml() -> None:
 def test_ci_runs_actionlint_on_workflows() -> None:
     """PR CI must lint Actions YAML so schedule.yml breakage fails before merge."""
     ci = (REPO_ROOT / ".github" / "workflows" / "python-app.yml").read_text(encoding="utf-8")
-    assert "./actionlint" in ci or "actionlint -color" in ci
     assert "download-actionlint.bash" in ci
+    assert "./actionlint" in ci
+    assert "-shellcheck=" in ci

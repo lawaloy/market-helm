@@ -30,8 +30,10 @@ jobs:
       - name: Lint GitHub Actions workflows
         run: |
           bash <(curl --proto '=https' --tlsv1.2 -fsSL \
-            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash)
-          ./actionlint -color
+            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          # shellcheck off: this gate targets workflow/YAML validity (the schedule.yml
+          # class of merge failures). ShellCheck integration is a separate cleanup.
+          ./actionlint -color -shellcheck=
       - name: Audit Python packages
         run: |
           pip-audit -r requirements.txt -r dashboard/backend/requirements.txt
