@@ -1,0 +1,32 @@
+"""Repo gates for GitHub Actions workflow hygiene."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+WORKFLOWS = REPO_ROOT / ".github" / "workflows"
+
+
+def _workflow_files() -> list[Path]:
+    return sorted(WORKFLOWS.glob("*.yml")) + sorted(WORKFLOWS.glob("*.yaml"))
+
+
+def test_workflows_contain_no_inline_python_c() -> None:
+    """Logic belongs in scripts/; python -c is YAML-fragile and untested."""
+    offenders: list[str] = []
+    for path in _workflow_files():
+        text = path.read_text(encoding="utf-8")
+        if "python -c" in text or "python3 -c" in text:
+            offenders.append(path.relative_to(REPO_ROOT).as_posix())
+    assert offenders == [], f"inline python -c found in: {offenders}"
+
+
+def test_workflows_are_valid_yaml() -> None:
+    """Catch multiline/run-block YAML breakage before merge."""
+    for path in _workflow_files():
+        parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert isinstance(parsed, dict), f"{path.name} did not parse to a mapping"
+        assert "jobs" in parsed, f"{path.name} missing jobs"

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "schedule.yml"
@@ -12,6 +14,17 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "schedule.yml"
 def _workflow() -> str:
     return WORKFLOW.read_text(encoding="utf-8")
 
+
+def test_projection_evidence_workflow_is_valid_yaml() -> None:
+    """Broken multiline run blocks must fail CI before merge, not only on push."""
+    parsed = yaml.safe_load(_workflow())
+    assert isinstance(parsed, dict)
+    assert parsed.get("name") == "Projection evidence collection"
+    # PyYAML 1.1 treats bare key ``on`` as boolean True.
+    triggers = parsed.get("on", parsed.get(True))
+    assert isinstance(triggers, dict)
+    assert "schedule" in triggers
+    assert "workflow_dispatch" in triggers
 
 def test_projection_evidence_runs_weekdays_after_xnys_close() -> None:
     workflow = _workflow()
@@ -45,8 +58,8 @@ def test_projection_evidence_preserves_progress_and_qualified_capture() -> None:
     workflow = _workflow()
 
     assert "scripts/projection_baseline.py assess" in workflow
-    assert 'json.load(open("data/projection-assessment.json"))' in workflow
-    assert 'assert type(value) is bool' in workflow
+    assert "scripts/projection_baseline.py print-qualified" in workflow
+    assert "python -c" not in workflow
     assert 'echo "qualified=$qualified" >> "$GITHUB_OUTPUT"' in workflow
     assert "scripts/projection_baseline.py capture" in workflow
     assert "name: projection-forward-archive" in workflow
@@ -61,6 +74,34 @@ def test_projection_evidence_requires_fresh_bars_and_projection_files() -> None:
     workflow = _workflow()
 
     assert 'rm -f "data/projections_${snapshot_date}.csv"' in workflow
-    assert "list_market_bar_dates" in workflow
-    assert "snapshot_date" in workflow
+    assert "scripts/assert_market_bar_date.py" in workflow
+    assert "--trade-date" in workflow
     assert 'test -s "data/projections_${snapshot_date}.csv"' in workflow
+
+
+def test_assert_market_bar_date_script_reports_missing(tmp_path: Path) -> None:
+    import importlib.util
+
+    module_path = REPO_ROOT / "scripts" / "assert_market_bar_date.py"
+    spec = importlib.util.spec_from_file_location("assert_market_bar_date", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.main(["--trade-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
+
+
+def test_print_qualified_reads_assessment_bool(tmp_path: Path) -> None:
+    import importlib.util
+
+    module_path = REPO_ROOT / "scripts" / "projection_baseline.py"
+    spec = importlib.util.spec_from_file_location("projection_baseline", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    path = tmp_path / "assessment.json"
+    path.write_text('{"qualified": false}\n', encoding="utf-8")
+    assert module.print_qualified(path) == 0
+    path.write_text('{"qualified": "yes"}\n', encoding="utf-8")
+    assert module.print_qualified(path) == 2

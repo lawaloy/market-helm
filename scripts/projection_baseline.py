@@ -202,12 +202,39 @@ def capture(data_dir: Path, output_dir: Path, days: int, **thresholds: object) -
     return 0
 
 
+def print_qualified(path: Path) -> int:
+    """Print ``true``/``false`` for assessment JSON; exit 2 when the field is not a bool."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Unable to read assessment JSON: {exc}", file=sys.stderr)
+        return 2
+    value = payload.get("qualified") if isinstance(payload, dict) else None
+    if not isinstance(value, bool):
+        print(
+            f"assessment.qualified must be a bool; got {type(value).__name__}: {value!r}",
+            file=sys.stderr,
+        )
+        return 2
+    print(str(value).lower())
+    return 0
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check", "update", "assess", "capture"))
+    parser.add_argument(
+        "command",
+        choices=("check", "update", "assess", "capture", "print-qualified"),
+    )
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data")
     parser.add_argument("--days", type=int, default=365)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument(
+        "--assessment",
+        type=Path,
+        default=ROOT / "data" / "projection-assessment.json",
+        help="Assessment JSON path for print-qualified",
+    )
     parser.add_argument("--min-samples", type=int, default=DEFAULT_MIN_SAMPLES)
     parser.add_argument("--min-run-dates", type=int, default=DEFAULT_MIN_RUN_DATES)
     parser.add_argument("--min-symbols", type=int, default=DEFAULT_MIN_SYMBOLS)
@@ -221,6 +248,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return check()
     if args.command == "update":
         return update()
+    if args.command == "print-qualified":
+        return print_qualified(args.assessment)
     thresholds = {
         "min_samples": args.min_samples,
         "min_run_dates": args.min_run_dates,

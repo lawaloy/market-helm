@@ -103,7 +103,9 @@ jobs:
           snapshot_date="$(date +%F)"
           rm -f "data/projections_${snapshot_date}.csv"
           market-helm
-          python -c "from src.storage.market_bars import list_market_bar_dates; dates = list_market_bar_dates(data_dir='data', limit=5); assert '${snapshot_date}' in dates, dates"
+          python scripts/assert_market_bar_date.py \
+            --trade-date "${snapshot_date}" \
+            --data-dir data
           test -s "data/projections_${snapshot_date}.csv"
 
       - name: Assess cumulative projection evidence
@@ -118,8 +120,8 @@ jobs:
           status=$?
           set -e
           cat data/projection-assessment.json
-          qualified=$(python -c \
-            'import json; value = json.load(open("data/projection-assessment.json"))["qualified"]; assert type(value) is bool; print(str(value).lower())') || exit 2
+          qualified=$(python scripts/projection_baseline.py print-qualified \
+            --assessment data/projection-assessment.json) || exit 2
           if { [ "$status" -eq 0 ] && [ "$qualified" != "true" ]; } || \
              { [ "$status" -eq 1 ] && [ "$qualified" != "false" ]; } || \
              [ "$status" -gt 1 ]; then
