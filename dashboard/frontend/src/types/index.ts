@@ -200,10 +200,7 @@ export type AlertNotification = 'log' | 'email' | 'webhook';
 export type AlertOperator = 'less_than' | 'greater_than';
 export type WebhookFormat = 'json' | 'slack' | 'discord';
 export type AlertConditionType =
-  | 'price_threshold'
-  | 'rsi_threshold'
-  | 'screening_match'
-  | 'compound';
+  'price_threshold' | 'rsi_threshold' | 'screening_match' | 'compound';
 
 export interface AlertCondition {
   type: AlertConditionType;

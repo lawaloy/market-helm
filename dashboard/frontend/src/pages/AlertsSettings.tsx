@@ -424,13 +424,7 @@ const AlertsSettings: React.FC = () => {
         cooldown_minutes: 60,
       };
     } else if (composerMode === 'rsi' && rsiValue !== null) {
-      const existing = findDuplicateRsiRule(
-        config.alerts,
-        symbol,
-        newRsiOperator,
-        rsiValue,
-        14,
-      );
+      const existing = findDuplicateRsiRule(config.alerts, symbol, newRsiOperator, rsiValue, 14);
       if (existing) {
         setSuccess(null);
         setError(`You already have a watch when ${formatCondition(existing).toLowerCase()}.`);
@@ -453,9 +447,8 @@ const AlertsSettings: React.FC = () => {
     } else if (priceValue !== null && rsiValue !== null) {
       rule = {
         id:
-          slugify(
-            `${symbol}_${newOperator}_${priceValue}_rsi_${newRsiOperator}_${rsiValue}`,
-          ) || 'compound_alert',
+          slugify(`${symbol}_${newOperator}_${priceValue}_rsi_${newRsiOperator}_${rsiValue}`) ||
+          'compound_alert',
         name: `${symbol} price + RSI alert`,
         enabled: true,
         condition: {

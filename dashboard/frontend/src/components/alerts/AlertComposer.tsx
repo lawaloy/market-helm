@@ -151,7 +151,9 @@ export function AlertComposer({
             {needsPrice ? (
               <span className="shrink-0 font-medium text-slate-400">and RSI(14)</span>
             ) : (
-              <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">RSI(14)</span>
+              <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+                RSI(14)
+              </span>
             )}
             <select
               value={newRsiOperator}
@@ -202,8 +204,8 @@ export function AlertComposer({
       </p>
       {needsRsi ? (
         <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-          RSI(14) needs 15 daily closes. We pull those from Finnhub when an API key
-          is configured; otherwise we fall back to saved daily history.
+          RSI(14) needs 15 daily closes. We pull those from Finnhub when an API key is configured;
+          otherwise we fall back to saved daily history.
         </p>
       ) : null}
       <button

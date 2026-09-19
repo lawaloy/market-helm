@@ -47,13 +47,12 @@ export function RuleCard({
   const isPrice = rule.condition.type === 'price_threshold';
   const isRsi = rule.condition.type === 'rsi_threshold';
   const isCompound = rule.condition.type === 'compound';
-  const symbol = isPrice || isRsi
-    ? (rule.condition.symbol ?? '?').toUpperCase()
-    : isCompound
-      ? (
-          rule.condition.conditions?.find((leaf) => leaf.symbol)?.symbol ?? '?'
-        ).toUpperCase()
-      : '?';
+  const symbol =
+    isPrice || isRsi
+      ? (rule.condition.symbol ?? '?').toUpperCase()
+      : isCompound
+        ? (rule.condition.conditions?.find((leaf) => leaf.symbol)?.symbol ?? '?').toUpperCase()
+        : '?';
   const showSymbolBadge = Boolean(symbol && symbol !== '?');
   const isRise =
     (isPrice && rule.condition.operator === 'greater_than') ||
