@@ -103,11 +103,7 @@ jobs:
           snapshot_date="$(date +%F)"
           rm -f "data/projections_${snapshot_date}.csv"
           market-helm
-          python -c "
-from src.storage.market_bars import list_market_bar_dates
-dates = list_market_bar_dates(data_dir='data', limit=5)
-assert '${snapshot_date}' in dates, dates
-"
+          python -c "from src.storage.market_bars import list_market_bar_dates; dates = list_market_bar_dates(data_dir='data', limit=5); assert '${snapshot_date}' in dates, dates"
           test -s "data/projections_${snapshot_date}.csv"
 
       - name: Assess cumulative projection evidence
