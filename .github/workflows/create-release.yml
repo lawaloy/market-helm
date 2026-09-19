@@ -44,11 +44,11 @@ jobs:
 
       - name: Require empty Release tag unless manual bump
         env:
-          BUMP: ${{ inputs.bump_type }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
           RAW_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          if [ "$BUMP" = "manual" ]; then
+          if [ "$BUMP_TYPE" = "manual" ]; then
             exit 0
           fi
           if printf '%s' "$RAW_TAG" | grep -q '[[:graph:]]'; then
@@ -65,22 +65,22 @@ jobs:
       - name: Resolve release tag
         id: tag
         env:
-          BUMP: ${{ inputs.bump_type }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
           RAW_TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
           bump_semver() {
-            local bump="$1" major="$2" minor="$3" patch="$4"
-            case "$bump" in
+            local kind="$1" major="$2" minor="$3" patch="$4"
+            case "$kind" in
               patch) patch=$((patch + 1)) ;;
               minor) minor=$((minor + 1)); patch=0 ;;
               major) major=$((major + 1)); minor=0; patch=0 ;;
-              *) echo "Invalid bump: $bump"; exit 1 ;;
+              *) echo "Invalid bump: $kind"; exit 1 ;;
             esac
             echo "v${major}.${minor}.${patch}"
           }
 
-          if [ "$BUMP" = "manual" ]; then
+          if [ "$BUMP_TYPE" = "manual" ]; then
             t="${RAW_TAG#v}"
             if [ -z "$t" ]; then
               echo 'For bump type "manual", set the Release tag input (e.g. v0.10.0).'
@@ -111,8 +111,8 @@ jobs:
             rest="${latest#*.}"
             minor="${rest%%.*}"
             patch="${rest#*.}"
-            TAG="$(bump_semver "$BUMP" "$major" "$minor" "$patch")"
-            echo "Latest release tag on origin: v${latest} → next ($BUMP): ${TAG}"
+            TAG="$(bump_semver "$BUMP_TYPE" "$major" "$minor" "$patch")"
+            echo "Latest release tag on origin: v${latest} → next ($BUMP_TYPE): ${TAG}"
           fi
 
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
