@@ -30,3 +30,11 @@ def test_workflows_are_valid_yaml() -> None:
         parsed = yaml.safe_load(path.read_text(encoding="utf-8"))
         assert isinstance(parsed, dict), f"{path.name} did not parse to a mapping"
         assert "jobs" in parsed, f"{path.name} missing jobs"
+
+
+def test_ci_runs_actionlint_on_workflows() -> None:
+    """PR CI must lint Actions YAML so schedule.yml breakage fails before merge."""
+    ci = (REPO_ROOT / ".github" / "workflows" / "python-app.yml").read_text(encoding="utf-8")
+    assert "download-actionlint.bash" in ci
+    assert "./actionlint -color" in ci
+    assert "-shellcheck=" not in ci
