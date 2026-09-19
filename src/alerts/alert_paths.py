@@ -228,7 +228,9 @@ def save_alerts_config(config: Dict[str, Any], explicit: Optional[Path] = None) 
 
 
 def get_enabled_watch_symbols() -> List[str]:
-    """Symbols referenced by enabled price-threshold watches."""
+    """Symbols referenced by enabled price / RSI / single-symbol compound watches."""
+    from src.alerts.alert_rules import condition_watch_symbols
+
     _, raw = load_alerts_config()
     if not raw:
         return []
@@ -241,10 +243,7 @@ def get_enabled_watch_symbols() -> List[str]:
         condition = alert.get("condition") or {}
         if not isinstance(condition, dict):
             continue
-        if condition.get("type") != "price_threshold":
-            continue
-        symbol = normalize_ticker(condition.get("symbol"))
-        if symbol:
+        for symbol in condition_watch_symbols(condition):
             symbols.add(symbol)
     return sorted(symbols)
 

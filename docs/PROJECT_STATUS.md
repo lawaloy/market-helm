@@ -46,7 +46,7 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 | Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes               |
 | Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                              |
 | Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                     |
-| Alerts                        | **Shipped and tested**                       | Price and screening rules, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                       | Technical-indicator and compound rules; SMS/push; real-provider staging tests                                          |
+| Alerts                        | **Shipped and tested**                       | Price, RSI, and shallow compound rules, screening match, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI | Nested compounds and additional indicators; SMS/push; real-provider staging tests                                          |
 | Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                                             |
 | Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Cut dashboard/alert reads over to `market_bars`; environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
 | Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                  |
@@ -117,16 +117,17 @@ unit tests and container-only integration tests cannot fully reproduce.
    against the chosen managed PostgreSQL, ingress, monitoring, and
    transactional-email providers. This is an operator-owned release gate requiring
    credentials/evidence, not unfinished repository automation.
-4. **Alert depth / dashboard quality:** see remaining gaps in the capability
-   matrix (compound depth, SMS/push, code-splitting, watchlists).
-
+3. **Alert depth:** extend beyond RSI and shallow compounds (more indicators,
+   nested rules); consider SMS/push only after hosted email is proven reliable.
+4. **Dashboard quality:** code-split routes, run accessibility/performance audits,
+   and decide whether saved watchlists/views belong in the product.
 ## Explicitly deferred
 
 | Item                                    | Reason                                                                                   |
 | --------------------------------------- | ---------------------------------------------------------------------------------------- |
 | Automated trading                       | Requires separate intraday orchestration plus risk, compliance, broker, and audit design |
+| Nested compound / extra indicators  | RSI + shallow AND/OR cover the first technical slice; deeper nesting deferred |
 | SMS and push notifications              | Email/webhook production operation should be proven first                                |
-| Advanced technical/compound alert rules | Current price and screening rules cover the initial alert product                        |
 | International exchanges                 | Current screening is centered on S&P 500 and NASDAQ-100                                  |
 | ML/fundamental/news projections         | Current projection engine is intentionally heuristic                                     |
 

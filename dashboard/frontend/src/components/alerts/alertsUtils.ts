@@ -10,6 +10,8 @@ export type SymbolOption = {
 
 export const SAMPLE_RULE_IDS = new Set([
   'alert_aapl_drop',
+  'alert_aapl_rsi_oversold',
+  'alert_aapl_price_and_rsi',
   'alert_high_volume_gainers',
   'alert_multi_channel',
   'alert_discord_example',
@@ -68,13 +70,27 @@ export function formatQuotePrice(value: number | undefined | null): string | nul
 }
 
 export function formatCondition(rule: AlertRule): string {
-  const condition = rule.condition;
+  return formatConditionValue(rule.condition);
+}
+
+export function formatConditionValue(condition: AlertRule['condition']): string {
   if (condition.type === 'price_threshold') {
     const op = condition.operator === 'greater_than' ? 'rises above' : 'falls below';
     return `${condition.symbol ?? '?'} ${op} $${formatPrice(condition.value)}`;
   }
+  if (condition.type === 'rsi_threshold') {
+    const op = condition.operator === 'greater_than' ? 'rises above' : 'falls below';
+    const period = condition.period ?? 14;
+    return `${condition.symbol ?? '?'} RSI(${period}) ${op} ${formatPrice(condition.value)}`;
+  }
   if (condition.type === 'screening_match') {
     return 'Matches your screening filters';
+  }
+  if (condition.type === 'compound') {
+    const leaves = condition.conditions ?? [];
+    const joiner = condition.op === 'or' ? ' or ' : ' and ';
+    if (leaves.length === 0) return 'Custom compound condition';
+    return leaves.map((leaf) => formatConditionValue(leaf)).join(joiner);
   }
   return 'Custom condition';
 }
@@ -82,6 +98,12 @@ export function formatCondition(rule: AlertRule): string {
 export function ruleTitle(rule: AlertRule): string {
   if (rule.condition.type === 'price_threshold') {
     return `${rule.condition.symbol ?? 'Stock'} price alert`;
+  }
+  if (rule.condition.type === 'rsi_threshold') {
+    return `${rule.condition.symbol ?? 'Stock'} RSI alert`;
+  }
+  if (rule.condition.type === 'compound') {
+    return rule.name || 'Combined alert';
   }
   return rule.name;
 }
@@ -100,11 +122,37 @@ export function priceAlertKey(condition: AlertRule['condition']): string | null 
   return `${symbol}|${operator}|${value}`;
 }
 
+export function rsiAlertKey(condition: AlertRule['condition']): string | null {
+  if (condition.type !== 'rsi_threshold') return null;
+  const symbol = condition.symbol?.trim().toUpperCase();
+  const operator = condition.operator;
+  const value = condition.value;
+  const period = condition.period ?? 14;
+  if (!symbol || !operator || value === undefined || !Number.isFinite(Number(value))) return null;
+  if (!Number.isFinite(Number(period))) return null;
+  return `rsi|${symbol}|${period}|${operator}|${value}`;
+}
+
+export function compoundAlertKey(condition: AlertRule['condition']): string | null {
+  if (condition.type !== 'compound') return null;
+  const op = condition.op ?? 'and';
+  const leaves = condition.conditions ?? [];
+  const parts = leaves
+    .map((leaf) => priceAlertKey(leaf) ?? rsiAlertKey(leaf) ?? JSON.stringify(leaf))
+    .sort();
+  if (parts.length === 0) return null;
+  return `compound|${op}|${parts.join('||')}`;
+}
+
 export function dedupeAlerts(alerts: AlertRule[]): AlertRule[] {
   const seen = new Set<string>();
   const unique: AlertRule[] = [];
   for (const rule of alerts) {
-    const key = priceAlertKey(rule.condition) ?? rule.id;
+    const key =
+      priceAlertKey(rule.condition) ??
+      rsiAlertKey(rule.condition) ??
+      compoundAlertKey(rule.condition) ??
+      rule.id;
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(rule);
@@ -130,6 +178,28 @@ export function findDuplicatePriceRule(
   return alerts.find((rule) => {
     if (excludeId && rule.id === excludeId) return false;
     return priceAlertKey(rule.condition) === key;
+  });
+}
+
+export function findDuplicateRsiRule(
+  alerts: AlertRule[],
+  symbol: string,
+  operator: AlertRule['condition']['operator'],
+  value: number,
+  period = 14,
+  excludeId?: string,
+): AlertRule | undefined {
+  const key = rsiAlertKey({
+    type: 'rsi_threshold',
+    symbol,
+    operator,
+    value,
+    period,
+  });
+  if (!key) return undefined;
+  return alerts.find((rule) => {
+    if (excludeId && rule.id === excludeId) return false;
+    return rsiAlertKey(rule.condition) === key;
   });
 }
 

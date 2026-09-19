@@ -44,11 +44,21 @@ def _format_condition(condition: Any) -> str:
             f"{condition.get('symbol')} {condition.get('operator')} "
             f"{condition.get('value')}"
         )
+    if ctype == "rsi_threshold":
+        period = condition.get("period", 14)
+        return (
+            f"{condition.get('symbol')} RSI({period}) "
+            f"{condition.get('operator')} {condition.get('value')}"
+        )
     if ctype == "screening_match":
         raw_filters = condition.get("filters", {})
         filters = raw_filters if isinstance(raw_filters, dict) else {}
         parts = [f"{key}={value}" for key, value in filters.items()]
         return "screening: " + ", ".join(parts)
+    if ctype == "compound":
+        leaves = condition.get("conditions")
+        count = len(leaves) if isinstance(leaves, list) else 0
+        return f"compound {condition.get('op', 'and')} ({count} conditions)"
     return ctype
 
 
