@@ -11,9 +11,12 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -34,7 +37,7 @@ def client(temp_data_dir):
         yield TestClient(app)
 
 
-def _write_csvs(temp_data_dir: Path, confidence_values) -> None:
+def _write_fixtures(temp_data_dir: Path, confidence_values) -> None:
     n = len(confidence_values)
     symbols = [f"T{i}" for i in range(n)]
     pd.DataFrame(
@@ -52,18 +55,16 @@ def _write_csvs(temp_data_dir: Path, confidence_values) -> None:
             "reason": ["momentum"] * n,
         }
     ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
-    pd.DataFrame(
-        {
-            "symbol": symbols,
-            "close": [150.0] * n,
-            "volume": [10_000] * n,
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [{"symbol": s, "close": 150.0, "volume": 10_000} for s in symbols],
+    )
 
 
 def test_opportunities_soft_fails_string_confidence_column(client, temp_data_dir) -> None:
     """Object/str confidence previously TypeError'd nlargest → 500 the bucket."""
-    _write_csvs(temp_data_dir, ["high", "90", "bad", "40"])
+    _write_fixtures(temp_data_dir, ["high", "90", "bad", "40"])
 
     r = client.get(
         "/api/projections/opportunities",
@@ -82,7 +83,7 @@ def test_opportunities_skips_nonfinite_confidence_before_ranking(
     client, temp_data_dir
 ) -> None:
     """Inf/NaN confidence must not win nlargest slots or abort the endpoint."""
-    _write_csvs(temp_data_dir, [math.inf, float("nan"), 70.0, -math.inf])
+    _write_fixtures(temp_data_dir, [math.inf, float("nan"), 70.0, -math.inf])
 
     r = client.get(
         "/api/projections/opportunities",

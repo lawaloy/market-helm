@@ -1,4 +1,4 @@
-"""Opportunities must join daily prices via normalize_ticker (padded CSV)."""
+"""Opportunities must join daily prices via normalize_ticker (padded symbols)."""
 
 from __future__ import annotations
 
@@ -10,9 +10,12 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -34,17 +37,21 @@ def client(temp_data_dir):
 
 
 def test_opportunities_joins_padded_mixed_case_daily_symbols(client, temp_data_dir):
-    """Projection AAPL must still resolve daily close/volume when CSV has ' aapl '."""
-    pd.DataFrame(
-        {
-            "symbol": [" aapl "],
-            "name": ["Apple"],
-            "close": [151.25],
-            "change": [1.0],
-            "change_percent": [0.7],
-            "volume": [42_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    """Projection AAPL must still resolve daily close/volume when symbol was padded."""
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": " aapl ",
+                "name": "Apple",
+                "close": 151.25,
+                "change": 1.0,
+                "change_percent": 0.7,
+                "volume": 42_000,
+            }
+        ],
+    )
     pd.DataFrame(
         {
             "symbol": ["AAPL"],
@@ -76,16 +83,20 @@ def test_opportunities_joins_padded_mixed_case_daily_symbols(client, temp_data_d
 
 def test_opportunities_skips_sentinel_projection_symbols(client, temp_data_dir):
     """Blank/sentinel projection tickers must not appear as opportunity cards."""
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": ["Apple"],
-            "close": [150.0],
-            "change": [1.0],
-            "change_percent": [0.7],
-            "volume": [1_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "close": 150.0,
+                "change": 1.0,
+                "change_percent": 0.7,
+                "volume": 1_000,
+            }
+        ],
+    )
     pd.DataFrame(
         {
             "symbol": ["nan", "AAPL"],

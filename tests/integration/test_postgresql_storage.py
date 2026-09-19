@@ -104,7 +104,7 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == [1, 2, 3, 4, 5]
+    assert [row["version"] for row in versions] == [1, 2, 3, 4, 5, 6]
 
     reset_token = issue_token(user["id"], RESET_PASSWORD)
     assert consume_token(reset_token, RESET_PASSWORD) == user["id"]

@@ -35,7 +35,10 @@ frontend build is emitted into `dashboard/backend/static/` and served by FastAPI
 
 This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 
-- Market runs write dated CSV/JSON/Markdown files under `DATA_DIR`.
+- Market runs write dated CSV/JSON/Markdown files under `DATA_DIR` and dual-write
+  daily quote rows into durable `market_bars` (app database when
+  `MARKET_HELM_DATABASE_URL` is set, otherwise `DATA_DIR/market_bars.sqlite`).
+  Dashboard/alert readers still use CSV in this slice; DB is the accumulation path.
 - Alert preferences and history use the local MarketHelm configuration directory.
 - Alert API routes are intended for an operator-controlled deployment and do not
   require user accounts.

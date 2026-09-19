@@ -11,38 +11,41 @@ import pandas as pd
 import pytest
 
 from src.storage.data_storage import DataStorage
+from src.storage.market_bars import load_market_bars
 
 
 @pytest.fixture
-def storage(tmp_path):
+def storage(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     return DataStorage(data_dir=str(tmp_path))
 
 
-def test_save_daily_data_preserves_prior_file_when_replace_fails(storage, tmp_path):
+def test_save_daily_data_upserts_and_overwrites_bars(storage, tmp_path):
+    """save_daily_data writes market_bars; a later upsert replaces the same day."""
     target = date(2026, 6, 9)
     first = storage.save_daily_data(
         [{"symbol": "AAPL", "name": "Apple", "close": 150.0}],
         date=target,
     )
-    assert first is not None
-    prior = Path(first).read_text(encoding="utf-8")
+    assert first == "market_bars:2026-06-09"
+    rows = load_market_bars(target, data_dir=tmp_path)
+    assert len(rows) == 1
+    assert rows[0]["symbol"] == "AAPL"
+    assert rows[0]["close"] == 150.0
 
-    real_replace = Path.replace
-
-    def boom(self, target_path):
-        if self.name.endswith(".csv.tmp"):
-            raise OSError("simulated crash before replace")
-        return real_replace(self, target_path)
-
-    with patch.object(Path, "replace", boom):
-        with pytest.raises(OSError, match="simulated crash"):
-            storage.save_daily_data(
-                [{"symbol": "MSFT", "name": "Microsoft", "close": 400.0}],
-                date=target,
-            )
-
-    assert Path(first).read_text(encoding="utf-8") == prior
-    assert list(tmp_path.glob("daily_data_*.csv.tmp")) == []
+    second = storage.save_daily_data(
+        [
+            {"symbol": "AAPL", "name": "Apple", "close": 155.0},
+            {"symbol": "MSFT", "name": "Microsoft", "close": 400.0},
+        ],
+        date=target,
+    )
+    assert second == "market_bars:2026-06-09"
+    rows = load_market_bars(target, data_dir=tmp_path)
+    by_symbol = {row["symbol"]: row["close"] for row in rows}
+    assert by_symbol["AAPL"] == 155.0
+    assert by_symbol["MSFT"] == 400.0
+    assert list(tmp_path.glob("daily_data_*.csv")) == []
 
 
 def test_save_summary_preserves_prior_file_when_replace_fails(storage, tmp_path):

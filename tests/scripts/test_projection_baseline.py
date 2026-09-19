@@ -130,14 +130,15 @@ def test_capture_hashes_the_same_private_snapshot_it_evaluates(
 ) -> None:
     source = tmp_path / "source"
     source.mkdir()
-    input_path = source / "daily_data_2026-07-07.csv"
-    input_path.write_text("symbol,outcome_close\nAAPL,100\n", encoding="utf-8")
+    # Capture still snapshots projections_*.csv (daily quotes live in market_bars).
+    input_path = source / "projections_2026-07-07.csv"
+    input_path.write_text("symbol,target_mid\nAAPL,100\n", encoding="utf-8")
     seen = {}
 
     def evaluate(snapshot_dir: Path, _days: int) -> dict:
         copied = snapshot_dir / input_path.name
         seen["content"] = copied.read_bytes()
-        input_path.write_text("symbol,outcome_close\nAAPL,999\n", encoding="utf-8")
+        input_path.write_text("symbol,target_mid\nAAPL,999\n", encoding="utf-8")
         return _qualified_report()
 
     monkeypatch.setattr(projection_baseline, "observed_report", evaluate)

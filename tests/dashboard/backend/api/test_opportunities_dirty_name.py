@@ -10,9 +10,12 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_simple_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -37,13 +40,7 @@ def test_opportunities_falls_back_when_name_and_reason_are_nan(
     client, temp_data_dir
 ) -> None:
     """NaN name/reason previously failed Opportunity str validation → 500."""
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "close": [150.0],
-            "volume": [1_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_simple_bars(temp_data_dir, "2026-01-15", close=150.0, volume=1_000)
     pd.DataFrame(
         {
             "symbol": ["AAPL"],

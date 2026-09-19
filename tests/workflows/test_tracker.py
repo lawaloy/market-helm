@@ -63,7 +63,7 @@ class TestStockTrackerWorkflow:
         mock_fetcher_cls.return_value = mock_fetcher
 
         mock_storage = MagicMock()
-        mock_storage.save_daily_data.return_value = str(temp_data_dir / "daily_data_2026-01-15.csv")
+        mock_storage.save_daily_data.return_value = "market_bars:2026-01-15"
         mock_storage.save_summary.return_value = str(temp_data_dir / "summary_2026-01-15.json")
         mock_storage.save_projections.return_value = str(temp_data_dir / "projections_2026-01-15.csv")
         mock_storage_cls.return_value = mock_storage
@@ -124,9 +124,7 @@ class TestStockTrackerWorkflow:
         mock_fetcher_cls.return_value = mock_fetcher
 
         mock_storage = MagicMock()
-        mock_storage.save_daily_data.return_value = str(
-            temp_data_dir / "daily_data_2026-01-15.csv"
-        )
+        mock_storage.save_daily_data.return_value = "market_bars:2026-01-15"
         mock_storage.save_summary.return_value = str(
             temp_data_dir / "summary_2026-01-15.json"
         )
@@ -321,7 +319,7 @@ class TestStockTrackerWorkflow:
         mock_fetcher_cls.return_value = mock_fetcher
 
         mock_storage = MagicMock()
-        mock_storage.save_daily_data.return_value = str(temp_data_dir / "daily.csv")
+        mock_storage.save_daily_data.return_value = "market_bars:2026-01-15"
         mock_storage.save_summary.return_value = str(temp_data_dir / "summary.json")
         mock_storage.save_projections.return_value = str(temp_data_dir / "proj.csv")
         mock_storage_cls.return_value = mock_storage

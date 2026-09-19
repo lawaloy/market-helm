@@ -193,7 +193,7 @@ Each run writes:
 
 | File                              | Contents                                       |
 | --------------------------------- | ---------------------------------------------- |
-| `data/daily_data_YYYY-MM-DD.csv`  | Full stock data (prices, volume, changes)      |
+| `data/market_bars` (sqlite/DB) | Full stock data (prices, volume, changes)      |
 | `data/summary_YYYY-MM-DD.json`    | Analysis summary (gainers, losers, statistics) |
 | `logs/market_helm_YYYY-MM-DD.log` | Detailed execution logs                        |
 

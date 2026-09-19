@@ -60,6 +60,8 @@ data/*.json
 data/*.md
 data/cache/
 data/indices/
+data/market_bars.sqlite
+data/*.sqlite
 
 # Keep config files
 !config/*.json

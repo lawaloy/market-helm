@@ -124,7 +124,7 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 
 | Output                            | Description                       |
 | --------------------------------- | --------------------------------- |
-| `data/daily_data_YYYY-MM-DD.csv`  | Prices, volume, and daily changes |
+| `data/market_bars` (sqlite/DB) | Prices, volume, and daily changes |
 | `data/projections_YYYY-MM-DD.csv` | Saved projection observations     |
 | `data/summary_YYYY-MM-DD.json`    | Gainers, losers, and statistics   |
 | `logs/market_helm_YYYY-MM-DD.log` | Execution logs                    |

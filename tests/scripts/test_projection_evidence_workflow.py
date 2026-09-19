@@ -50,18 +50,17 @@ def test_projection_evidence_preserves_progress_and_qualified_capture() -> None:
     assert 'echo "qualified=$qualified" >> "$GITHUB_OUTPUT"' in workflow
     assert "scripts/projection_baseline.py capture" in workflow
     assert "name: projection-forward-archive" in workflow
-    assert "data/daily_data_*.csv" in workflow
+    assert "data/market_bars.sqlite" in workflow
     assert "data/projections_*.csv" in workflow
     assert "data/projection-assessment.json" in workflow
     assert "name: projection-observed-baseline-${{ github.run_id }}" in workflow
     assert workflow.count("retention-days: 90") == 2
 
 
-def test_projection_evidence_requires_fresh_daily_and_projection_files() -> None:
+def test_projection_evidence_requires_fresh_bars_and_projection_files() -> None:
     workflow = _workflow()
 
-    assert 'rm -f \\' in workflow
-    assert '"data/daily_data_${snapshot_date}.csv"' in workflow
-    assert '"data/projections_${snapshot_date}.csv"' in workflow
-    assert 'test -s "data/daily_data_${snapshot_date}.csv"' in workflow
+    assert 'rm -f "data/projections_${snapshot_date}.csv"' in workflow
+    assert "list_market_bar_dates" in workflow
+    assert "snapshot_date" in workflow
     assert 'test -s "data/projections_${snapshot_date}.csv"' in workflow

@@ -8,25 +8,26 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.helpers.market_bars import seed_simple_bars
+
 
 @pytest.fixture
-def summary_client():
+def summary_client(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     data_dir = Path(tmp)
-    import pandas as pd
     from dashboard.backend.services.data_loader import DataLoader
 
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": ["Apple"],
-            "close": [150.0],
-            "change": [1.5],
-            "change_percent": [1.0],
-            "volume": [1_000_000],
-            "index_name": ["S&P 500"],
-        }
-    ).to_csv(data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_simple_bars(
+        data_dir,
+        "2026-01-15",
+        close=150.0,
+        change=1.5,
+        change_percent=1.0,
+        volume=1_000_000,
+        name="Apple",
+        index_name="S&P 500",
+    )
 
     loader = DataLoader(data_dir=data_dir)
     import dashboard.backend.api.history

@@ -10,10 +10,11 @@ five-session XNYS projection evaluator. It covers:
 - missing actual closes, pending projections, and invalid rows; and
 - newest-first sample ordering.
 
-The CSVs are synthetic and exist to detect evaluator/reporting regressions. The
-resulting metrics are **not model-performance evidence** and must not be used to
-calibrate confidence. Real calibration requires separately preserved,
-out-of-sample production projections and exact target-session closes.
+The scenario fixtures are synthetic (`market_bars` quotes + `projections_*.csv`)
+and exist to detect evaluator/reporting regressions. The resulting metrics are
+**not model-performance evidence** and must not be used to calibrate confidence.
+Real calibration requires separately preserved, out-of-sample production
+projections and exact target-session closes.
 
 Verify the committed report:
 

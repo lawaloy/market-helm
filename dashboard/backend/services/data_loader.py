@@ -71,7 +71,7 @@ def get_most_recent_trading_day() -> str:
 
 
 class DataLoader:
-    """Loads and caches stock market data from CSV/JSON files"""
+    """Loads and caches stock market data from durable stores and JSON/CSV files."""
     
     def __init__(self, data_dir: Optional[Path] = None):
         if data_dir is None:
@@ -84,7 +84,7 @@ class DataLoader:
     
     def _get_latest_file(self, pattern: str, sort_by_date: bool = False) -> Optional[Path]:
         """Get the most recent file matching the pattern.
-        When sort_by_date=True, uses date in filename (YYYY-MM-DD) for daily_data/projections/summary.
+        When sort_by_date=True, uses date in filename (YYYY-MM-DD) for projections/summary.
         """
         try:
             files = list(self.data_dir.glob(pattern))
@@ -94,13 +94,11 @@ class DataLoader:
         if not files:
             return None
         if sort_by_date:
-            # Extract date from filename (e.g. daily_data_2026-02-14.csv) and pick latest.
+            # Extract date from filename (e.g. projections_2026-02-14.csv) and pick latest.
             # Non-ISO suffixes (tmp/partial/garbage) must not win lexicographic sort.
             def parse_date(f: Path) -> str:
                 stem = f.stem
-                if "daily_data_" in stem:
-                    candidate = stem.replace("daily_data_", "", 1)
-                elif "projections_" in stem:
+                if "projections_" in stem:
                     candidate = stem.replace("projections_", "", 1)
                 elif "summary_" in stem:
                     candidate = stem.replace("summary_", "", 1)
@@ -136,21 +134,37 @@ class DataLoader:
         return target not in dates
     
     def load_daily_data(self, date: Optional[str] = None) -> pd.DataFrame:
-        """Load daily stock data CSV"""
-        if date is None:
-            file_path = self._get_latest_file("daily_data_*.csv", sort_by_date=True)
-            if file_path is None:
-                raise ValueError("No daily data files found")
-        else:
-            file_path = self.data_dir / f"daily_data_{date}.csv"
-            if not file_path.exists():
-                raise ValueError(f"Daily data file not found for date: {date}")
-        
+        """Load daily stock data from durable ``market_bars`` storage."""
+        from src.storage.market_bars import list_market_bar_dates, market_bars_frame
+
         try:
-            return pd.read_csv(file_path)
+            if date is None:
+                dates = list_market_bar_dates(data_dir=self.data_dir, limit=64)
+                day = None
+                for candidate in dates:
+                    if _is_weekday(candidate):
+                        day = candidate
+                        break
+                if day is None and dates:
+                    day = dates[0]
+                if day is None:
+                    raise ValueError("No daily data found")
+            else:
+                if not _is_iso_date(date):
+                    raise ValueError(f"Daily data not found for date: {date}")
+                day = date
+
+            frame = market_bars_frame(day, data_dir=self.data_dir)
+        except ValueError:
+            raise
         except Exception as exc:
-            # ParserError/OSError must surface as ValueError so APIs map to 404.
-            raise ValueError(f"Daily data unreadable: {file_path.name}") from exc
+            raise ValueError(f"Daily data unreadable for date: {date or 'latest'}") from exc
+
+        if frame is None or frame.empty:
+            if date is None:
+                raise ValueError("No daily data found")
+            raise ValueError(f"Daily data not found for date: {date}")
+        return frame
     
     def load_projections(self, date: Optional[str] = None) -> pd.DataFrame:
         """Load projections CSV"""
@@ -194,19 +208,15 @@ class DataLoader:
         return data
     
     def get_available_dates(self) -> List[str]:
-        """Get list of all available dates (strict YYYY-MM-DD filenames only)."""
+        """Get list of all available quote dates from ``market_bars`` (newest first)."""
+        from src.storage.market_bars import list_market_bar_dates
+
         try:
-            files = list(self.data_dir.glob("daily_data_*.csv"))
+            return list_market_bar_dates(data_dir=self.data_dir, limit=3650)
         except OSError as exc:
-            # Unreadable data/ must map to ValueError → API 404, not generic 500.
             raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
-        dates = [
-            date
-            for f in files
-            for date in [f.stem.replace("daily_data_", "", 1)]
-            if _is_iso_date(date)
-        ]
-        return sorted(dates, reverse=True)
+        except Exception as exc:
+            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
     
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
         """Load historical data for a specific symbol"""

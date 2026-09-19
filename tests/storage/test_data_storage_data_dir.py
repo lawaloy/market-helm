@@ -49,10 +49,14 @@ def test_fetch_writes_and_dashboard_reads_the_same_data_dir(monkeypatch, tmp_pat
         [{"symbol": "AAPL", "name": "Apple", "close": 150.0}],
     )
 
-    assert saved is not None
-    assert Path(saved).parent == target
+    assert saved == f"market_bars:{saved.split(':', 1)[1]}"
+    assert saved.startswith("market_bars:")
     assert _default_data_dir() == target.resolve()
-    assert list(target.glob("daily_data_*.csv"))
+    assert (target / "market_bars.sqlite").is_file()
+    assert list(target.glob("daily_data_*.csv")) == []
+    loaded = storage.load_daily_data()
+    assert loaded is not None
+    assert float(loaded.iloc[0]["close"]) == 150.0
 
 
 def test_blank_data_dir_env_falls_back_to_local_data(monkeypatch, tmp_path):
@@ -67,7 +71,7 @@ def test_blank_data_dir_env_falls_back_to_local_data(monkeypatch, tmp_path):
 
 
 def test_summary_and_projections_write_to_data_dir(monkeypatch, tmp_path):
-    """Fetch New also persists summary JSON and projection CSV/MD beside daily CSVs."""
+    """Fetch New also persists summary JSON and projection CSV/MD beside market bars."""
     target = tmp_path / "var-lib-markethelm-data"
     target.mkdir()
     monkeypatch.setenv("DATA_DIR", str(target))
