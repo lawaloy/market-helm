@@ -10,9 +10,12 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -53,16 +56,16 @@ def _write_projection(temp_data_dir: Path, **overrides) -> None:
     )
 
 
-def test_opportunities_defaults_when_daily_symbol_column_missing(
+def test_opportunities_defaults_when_daily_bars_missing(
     client, temp_data_dir
 ) -> None:
-    """Daily CSV without symbol previously KeyError'd opportunities → 500."""
-    pd.DataFrame(
-        {
-            "close": [151.25],
-            "volume": [42_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    """Unmatched daily symbols must soft-default price/volume instead of 500ing."""
+    # Bars exist for the trade date (so get_latest_date works) but not for AAPL.
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [{"symbol": "MSFT", "close": 400.0, "volume": 2_000}],
+    )
     _write_projection(temp_data_dir)
 
     r = client.get(
@@ -80,13 +83,11 @@ def test_opportunities_defaults_when_daily_symbol_column_missing(
 
 def test_opportunities_defaults_missing_risk_and_trend(client, temp_data_dir) -> None:
     """Legacy projection CSVs without risk_level/trend must still list cards."""
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "close": [150.0],
-            "volume": [1_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [{"symbol": "AAPL", "close": 150.0, "volume": 1_000}],
+    )
     pd.DataFrame(
         {
             "symbol": ["AAPL"],

@@ -1,4 +1,4 @@
-"""Tests for durable market_bars storage and CSV dual-write."""
+"""Tests for durable market_bars storage (CSV daily_data removed)."""
 
 from datetime import date
 
@@ -8,7 +8,6 @@ from src.storage.database import LATEST_SCHEMA_VERSION, get_connection, init_dat
 from src.storage.data_storage import DataStorage
 from src.storage.market_bars import (
     default_sidecar_path,
-    dual_write_market_bars,
     list_market_bar_dates,
     load_market_bars,
     upsert_market_bars,
@@ -77,26 +76,26 @@ def test_sidecar_sqlite_when_database_disabled(tmp_path, monkeypatch):
     assert rows[0]["close"] == 12.0
 
 
-def test_dual_write_swallows_errors(monkeypatch, tmp_path):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-
-    def boom(*_args, **_kwargs):
-        raise RuntimeError("disk full")
-
-    monkeypatch.setattr("src.storage.market_bars.upsert_market_bars", boom)
-    assert dual_write_market_bars([{"symbol": "AAPL", "close": 1}], "2026-09-18") == 0
-
-
-def test_save_daily_data_dual_writes_to_sidecar(tmp_path, monkeypatch):
+def test_save_daily_data_writes_bars_not_csv(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     data_dir = tmp_path / "data"
     storage = DataStorage(data_dir=str(data_dir))
-    path = storage.save_daily_data(
+    location = storage.save_daily_data(
         [{"symbol": "AAPL", "name": "Apple", "close": 99.0, "volume": 10}],
         date=date(2026, 9, 18),
     )
-    assert path.endswith("daily_data_2026-09-18.csv")
-    assert (data_dir / "daily_data_2026-09-18.csv").is_file()
+    assert location == "market_bars:2026-09-18"
+    assert list(data_dir.glob("daily_data_*.csv")) == []
     rows = load_market_bars("2026-09-18", data_dir=data_dir)
     assert len(rows) == 1
     assert rows[0]["close"] == 99.0
+    loaded = storage.load_daily_data(trade_date=date(2026, 9, 18))
+    assert loaded is not None
+    assert float(loaded.iloc[0]["close"]) == 99.0
+
+
+def test_save_daily_data_raises_when_no_valid_bars(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    storage = DataStorage(data_dir=str(tmp_path))
+    with pytest.raises(ValueError, match="No valid market bars"):
+        storage.save_daily_data([{"symbol": "AAPL", "close": float("nan")}])

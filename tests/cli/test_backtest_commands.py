@@ -6,17 +6,15 @@ import pandas as pd
 import pytest
 
 from src.cli.backtest_commands import main
+from tests.helpers.market_bars import seed_daily_bars
 
 
-def test_backtest_cli_writes_strict_json_report(tmp_path):
+def test_backtest_cli_writes_strict_json_report(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
-    pd.DataFrame([{"symbol": "AAPL", "close": 100.0}]).to_csv(
-        data_dir / "daily_data_2026-07-02.csv", index=False
-    )
-    pd.DataFrame([{"symbol": "AAPL", "close": 108.0}]).to_csv(
-        data_dir / "daily_data_2026-07-10.csv", index=False
-    )
+    seed_daily_bars(data_dir, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])
+    seed_daily_bars(data_dir, "2026-07-10", [{"symbol": "AAPL", "close": 108.0}])
     pd.DataFrame(
         [
             {

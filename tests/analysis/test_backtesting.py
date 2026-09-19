@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from src.analysis.backtesting import backtest_data_dir, evaluate_projections
+from tests.helpers.market_bars import seed_daily_bars
 
 
 def _projection(**overrides):
@@ -66,13 +67,10 @@ def test_missing_target_close_does_not_roll_forward():
     assert report["summary"]["missingActualCount"] == 1
 
 
-def test_data_dir_loader_reads_dated_csvs(tmp_path):
-    pd.DataFrame([{"symbol": "AAPL", "close": 100.0}]).to_csv(
-        tmp_path / "daily_data_2026-07-02.csv", index=False
-    )
-    pd.DataFrame([{"symbol": "AAPL", "close": 108.0}]).to_csv(
-        tmp_path / "daily_data_2026-07-10.csv", index=False
-    )
+def test_data_dir_loader_reads_market_bars(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(tmp_path, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])
+    seed_daily_bars(tmp_path, "2026-07-10", [{"symbol": "AAPL", "close": 108.0}])
     pd.DataFrame([_projection()]).drop(columns=["run_date"]).to_csv(
         tmp_path / "projections_2026-07-02.csv", index=False
     )
@@ -88,8 +86,13 @@ def test_data_dir_loader_reads_dated_csvs(tmp_path):
     assert verified_report["summary"]["pendingCount"] == 1
 
 
-def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
-    pd.DataFrame(
+def test_data_dir_uses_verified_outcome_session_instead_of_filename(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(
+        tmp_path,
+        "2026-07-12",
         [
             {
                 "symbol": "AAPL",
@@ -98,8 +101,8 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
                 "outcome_close": 107.5,
                 "outcome_final": True,
             }
-        ]
-    ).to_csv(tmp_path / "daily_data_2026-07-12.csv", index=False)
+        ],
+    )
     pd.DataFrame(
         [_projection(generated_at="2026-07-02T21:00:00+00:00")]
     ).drop(columns=["run_date"]).to_csv(
@@ -116,8 +119,13 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path):
     assert report["samples"][0]["actualProvenance"] == "verified_previous_close"
 
 
-def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path):
-    pd.DataFrame(
+def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(
+        tmp_path,
+        "2026-07-10",
         [
             {
                 "symbol": "AAPL",
@@ -126,8 +134,8 @@ def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path):
                 "outcome_close": "",
                 "outcome_final": False,
             }
-        ]
-    ).to_csv(tmp_path / "daily_data_2026-07-10.csv", index=False)
+        ],
+    )
     pd.DataFrame([_projection()]).drop(columns=["run_date"]).to_csv(
         tmp_path / "projections_2026-07-02.csv", index=False
     )

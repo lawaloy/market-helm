@@ -9,10 +9,12 @@ from unittest.mock import patch
 import pytest
 
 from dashboard.backend.api.market import _generate_demo_summary
+from tests.helpers.market_bars import seed_simple_bars
 
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -21,21 +23,19 @@ def temp_data_dir():
 @pytest.fixture
 def summary_client(temp_data_dir):
     """TestClient with DataLoader pointed at temp_data_dir (summary JSON only)."""
-    import pandas as pd
     from dashboard.backend.services.data_loader import DataLoader
 
-    # Daily CSV keeps other endpoints happy if imported; summary path only needs JSON.
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": ["Apple"],
-            "close": [150.0],
-            "change": [1.5],
-            "change_percent": [1.0],
-            "volume": [1_000_000],
-            "index_name": ["S&P 500"],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    # Seed bars so other endpoints stay happy if imported; summary path only needs JSON.
+    seed_simple_bars(
+        temp_data_dir,
+        "2026-01-15",
+        close=150.0,
+        change=1.5,
+        change_percent=1.0,
+        volume=1_000_000,
+        name="Apple",
+        index_name="S&P 500",
+    )
 
     loader = DataLoader(data_dir=temp_data_dir)
     import dashboard.backend.api.market

@@ -10,9 +10,12 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -34,16 +37,28 @@ def client(temp_data_dir):
 
 
 def _write_fixtures(temp_data_dir: Path) -> None:
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL", "MSFT"],
-            "name": ["Apple", "Microsoft"],
-            "close": [150.0, 400.0],
-            "change": [1.0, -1.0],
-            "change_percent": [0.7, -0.2],
-            "volume": [1_000, 2_000],
-        }
-    ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "close": 150.0,
+                "change": 1.0,
+                "change_percent": 0.7,
+                "volume": 1_000,
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft",
+                "close": 400.0,
+                "change": -1.0,
+                "change_percent": -0.2,
+                "volume": 2_000,
+            },
+        ],
+    )
     pd.DataFrame(
         {
             "symbol": ["AAPL", "MSFT"],

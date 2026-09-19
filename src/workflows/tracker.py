@@ -265,7 +265,7 @@ class StockTrackerWorkflow:
             }
     
     def _save_data(self, data: List[Dict]) -> Dict[str, Any]:
-        """Save stock data to CSV."""
+        """Persist stock data to durable market_bars storage."""
         try:
             file_path = self.storage.save_daily_data(data)
             if file_path:

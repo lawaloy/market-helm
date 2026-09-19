@@ -156,7 +156,12 @@ def evaluate_projections(
     observed_dates = set()
     for row in closes:
         symbol = normalize_ticker(row.get("symbol"))
-        has_provenance = "outcome_final" in row or "outcome_session" in row
+        # market_bars rows always include outcome_* keys (often NULL); only treat
+        # non-empty values as verified-outcome provenance.
+        has_provenance = any(
+            row.get(key) not in (None, "")
+            for key in ("outcome_final", "outcome_session", "outcome_close")
+        )
         if verified_outcomes_only and not has_provenance:
             continue
         close = _finite_positive(
@@ -299,28 +304,35 @@ def backtest_data_dir(
     max_samples: Optional[int] = 300,
     verified_outcomes_only: bool = False,
 ) -> Dict[str, Any]:
-    """Load dated snapshot CSVs from ``data_dir`` and evaluate projections."""
+    """Load market_bars closes and dated projection CSVs from ``data_dir``."""
     root = Path(data_dir).resolve()
     if not root.is_dir():
         raise ValueError(f"Data directory not found: {root}")
     if days < 1:
         raise ValueError("days must be at least 1")
 
-    dated_files: List[Tuple[str, str, Path]] = []
-    for path in root.glob("*.csv"):
+    projection_files: List[Tuple[str, Path]] = []
+    for path in root.glob("projections_*.csv"):
         match = _DATED_FILE.fullmatch(path.name)
-        if match:
-            try:
-                datetime.strptime(match.group(2), "%Y-%m-%d")
-            except ValueError:
-                continue
-            dated_files.append((match.group(1), match.group(2), path))
-    dated_files.sort(key=lambda item: (item[1], item[0], item[2].name))
-    daily_files = [(day, path) for kind, day, path in dated_files if kind == "daily_data"]
-    projection_files = [
-        (day, path) for kind, day, path in dated_files if kind == "projections"
+        if not match or match.group(1) != "projections":
+            continue
+        try:
+            datetime.strptime(match.group(2), "%Y-%m-%d")
+        except ValueError:
+            continue
+        projection_files.append((match.group(2), path))
+    projection_files.sort(key=lambda item: (item[0], item[1].name))
+
+    from src.storage.market_bars import list_market_bar_dates, load_market_bars
+
+    try:
+        bar_dates = list_market_bar_dates(data_dir=root, limit=3650)
+    except Exception:
+        bar_dates = []
+
+    dated_inputs = [(day, None) for day in bar_dates] or [
+        (day, None) for day, _ in projection_files
     ]
-    dated_inputs = daily_files or projection_files
     if not dated_inputs:
         return evaluate_projections(
             [],
@@ -331,17 +343,16 @@ def backtest_data_dir(
             verified_outcomes_only=verified_outcomes_only,
         )
 
-    latest = max(datetime.strptime(day, "%Y-%m-%d").date() for day, _ in dated_inputs)
+    latest = max(
+        datetime.strptime(day, "%Y-%m-%d").date()
+        for day, _ in dated_inputs
+    )
     cutoff = latest - timedelta(days=days)
     projections: List[Dict[str, Any]] = []
     closes: List[Dict[str, Any]] = []
 
-    for day, path in daily_files:
-        try:
-            frame = pd.read_csv(path)
-        except Exception:
-            continue
-        for row in frame.to_dict("records"):
+    for day in bar_dates:
+        for row in load_market_bars(day, data_dir=root):
             closes.append({**row, "date": day})
 
     for day, path in projection_files:

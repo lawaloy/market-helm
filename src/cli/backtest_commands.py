@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--data-dir",
         type=Path,
         default=Path(os.getenv("DATA_DIR", "data")),
-        help="Directory containing daily_data_*.csv and projections_*.csv.",
+        help="Directory containing market_bars data and projections_*.csv.",
     )
     parser.add_argument("--days", type=_positive_int, default=365)
     parser.add_argument("--horizon-sessions", type=_positive_int, default=5)

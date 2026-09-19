@@ -296,7 +296,7 @@ Point your process manager (systemd, Docker, etc.) at that environment.
 
 | Variable                                 | Used by                         | Purpose                                                                            |
 | ---------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
-| `DATA_DIR`                               | Tracker, dashboard backend      | Path to `daily_data_*.csv`, `projections_*.csv`, `summary_*.json`                  |
+| `DATA_DIR`                               | Tracker, dashboard backend      | Path to `market_bars` (sqlite/DB), `projections_*.csv`, `summary_*.json`           |
 | `FINNHUB_API_KEY`                        | Tracker CLI                     | Market data (required for live fetches)                                            |
 | `CORS_ORIGINS`                           | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)        |
 | `VITE_API_URL`                           | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                             |

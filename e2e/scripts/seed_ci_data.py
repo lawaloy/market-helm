@@ -32,7 +32,9 @@ def main() -> None:
             "index_name": ["S&P 500", "S&P 500"],
         }
     )
-    daily.to_csv(data_dir / f"daily_data_{day}.csv", index=False)
+    from src.storage.market_bars import upsert_market_bars
+
+    upsert_market_bars(daily.to_dict("records"), day, data_dir=data_dir, source="e2e")
 
     projections = pd.DataFrame(
         {

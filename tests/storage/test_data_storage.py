@@ -32,7 +32,7 @@ class TestDataDateForFilename:
             mock_dt.now.return_value = datetime(2026, 7, 26, 9, 0, 0)
             assert _data_date_for_filename() == date(2026, 7, 26)
 
-    def test_save_daily_data_uses_trading_day_filename(self, tmp_path):
+    def test_save_daily_data_uses_trade_date_key(self, tmp_path):
         storage = DataStorage(data_dir=str(tmp_path))
         with patch(
             "src.storage.data_storage._data_date_for_filename",
@@ -41,13 +41,13 @@ class TestDataDateForFilename:
             path = storage.save_daily_data(
                 [{"symbol": "AAPL", "name": "Apple", "close": 150.0}]
             )
-        assert path is not None
-        assert Path(path).name == "daily_data_2026-07-24.csv"
+        assert path == "market_bars:2026-07-24"
 
     def test_save_daily_data_empty_returns_none(self, tmp_path):
         storage = DataStorage(data_dir=str(tmp_path))
         assert storage.save_daily_data([]) is None
         assert list(tmp_path.glob("daily_data_*.csv")) == []
+        assert list(tmp_path.glob("market_bars.sqlite")) == []
 
 
 class TestDataStorage(unittest.TestCase):
@@ -77,11 +77,11 @@ class TestDataStorage(unittest.TestCase):
         self.assertTrue(Path(self.test_data_dir).exists())
 
     def test_save_daily_data(self):
-        """Test saving daily data to CSV."""
+        """Test saving daily data to market_bars."""
         data_list = self.sample_df.to_dict('records')
-        self.storage.save_daily_data(data_list)
-        csv_files = list(Path(self.test_data_dir).glob("daily_data_*.csv"))
-        self.assertEqual(len(csv_files), 1)
+        location = self.storage.save_daily_data(data_list)
+        self.assertTrue(str(location).startswith("market_bars:"))
+        self.assertEqual(list(Path(self.test_data_dir).glob("daily_data_*.csv")), [])
 
     def test_save_summary(self):
         """Test saving summary to JSON."""
@@ -90,7 +90,7 @@ class TestDataStorage(unittest.TestCase):
         self.assertEqual(len(json_files), 1)
 
     def test_load_daily_data(self):
-        """Test loading daily data from CSV."""
+        """Test loading daily data from market_bars."""
         data_list = self.sample_df.to_dict('records')
         self.storage.save_daily_data(data_list)
         loaded_df = self.storage.load_daily_data()
@@ -194,17 +194,13 @@ class TestDataStorage(unittest.TestCase):
     def test_save_projections_empty_returns_none(self):
         self.assertIsNone(self.storage.save_projections({}))
 
-    def test_load_daily_data_missing_file_returns_none(self):
-        """Absent daily CSV soft-fails to None instead of raising."""
-        self.assertIsNone(self.storage.load_daily_data(date=date(2099, 1, 1)))
+    def test_load_daily_data_missing_date_returns_none(self):
+        """Absent trade date soft-fails to None instead of raising."""
+        self.assertIsNone(self.storage.load_daily_data(trade_date=date(2099, 1, 1)))
 
-    def test_load_daily_data_corrupt_csv_returns_none(self):
-        """Unreadable daily CSV soft-fails to None so callers can skip the day."""
-        bad_path = Path(self.test_data_dir) / "daily_data_2099-01-02.csv"
-        bad_path.write_bytes(b"\xff\xfe not,valid,csv\n\x00\x01")
-        with unittest.mock.patch("builtins.print"):
-            loaded = self.storage.load_daily_data(date=date(2099, 1, 2))
-        self.assertIsNone(loaded)
+    def test_load_daily_data_empty_store_returns_none(self):
+        """Empty market_bars store soft-fails to None."""
+        self.assertIsNone(self.storage.load_daily_data())
 
 
 if __name__ == '__main__':

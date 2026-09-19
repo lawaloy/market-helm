@@ -25,7 +25,7 @@ def _load_env() -> None:
 
 
 def prices_from_saved_daily_data() -> Dict[str, float]:
-    """Prices from the newest daily_data CSV on disk."""
+    """Prices from the newest market_bars snapshot."""
     from dashboard.backend.services.data_loader import get_data_loader
 
     prices: Dict[str, float] = {}

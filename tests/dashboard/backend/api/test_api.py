@@ -9,10 +9,13 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
     """Create temp data directory with sample files."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -20,18 +23,41 @@ def temp_data_dir():
 
 @pytest.fixture
 def sample_daily_data(temp_data_dir):
-    """Create sample daily_data CSV."""
-    df = pd.DataFrame({
-        "symbol": ["AAPL", "GOOGL", "MSFT"],
-        "name": ["Apple", "Alphabet", "Microsoft"],
-        "close": [150.0, 2800.0, 350.0],
-        "change": [1.5, -28.0, 2.1],
-        "change_percent": [1.0, -1.0, 0.6],
-        "volume": [50_000_000, 2_000_000, 25_000_000],
-        "index_name": ["S&P 500", "NASDAQ-100", "S&P 500"],
-    })
-    df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
-    return temp_data_dir / "daily_data_2026-01-15.csv"
+    """Seed sample daily quotes into market_bars."""
+    seed_daily_bars(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "close": 150.0,
+                "change": 1.5,
+                "change_percent": 1.0,
+                "volume": 50_000_000,
+                "index_name": "S&P 500",
+            },
+            {
+                "symbol": "GOOGL",
+                "name": "Alphabet",
+                "close": 2800.0,
+                "change": -28.0,
+                "change_percent": -1.0,
+                "volume": 2_000_000,
+                "index_name": "NASDAQ-100",
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft",
+                "close": 350.0,
+                "change": 2.1,
+                "change_percent": 0.6,
+                "volume": 25_000_000,
+                "index_name": "S&P 500",
+            },
+        ],
+    )
+    return temp_data_dir
 
 
 @pytest.fixture
@@ -449,31 +475,32 @@ class TestStocksAPI:
         assert data["technical"] is None
 
     def test_stock_historical_skips_nan_days(self, client, mock_data_loader, temp_data_dir):
-        """One corrupt day is omitted; valid siblings still return 200."""
+        """Days without usable change_percent are omitted; valid siblings still return 200."""
         from datetime import datetime, timedelta
 
         recent = datetime.now().strftime("%Y-%m-%d")
         prior = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "close": [float("nan")],
-                "change": [0.0],
-                "change_percent": [float("nan")],
-                "volume": [1],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "close": [150.0],
-                "change": [1.0],
-                "change_percent": [0.7],
-                "volume": [2_000],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{prior}.csv", index=False)
+        # Non-finite close is rejected at upsert; missing change_percent is stored
+        # as NULL and skipped by the historical API response builder.
+        seed_daily_bars(
+            temp_data_dir,
+            recent,
+            [{"symbol": "AAPL", "name": "Apple", "close": 149.0, "volume": 1}],
+        )
+        seed_daily_bars(
+            temp_data_dir,
+            prior,
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "close": 150.0,
+                    "change": 1.0,
+                    "change_percent": 0.7,
+                    "volume": 2_000,
+                }
+            ],
+        )
 
         r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
         assert r.status_code == 200
@@ -484,20 +511,15 @@ class TestStocksAPI:
     def test_stock_historical_404_when_all_points_invalid(
         self, client, mock_data_loader, temp_data_dir
     ):
-        """If every day is non-finite, historical returns 404 like an empty series."""
+        """If every day lacks finite change_percent, historical returns 404."""
         from datetime import datetime
 
         recent = datetime.now().strftime("%Y-%m-%d")
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "close": [float("nan")],
-                "change": [0.0],
-                "change_percent": [float("inf")],
-                "volume": [1],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        seed_daily_bars(
+            temp_data_dir,
+            recent,
+            [{"symbol": "AAPL", "name": "Apple", "close": 150.0, "volume": 1}],
+        )
 
         r = client.get("/api/stocks/AAPL/historical", params={"days": 7})
         assert r.status_code == 404
@@ -508,16 +530,20 @@ class TestStocksAPI:
 
         recent = datetime.now().strftime("%Y-%m-%d")
         older = (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d")
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "close": [155.0],
-                "change": [5.0],
-                "change_percent": [3.3],
-                "volume": [40_000_000],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        seed_daily_bars(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "close": 155.0,
+                    "change": 5.0,
+                    "change_percent": 3.3,
+                    "volume": 40_000_000,
+                }
+            ],
+        )
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -528,17 +554,21 @@ class TestStocksAPI:
                 "recommendation": ["BUY"],
             }
         ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
-        # Stale file outside the requested window should be ignored.
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "name": ["Apple"],
-                "close": [100.0],
-                "change": [0.0],
-                "change_percent": [0.0],
-                "volume": [1],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{older}.csv", index=False)
+        # Stale bar outside the requested window should be ignored.
+        seed_daily_bars(
+            temp_data_dir,
+            older,
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple",
+                    "close": 100.0,
+                    "change": 0.0,
+                    "change_percent": 0.0,
+                    "volume": 1,
+                }
+            ],
+        )
 
         r = client.get("/api/stocks/AAPL/historical", params={"days": 1})
         assert r.status_code == 200
@@ -553,17 +583,21 @@ class TestStocksAPI:
     def test_stock_detail_matches_padded_daily_and_projection_symbols(
         self, client, mock_data_loader, temp_data_dir
     ):
-        """Padded CSV symbols must still resolve via normalize_ticker matching."""
-        pd.DataFrame(
-            {
-                "symbol": [" AAPL "],
-                "name": ["Apple"],
-                "close": [151.0],
-                "change": [1.0],
-                "change_percent": [0.7],
-                "volume": [1_000],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        """Padded symbols must still resolve via normalize_ticker matching."""
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": " AAPL ",
+                    "name": "Apple",
+                    "close": 151.0,
+                    "change": 1.0,
+                    "change_percent": 0.7,
+                    "volume": 1_000,
+                }
+            ],
+        )
         pd.DataFrame(
             {
                 "symbol": [" aapl "],
@@ -594,16 +628,20 @@ class TestStocksAPI:
         from datetime import date, timedelta
 
         recent = (date.today() - timedelta(days=1)).isoformat()
-        pd.DataFrame(
-            {
-                "symbol": [" AAPL "],
-                "name": ["Apple"],
-                "close": [155.0],
-                "change": [1.0],
-                "change_percent": [0.5],
-                "volume": [2_000],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        seed_daily_bars(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": " AAPL ",
+                    "name": "Apple",
+                    "close": 155.0,
+                    "change": 1.0,
+                    "change_percent": 0.5,
+                    "volume": 2_000,
+                }
+            ],
+        )
         pd.DataFrame(
             {
                 "symbol": ["aapl"],
@@ -995,11 +1033,9 @@ class TestHistorySummaryAPI:
             }
         ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
         (temp_data_dir / "projections_2026-01-14.csv").write_text("broken")
-        # Daily files so get_available_dates includes these days
+        # Bars so get_available_dates includes these days
         for d in ("2026-01-16", "2026-01-15", "2026-01-14"):
-            pd.DataFrame(
-                {"symbol": ["AAPL"], "close": [1.0], "change_percent": [0.0]}
-            ).to_csv(temp_data_dir / f"daily_data_{d}.csv", index=False)
+            seed_simple_bars(temp_data_dir, d, close=1.0, change_percent=0.0)
 
         with patch(
             "dashboard.backend.api.history._resolve_company_names",

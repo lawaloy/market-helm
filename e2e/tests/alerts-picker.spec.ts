@@ -33,7 +33,7 @@ test.describe('Helmtower company picker', () => {
     await page.getByRole('button', { name: 'Company' }).click();
     await expect(page.getByPlaceholder('Search Apple, AAPL…')).toBeVisible();
 
-    // CI seeds AAPL at $150 in daily_data CSV — no Finnhub key required.
+    // CI seeds AAPL at $150 in market_bars — no Finnhub key required.
     await page.getByPlaceholder('Search Apple, AAPL…').fill('Apple');
     await expect(page.locator('[data-symbol="AAPL"] span').last()).toHaveText(/\$150\.00/, {
       timeout: 10_000,

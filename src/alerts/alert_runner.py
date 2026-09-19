@@ -112,7 +112,7 @@ def _fetch_missing_watch_quotes(
 
 def evaluate_alerts_from_latest_data(*, fetch_missing_quotes: bool = True) -> Dict[str, Any]:
     """
-    Run all enabled watches against the newest daily_data CSV on disk.
+    Run all enabled watches against the newest market_bars snapshot.
     When fetch_missing_quotes is True, also pulls live Finnhub quotes for
     watch symbols that are not in the saved CSV (common with REFRESH_TOP_N=10).
     """

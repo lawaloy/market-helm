@@ -1,4 +1,4 @@
-"""Durable market bar storage (slice 1: dual-write alongside daily CSV)."""
+"""Durable market bar storage for daily quotes (CSV daily_data removed)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
+from typing import Any, Dict, Iterator, List, Optional, Sequence
 
 from src.utils.tickers import normalize_ticker
 
@@ -281,6 +281,25 @@ def load_market_bars(
     return [dict(row) for row in rows]
 
 
+def market_bars_frame(
+    trade_date: date | datetime | str,
+    *,
+    data_dir: Optional[str | Path] = None,
+):
+    """Return a pandas DataFrame of bars for ``trade_date`` (possibly empty)."""
+    import pandas as pd
+
+    rows = load_market_bars(trade_date, data_dir=data_dir)
+    if not rows:
+        return pd.DataFrame()
+    frame = pd.DataFrame(rows)
+    # Drop storage-only columns that callers of the old CSV shape did not expect.
+    drop_cols = [col for col in ("written_at", "source") if col in frame.columns]
+    if drop_cols:
+        frame = frame.drop(columns=drop_cols)
+    return frame
+
+
 def list_market_bar_dates(
     *,
     data_dir: Optional[str | Path] = None,
@@ -305,27 +324,3 @@ def list_market_bar_dates(
             (limit_n,),
         ).fetchall()
     return [str(row["trade_date"]) for row in rows]
-
-
-def dual_write_market_bars(
-    stocks: Iterable[Dict[str, Any]],
-    trade_date: date | datetime | str,
-    *,
-    data_dir: Optional[str | Path] = None,
-    source: str = "fetch",
-) -> int:
-    """
-    Best-effort upsert used by CSV writers.
-
-    Returns written count, or 0 when persistence fails (logged, never raised).
-    """
-    try:
-        return upsert_market_bars(
-            list(stocks),
-            trade_date,
-            data_dir=data_dir,
-            source=source,
-        )
-    except Exception as exc:
-        logger.warning("Market bars dual-write failed: %s", exc)
-        return 0

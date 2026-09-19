@@ -8,9 +8,12 @@ import tempfile
 import pandas as pd
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+
 
 @pytest.fixture
-def temp_data_dir():
+def temp_data_dir(monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)
@@ -28,20 +31,12 @@ class TestProjectionAccuracyInvalidDates:
         self, loader, temp_data_dir
     ):
         """The shared evaluator derives the exact session instead of trusting a dirty field."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [110.0],
-                "change_percent": [1.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
+        seed_daily_bars(
+            temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}]
+        )
+        seed_daily_bars(
+            temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
+        )
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -63,20 +58,12 @@ class TestProjectionAccuracyInvalidDates:
 class TestProjectionAccuracyRecommendationSentinels:
     def test_nan_recommendation_becomes_unknown(self, loader, temp_data_dir):
         """NaN recommendation cells must not create a \"nan\" accuracy bucket."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [100.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [110.0],
-                "change_percent": [1.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
+        seed_daily_bars(
+            temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}]
+        )
+        seed_daily_bars(
+            temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
+        )
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -101,14 +88,13 @@ class TestHistoricalCorruptProjections:
     ):
         """A corrupt projections CSV must not hide valid daily history for the symbol."""
         recent = (date.today() - timedelta(days=1)).isoformat()
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [155.0],
-                "change_percent": [0.5],
-                "volume": [1_000],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+        seed_simple_bars(
+            temp_data_dir,
+            recent,
+            close=155.0,
+            change_percent=0.5,
+            volume=1_000,
+        )
         (temp_data_dir / f"projections_{recent}.csv").write_text(
             'col1,col2\n1,"unclosed',
             encoding="utf-8",

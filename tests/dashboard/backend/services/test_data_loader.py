@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+
 
 @pytest.fixture
 def temp_data_dir():
@@ -20,8 +22,9 @@ def temp_data_dir():
 
 
 @pytest.fixture
-def loader(temp_data_dir):
-    """Create DataLoader with temp directory."""
+def loader(temp_data_dir, monkeypatch):
+    """Create DataLoader with temp directory (file-mode market_bars sidecar)."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     from dashboard.backend.services.data_loader import DataLoader
     return DataLoader(data_dir=temp_data_dir)
 
@@ -42,7 +45,7 @@ class TestDataLoader:
 
     def test_load_daily_data_raises_when_no_files(self, loader):
         """load_daily_data raises when no files exist."""
-        with pytest.raises(ValueError, match="No daily data files found"):
+        with pytest.raises(ValueError, match="No daily data found"):
             loader.load_daily_data()
 
     def test_load_summary_raises_when_no_files(self, loader):
@@ -52,12 +55,10 @@ class TestDataLoader:
 
     def test_load_daily_data_returns_dataframe(self, loader, temp_data_dir):
         """load_daily_data returns correct DataFrame."""
-        df = pd.DataFrame({
-            "symbol": ["AAPL", "GOOGL"],
-            "close": [150.0, 2800.0],
-            "change_percent": [1.0, -0.5],
-        })
-        df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        seed_daily_bars(temp_data_dir, "2026-01-15", [
+            {"symbol": "AAPL", "close": 150.0, "change_percent": 1.0},
+            {"symbol": "GOOGL", "close": 2800.0, "change_percent": -0.5},
+        ])
 
         result = loader.load_daily_data()
         assert isinstance(result, pd.DataFrame)
@@ -82,69 +83,49 @@ class TestDataLoader:
         with pytest.raises(ValueError, match="Summary file unreadable"):
             loader.load_summary()
 
-    def test_load_daily_data_raises_value_error_on_corrupt_csv(self, loader, temp_data_dir):
-        """Unreadable daily CSV raises ValueError (not raw ParserError)."""
-        (temp_data_dir / "daily_data_2026-01-15.csv").write_text(
-            'col1,col2\n1,"unclosed', encoding="utf-8"
-        )
-        with pytest.raises(ValueError, match="Daily data unreadable"):
-            loader.load_daily_data()
+    def test_load_daily_data_raises_when_date_missing(self, loader, temp_data_dir):
+        """Missing trade date raises ValueError so APIs can map to 404."""
+        seed_simple_bars(temp_data_dir, "2026-01-15", close=100.0)
+        with pytest.raises(ValueError, match="Daily data not found for date"):
+            loader.load_daily_data("2099-01-01")
 
     def test_get_latest_date_returns_date_string(self, loader, temp_data_dir):
         """get_latest_date returns date from most recent file by filename date."""
-        df = pd.DataFrame({"symbol": ["A"], "close": [100.0], "change_percent": [0.0]})
-        df.to_csv(temp_data_dir / "daily_data_2026-01-20.csv", index=False)
-        df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        seed_simple_bars(temp_data_dir, "2026-01-20", close=100.0)
+        seed_simple_bars(temp_data_dir, "2026-01-15", close=100.0)
 
         result = loader.get_latest_date()
         assert result == "2026-01-20"
 
-    def test_get_latest_date_uses_filename_date_not_mtime(self, loader, temp_data_dir):
-        """get_latest_date uses date in filename, not file mtime."""
-        df = pd.DataFrame({"symbol": ["A"], "close": [100.0], "change_percent": [0.0]})
-        newer_date_file = temp_data_dir / "daily_data_2026-01-20.csv"
-        older_date_file = temp_data_dir / "daily_data_2026-01-15.csv"
-        df.to_csv(newer_date_file, index=False)
-        df.to_csv(older_date_file, index=False)
-        # Make older-date file have newer mtime
-        time.sleep(0.01)
-        os.utime(older_date_file, (time.time(), time.time()))
+    def test_get_latest_date_uses_trade_date_order(self, loader, temp_data_dir):
+        """get_latest_date uses trade_date, not insert order."""
+        seed_simple_bars(temp_data_dir, "2026-01-20", close=100.0)
+        seed_simple_bars(temp_data_dir, "2026-01-15", close=100.0)
 
         result = loader.get_latest_date()
         assert result == "2026-01-20"
 
     def test_get_available_dates_returns_sorted_list(self, loader, temp_data_dir):
         """get_available_dates returns sorted list of dates."""
-        df = pd.DataFrame({"symbol": ["A"], "close": [100.0], "change_percent": [0.0]})
-        df.to_csv(temp_data_dir / "daily_data_2026-01-10.csv", index=False)
-        df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        seed_simple_bars(temp_data_dir, "2026-01-10", close=100.0)
+        seed_simple_bars(temp_data_dir, "2026-01-15", close=100.0)
 
         result = loader.get_available_dates()
         assert len(result) == 2
         assert result == sorted(result, reverse=True)
 
-    def test_load_daily_data_loads_by_filename_date_not_mtime(self, loader, temp_data_dir):
-        """load_daily_data loads latest by date in filename, not mtime."""
-        df_old = pd.DataFrame({"symbol": ["OLD"], "close": [50.0], "change_percent": [0.0]})
-        df_new = pd.DataFrame({"symbol": ["NEW"], "close": [100.0], "change_percent": [0.0]})
-        newer_file = temp_data_dir / "daily_data_2026-01-20.csv"
-        older_file = temp_data_dir / "daily_data_2026-01-15.csv"
-        df_new.to_csv(newer_file, index=False)
-        df_old.to_csv(older_file, index=False)
-        time.sleep(0.01)
-        os.utime(older_file, (time.time(), time.time()))
+    def test_load_daily_data_loads_latest_trade_date(self, loader, temp_data_dir):
+        """load_daily_data loads the newest trade_date by default."""
+        seed_daily_bars(temp_data_dir, "2026-01-20", [{"symbol": "NEW", "close": 100.0}])
+        seed_daily_bars(temp_data_dir, "2026-01-15", [{"symbol": "OLD", "close": 50.0}])
 
         result = loader.load_daily_data()
         assert result.iloc[0]["symbol"] == "NEW"
 
     def test_compute_projection_accuracy_matches_actual(self, loader, temp_data_dir):
         """Reports exact-session error, direction, band, and calibration metrics."""
-        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
-            temp_data_dir / "daily_data_2026-01-05.csv", index=False
-        )
-        pd.DataFrame({"symbol": ["AAPL"], "close": [105.0]}).to_csv(
-            temp_data_dir / "daily_data_2026-01-12.csv", index=False
-        )
+        seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
+        seed_daily_bars(temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 105.0}])
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -178,12 +159,8 @@ class TestDataLoader:
         self, loader, temp_data_dir
     ):
         """A later close cannot turn an exact-session gap into a variable-horizon score."""
-        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
-            temp_data_dir / "daily_data_2026-01-05.csv", index=False
-        )
-        pd.DataFrame({"symbol": ["AAPL"], "close": [108.0]}).to_csv(
-            temp_data_dir / "daily_data_2026-01-13.csv", index=False
-        )
+        seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
+        seed_daily_bars(temp_data_dir, "2026-01-13", [{"symbol": "AAPL", "close": 108.0}])
         pd.DataFrame(
             {"symbol": ["AAPL"], "current_price": [100.0], "target_mid": [110.0]}
         ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
@@ -199,9 +176,7 @@ class TestDataLoader:
         self, loader, temp_data_dir
     ):
         """Unmatured and malformed projections remain visible in report coverage."""
-        pd.DataFrame({"symbol": ["AAPL"], "close": [100.0]}).to_csv(
-            temp_data_dir / "daily_data_2026-01-05.csv", index=False
-        )
+        seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
         pd.DataFrame(
             {
                 "symbol": ["AAPL", "MSFT"],
@@ -230,13 +205,10 @@ class TestDataLoader:
         self, loader, temp_data_dir
     ):
         """Padded symbols match daily rows; None/NaN never become NONE/NAN samples."""
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "  msft  "],
-                "close": [100.0, 200.0],
-                "change_percent": [0.0, 0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-12.csv", index=False)
+        seed_daily_bars(temp_data_dir, "2026-01-12", [
+            {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
+            {"symbol": "  msft  ", "close": 200.0, "change_percent": 0.0},
+        ])
         pd.DataFrame(
             {
                 "symbol": [" aapl ", None, float("nan"), "  ", "MSFT"],
@@ -244,13 +216,9 @@ class TestDataLoader:
                 "recommendation": ["BUY", "HOLD", "HOLD", "HOLD", "SELL"],
             }
         ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "close": [95.0],
-                "change_percent": [0.0],
-            }
-        ).to_csv(temp_data_dir / "daily_data_2026-01-05.csv", index=False)
+        seed_daily_bars(temp_data_dir, "2026-01-05", [
+            {"symbol": "AAPL", "close": 95.0, "change_percent": 0.0},
+        ])
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -267,18 +235,18 @@ class TestDataLoader:
     def test_load_historical_data_matches_padded_symbols_and_skips_sentinels(
         self, loader, temp_data_dir
     ):
-        """Historical lookup must normalize CSV symbols and reject blank/sentinel keys."""
+        """Historical lookup must normalize symbols and reject blank/sentinel keys."""
         from datetime import date, timedelta
 
         recent = (date.today() - timedelta(days=1)).isoformat()
-        pd.DataFrame(
+        seed_daily_bars(temp_data_dir, recent, [
             {
-                "symbol": [" AAPL "],
-                "close": [155.0],
-                "change_percent": [0.5],
-                "volume": [1_000],
-            }
-        ).to_csv(temp_data_dir / f"daily_data_{recent}.csv", index=False)
+                "symbol": " AAPL ",
+                "close": 155.0,
+                "change_percent": 0.5,
+                "volume": 1_000,
+            },
+        ])
         pd.DataFrame(
             {
                 "symbol": ["aapl"],
@@ -300,19 +268,17 @@ class TestDataLoader:
         assert loader.load_historical_data("NONE", days=7) == []
 
     def test_get_latest_date_falls_back_when_only_weekends(self, loader, temp_data_dir):
-        """If every file is a weekend date, still return the newest one."""
-        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
-        df.to_csv(temp_data_dir / "daily_data_2026-01-17.csv", index=False)
-        df.to_csv(temp_data_dir / "daily_data_2026-01-18.csv", index=False)
+        """If every bar date is a weekend, still return the newest one."""
+        seed_simple_bars(temp_data_dir, "2026-01-17", symbol="A", close=1.0)
+        seed_simple_bars(temp_data_dir, "2026-01-18", symbol="A", close=1.0)
 
         assert loader.get_latest_date() == "2026-01-18"
 
     def test_get_latest_date_skips_weekend_files(self, loader, temp_data_dir):
-        """Prefer Friday over newer Saturday/Sunday filenames."""
-        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
-        df.to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)  # Fri
-        df.to_csv(temp_data_dir / "daily_data_2026-01-17.csv", index=False)  # Sat
-        df.to_csv(temp_data_dir / "daily_data_2026-01-18.csv", index=False)  # Sun
+        """Prefer Friday over newer Saturday/Sunday bar dates."""
+        seed_simple_bars(temp_data_dir, "2026-01-16", symbol="A", close=1.0)  # Fri
+        seed_simple_bars(temp_data_dir, "2026-01-17", symbol="A", close=1.0)  # Sat
+        seed_simple_bars(temp_data_dir, "2026-01-18", symbol="A", close=1.0)  # Sun
 
         assert loader.get_latest_date() == "2026-01-16"
         loaded = loader.load_daily_data()
@@ -379,14 +345,13 @@ class TestDataLoader:
 
         monkeypatch.setattr(dl, "datetime", _Now)
 
-        pd.DataFrame(
-            {"symbol": ["AAPL"], "close": [100.0], "change_percent": [0.0]}
-        ).to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
-        pd.DataFrame(
-            {"symbol": ["MSFT"], "close": [200.0], "change_percent": [0.0]}
-        ).to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
-        # Corrupt / unreadable daily file should be skipped
-        (temp_data_dir / "daily_data_2026-01-14.csv").write_text("not,csv\n")
+        seed_daily_bars(temp_data_dir, "2026-01-16", [
+            {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
+        ])
+        seed_daily_bars(temp_data_dir, "2026-01-15", [
+            {"symbol": "MSFT", "close": 200.0, "change_percent": 0.0},
+        ])
+        # Dates with no bars for AAPL are skipped (gap days)
         pd.DataFrame(
             {
                 "symbol": ["AAPL"],
@@ -419,9 +384,8 @@ class TestDataLoader:
                 return _N()
 
         monkeypatch.setattr(dl, "datetime", _Fri)
-        df = pd.DataFrame({"symbol": ["A"], "close": [1.0], "change_percent": [0.0]})
-        df.to_csv(temp_data_dir / "daily_data_2026-01-15.csv", index=False)
+        seed_simple_bars(temp_data_dir, "2026-01-15", symbol="A", close=1.0)
         assert loader.needs_fetch_for_latest_trading_day() is True
 
-        df.to_csv(temp_data_dir / "daily_data_2026-01-16.csv", index=False)
+        seed_simple_bars(temp_data_dir, "2026-01-16", symbol="A", close=1.0)
         assert loader.needs_fetch_for_latest_trading_day() is False

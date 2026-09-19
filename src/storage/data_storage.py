@@ -1,7 +1,7 @@
 """
 MarketHelm - Data Storage Module
 
-Handles saving and loading stock market data to/from CSV files.
+Handles durable market bars plus summary/projection file persistence.
 """
 
 import pandas as pd
@@ -9,7 +9,7 @@ from ..utils.company_names import enrich_stock_data_with_names
 import os
 import json
 import math
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, List, Dict, Optional
 from pathlib import Path
 
@@ -85,7 +85,7 @@ def _data_date_for_filename() -> datetime.date:
 
 
 class DataStorage:
-    """Manages storage of stock market data in CSV format."""
+    """Manages storage of stock market data (market_bars + projection/summary files)."""
     
     def __init__(self, data_dir: Optional[str] = None):
         """
@@ -101,70 +101,71 @@ class DataStorage:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
     
-    def _get_daily_file_path(self, date: datetime.date = None) -> Path:
-        """Get file path for daily data. Uses most recent trading day when date not specified."""
-        if date is None:
-            date = _data_date_for_filename()
-        
-        filename = f"daily_data_{date.strftime('%Y-%m-%d')}.csv"
-        return self.data_dir / filename
-    
     def save_daily_data(self, data: List[Dict], date: datetime.date = None) -> str:
         """
-        Save daily stock data to CSV.
+        Persist daily stock quotes to durable ``market_bars`` storage.
+
         Enriches company names at save time (pytickersymbols) when name==symbol.
-        Also dual-writes durable rows into market_bars (app DB or DATA_DIR sidecar).
-        
+        Does not write ``daily_data_*.csv``.
+
         Args:
             data: List of stock data dictionaries
             date: Date for the data (defaults to today)
-        
+
         Returns:
-            Path to saved file
+            Logical location string ``market_bars:YYYY-MM-DD``
         """
         if not data:
             return None
-        
+
         enrich_stock_data_with_names(data)
         if date is None:
             date = _data_date_for_filename()
-        df = pd.DataFrame(data)
-        file_path = self._get_daily_file_path(date)
-        _atomic_replace(file_path, lambda tmp: df.to_csv(tmp, index=False))
-        try:
-            from .market_bars import dual_write_market_bars
 
-            dual_write_market_bars(
-                data,
-                date,
-                data_dir=self.data_dir,
-                source="fetch",
-            )
-        except Exception as exc:
-            # CSV remains source of truth for slice 1; never fail the fetch on DB.
-            print(f"Warning: market bars dual-write skipped: {exc}")
-        return str(file_path)
-    
-    def load_daily_data(self, date: datetime.date = None) -> Optional[pd.DataFrame]:
+        from .market_bars import upsert_market_bars
+
+        written = upsert_market_bars(
+            data,
+            date,
+            data_dir=self.data_dir,
+            source="fetch",
+        )
+        if written <= 0:
+            raise ValueError("No valid market bars to persist (missing symbols/closes)")
+        return f"market_bars:{date.strftime('%Y-%m-%d')}"
+
+    def load_daily_data(self, trade_date: date = None) -> Optional[pd.DataFrame]:
         """
-        Load daily stock data from CSV.
-        
+        Load daily stock data from ``market_bars``.
+
         Args:
-            date: Date to load (defaults to today)
-        
+            trade_date: Date to load (defaults to latest available bar date)
+
         Returns:
             DataFrame with stock data or None if not found
         """
-        file_path = self._get_daily_file_path(date)
-        
-        if not file_path.exists():
-            return None
-        
+        from .market_bars import list_market_bar_dates, market_bars_frame
+
+        if trade_date is None:
+            dates = list_market_bar_dates(data_dir=self.data_dir, limit=1)
+            if not dates:
+                return None
+            day = dates[0]
+        else:
+            day = (
+                trade_date.strftime("%Y-%m-%d")
+                if isinstance(trade_date, date)
+                else str(trade_date)
+            )
+
         try:
-            return pd.read_csv(file_path)
+            frame = market_bars_frame(day, data_dir=self.data_dir)
         except Exception as e:
-            print(f"Error loading data from {file_path}: {str(e)}")
+            print(f"Error loading market bars for {day}: {str(e)}")
             return None
+        if frame is None or frame.empty:
+            return None
+        return frame
     
     def save_summary(self, summary_data: Dict, date: datetime.date = None) -> str:
         """
@@ -488,8 +489,8 @@ class DataStorage:
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(md) + '\n')
     
-    def get_historical_data(self, start_date: datetime.date = None, 
-                          end_date: datetime.date = None) -> pd.DataFrame:
+    def get_historical_data(self, start_date: date = None,
+                          end_date: date = None) -> pd.DataFrame:
         """
         Load historical data for a date range.
         

@@ -1,31 +1,25 @@
-"""Malformed market-data filenames must not become the latest trading day."""
+"""ISO date helpers and market_bars date listing edge cases."""
 
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
 from dashboard.backend.services.data_loader import DataLoader, _is_iso_date
+from tests.helpers.market_bars import seed_simple_bars
 
 
 @pytest.fixture
-def data_dir(tmp_path: Path) -> Path:
+def data_dir(tmp_path: Path, monkeypatch) -> Path:
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     return tmp_path
 
 
 @pytest.fixture
 def loader(data_dir: Path) -> DataLoader:
     return DataLoader(data_dir=data_dir)
-
-
-def _write_daily(data_dir: Path, suffix: str) -> Path:
-    path = data_dir / f"daily_data_{suffix}.csv"
-    pd.DataFrame(
-        {"symbol": ["AAPL"], "close": [100.0], "change_percent": [1.0]}
-    ).to_csv(path, index=False)
-    return path
 
 
 def test_is_iso_date_accepts_strict_calendar_dates() -> None:
@@ -36,55 +30,46 @@ def test_is_iso_date_accepts_strict_calendar_dates() -> None:
     assert _is_iso_date("not-a-date") is False
 
 
-def test_get_available_dates_ignores_malformed_suffixes(
+def test_get_available_dates_returns_seeded_iso_dates(
     loader: DataLoader, data_dir: Path
 ) -> None:
-    _write_daily(data_dir, "2026-01-15")
-    _write_daily(data_dir, "zzzz")
-    _write_daily(data_dir, "tmp")
-    _write_daily(data_dir, "2026-01-15.bak")
-    (data_dir / "daily_data_.csv").write_text("symbol,close\nA,1\n", encoding="utf-8")
-
+    seed_simple_bars(data_dir, "2026-01-15")
     assert loader.get_available_dates() == ["2026-01-15"]
 
 
-def test_get_latest_date_prefers_valid_iso_over_lexicographic_garbage(
+def test_get_latest_date_returns_newest_seeded_date(
     loader: DataLoader, data_dir: Path
 ) -> None:
-    _write_daily(data_dir, "2026-01-15")  # Thursday
-    _write_daily(data_dir, "zzzz")  # would sort above ISO dates lexicographically
+    seed_simple_bars(data_dir, "2026-01-15")  # Thursday
+    seed_simple_bars(data_dir, "2026-01-14")  # Wednesday
 
     assert loader.get_latest_date() == "2026-01-15"
 
 
-def test_load_daily_data_default_ignores_malformed_competitors(
+def test_load_daily_data_default_uses_newest_weekday(
     loader: DataLoader, data_dir: Path
 ) -> None:
-    _write_daily(data_dir, "2026-01-14")  # Wednesday
-    garbage = _write_daily(data_dir, "zzzz")
-    garbage.write_text("symbol,close,change_percent\nGARBAGE,1,0\n", encoding="utf-8")
+    seed_simple_bars(data_dir, "2026-01-14", symbol="OLDER", close=50.0)
+    seed_simple_bars(data_dir, "2026-01-15", symbol="NEWER", close=100.0)
 
     frame = loader.load_daily_data()
-    assert list(frame["symbol"]) == ["AAPL"]
+    assert list(frame["symbol"]) == ["NEWER"]
 
 
-def test_get_latest_file_returns_none_when_only_malformed_dates(
+def test_empty_store_has_no_available_dates(
     loader: DataLoader, data_dir: Path
 ) -> None:
-    _write_daily(data_dir, "zzzz")
-    _write_daily(data_dir, "partial")
-
-    assert loader._get_latest_file("daily_data_*.csv", sort_by_date=True) is None
     assert loader.get_available_dates() == []
     assert loader.get_latest_date() is None
 
 
-def test_get_available_dates_maps_glob_oserror_to_valueerror(loader: DataLoader) -> None:
-    """Unreadable data/ must become ValueError so history/overview APIs return 404."""
-    from unittest.mock import MagicMock
-
-    fake_dir = MagicMock()
-    fake_dir.glob.side_effect = OSError("permission denied")
-    loader.data_dir = fake_dir
-    with pytest.raises(ValueError, match="unreadable"):
-        loader.get_available_dates()
+def test_get_available_dates_maps_list_oserror_to_valueerror(
+    loader: DataLoader,
+) -> None:
+    """Unreadable market_bars must become ValueError so history/overview APIs return 404."""
+    with patch(
+        "src.storage.market_bars.list_market_bar_dates",
+        side_effect=OSError("permission denied"),
+    ):
+        with pytest.raises(ValueError, match="unreadable"):
+            loader.get_available_dates()
