@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { BellAlertIcon, ChatBubbleLeftRightIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
-import { AlertComposer } from '../components/alerts/AlertComposer';
+import { AlertComposer, type ComposerMode } from '../components/alerts/AlertComposer';
 import { AlertsToast, PlatformChip } from '../components/alerts/AlertsUi';
 import { DeliveryChannel } from '../components/alerts/DeliveryChannel';
 import { RuleCard } from '../components/alerts/RuleCard';
@@ -13,6 +13,7 @@ import {
   emptyConfig,
   fieldClass,
   findDuplicatePriceRule,
+  findDuplicateRsiRule,
   formatCondition,
   formatDeliveryStatusLine,
   formatTestSuccess,
@@ -48,6 +49,9 @@ const AlertsSettings: React.FC = () => {
   const [newSymbol, setNewSymbol] = useState('AAPL');
   const [newOperator, setNewOperator] = useState<'less_than' | 'greater_than'>('less_than');
   const [newValue, setNewValue] = useState('150');
+  const [composerMode, setComposerMode] = useState<ComposerMode>('price');
+  const [newRsiOperator, setNewRsiOperator] = useState<'less_than' | 'greater_than'>('less_than');
+  const [newRsiValue, setNewRsiValue] = useState('30');
   const [symbolOptions, setSymbolOptions] = useState<SymbolOption[]>([]);
   const [symbolsLoading, setSymbolsLoading] = useState(true);
   /** Bumped on unmount / superseded loadConfig so late config/status responses are ignored. */
@@ -382,28 +386,98 @@ const AlertsSettings: React.FC = () => {
 
   const handleAddRule = async () => {
     const symbol = newSymbol.trim().toUpperCase();
+    if (!symbol) {
+      setError('Enter a valid symbol.');
+      return;
+    }
+
+    const needsPrice = composerMode === 'price' || composerMode === 'price_and_rsi';
+    const needsRsi = composerMode === 'rsi' || composerMode === 'price_and_rsi';
     // Reject blank / NaN / ±Infinity — Inf survives Number.isNaN and would persist as
-    // null over the wire (JSON.stringify) or poison file-mode watch state. type=number
-    // inputs may sanitize Inf to "" which Number("") treats as 0.
-    const value = parseFinitePrice(newValue);
-    if (!symbol || value === null) {
-      setError('Enter a valid symbol and price.');
+    // null over the wire (JSON.stringify) or poison file-mode watch state.
+    const priceValue = needsPrice ? parseFinitePrice(newValue) : null;
+    const rsiValue = needsRsi ? parseFinitePrice(newRsiValue) : null;
+
+    if (needsPrice && priceValue === null) {
+      setError('Enter a valid price.');
       return;
     }
-    const existing = findDuplicatePriceRule(config.alerts, symbol, newOperator, value);
-    if (existing) {
-      setSuccess(null);
-      setError(`You already have a watch when ${formatCondition(existing).toLowerCase()}.`);
+    if (needsRsi && rsiValue === null) {
+      setError('Enter a valid RSI threshold.');
       return;
     }
-    const rule: AlertRule = {
-      id: slugify(`${symbol}_${newOperator}_${value}`) || 'price_alert',
-      name: `${symbol} price alert`,
-      enabled: true,
-      condition: { type: 'price_threshold', symbol, operator: newOperator, value },
-      notifications: buildNotifications(notifyEmail, notifyWebhook),
-      cooldown_minutes: 60,
-    };
+
+    let rule: AlertRule;
+    if (composerMode === 'price' && priceValue !== null) {
+      const existing = findDuplicatePriceRule(config.alerts, symbol, newOperator, priceValue);
+      if (existing) {
+        setSuccess(null);
+        setError(`You already have a watch when ${formatCondition(existing).toLowerCase()}.`);
+        return;
+      }
+      rule = {
+        id: slugify(`${symbol}_${newOperator}_${priceValue}`) || 'price_alert',
+        name: `${symbol} price alert`,
+        enabled: true,
+        condition: { type: 'price_threshold', symbol, operator: newOperator, value: priceValue },
+        notifications: buildNotifications(notifyEmail, notifyWebhook),
+        cooldown_minutes: 60,
+      };
+    } else if (composerMode === 'rsi' && rsiValue !== null) {
+      const existing = findDuplicateRsiRule(config.alerts, symbol, newRsiOperator, rsiValue, 14);
+      if (existing) {
+        setSuccess(null);
+        setError(`You already have a watch when ${formatCondition(existing).toLowerCase()}.`);
+        return;
+      }
+      rule = {
+        id: slugify(`${symbol}_rsi_${newRsiOperator}_${rsiValue}`) || 'rsi_alert',
+        name: `${symbol} RSI alert`,
+        enabled: true,
+        condition: {
+          type: 'rsi_threshold',
+          symbol,
+          period: 14,
+          operator: newRsiOperator,
+          value: rsiValue,
+        },
+        notifications: buildNotifications(notifyEmail, notifyWebhook),
+        cooldown_minutes: 60,
+      };
+    } else if (priceValue !== null && rsiValue !== null) {
+      rule = {
+        id:
+          slugify(`${symbol}_${newOperator}_${priceValue}_rsi_${newRsiOperator}_${rsiValue}`) ||
+          'compound_alert',
+        name: `${symbol} price + RSI alert`,
+        enabled: true,
+        condition: {
+          type: 'compound',
+          op: 'and',
+          conditions: [
+            {
+              type: 'price_threshold',
+              symbol,
+              operator: newOperator,
+              value: priceValue,
+            },
+            {
+              type: 'rsi_threshold',
+              symbol,
+              period: 14,
+              operator: newRsiOperator,
+              value: rsiValue,
+            },
+          ],
+        },
+        notifications: buildNotifications(notifyEmail, notifyWebhook),
+        cooldown_minutes: 60,
+      };
+    } else {
+      setError('Enter a valid symbol and thresholds.');
+      return;
+    }
+
     const nextConfig: AlertsConfig = { ...config, alerts: [...config.alerts, rule] };
     setConfig(nextConfig);
     setError(null);
@@ -425,9 +499,13 @@ const AlertsSettings: React.FC = () => {
   const composer = (
     <AlertComposer
       headline={userRules.length === 0 ? 'New watch' : 'Add another watch'}
+      mode={composerMode}
+      onModeChange={setComposerMode}
       newSymbol={newSymbol}
       newOperator={newOperator}
       newValue={newValue}
+      newRsiOperator={newRsiOperator}
+      newRsiValue={newRsiValue}
       symbolOptions={symbolOptions}
       symbolsLoading={symbolsLoading}
       prices={symbolPrices}
@@ -438,6 +516,8 @@ const AlertsSettings: React.FC = () => {
       onSymbolChange={setNewSymbol}
       onOperatorChange={setNewOperator}
       onValueChange={setNewValue}
+      onRsiOperatorChange={setNewRsiOperator}
+      onRsiValueChange={setNewRsiValue}
       onSubmit={() => void handleAddRule()}
       submitting={saving}
       canActivate={canSave}

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Alert depth:** RSI(14) threshold watches, shallow AND/OR compound conditions
+  (price + RSI in Helmtower), provider candle history for RSI (CSV fallback), and
+  hosted symbol-queue evaluation for single-symbol technical/compound rules.
 - **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
   verification command, and regression gate for projection-evaluator semantics.
 - **Projection validation:** XNYS trading-session targets plus a shared CLI, API,
@@ -39,8 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Not yet shipped
 
-- **Alerts:** Technical/multi-condition rules and SMS/push channels (see
-  [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
+- **Alerts:** Nested compound rules, additional indicators beyond RSI, and SMS/push
+  channels (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Dashboard:** Route-level code splitting, watchlist, keyboard shortcuts (see [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)).
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
 - **Execution:** Broker integration and automated order placement.

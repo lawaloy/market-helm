@@ -114,8 +114,10 @@ In hosted mode, database jobs add claim/lease semantics around evaluation so
 multiple workers can process user rules without sharing in-memory tenant state.
 
 Current conditions are price thresholds and screening matches. Current channels
-are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Technical
-indicators, patterns, compound rules, SMS, push, and cloud queue-provider adapters
+are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
+conditions are price thresholds, RSI thresholds, shallow AND/OR compounds of those
+leaves (plus screening match), with history loaded from saved daily CSVs. Patterns,
+nested compounds, SMS, push, and cloud queue-provider adapters
 are not implemented.
 
 | Module                                      | Responsibility                                  |

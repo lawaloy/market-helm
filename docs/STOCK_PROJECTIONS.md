@@ -294,8 +294,8 @@ Potential improvements for future versions:
 - [ ] Fundamental analysis factors
 - [ ] News sentiment integration
 - [ ] Sector correlation analysis
-- [ ] Technical/compound rules and SMS/push for high-confidence opportunities
-      (price/screening rules plus email/webhooks already ship; see
+- [ ] Nested compound / extra indicators and SMS/push for high-confidence
+      opportunities (RSI + shallow price/RSI compounds already ship; see
       [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))
 
 ## Architecture

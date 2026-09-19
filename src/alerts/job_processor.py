@@ -8,7 +8,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from src.alerts.alert_engine import AlertEngine
-from src.alerts.alert_rules import evaluate_price_threshold
+from src.alerts.alert_rules import evaluate_compound, evaluate_leaf_symbols
+from src.alerts.price_history import closes_by_symbol
 from src.alerts.user_alert_storage import UserAlertStorage
 from src.storage.alert_jobs import (
     JOB_DELIVER,
@@ -114,28 +115,53 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
                 symbol,
             )
             continue
-        if watch["condition_type"] != "price_threshold":
+        if watch["condition_type"] not in {
+            "price_threshold",
+            "rsi_threshold",
+            "compound",
+        }:
             continue
         try:
-            matched = evaluate_price_threshold(condition, stock)
+            if watch["condition_type"] == "price_threshold":
+                matched_symbols = evaluate_leaf_symbols(condition, [stock])
+            elif watch["condition_type"] == "rsi_threshold":
+                history = closes_by_symbol([symbol], [stock])
+                matched_symbols = evaluate_leaf_symbols(
+                    condition, [stock], closes_by_symbol=history
+                )
+            else:
+                # Single-symbol compounds are indexed on the shared ticker.
+                needed = []
+                leaves = condition.get("conditions")
+                if isinstance(leaves, list):
+                    for leaf in leaves:
+                        if (
+                            isinstance(leaf, dict)
+                            and leaf.get("type") == "rsi_threshold"
+                        ):
+                            needed.append(symbol)
+                history = closes_by_symbol(needed or [], [stock])
+                matched_symbols = evaluate_compound(
+                    condition, [stock], closes_by_symbol=history
+                )
         except (TypeError, ValueError, AttributeError) as exc:
             logger.warning(
-                "Skipping invalid price alert %s for user %s on %s: %s",
+                "Skipping invalid alert %s for user %s on %s: %s",
                 alert_id,
                 user_id,
                 symbol,
                 exc,
             )
             continue
-        if not matched:
+        if not matched_symbols:
             continue
 
         event = {
             "alert_id": alert_id,
             "alert_name": alert.get("name", alert_id),
-            "symbols": [symbol],
+            "symbols": matched_symbols,
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "condition_type": "price_threshold",
+            "condition_type": watch["condition_type"],
             "user_id": user_id,
         }
         enqueue_job(

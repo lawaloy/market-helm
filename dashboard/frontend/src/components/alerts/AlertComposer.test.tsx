@@ -13,6 +13,21 @@ const OPTIONS: SymbolOption[] = [
   { value: 'AAPL', label: 'Apple · AAPL', searchText: 'apple aapl' },
 ];
 
+const baseProps = {
+  mode: 'price' as const,
+  onModeChange: () => {},
+  newOperator: 'less_than' as const,
+  newRsiOperator: 'less_than' as const,
+  newRsiValue: '30',
+  symbolOptions: OPTIONS,
+  prices: {},
+  onSymbolChange: () => {},
+  onOperatorChange: () => {},
+  onValueChange: () => {},
+  onRsiOperatorChange: () => {},
+  onRsiValueChange: () => {},
+};
+
 function renderComposer(
   overrides: Partial<{
     newSymbol: string;
@@ -24,15 +39,10 @@ function renderComposer(
 ) {
   return render(
     <AlertComposer
+      {...baseProps}
       newSymbol={overrides.newSymbol ?? 'AAPL'}
-      newOperator="less_than"
       newValue={overrides.newValue ?? '150'}
-      symbolOptions={OPTIONS}
       symbolsLoading={overrides.symbolsLoading ?? false}
-      prices={{}}
-      onSymbolChange={() => {}}
-      onOperatorChange={() => {}}
-      onValueChange={() => {}}
       onSubmit={overrides.onSubmit ?? vi.fn()}
       submitting={overrides.submitting}
     />,
@@ -64,15 +74,10 @@ describe('AlertComposer submit gate', () => {
 
     rerender(
       <AlertComposer
+        {...baseProps}
         newSymbol="AAPL"
-        newOperator="less_than"
         newValue="NaN"
-        symbolOptions={OPTIONS}
         symbolsLoading={false}
-        prices={{}}
-        onSymbolChange={() => {}}
-        onOperatorChange={() => {}}
-        onValueChange={() => {}}
         onSubmit={vi.fn()}
       />,
     );

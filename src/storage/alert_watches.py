@@ -66,25 +66,110 @@ def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
     return text
 
 
-def _coerce_threshold(raw_value: Any, alert_id: str) -> float:
+def _coerce_threshold(
+    raw_value: Any, alert_id: str, *, label: str = "price threshold"
+) -> float:
     # Missing/null thresholds previously persisted as SQL NULL watches that can
     # never evaluate usefully — reject at save so Infinity→JSON-null clients
     # and incomplete Settings payloads fail closed.
     if raw_value is None:
         raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid price threshold value."
+            f"Alert '{alert_id}' has an invalid {label} value."
         )
     try:
         threshold = float(raw_value)
     except (TypeError, ValueError) as exc:
         raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid price threshold value."
+            f"Alert '{alert_id}' has an invalid {label} value."
         ) from exc
     if not math.isfinite(threshold):
         raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid price threshold value."
+            f"Alert '{alert_id}' has an invalid {label} value."
         )
     return threshold
+
+
+def _coerce_rsi_period(raw_value: Any, alert_id: str) -> int:
+    from src.alerts.alert_rules import (
+        DEFAULT_RSI_PERIOD,
+        MAX_RSI_PERIOD,
+        MIN_RSI_PERIOD,
+    )
+
+    if raw_value is None:
+        return DEFAULT_RSI_PERIOD
+    try:
+        period = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid RSI period."
+        ) from exc
+    if period < MIN_RSI_PERIOD or period > MAX_RSI_PERIOD:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' has an invalid RSI period."
+        )
+    return period
+
+
+def _validate_compound_condition(condition: Dict[str, Any], alert_id: str) -> None:
+    from src.alerts.alert_rules import (
+        COMPOUND_OPS,
+        LEAF_CONDITION_TYPES,
+        MAX_COMPOUND_LEAVES,
+    )
+
+    op = str(condition.get("op") or "").strip().lower()
+    if op not in COMPOUND_OPS:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' compound rule must use op 'and' or 'or'."
+        )
+    leaves = condition.get("conditions")
+    if not isinstance(leaves, list) or not leaves:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' compound rule must include conditions."
+        )
+    if len(leaves) > MAX_COMPOUND_LEAVES:
+        raise InvalidAlertWatchConfig(
+            f"Alert '{alert_id}' compound rule exceeds {MAX_COMPOUND_LEAVES} conditions."
+        )
+    for leaf in leaves:
+        if not isinstance(leaf, dict):
+            raise InvalidAlertWatchConfig(
+                f"Alert '{alert_id}' compound rule has an invalid condition."
+            )
+        leaf_type = leaf.get("type")
+        if leaf_type == "compound":
+            raise InvalidAlertWatchConfig(
+                f"Alert '{alert_id}' does not support nested compound rules."
+            )
+        if leaf_type not in LEAF_CONDITION_TYPES:
+            raise InvalidAlertWatchConfig(
+                f"Alert '{alert_id}' compound rule has an unsupported condition type."
+            )
+        if leaf_type == "price_threshold":
+            if not normalize_ticker(leaf.get("symbol")):
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have a valid symbol."
+                )
+            raw_operator = leaf.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have an operator."
+                )
+            _coerce_threshold(leaf.get("value"), alert_id)
+        elif leaf_type == "rsi_threshold":
+            if not normalize_ticker(leaf.get("symbol")):
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have a valid symbol."
+                )
+            raw_operator = leaf.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have an operator."
+                )
+            _coerce_threshold(leaf.get("value"), alert_id, label="RSI threshold")
+            _coerce_rsi_period(leaf.get("period"), alert_id)
+
 
 
 def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
@@ -163,6 +248,30 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
                 )
             operator = str(raw_operator).strip()
             threshold = _coerce_threshold(condition.get("value"), alert_id)
+        elif condition_type == "rsi_threshold":
+            symbol = normalize_ticker(condition.get("symbol"))
+            if not symbol:
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have a valid symbol."
+                )
+            raw_operator = condition.get("operator")
+            if raw_operator is None or not str(raw_operator).strip():
+                raise InvalidAlertWatchConfig(
+                    f"Alert '{alert_id}' must have an operator."
+                )
+            operator = str(raw_operator).strip()
+            threshold = _coerce_threshold(
+                condition.get("value"), alert_id, label="RSI threshold"
+            )
+            _coerce_rsi_period(condition.get("period"), alert_id)
+        elif condition_type == "compound":
+            _validate_compound_condition(condition, alert_id)
+            # Index single-symbol compounds on the shared ticker so the hosted
+            # evaluate_symbol queue can fire them; multi-symbol compounds stay
+            # off the queue (same as screening_match).
+            from src.alerts.alert_rules import primary_watch_symbol
+
+            symbol = primary_watch_symbol(condition)
         cooldown_minutes = _coerce_cooldown(alert.get("cooldown_minutes"), alert_id)
         rows.append(
             (
