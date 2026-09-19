@@ -276,7 +276,8 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 
 - [ ] Record managed PostgreSQL, real email/webhook, ingress, and monitoring
       evidence using the staging runbook
-- [ ] Technical/compound rules; later, SMS/push
+- [x] RSI threshold + shallow compound (price AND/OR RSI) rules in Helmtower
+- [ ] Nested compounds / more indicators; later, SMS/push
 
 ---
 

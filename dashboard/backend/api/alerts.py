@@ -284,7 +284,10 @@ async def put_alerts_config(
         seen_ids.add(alert_id)
         alert["id"] = alert_id
         condition = alert.get("condition") or {}
-        if isinstance(condition, dict) and condition.get("type") == "price_threshold":
+        if isinstance(condition, dict) and condition.get("type") in {
+            "price_threshold",
+            "rsi_threshold",
+        }:
             # File mode never hits InvalidAlertWatchConfig; reject blank/sentinel
             # symbols and missing operators here so both modes fail closed.
             symbol = normalize_ticker(condition.get("symbol"))
@@ -301,6 +304,34 @@ async def put_alerts_config(
                     detail=f"Alert '{alert_id}' must have an operator.",
                 )
             condition["operator"] = str(raw_operator).strip()
+            if condition.get("type") == "rsi_threshold":
+                period = condition.get("period", 14)
+                try:
+                    period_n = int(period)
+                except (TypeError, ValueError) as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Alert '{alert_id}' has an invalid RSI period.",
+                    ) from exc
+                if period_n < 2 or period_n > 50:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Alert '{alert_id}' has an invalid RSI period.",
+                    )
+                condition["period"] = period_n
+            alert["condition"] = condition
+        elif isinstance(condition, dict) and condition.get("type") == "compound":
+            # Hosted validate_watches_config covers this; file mode needs a light gate.
+            op = str(condition.get("op") or "").strip().lower()
+            leaves = condition.get("conditions")
+            if op not in {"and", "or"} or not isinstance(leaves, list) or not leaves:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Alert '{alert_id}' compound rule must use op "
+                        "'and' or 'or' with conditions."
+                    ),
+                )
             alert["condition"] = condition
     _save_raw_config(user_id, config)
     status_source = config

@@ -15,6 +15,49 @@
       "cooldown_minutes": 60
     },
     {
+      "id": "alert_aapl_rsi_oversold",
+      "name": "AAPL RSI Oversold",
+      "enabled": false,
+      "condition": {
+        "type": "rsi_threshold",
+        "symbol": "AAPL",
+        "period": 14,
+        "operator": "less_than",
+        "value": 30
+      },
+      "notifications": ["log", "email"],
+      "email_to": "you@example.com",
+      "cooldown_minutes": 60
+    },
+    {
+      "id": "alert_aapl_price_and_rsi",
+      "name": "AAPL Price Drop + RSI Oversold",
+      "enabled": false,
+      "condition": {
+        "type": "compound",
+        "op": "and",
+        "conditions": [
+          {
+            "type": "price_threshold",
+            "symbol": "AAPL",
+            "operator": "less_than",
+            "value": 150.0
+          },
+          {
+            "type": "rsi_threshold",
+            "symbol": "AAPL",
+            "period": 14,
+            "operator": "less_than",
+            "value": 30
+          }
+        ]
+      },
+      "notifications": ["log", "webhook"],
+      "webhook_url": "https://hooks.example.com/your/incoming/webhook",
+      "webhook_format": "slack",
+      "cooldown_minutes": 120
+    },
+    {
       "id": "alert_high_volume_gainers",
       "name": "High Volume Gainers",
       "enabled": false,

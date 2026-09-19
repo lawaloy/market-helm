@@ -10,12 +10,16 @@ import json
 from ..core.logger import setup_logger
 from .alert_paths import apply_alert_defaults, resolve_alerts_config_path
 from .alert_storage import AlertStorage
-from .alert_rules import evaluate_price_threshold, evaluate_screening_match
+from .alert_rules import (
+    collect_rsi_symbols,
+    evaluate_compound,
+    evaluate_leaf_symbols,
+)
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
+from .price_history import closes_by_symbol
 from src.utils.company_names import _clean_display_name
-from src.utils.tickers import normalize_ticker
 
 logger = setup_logger("alerts")
 
@@ -217,6 +221,16 @@ class AlertEngine:
             instances.append(LogNotifier())
         return instances
 
+    def _closes_for_evaluate(self, stocks: List[Dict]) -> Dict[str, List[float]]:
+        """Cached per evaluate() call so sibling RSI watches share one disk pass."""
+        cached = getattr(self, "_evaluate_closes_cache", None)
+        if cached is not None:
+            return cached
+        symbols = collect_rsi_symbols(self.alerts)
+        history = closes_by_symbol(symbols, stocks) if symbols else {}
+        self._evaluate_closes_cache = history
+        return history
+
     def evaluate(self, stocks: List[Dict]) -> List[Dict]:
         events: List[Dict] = []
         # Hand-edited / corrupt runners can pass None/dict; iterating must not
@@ -224,6 +238,7 @@ class AlertEngine:
         if not isinstance(stocks, list):
             logger.warning("Alert evaluate received non-list stocks; skipping")
             return events
+        self._evaluate_closes_cache = None
         for alert in self.alerts:
             alert_id = alert.get("id")
             if not isinstance(alert_id, str) or not alert_id.strip():
@@ -245,31 +260,17 @@ class AlertEngine:
             condition_type = condition.get("type")
             triggered_symbols: List[str] = []
 
-            if condition_type == "price_threshold":
-                symbol = normalize_ticker(condition.get("symbol"))
-                if not symbol:
-                    continue
-                stock = next(
-                    (
-                        s
-                        for s in stocks
-                        if isinstance(s, dict)
-                        and normalize_ticker(s.get("symbol")) == symbol
-                    ),
-                    None,
+            if condition_type in {"price_threshold", "rsi_threshold", "screening_match"}:
+                # Lazy-load close history once per evaluate() when any RSI leaf needs it.
+                history = self._closes_for_evaluate(stocks)
+                triggered_symbols = evaluate_leaf_symbols(
+                    condition, stocks, closes_by_symbol=history
                 )
-                if stock and evaluate_price_threshold(condition, stock):
-                    triggered_symbols = [symbol]
-            elif condition_type == "screening_match":
-                for stock in stocks:
-                    if not isinstance(stock, dict):
-                        continue
-                    if evaluate_screening_match(condition, stock):
-                        # Mirror price_threshold: drop None/NaN/padded sentinels
-                        # so events never carry raw CSV junk into notifications.
-                        symbol = normalize_ticker(stock.get("symbol"))
-                        if symbol:
-                            triggered_symbols.append(symbol)
+            elif condition_type == "compound":
+                history = self._closes_for_evaluate(stocks)
+                triggered_symbols = evaluate_compound(
+                    condition, stocks, closes_by_symbol=history
+                )
             else:
                 logger.warning(f"Unsupported alert condition: {condition_type}")
                 continue

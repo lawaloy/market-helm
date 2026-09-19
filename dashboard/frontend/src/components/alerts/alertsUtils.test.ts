@@ -433,7 +433,7 @@ describe('formatDeliveryStatusLine', () => {
 });
 
 describe('formatCondition', () => {
-  it('describes price thresholds and screening matches', () => {
+  it('describes price, screening, RSI, and compound rules', () => {
     expect(
       formatCondition({
         id: '1',
@@ -452,5 +452,42 @@ describe('formatCondition', () => {
         notifications: ['log'],
       }),
     ).toBe('Matches your screening filters');
+    expect(
+      formatCondition({
+        id: '3',
+        name: 'rsi',
+        enabled: true,
+        condition: {
+          type: 'rsi_threshold',
+          symbol: 'AAPL',
+          period: 14,
+          operator: 'less_than',
+          value: 30,
+        },
+        notifications: ['log'],
+      }),
+    ).toBe('AAPL RSI(14) falls below 30.00');
+    expect(
+      formatCondition({
+        id: '4',
+        name: 'combo',
+        enabled: true,
+        condition: {
+          type: 'compound',
+          op: 'and',
+          conditions: [
+            { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 100 },
+            {
+              type: 'rsi_threshold',
+              symbol: 'AAPL',
+              period: 14,
+              operator: 'less_than',
+              value: 30,
+            },
+          ],
+        },
+        notifications: ['log'],
+      }),
+    ).toBe('AAPL falls below $100.00 and AAPL RSI(14) falls below 30.00');
   });
 });

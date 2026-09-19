@@ -45,10 +45,21 @@ export function RuleCard({
 }) {
   const [editing, setEditing] = useState(false);
   const isPrice = rule.condition.type === 'price_threshold';
-  const symbol = isPrice ? (rule.condition.symbol ?? '?').toUpperCase() : '?';
-  const isRise = isPrice && rule.condition.operator === 'greater_than';
+  const isRsi = rule.condition.type === 'rsi_threshold';
+  const isCompound = rule.condition.type === 'compound';
+  const symbol = isPrice || isRsi
+    ? (rule.condition.symbol ?? '?').toUpperCase()
+    : isCompound
+      ? (
+          rule.condition.conditions?.find((leaf) => leaf.symbol)?.symbol ?? '?'
+        ).toUpperCase()
+      : '?';
+  const showSymbolBadge = Boolean(symbol && symbol !== '?');
+  const isRise =
+    (isPrice && rule.condition.operator === 'greater_than') ||
+    (isRsi && rule.condition.operator === 'greater_than');
   const price = isPrice ? formatPrice(rule.condition.value) : null;
-  const currentQuote = isPrice ? formatQuotePrice(symbolPrices[symbol]) : null;
+  const currentQuote = showSymbolBadge ? formatQuotePrice(symbolPrices[symbol]) : null;
 
   const [editOperator, setEditOperator] = useState<'less_than' | 'greater_than'>(
     isPrice && rule.condition.operator === 'greater_than' ? 'greater_than' : 'less_than',
@@ -86,7 +97,7 @@ export function RuleCard({
       }`}
     >
       <div className="flex items-start gap-4">
-        {isPrice ? (
+        {showSymbolBadge ? (
           <SymbolBadge symbol={symbol} gradient={symbolGradient(symbol)} />
         ) : (
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 dark:bg-slate-700">
@@ -100,7 +111,7 @@ export function RuleCard({
                 rule.enabled ? 'text-slate-900 dark:text-slate-100' : 'text-slate-500'
               }`}
             >
-              {isPrice ? symbol : rule.name}
+              {isPrice || isRsi ? symbol : ruleTitle(rule)}
             </p>
             {currentQuote && (
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">

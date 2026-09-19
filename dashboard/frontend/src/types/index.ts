@@ -199,13 +199,21 @@ export interface MarketSummaryResponse {
 export type AlertNotification = 'log' | 'email' | 'webhook';
 export type AlertOperator = 'less_than' | 'greater_than';
 export type WebhookFormat = 'json' | 'slack' | 'discord';
+export type AlertConditionType =
+  | 'price_threshold'
+  | 'rsi_threshold'
+  | 'screening_match'
+  | 'compound';
 
 export interface AlertCondition {
-  type: 'price_threshold' | 'screening_match';
+  type: AlertConditionType;
   symbol?: string;
   operator?: AlertOperator;
   value?: number;
+  period?: number;
   filters?: Record<string, number>;
+  op?: 'and' | 'or';
+  conditions?: AlertCondition[];
 }
 
 export interface AlertRule {
