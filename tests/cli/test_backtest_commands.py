@@ -2,11 +2,10 @@
 
 import json
 
-import pandas as pd
 import pytest
 
 from src.cli.backtest_commands import main
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 def test_backtest_cli_writes_strict_json_report(tmp_path, monkeypatch):
@@ -15,7 +14,9 @@ def test_backtest_cli_writes_strict_json_report(tmp_path, monkeypatch):
     data_dir.mkdir()
     seed_daily_bars(data_dir, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])
     seed_daily_bars(data_dir, "2026-07-10", [{"symbol": "AAPL", "close": 108.0}])
-    pd.DataFrame(
+    seed_projections(
+        data_dir,
+        "2026-07-02",
         [
             {
                 "symbol": "AAPL",
@@ -26,8 +27,8 @@ def test_backtest_cli_writes_strict_json_report(tmp_path, monkeypatch):
                 "confidence": 80,
                 "recommendation": "BUY",
             }
-        ]
-    ).to_csv(data_dir / "projections_2026-07-02.csv", index=False)
+        ],
+    )
     output = tmp_path / "reports" / "backtest.json"
 
     assert main(["--data-dir", str(data_dir), "--output", str(output)]) == 0

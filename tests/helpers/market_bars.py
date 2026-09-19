@@ -1,4 +1,4 @@
-"""Shared helper to seed durable daily bars in tests (CSV daily_data removed)."""
+"""Shared helper to seed durable daily bars / projections / summaries in tests."""
 
 from __future__ import annotations
 
@@ -28,3 +28,27 @@ def seed_simple_bars(
 ) -> int:
     row: Dict[str, Any] = {"symbol": symbol, "close": close, **extra}
     return seed_daily_bars(data_dir, trade_date, [row])
+
+
+def seed_projections(
+    data_dir: Union[str, Path],
+    run_date: Union[str, date],
+    rows: Sequence[Dict[str, Any]],
+) -> int:
+    """Upsert projection rows for one run date into market_bars under ``data_dir``."""
+    from src.storage.projections_store import upsert_projections
+
+    return upsert_projections(list(rows), run_date, data_dir=data_dir, source="test")
+
+
+def seed_summary(
+    data_dir: Union[str, Path],
+    summary_date: Union[str, date],
+    summary_data: Dict[str, Any],
+) -> str:
+    """Persist one daily summary into market_bars under ``data_dir``."""
+    from src.storage.projections_store import upsert_daily_summary
+
+    return upsert_daily_summary(
+        dict(summary_data), summary_date, data_dir=data_dir, source="test"
+    )

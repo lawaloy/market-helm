@@ -23,9 +23,9 @@ def test_projection_baseline_covers_representative_scenarios() -> None:
     report = json.loads(projection_baseline.render_report())
     summary = report["summary"]
 
-    assert summary["projectionCount"] == 10
+    assert summary["projectionCount"] == 9
     assert summary["sampleCount"] == 7
-    assert summary["invalidCount"] == 1
+    assert summary["invalidCount"] == 0
     assert summary["pendingCount"] == 1
     assert summary["missingActualCount"] == 1
     assert summary["evaluationCoveragePct"] == 87.5
@@ -128,17 +128,23 @@ def test_capture_refuses_unqualified_data_without_creating_output(
 def test_capture_hashes_the_same_private_snapshot_it_evaluates(
     tmp_path: Path, monkeypatch
 ) -> None:
+    from tests.helpers.market_bars import seed_projections
+
     source = tmp_path / "source"
     source.mkdir()
-    # Capture still snapshots projections_*.csv (daily quotes live in market_bars).
-    input_path = source / "projections_2026-07-07.csv"
-    input_path.write_text("symbol,target_mid\nAAPL,100\n", encoding="utf-8")
+    # Capture snapshots market_bars.sqlite (bars + projections + summaries).
+    seed_projections(
+        source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 100.0}]
+    )
+    input_path = source / "market_bars.sqlite"
     seen = {}
 
     def evaluate(snapshot_dir: Path, _days: int) -> dict:
         copied = snapshot_dir / input_path.name
         seen["content"] = copied.read_bytes()
-        input_path.write_text("symbol,target_mid\nAAPL,999\n", encoding="utf-8")
+        seed_projections(
+            source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 999.0}]
+        )
         return _qualified_report()
 
     monkeypatch.setattr(projection_baseline, "observed_report", evaluate)
@@ -146,6 +152,7 @@ def test_capture_hashes_the_same_private_snapshot_it_evaluates(
 
     assert projection_baseline.capture(source, output, 365) == 0
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["inputs"][0]["path"] == "market_bars.sqlite"
     assert manifest["inputs"][0]["sha256"] == projection_baseline.hashlib.sha256(
         seen["content"]
     ).hexdigest()

@@ -1,6 +1,5 @@
 """Regression tests for JSON-safe daily summary writes."""
 
-import json
 import math
 from datetime import date
 from pathlib import Path
@@ -8,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from src.storage.data_storage import DataStorage, _json_safe_value
+from src.storage.projections_store import load_daily_summary
 
 
 @pytest.fixture
@@ -50,14 +50,11 @@ def test_save_summary_writes_strict_json_for_nan_and_inf(
         },
     }
 
-    path = Path(storage.save_summary(summary, date=date(2026, 7, 24)))
-    assert path.exists()
+    location = storage.save_summary(summary, date=date(2026, 7, 24))
+    assert location == "summary:2026-07-24"
+    assert list(tmp_path.glob("summary_*.json")) == []
 
-    raw = path.read_text(encoding="utf-8")
-    assert "NaN" not in raw
-    assert "Infinity" not in raw
-
-    loaded = json.loads(raw)
+    loaded = load_daily_summary("2026-07-24", data_dir=tmp_path)
     assert loaded["date"] == "2026-07-24"
     assert loaded["analysis"]["average_change"] is None
     assert loaded["analysis"]["top_gainers"][0]["change_percent"] is None

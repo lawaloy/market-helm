@@ -101,12 +101,13 @@ jobs:
         shell: bash
         run: |
           snapshot_date="$(date +%F)"
-          rm -f "data/projections_${snapshot_date}.csv"
           market-helm
           python scripts/assert_market_bar_date.py \
             --trade-date "${snapshot_date}" \
             --data-dir data
-          test -s "data/projections_${snapshot_date}.csv"
+          python scripts/assert_projection_date.py \
+            --run-date "${snapshot_date}" \
+            --data-dir data
 
       - name: Assess cumulative projection evidence
         if: steps.collection-day.outputs.run == 'true'
@@ -150,7 +151,6 @@ jobs:
           name: projection-forward-archive
           path: |
             data/market_bars.sqlite
-            data/projections_*.csv
             data/projection-assessment.json
           if-no-files-found: error
           retention-days: 90

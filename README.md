@@ -124,9 +124,8 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 
 | Output                            | Description                       |
 | --------------------------------- | --------------------------------- |
-| `data/market_bars` (sqlite/DB) | Prices, volume, and daily changes |
-| `data/projections_YYYY-MM-DD.csv` | Saved projection observations     |
-| `data/summary_YYYY-MM-DD.json`    | Gainers, losers, and statistics   |
+| `data/market_bars` (sqlite/DB) | Quotes, projections, and daily summaries |
+| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report |
 | `logs/market_helm_YYYY-MM-DD.log` | Execution logs                    |
 
 Runtime data and credentials are not deployed from Git. Set `DATA_DIR` to an

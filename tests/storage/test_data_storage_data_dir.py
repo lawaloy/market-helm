@@ -71,7 +71,9 @@ def test_blank_data_dir_env_falls_back_to_local_data(monkeypatch, tmp_path):
 
 
 def test_summary_and_projections_write_to_data_dir(monkeypatch, tmp_path):
-    """Fetch New also persists summary JSON and projection CSV/MD beside market bars."""
+    """Fetch New also persists summary and projections beside market bars."""
+    from src.storage.projections_store import load_daily_summary, load_projections
+
     target = tmp_path / "var-lib-markethelm-data"
     target.mkdir()
     monkeypatch.setenv("DATA_DIR", str(target))
@@ -103,7 +105,11 @@ def test_summary_and_projections_write_to_data_dir(monkeypatch, tmp_path):
         date=stamp,
     )
 
-    assert Path(summary) == target / "summary_2026-08-28.json"
-    assert Path(projections) == target / "projections_2026-08-28.csv"
+    assert summary == "summary:2026-08-28"
+    assert projections == "projections:2026-08-28"
+    assert list(target.glob("summary_*.json")) == []
+    assert list(target.glob("projections_*.csv")) == []
+    assert load_daily_summary("2026-08-28", data_dir=target)["total_stocks"] == 1
+    assert load_projections("2026-08-28", data_dir=target)[0]["symbol"] == "AAPL"
     assert (target / "projections_2026-08-28.md").is_file()
     assert _default_data_dir() == target.resolve()

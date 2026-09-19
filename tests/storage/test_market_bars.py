@@ -22,19 +22,25 @@ def app_db(tmp_path, monkeypatch):
     return db_path
 
 
-def test_migration_six_creates_market_bars(app_db):
-    assert LATEST_SCHEMA_VERSION == 6
+def test_migration_seven_creates_projections_and_summaries(app_db):
+    assert LATEST_SCHEMA_VERSION == 7
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT name FROM schema_migrations WHERE version = 6"
+            "SELECT name FROM schema_migrations WHERE version = 7"
         ).fetchone()
-        assert row["name"] == "market_bars"
-        cols = {
+        assert row["name"] == "projections_and_summaries"
+        proj_cols = {
             item["name"]
-            for item in conn.execute("PRAGMA table_info(market_bars)").fetchall()
+            for item in conn.execute("PRAGMA table_info(projections)").fetchall()
         }
-    assert "trade_date" in cols
-    assert "close" in cols
+        summary_cols = {
+            item["name"]
+            for item in conn.execute("PRAGMA table_info(daily_summaries)").fetchall()
+        }
+    assert "run_date" in proj_cols
+    assert "symbol" in proj_cols
+    assert "summary_date" in summary_cols
+    assert "payload_json" in summary_cols
 
 
 def test_upsert_and_load_via_app_database(app_db):

@@ -169,80 +169,68 @@ class DataStorage:
     
     def save_summary(self, summary_data: Dict, date: datetime.date = None) -> str:
         """
-        Save daily summary statistics.
-        
+        Persist daily summary statistics to durable ``daily_summaries`` storage.
+
+        Does not write ``summary_*.json``.
+
         Args:
             summary_data: Dictionary with summary statistics
             date: Date for the summary (defaults to today)
-        
+
         Returns:
-            Path to saved file
+            Logical location string ``summary:YYYY-MM-DD``
         """
         if date is None:
             date = _data_date_for_filename()
-        
-        summary_path = self.data_dir / f"summary_{date.strftime('%Y-%m-%d')}.json"
-        
-        summary_data["date"] = str(date)
-        # Default json.dump writes non-standard NaN/Infinity literals; coerce first
-        # and refuse allow_nan so dashboard/CLI consumers always get strict JSON.
-        payload = _json_safe_value(summary_data)
 
-        def _write_summary(tmp: Path) -> None:
-            with open(tmp, "w") as f:
-                json.dump(payload, f, indent=2, allow_nan=False)
+        from .projections_store import upsert_daily_summary
 
-        _atomic_replace(summary_path, _write_summary)
+        payload = _json_safe_value(dict(summary_data))
+        if not isinstance(payload, dict):
+            raise ValueError("Summary payload must be a JSON object")
+        return upsert_daily_summary(payload, date, data_dir=self.data_dir, source="tracker")
 
-        return str(summary_path)
-    
     def save_projections(self, projections: Dict, date: datetime.date = None) -> str:
         """
-        Save stock projections to CSV and generate Markdown report.
-        
+        Persist stock projections to durable ``projections`` storage.
+
+        Optionally writes a human-readable Markdown report beside DATA_DIR.
+        Does not write ``projections_*.csv``.
+
         Args:
             projections: Dictionary of stock projections
             date: Date for the projections (defaults to today)
-        
+
         Returns:
-            Path to saved CSV file
+            Logical location string ``projections:YYYY-MM-DD``
         """
         if not projections:
             return None
-        
+
         if date is None:
             date = _data_date_for_filename()
-        
-        # Convert projections dict to list of dicts for DataFrame
-        projection_list = list(projections.values())
-        
-        df = pd.DataFrame(projection_list)
-        
-        # Reorder columns for better readability
-        column_order = [
-            'symbol', 'name', 'current_price', 'target_low', 'target_mid', 'target_high',
-            'expected_change_percent', 'recommendation', 'confidence', 'trend',
-            'momentum_score', 'volatility_score', 'risk_level', 'reason',
-            'projection_date', 'projection_horizon_sessions',
-            'projection_calendar', 'generated_at'
-        ]
-        
-        # Only include columns that exist
-        columns = [col for col in column_order if col in df.columns]
-        df = df[columns]
-        
-        # Save CSV
-        csv_path = self.data_dir / f"projections_{date.strftime('%Y-%m-%d')}.csv"
-        _atomic_replace(csv_path, lambda tmp: df.to_csv(tmp, index=False))
-        
-        # Generate Markdown report
+
+        from .projections_store import projections_frame, upsert_projections
+
+        written = upsert_projections(
+            projections,
+            date,
+            data_dir=self.data_dir,
+            source="tracker",
+        )
+        if written <= 0:
+            raise ValueError("No valid projections to persist (missing symbols)")
+
+        # Best-effort human report from the just-written rows.
         try:
-            md_path = self.data_dir / f"projections_{date.strftime('%Y-%m-%d')}.md"
-            self._generate_projection_markdown(df, md_path, date)
+            df = projections_frame(date, data_dir=self.data_dir)
+            if not df.empty:
+                md_path = self.data_dir / f"projections_{date.strftime('%Y-%m-%d')}.md"
+                self._generate_projection_markdown(df, md_path, date)
         except Exception as e:
             print(f"Warning: Could not generate markdown report: {e}")
-        
-        return str(csv_path)
+
+        return f"projections:{date.strftime('%Y-%m-%d')}"
     
     def _generate_projection_markdown(self, df: pd.DataFrame, output_path: Path, date: datetime.date):
         """Generate a formatted Markdown report from projections DataFrame."""
@@ -278,8 +266,21 @@ class DataStorage:
         md = []
         md.append("# Stock Market Projections Report")
         md.append("")
-        horizon = int(df.get('projection_horizon_sessions', pd.Series([5])).iloc[0])
-        calendar = str(df.get('projection_calendar', pd.Series(['XNYS'])).iloc[0])
+        horizon = 5
+        if "projection_horizon_sessions" in df.columns:
+            raw_horizon = df["projection_horizon_sessions"].iloc[0]
+            try:
+                if raw_horizon is not None and pd.notna(raw_horizon):
+                    horizon = int(raw_horizon)
+            except (TypeError, ValueError):
+                horizon = 5
+        calendar = "XNYS"
+        if "projection_calendar" in df.columns:
+            raw_calendar = df["projection_calendar"].iloc[0]
+            if raw_calendar is not None and pd.notna(raw_calendar):
+                text = str(raw_calendar).strip()
+                if text:
+                    calendar = text
         md.append(
             f"**Projection Period:** {horizon} {calendar} trading sessions "
             f"(Target Date: {projection_date})"

@@ -7,10 +7,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 @pytest.fixture
@@ -38,22 +37,20 @@ def client(temp_data_dir):
 
 def _write_projection(temp_data_dir: Path, **overrides) -> None:
     row = {
-        "symbol": ["AAPL"],
-        "name": ["Apple"],
-        "target_mid": [160.0],
-        "expected_change_percent": [5.0],
-        "confidence": [90],
-        "recommendation": ["STRONG BUY"],
-        "risk_level": ["Low"],
-        "trend": ["Bullish"],
-        "momentum_score": [1.2],
-        "volatility_score": [0.3],
-        "reason": ["momentum"],
+        "symbol": "AAPL",
+        "name": "Apple",
+        "target_mid": 160.0,
+        "expected_change_percent": 5.0,
+        "confidence": 90,
+        "recommendation": "STRONG BUY",
+        "risk_level": "Low",
+        "trend": "Bullish",
+        "momentum_score": 1.2,
+        "volatility_score": 0.3,
+        "reason": "momentum",
     }
     row.update(overrides)
-    pd.DataFrame(row).to_csv(
-        temp_data_dir / "projections_2026-01-15.csv", index=False
-    )
+    seed_projections(temp_data_dir, "2026-01-15", [row])
 
 
 def test_opportunities_defaults_when_daily_bars_missing(
@@ -82,25 +79,29 @@ def test_opportunities_defaults_when_daily_bars_missing(
 
 
 def test_opportunities_defaults_missing_risk_and_trend(client, temp_data_dir) -> None:
-    """Legacy projection CSVs without risk_level/trend must still list cards."""
+    """Legacy projection rows without risk_level/trend must still list cards."""
     seed_daily_bars(
         temp_data_dir,
         "2026-01-15",
         [{"symbol": "AAPL", "close": 150.0, "volume": 1_000}],
     )
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL"],
-            "name": ["Apple"],
-            "target_mid": [160.0],
-            "expected_change_percent": [5.0],
-            "confidence": [90],
-            "recommendation": ["STRONG BUY"],
-            "momentum_score": [1.2],
-            "volatility_score": [0.3],
-            "reason": ["momentum"],
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": 90,
+                "recommendation": "STRONG BUY",
+                "momentum_score": 1.2,
+                "volatility_score": 0.3,
+                "reason": "momentum",
+            }
+        ],
+    )
 
     r = client.get(
         "/api/projections/opportunities",

@@ -1,16 +1,13 @@
 """Tests for dashboard data loader service."""
 
-import os
 import tempfile
 import shutil
-import json
-import time
 import pandas as pd
 from pathlib import Path
 
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars, seed_simple_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections, seed_simple_bars, seed_summary
 
 
 @pytest.fixture
@@ -67,20 +64,15 @@ class TestDataLoader:
 
     def test_load_summary_returns_dict(self, loader, temp_data_dir):
         """load_summary returns correct dict."""
-        summary = {"date": "2026-01-15", "analysis": {}}
-        with open(temp_data_dir / "summary_2026-01-15.json", "w") as f:
-            json.dump(summary, f)
+        seed_summary(temp_data_dir, "2026-01-15", {"date": "2026-01-15", "analysis": {}})
 
         result = loader.load_summary()
         assert isinstance(result, dict)
         assert result["date"] == "2026-01-15"
 
-    def test_load_summary_raises_value_error_on_corrupt_json(self, loader, temp_data_dir):
-        """Corrupt summary JSON raises ValueError so APIs can map to 404."""
-        (temp_data_dir / "summary_2026-01-15.json").write_text(
-            "{not-json", encoding="utf-8"
-        )
-        with pytest.raises(ValueError, match="Summary file unreadable"):
+    def test_load_summary_raises_value_error_when_missing(self, loader, temp_data_dir):
+        """Missing summary dates raise ValueError so APIs can map to 404."""
+        with pytest.raises(ValueError, match="No summary files found"):
             loader.load_summary()
 
     def test_load_daily_data_raises_when_date_missing(self, loader, temp_data_dir):
@@ -126,17 +118,21 @@ class TestDataLoader:
         """Reports exact-session error, direction, band, and calibration metrics."""
         seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
         seed_daily_bars(temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 105.0}])
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "current_price": [100.0],
-                "target_low": [104.0],
-                "target_mid": [110.0],
-                "target_high": [112.0],
-                "recommendation": ["BUY"],
-                "confidence": [70],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {
+                    "symbol": "AAPL",
+                    "current_price": 100.0,
+                    "target_low": 104.0,
+                    "target_mid": 110.0,
+                    "target_high": 112.0,
+                    "recommendation": "BUY",
+                    "confidence": 70,
+                }
+            ],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
         summary = out["summary"]
@@ -161,9 +157,11 @@ class TestDataLoader:
         """A later close cannot turn an exact-session gap into a variable-horizon score."""
         seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
         seed_daily_bars(temp_data_dir, "2026-01-13", [{"symbol": "AAPL", "close": 108.0}])
-        pd.DataFrame(
-            {"symbol": ["AAPL"], "current_price": [100.0], "target_mid": [110.0]}
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [{"symbol": "AAPL", "current_price": 100.0, "target_mid": 110.0}],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -177,13 +175,14 @@ class TestDataLoader:
     ):
         """Unmatured and malformed projections remain visible in report coverage."""
         seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL", "MSFT"],
-                "target_mid": [120.0, "not-a-number"],
-                "recommendation": ["BUY", "HOLD"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {"symbol": "AAPL", "target_mid": 120.0, "recommendation": "BUY"},
+                {"symbol": "MSFT", "target_mid": None, "recommendation": "HOLD"},
+            ],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -193,12 +192,9 @@ class TestDataLoader:
         assert out["summary"]["invalidCount"] == 1
         assert out["summary"]["sampleCount"] == 0
 
-    def test_load_projections_raises_value_error_on_corrupt_csv(self, loader, temp_data_dir):
-        """Unreadable projections CSV raises ValueError (not raw ParserError)."""
-        (temp_data_dir / "projections_2026-01-15.csv").write_text(
-            'col1,col2\n1,"unclosed', encoding="utf-8"
-        )
-        with pytest.raises(ValueError, match="Projections unreadable"):
+    def test_load_projections_raises_value_error_when_missing(self, loader, temp_data_dir):
+        """Missing projections raise ValueError (API 404 mapping)."""
+        with pytest.raises(ValueError, match="No projection files found"):
             loader.load_projections()
 
     def test_compute_projection_accuracy_normalizes_padded_and_skips_sentinels(
@@ -209,13 +205,18 @@ class TestDataLoader:
             {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
             {"symbol": "  msft  ", "close": 200.0, "change_percent": 0.0},
         ])
-        pd.DataFrame(
-            {
-                "symbol": [" aapl ", None, float("nan"), "  ", "MSFT"],
-                "target_mid": [110.0, 50.0, 60.0, 70.0, 210.0],
-                "recommendation": ["BUY", "HOLD", "HOLD", "HOLD", "SELL"],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-05.csv", index=False)
+        # Invalid/blank symbols are rejected by the store; only AAPL/MSFT persist.
+        seed_projections(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {"symbol": " aapl ", "target_mid": 110.0, "recommendation": "BUY"},
+                {"symbol": None, "target_mid": 50.0, "recommendation": "HOLD"},
+                {"symbol": float("nan"), "target_mid": 60.0, "recommendation": "HOLD"},
+                {"symbol": "  ", "target_mid": 70.0, "recommendation": "HOLD"},
+                {"symbol": "MSFT", "target_mid": 210.0, "recommendation": "SELL"},
+            ],
+        )
         seed_daily_bars(temp_data_dir, "2026-01-05", [
             {"symbol": "AAPL", "close": 95.0, "change_percent": 0.0},
         ])
@@ -230,7 +231,7 @@ class TestDataLoader:
         by_sym = {s["symbol"]: s for s in out["samples"]}
         assert by_sym["AAPL"]["absErrorPct"] == 10.0
         assert by_sym["MSFT"]["absErrorPct"] == 5.0
-        assert out["summary"]["invalidCount"] == 3
+        assert out["summary"]["invalidCount"] == 0
 
     def test_load_historical_data_matches_padded_symbols_and_skips_sentinels(
         self, loader, temp_data_dir
@@ -247,15 +248,19 @@ class TestDataLoader:
                 "volume": 1_000,
             },
         ])
-        pd.DataFrame(
-            {
-                "symbol": ["aapl"],
-                "target_mid": [165.0],
-                "confidence": [70],
-                "recommendation": ["BUY"],
-                "expected_change_percent": [3.0],
-            }
-        ).to_csv(temp_data_dir / f"projections_{recent}.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": "aapl",
+                    "target_mid": 165.0,
+                    "confidence": 70,
+                    "recommendation": "BUY",
+                    "expected_change_percent": 3.0,
+                }
+            ],
+        )
 
         rows = loader.load_historical_data(" aapl ", days=7)
         assert len(rows) == 1
@@ -352,15 +357,19 @@ class TestDataLoader:
             {"symbol": "MSFT", "close": 200.0, "change_percent": 0.0},
         ])
         # Dates with no bars for AAPL are skipped (gap days)
-        pd.DataFrame(
-            {
-                "symbol": ["AAPL"],
-                "target_mid": [110.0],
-                "confidence": [70],
-                "recommendation": ["BUY"],
-                "expected_change_percent": [5.0],
-            }
-        ).to_csv(temp_data_dir / "projections_2026-01-16.csv", index=False)
+        seed_projections(
+            temp_data_dir,
+            "2026-01-16",
+            [
+                {
+                    "symbol": "AAPL",
+                    "target_mid": 110.0,
+                    "confidence": 70,
+                    "recommendation": "BUY",
+                    "expected_change_percent": 5.0,
+                }
+            ],
+        )
 
         rows = loader.load_historical_data("AAPL", days=30)
         assert len(rows) == 1

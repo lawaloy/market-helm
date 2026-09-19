@@ -7,10 +7,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars
+from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 @pytest.fixture
@@ -59,21 +58,38 @@ def _write_fixtures(temp_data_dir: Path) -> None:
             },
         ],
     )
-    pd.DataFrame(
-        {
-            "symbol": ["AAPL", "MSFT"],
-            "name": ["Apple", "Microsoft"],
-            "target_mid": [160.0, 390.0],
-            "expected_change_percent": [5.0, -2.5],
-            "confidence": [90, 70],
-            "recommendation": ["STRONG BUY", "SELL"],
-            "risk_level": ["Low", "High"],
-            "trend": ["Bullish", "Bearish"],
-            "momentum_score": [1.2, -0.4],
-            "volatility_score": [0.3, 0.8],
-            "reason": ["momentum", "weakness"],
-        }
-    ).to_csv(temp_data_dir / "projections_2026-01-15.csv", index=False)
+    seed_projections(
+        temp_data_dir,
+        "2026-01-15",
+        [
+            {
+                "symbol": "AAPL",
+                "name": "Apple",
+                "target_mid": 160.0,
+                "expected_change_percent": 5.0,
+                "confidence": 90,
+                "recommendation": "STRONG BUY",
+                "risk_level": "Low",
+                "trend": "Bullish",
+                "momentum_score": 1.2,
+                "volatility_score": 0.3,
+                "reason": "momentum",
+            },
+            {
+                "symbol": "MSFT",
+                "name": "Microsoft",
+                "target_mid": 390.0,
+                "expected_change_percent": -2.5,
+                "confidence": 70,
+                "recommendation": "SELL",
+                "risk_level": "High",
+                "trend": "Bearish",
+                "momentum_score": -0.4,
+                "volatility_score": 0.8,
+                "reason": "weakness",
+            },
+        ],
+    )
 
 
 def test_opportunities_include_recommendation_matching_filter_type(

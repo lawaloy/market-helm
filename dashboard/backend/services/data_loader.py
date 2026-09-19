@@ -167,44 +167,71 @@ class DataLoader:
         return frame
     
     def load_projections(self, date: Optional[str] = None) -> pd.DataFrame:
-        """Load projections CSV"""
-        if date is None:
-            file_path = self._get_latest_file("projections_*.csv", sort_by_date=True)
-            if file_path is None:
-                raise ValueError("No projection files found")
-        else:
-            file_path = self.data_dir / f"projections_{date}.csv"
-            if not file_path.exists():
-                raise ValueError(f"Projections file not found for date: {date}")
-        
+        """Load projections from durable ``projections`` storage."""
+        from src.storage.projections_store import list_projection_dates, projections_frame
+
         try:
-            return pd.read_csv(file_path)
+            if date is None:
+                dates = list_projection_dates(data_dir=self.data_dir, limit=64)
+                day = None
+                for candidate in dates:
+                    if _is_weekday(candidate):
+                        day = candidate
+                        break
+                if day is None and dates:
+                    day = dates[0]
+                if day is None:
+                    raise ValueError("No projection files found")
+            else:
+                if not _is_iso_date(date):
+                    raise ValueError(f"Projections file not found for date: {date}")
+                day = date
+
+            frame = projections_frame(day, data_dir=self.data_dir)
+        except ValueError:
+            raise
         except Exception as exc:
-            raise ValueError(f"Projections unreadable: {file_path.name}") from exc
-    
+            raise ValueError(
+                f"Projections unreadable for date: {date or 'latest'}"
+            ) from exc
+
+        if frame is None or frame.empty:
+            if date is None:
+                raise ValueError("No projection files found")
+            raise ValueError(f"Projections file not found for date: {date}")
+        return frame
+
     def load_summary(self, date: Optional[str] = None) -> Dict:
-        """Load summary JSON"""
-        if date is None:
-            file_path = self._get_latest_file("summary_*.json", sort_by_date=True)
-            if file_path is None:
-                raise ValueError("No summary files found")
-        else:
-            file_path = self.data_dir / f"summary_{date}.json"
-            if not file_path.exists():
-                raise ValueError(f"Summary file not found for date: {date}")
-        
+        """Load summary from durable ``daily_summaries`` storage."""
+        from src.storage.projections_store import list_summary_dates, load_daily_summary
+
         try:
-            with open(file_path, 'r') as f:
-                # Default json.load accepts NaN/Infinity constants; those become
-                # floats that later AttributeError on ai_summary.strip() → 500.
-                data = json.load(f, parse_constant=_reject_nonfinite_json_constant)
-        except (json.JSONDecodeError, OSError, ValueError) as exc:
-            # Corrupt JSON must map to ValueError → API 404, not generic 500.
-            raise ValueError(f"Summary file unreadable: {file_path.name}") from exc
-        # Valid JSON that is not an object (null/[]/"x") would AttributeError
-        # on summary_data.get(...) in /api/market/summary — treat as unreadable.
+            if date is None:
+                dates = list_summary_dates(data_dir=self.data_dir, limit=64)
+                day = None
+                for candidate in dates:
+                    if _is_weekday(candidate):
+                        day = candidate
+                        break
+                if day is None and dates:
+                    day = dates[0]
+                if day is None:
+                    raise ValueError("No summary files found")
+            else:
+                if not _is_iso_date(date):
+                    raise ValueError(f"Summary file not found for date: {date}")
+                day = date
+
+            data = load_daily_summary(day, data_dir=self.data_dir)
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise ValueError(f"Summary file unreadable for date: {date or 'latest'}") from exc
+
         if not isinstance(data, dict):
-            raise ValueError(f"Summary file unreadable: {file_path.name}")
+            if date is None:
+                raise ValueError("No summary files found")
+            raise ValueError(f"Summary file unreadable for date: {date}")
         return data
     
     def get_available_dates(self) -> List[str]:
