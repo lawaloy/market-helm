@@ -27,6 +27,11 @@ jobs:
           pip install -e .[dev]
           pip install -r dashboard/backend/requirements.txt
           pip install flake8 pip-audit
+      - name: Lint GitHub Actions workflows
+        run: |
+          bash <(curl --proto '=https' --tlsv1.2 -fsSL \
+            https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash)
+          ./actionlint -color
       - name: Audit Python packages
         run: |
           pip-audit -r requirements.txt -r dashboard/backend/requirements.txt
