@@ -27,19 +27,11 @@ const OWN_CHECKS = new Set([
   'Post-release Auto Finish',
 ]);
 
-const hasSuccessfulAdvancedCodeQl = (checkRuns) =>
-  checkRuns.some(
-    (run) =>
-      run.name?.startsWith('Analyze (') &&
-      run.status === 'completed' &&
-      run.conclusion === 'success',
-  );
-
-const isIgnoredCheck = (run, checkRuns) =>
-  OWN_CHECKS.has(run.name) || (run.name === 'CodeQL' && hasSuccessfulAdvancedCodeQl(checkRuns));
+// Bare "CodeQL" is a default-setup duplicate; required coverage is Analyze (*).
+const isIgnoredCheck = (run) => OWN_CHECKS.has(run.name) || run.name === 'CodeQL';
 
 const classifyCheckRuns = (checkRuns) => {
-  const relevant = checkRuns.filter((run) => !isIgnoredCheck(run, checkRuns));
+  const relevant = checkRuns.filter((run) => !isIgnoredCheck(run));
   const missing = REQUIRED_CHECKS.filter((name) => !relevant.some((run) => run.name === name));
   const pending = relevant.filter((run) => run.status === 'queued' || run.status === 'in_progress');
   const unacceptable = relevant.filter((run) => {
