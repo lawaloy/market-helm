@@ -1,8 +1,9 @@
 """Load per-symbol close history for technical alert rules.
 
 Preferred source is the live market-data provider (Finnhub daily candles).
-Local ``daily_data_*.csv`` files remain a fallback for offline / no-key runs
-and for the broader product surface that still stores market snapshots as files.
+Durable ``market_bars`` (hosted DB or ``DATA_DIR/market_bars.sqlite``) is the
+local fallback after the CSV cutover. Legacy ``daily_data_*.csv`` files are
+read last so older fixtures still work.
 """
 
 from __future__ import annotations
@@ -128,6 +129,78 @@ def load_symbol_closes_from_provider(
     return closes
 
 
+def load_symbol_closes_from_market_bars(
+    symbol: str,
+    *,
+    data_dir: Optional[str | Path] = None,
+    max_dates: int = 120,
+) -> List[float]:
+    """
+    Chronological closes for ``symbol`` from durable ``market_bars``.
+
+    Uses the hosted app database when ``MARKET_HELM_DATABASE_URL`` is set,
+    otherwise the sidecar at ``DATA_DIR/market_bars.sqlite``. Returns an empty
+    list on any soft failure so RSI evaluation can fall through to CSV.
+    """
+    ticker = normalize_ticker(symbol)
+    if not ticker:
+        return []
+    try:
+        limit_n = int(max_dates)
+    except (TypeError, ValueError):
+        limit_n = 120
+    if limit_n <= 0:
+        return []
+
+    root = resolve_market_data_dir(data_dir)
+    try:
+        from src.storage.market_bars import (
+            ensure_market_bars_schema,
+            market_bars_connection,
+        )
+
+        with market_bars_connection(data_dir=root) as conn:
+            ensure_market_bars_schema(conn)
+            rows = conn.execute(
+                """
+                SELECT close
+                FROM market_bars
+                WHERE symbol = ?
+                ORDER BY trade_date DESC
+                LIMIT ?
+                """,
+                (ticker, limit_n),
+            ).fetchall()
+    except Exception as exc:
+        logger.info("market_bars close history unavailable for %s: %s", ticker, exc)
+        return []
+
+    closes: List[float] = []
+    for row in reversed(rows):
+        raw = row["close"] if not isinstance(row, (tuple, list)) else row[0]
+        value = _finite_close(raw)
+        if value is not None:
+            closes.append(value)
+    return closes
+
+
+def load_symbol_closes_from_local(
+    symbol: str,
+    *,
+    data_dir: Optional[str | Path] = None,
+    max_files: int = 120,
+) -> List[float]:
+    """Prefer market_bars; fall back to leftover daily CSV snapshots."""
+    bars = load_symbol_closes_from_market_bars(
+        symbol, data_dir=data_dir, max_dates=max_files
+    )
+    if bars:
+        return bars
+    return load_symbol_closes_from_csv(
+        symbol, data_dir=data_dir, max_files=max_files
+    )
+
+
 def load_symbol_closes_from_csv(
     symbol: str,
     *,
@@ -198,21 +271,21 @@ def load_symbol_closes(
     """
     Chronological closes for technical rules.
 
-    Tries the live provider first (when ``prefer_provider``), then falls back to
-    local daily CSV snapshots so offline demos and key-less CI still work.
+    Tries the live provider first (when ``prefer_provider``), then durable
+    ``market_bars``, then leftover ``daily_data_*.csv`` snapshots.
     """
     if prefer_provider:
         provider_closes = load_symbol_closes_from_provider(symbol, client=client)
         if len(provider_closes) >= DEFAULT_PROVIDER_MIN_BARS:
             return provider_closes
         if provider_closes:
-            # Partial provider series — still prefer it when longer than CSV.
-            csv_closes = load_symbol_closes_from_csv(
+            # Partial provider series — still prefer it when longer than local.
+            local_closes = load_symbol_closes_from_local(
                 symbol, data_dir=data_dir, max_files=max_files
             )
-            return provider_closes if len(provider_closes) >= len(csv_closes) else csv_closes
+            return provider_closes if len(provider_closes) >= len(local_closes) else local_closes
 
-    return load_symbol_closes_from_csv(
+    return load_symbol_closes_from_local(
         symbol, data_dir=data_dir, max_files=max_files
     )
 

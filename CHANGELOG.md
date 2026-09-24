@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **RSI history after CSV cutover:** `load_symbol_closes` reads durable
+  `market_bars` when Finnhub candles are missing, so RSI and compound alerts
+  still evaluate from saved quotes instead of a dead `daily_data_*.csv` path.
+
 ### Changed
 
 - **Daily quotes leave CSV:** `save_daily_data` / dashboard loaders / backtests
@@ -28,7 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Projections / summaries store:** Schema migration 7 adds `projections` and
   `daily_summaries` beside market bars in the hosted DB or sidecar sqlite.
 - **Alert depth:** RSI(14) threshold watches, shallow AND/OR compound conditions
-  (price + RSI in Helmtower), provider candle history for RSI (CSV fallback), and
+  (price + RSI in Helmtower), provider candle history for RSI
+  (``market_bars`` fallback, then leftover CSV), and
   hosted symbol-queue evaluation for single-symbol technical/compound rules.
 - **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
   verification command, and regression gate for projection-evaluator semantics.
