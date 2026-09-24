@@ -62,6 +62,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Real-time:** WebSocket or streaming-style updates (batch/daily today).
 - **Execution:** Broker integration and automated order placement.
 
+## [0.3.6] - 2026-09-23
+
+### Changed
+
+- Repository version metadata aligned with Git tag **`v0.3.6`** / PyPI **`0.3.6`** (automated post-release sync).
+
+
 ## [0.3.5] - 2026-09-02
 
 ### Changed
