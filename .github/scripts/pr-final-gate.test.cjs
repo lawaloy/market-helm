@@ -76,6 +76,25 @@ test('reports missing required checks', () => {
   assert.deepEqual(state.missing, ['Curl + Playwright']);
 });
 
+test('ignores bare CodeQL even while Analyze is still pending', () => {
+  const state = _test.classifyCheckRuns([
+    ...requiredSuccesses.filter((run) => !run.name.startsWith('Analyze (')),
+    { name: 'CodeQL', status: 'completed', conclusion: 'neutral' },
+    {
+      name: 'Analyze (python)',
+      status: 'in_progress',
+      conclusion: null,
+    },
+  ]);
+  assert.deepEqual(state.unacceptable, []);
+  assert.deepEqual(
+    state.pending.map((run) => run.name),
+    ['Analyze (python)'],
+  );
+  assert.ok(state.missing.includes('Analyze (actions)'));
+  assert.ok(state.missing.includes('Analyze (javascript-typescript)'));
+});
+
 test('allows only the E2E sticky conversation comment', () => {
   const informational = {
     user: { login: 'github-actions[bot]' },
