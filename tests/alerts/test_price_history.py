@@ -6,8 +6,12 @@ from src.alerts.price_history import (
     closes_from_candle_payload,
     load_symbol_closes,
     load_symbol_closes_from_csv,
+    load_symbol_closes_from_market_bars,
     merge_latest_close,
 )
+from src.storage.database import init_database
+from src.storage.market_bars import upsert_market_bars
+from tests.helpers.market_bars import seed_daily_bars
 
 
 def test_load_symbol_closes_from_daily_csvs(tmp_path):
@@ -70,3 +74,67 @@ def test_load_symbol_closes_falls_back_to_csv_when_provider_empty(tmp_path):
 
     closes = load_symbol_closes("AAPL", data_dir=tmp_path, client=client)
     assert closes == [100.0, 101.0]
+
+
+def test_load_symbol_closes_from_market_bars_sidecar(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 100.0}])
+    seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 101.5}])
+    seed_daily_bars(tmp_path, "2026-09-03", [{"symbol": "AAPL", "close": 99.0}])
+
+    assert load_symbol_closes_from_market_bars("AAPL", data_dir=tmp_path) == [
+        100.0,
+        101.5,
+        99.0,
+    ]
+    assert load_symbol_closes_from_market_bars("msft", data_dir=tmp_path) == []
+
+
+def test_load_symbol_closes_uses_market_bars_when_csv_gone(tmp_path, monkeypatch):
+    """Post-#635: no daily_data CSV is written; RSI must still see saved bars."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 100.0}])
+    seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 101.0}])
+    client = MagicMock()
+    client.get_candle_data.side_effect = RuntimeError("rate limited")
+
+    closes = load_symbol_closes("AAPL", data_dir=tmp_path, client=client)
+    assert closes == [100.0, 101.0]
+    assert list(tmp_path.glob("daily_data_*.csv")) == []
+
+
+def test_load_symbol_closes_prefers_market_bars_over_stale_csv(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    (tmp_path / "daily_data_2026-09-01.csv").write_text(
+        "symbol,close\nAAPL,1.0\n",
+        encoding="utf-8",
+    )
+    seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 150.0}])
+    seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 151.0}])
+    client = MagicMock()
+    client.get_candle_data.return_value = {"s": "no_data"}
+
+    closes = load_symbol_closes("AAPL", data_dir=tmp_path, client=client)
+    assert closes == [150.0, 151.0]
+
+
+def test_load_symbol_closes_from_hosted_market_bars(tmp_path, monkeypatch):
+    db_path = tmp_path / "hosted.db"
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    init_database()
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 200.0}],
+        "2026-09-10",
+        source="test",
+    )
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 202.0}],
+        "2026-09-11",
+        source="test",
+    )
+    client = MagicMock()
+    client.get_candle_data.side_effect = RuntimeError("no key")
+
+    # data_dir is ignored in hosted mode; bars come from the app database.
+    closes = load_symbol_closes("AAPL", data_dir=tmp_path / "unused", client=client)
+    assert closes == [200.0, 202.0]
