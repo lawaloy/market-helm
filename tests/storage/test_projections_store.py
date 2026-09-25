@@ -123,3 +123,34 @@ def test_load_daily_summary_rebuilds_from_columns_when_payload_is_poison(data_di
     assert loaded["analysis"] == {"total_stocks": 3}
     assert loaded["exchange_comparison"] == {"nasdaq": 1}
     assert loaded["projection_summary"] == {"count": 4}
+
+
+def test_load_daily_summary_backfills_missing_keys_from_columns(data_dir):
+    """Partial payload_json must keep present keys and fill missing ones from columns."""
+    upsert_daily_summary(
+        {
+            "ai_summary": "column text",
+            "analysis": {"total_stocks": 5},
+            "exchange_comparison": {"nasdaq": 2},
+            "projection_summary": {"count": 7},
+        },
+        "2026-09-20",
+        data_dir=data_dir,
+    )
+    with market_bars_connection(data_dir=data_dir) as conn:
+        conn.execute(
+            "UPDATE daily_summaries SET payload_json = ? WHERE summary_date = ?",
+            (
+                '{"date": "2026-09-20", "keep": true, "analysis": {"stale": 1}}',
+                "2026-09-20",
+            ),
+        )
+
+    loaded = load_daily_summary("2026-09-20", data_dir=data_dir)
+    assert loaded["keep"] is True
+    assert loaded["date"] == "2026-09-20"
+    # A present analysis key is forward-compat payload, not overwritten.
+    assert loaded["analysis"] == {"stale": 1}
+    assert loaded["exchange_comparison"] == {"nasdaq": 2}
+    assert loaded["projection_summary"] == {"count": 7}
+    assert loaded["ai_summary"] == "column text"
