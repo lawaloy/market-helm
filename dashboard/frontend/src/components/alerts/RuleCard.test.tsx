@@ -170,6 +170,16 @@ function compoundRule(): AlertRule {
   };
 }
 
+function screeningRule(): AlertRule {
+  return {
+    id: 'volume_screen',
+    name: 'High volume screen',
+    enabled: true,
+    condition: { type: 'screening_match', filters: { min_volume: 1e6 } },
+    notifications: ['log'],
+  };
+}
+
 const cardHandlers = {
   testing: false,
   symbolPrices: {},
@@ -205,6 +215,18 @@ describe('RuleCard RSI and compound display', () => {
     expect(
       screen.getByText('AAPL falls below $150.00 and AAPL RSI(14) falls below 30.00'),
     ).toBeTruthy();
+    expect(screen.queryByTitle('Edit')).toBeNull();
+    expect(screen.getByTitle('Send test')).toBeTruthy();
+    expect(screen.getByTitle('Remove')).toBeTruthy();
+  });
+
+  it('shows screening text without an edit control', () => {
+    const rule = screeningRule();
+    render(<RuleCard rule={rule} index={0} allAlerts={[rule]} {...cardHandlers} />);
+
+    expect(screen.getByLabelText('Enable High volume screen')).toBeTruthy();
+    expect(screen.getByText('High volume screen')).toBeTruthy();
+    expect(screen.getByText('Matches your screening filters')).toBeTruthy();
     expect(screen.queryByTitle('Edit')).toBeNull();
     expect(screen.getByTitle('Send test')).toBeTruthy();
     expect(screen.getByTitle('Remove')).toBeTruthy();
