@@ -105,3 +105,30 @@ def test_save_daily_data_raises_when_no_valid_bars(tmp_path, monkeypatch):
     storage = DataStorage(data_dir=str(tmp_path))
     with pytest.raises(ValueError, match="No valid market bars"):
         storage.save_daily_data([{"symbol": "AAPL", "close": float("nan")}])
+
+
+def test_upsert_accepts_price_alias_and_outcome_final_text(app_db):
+    written = upsert_market_bars(
+        [
+            "not-a-dict",
+            {"symbol": " aapl ", "price": 150.0, "outcome_final": "yes"},
+            {"symbol": "MSFT", "close": 400.0, "outcome_final": "no"},
+        ],
+        "2026-09-18",
+    )
+    assert written == 2
+    rows = {row["symbol"]: row for row in load_market_bars("2026-09-18")}
+    assert rows["AAPL"]["close"] == 150.0
+    assert rows["AAPL"]["outcome_final"] == 1
+    assert rows["MSFT"]["outcome_final"] == 0
+
+
+def test_upsert_rejects_invalid_trade_date(app_db):
+    with pytest.raises(ValueError, match="Invalid trade_date"):
+        upsert_market_bars([{"symbol": "AAPL", "close": 1.0}], "not-a-date")
+
+
+def test_load_market_bars_returns_empty_for_invalid_trade_date(app_db):
+    upsert_market_bars([{"symbol": "AAPL", "close": 1.0}], "2026-09-18")
+    assert load_market_bars("not-a-date") == []
+    assert load_market_bars("") == []

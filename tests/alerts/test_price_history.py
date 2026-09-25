@@ -1,8 +1,9 @@
 """Close-history loader for RSI alert evaluation."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.alerts.price_history import (
+    closes_by_symbol,
     closes_from_candle_payload,
     load_symbol_closes,
     load_symbol_closes_from_csv,
@@ -35,6 +36,14 @@ def test_merge_latest_close_replaces_last_bar():
     assert merge_latest_close([10.0, 11.0], 12.0) == [10.0, 12.0]
     assert merge_latest_close([10.0, 11.0], 11.0) == [10.0, 11.0]
     assert merge_latest_close([], 9.5) == [9.5]
+
+
+def test_merge_latest_close_ignores_non_finite_latest():
+    series = [10.0, 11.0]
+    assert merge_latest_close(series, float("nan")) == series
+    assert merge_latest_close(series, float("inf")) == series
+    assert merge_latest_close(series, "nope") == series
+    assert merge_latest_close(series, None) == series
 
 
 def test_closes_from_candle_payload_sorts_by_timestamp():
@@ -138,3 +147,60 @@ def test_load_symbol_closes_from_hosted_market_bars(tmp_path, monkeypatch):
     # data_dir is ignored in hosted mode; bars come from the app database.
     closes = load_symbol_closes("AAPL", data_dir=tmp_path / "unused", client=client)
     assert closes == [200.0, 202.0]
+
+
+def test_load_symbol_closes_prefers_local_when_provider_is_partial(tmp_path, monkeypatch):
+    """Short Finnhub series must not beat a longer durable market_bars history."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    local = [100.0 + i for i in range(12)]
+    for i, close in enumerate(local):
+        seed_daily_bars(
+            tmp_path,
+            f"2026-09-{i + 1:02d}",
+            [{"symbol": "AAPL", "close": close}],
+        )
+    client = MagicMock()
+    client.get_candle_data.return_value = {
+        "s": "ok",
+        "c": [float(i) for i in range(10)],
+    }
+
+    closes = load_symbol_closes("AAPL", data_dir=tmp_path, client=client)
+    assert closes == local
+
+
+def test_load_symbol_closes_keeps_partial_provider_when_longer_than_local(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 1.0}])
+    seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 2.0}])
+    client = MagicMock()
+    client.get_candle_data.return_value = {
+        "s": "ok",
+        "c": [10.0, 11.0, 12.0, 13.0],
+    }
+
+    closes = load_symbol_closes("AAPL", data_dir=tmp_path, client=client)
+    assert closes == [10.0, 11.0, 12.0, 13.0]
+
+
+def test_closes_by_symbol_overlays_snapshot_and_skips_bad_latest():
+    with patch(
+        "src.alerts.price_history.load_symbol_closes",
+        return_value=[100.0, 101.0],
+    ) as loader:
+        overlaid = closes_by_symbol(
+            ["AAPL", "aapl"],
+            [{"symbol": "AAPL", "close": 105.0}],
+            prefer_provider=False,
+        )
+        ignored = closes_by_symbol(
+            ["AAPL"],
+            [{"symbol": "AAPL", "close": float("nan")}],
+            prefer_provider=False,
+        )
+
+    assert overlaid == {"AAPL": [100.0, 105.0]}
+    assert ignored == {"AAPL": [100.0, 101.0]}
+    assert loader.call_count == 2
