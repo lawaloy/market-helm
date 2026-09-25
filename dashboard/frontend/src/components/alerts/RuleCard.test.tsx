@@ -130,3 +130,83 @@ describe('RuleCard edit validation', () => {
     expect(onUpdate).not.toHaveBeenCalled();
   });
 });
+
+function rsiRule(): AlertRule {
+  return {
+    id: 'aapl_rsi_less_than_30',
+    name: 'AAPL RSI alert',
+    enabled: true,
+    condition: {
+      type: 'rsi_threshold',
+      symbol: 'AAPL',
+      period: 14,
+      operator: 'less_than',
+      value: 30,
+    },
+    notifications: ['log'],
+  };
+}
+
+function compoundRule(): AlertRule {
+  return {
+    id: 'aapl_price_and_rsi',
+    name: 'AAPL combo',
+    enabled: true,
+    condition: {
+      type: 'compound',
+      op: 'and',
+      conditions: [
+        { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 150 },
+        {
+          type: 'rsi_threshold',
+          symbol: 'AAPL',
+          period: 14,
+          operator: 'less_than',
+          value: 30,
+        },
+      ],
+    },
+    notifications: ['log'],
+  };
+}
+
+const cardHandlers = {
+  testing: false,
+  symbolPrices: {},
+  onToggleEnabled: vi.fn(),
+  onTest: vi.fn(),
+  onRemove: vi.fn(),
+  onUpdate: vi.fn(),
+  onEditError: vi.fn(),
+};
+
+describe('RuleCard RSI and compound display', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('shows RSI text without an edit control', () => {
+    const rule = rsiRule();
+    render(<RuleCard rule={rule} index={0} allAlerts={[rule]} {...cardHandlers} />);
+
+    expect(screen.getByLabelText('Enable AAPL RSI alert')).toBeTruthy();
+    expect(screen.getByText('AAPL RSI(14) falls below 30.00')).toBeTruthy();
+    expect(screen.queryByTitle('Edit')).toBeNull();
+    expect(screen.getByTitle('Send test')).toBeTruthy();
+    expect(screen.getByTitle('Remove')).toBeTruthy();
+  });
+
+  it('shows compound text without an edit control', () => {
+    const rule = compoundRule();
+    render(<RuleCard rule={rule} index={0} allAlerts={[rule]} {...cardHandlers} />);
+
+    expect(screen.getByLabelText('Enable AAPL combo')).toBeTruthy();
+    expect(screen.getByText('AAPL combo')).toBeTruthy();
+    expect(
+      screen.getByText('AAPL falls below $150.00 and AAPL RSI(14) falls below 30.00'),
+    ).toBeTruthy();
+    expect(screen.queryByTitle('Edit')).toBeNull();
+    expect(screen.getByTitle('Send test')).toBeTruthy();
+    expect(screen.getByTitle('Remove')).toBeTruthy();
+  });
+});

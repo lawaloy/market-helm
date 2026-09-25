@@ -186,3 +186,52 @@ class TestAISummarizerOpenAIPath:
             result = summarizer.generate_summary(self._analysis(), {})
 
         assert result is None
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=False)
+    def test_generate_summary_returns_none_when_message_content_is_none(self):
+        """Null completion content (openai 3.17 parse_response) must fail closed."""
+        import sys
+
+        summarizer = AISummarizer()
+
+        fake_message = type("Msg", (), {"content": None})()
+        fake_choice = type("Choice", (), {"message": fake_message})()
+        fake_response = type("Resp", (), {"choices": [fake_choice]})()
+
+        class FakeCompletions:
+            @staticmethod
+            def create(**_kwargs):
+                return fake_response
+
+        class FakeClient:
+            def __init__(self, api_key=None):
+                self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+        openai_mod = type("openai", (), {"OpenAI": FakeClient})()
+        with patch.dict(sys.modules, {"openai": openai_mod}):
+            result = summarizer.generate_summary(self._analysis(), {})
+
+        assert result is None
+
+    @patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test"}, clear=False)
+    def test_generate_summary_returns_none_when_choices_empty(self):
+        """A 200-style response with no choices must not crash the tracker path."""
+        import sys
+
+        summarizer = AISummarizer()
+        fake_response = type("Resp", (), {"choices": []})()
+
+        class FakeCompletions:
+            @staticmethod
+            def create(**_kwargs):
+                return fake_response
+
+        class FakeClient:
+            def __init__(self, api_key=None):
+                self.chat = type("Chat", (), {"completions": FakeCompletions()})()
+
+        openai_mod = type("openai", (), {"OpenAI": FakeClient})()
+        with patch.dict(sys.modules, {"openai": openai_mod}):
+            result = summarizer.generate_summary(self._analysis(), {})
+
+        assert result is None
