@@ -6,7 +6,9 @@ import {
   dedupeAlerts,
   emptyConfig,
   findDuplicatePriceRule,
+  findDuplicateRsiRule,
   formatCondition,
+  rsiAlertKey,
   formatDeliveryStatusLine,
   formatPrice,
   formatQuotePrice,
@@ -206,6 +208,127 @@ describe('dedupeAlerts', () => {
     };
     const clone = { ...screening };
     expect(dedupeAlerts([screening, clone]).map((r) => r.id)).toEqual(['screen-1']);
+  });
+});
+
+describe('rsiAlertKey / findDuplicateRsiRule', () => {
+  function rsiRule(
+    id: string,
+    symbol: string,
+    operator: AlertRule['condition']['operator'],
+    value: number,
+    period = 14,
+  ): AlertRule {
+    return {
+      id,
+      name: id,
+      enabled: true,
+      condition: { type: 'rsi_threshold', symbol, operator, value, period },
+      notifications: ['log'],
+    };
+  }
+
+  it('builds a stable RSI key and rejects incomplete or non-finite inputs', () => {
+    expect(
+      rsiAlertKey({
+        type: 'rsi_threshold',
+        symbol: '  aapl ',
+        operator: 'less_than',
+        value: 30,
+        period: 14,
+      }),
+    ).toBe('rsi|AAPL|14|less_than|30');
+    expect(
+      rsiAlertKey({
+        type: 'price_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: 30,
+      }),
+    ).toBeNull();
+    expect(
+      rsiAlertKey({
+        type: 'rsi_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: Number.NaN,
+        period: 14,
+      }),
+    ).toBeNull();
+    expect(
+      rsiAlertKey({
+        type: 'rsi_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: 30,
+        period: Number.POSITIVE_INFINITY,
+      }),
+    ).toBeNull();
+  });
+
+  it('matches RSI duplicates regardless of symbol casing', () => {
+    const alerts = [
+      rsiRule('keep', 'AAPL', 'less_than', 30),
+      rsiRule('other', 'MSFT', 'greater_than', 70),
+    ];
+    expect(findDuplicateRsiRule(alerts, ' aapl', 'less_than', 30, 14)?.id).toBe('keep');
+    expect(findDuplicateRsiRule(alerts, 'AAPL', 'less_than', 30, 14, 'keep')).toBeUndefined();
+    expect(findDuplicateRsiRule(alerts, 'AAPL', 'less_than', 30, 21)).toBeUndefined();
+  });
+});
+
+describe('dedupeAlerts RSI and compound', () => {
+  it('drops later RSI and compound rules that share the same key', () => {
+    const rsi: AlertRule = {
+      id: 'rsi-1',
+      name: 'rsi-1',
+      enabled: true,
+      condition: {
+        type: 'rsi_threshold',
+        symbol: 'AAPL',
+        operator: 'less_than',
+        value: 30,
+        period: 14,
+      },
+      notifications: ['log'],
+    };
+    const rsiDup: AlertRule = {
+      ...rsi,
+      id: 'rsi-2',
+      name: 'rsi-2',
+      condition: { ...rsi.condition, symbol: ' aapl ' },
+    };
+    const compound: AlertRule = {
+      id: 'combo-1',
+      name: 'combo-1',
+      enabled: true,
+      condition: {
+        type: 'compound',
+        op: 'and',
+        conditions: [
+          { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 100 },
+          { type: 'rsi_threshold', symbol: 'AAPL', period: 14, operator: 'less_than', value: 30 },
+        ],
+      },
+      notifications: ['log'],
+    };
+    const compoundDup: AlertRule = {
+      ...compound,
+      id: 'combo-2',
+      name: 'combo-2',
+      condition: {
+        type: 'compound',
+        op: 'and',
+        conditions: [
+          { type: 'rsi_threshold', symbol: 'AAPL', period: 14, operator: 'less_than', value: 30 },
+          { type: 'price_threshold', symbol: 'AAPL', operator: 'less_than', value: 100 },
+        ],
+      },
+    };
+    expect(dedupeAlerts([rsi, rsiDup, compound, compoundDup]).map((rule) => rule.id)).toEqual([
+      'rsi-1',
+      'combo-1',
+    ]);
   });
 });
 
