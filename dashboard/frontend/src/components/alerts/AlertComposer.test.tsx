@@ -30,8 +30,10 @@ const baseProps = {
 
 function renderComposer(
   overrides: Partial<{
+    mode: 'price' | 'rsi' | 'price_and_rsi';
     newSymbol: string;
     newValue: string;
+    newRsiValue: string;
     submitting: boolean;
     symbolsLoading: boolean;
     onSubmit: () => void;
@@ -40,8 +42,10 @@ function renderComposer(
   return render(
     <AlertComposer
       {...baseProps}
+      mode={overrides.mode ?? baseProps.mode}
       newSymbol={overrides.newSymbol ?? 'AAPL'}
       newValue={overrides.newValue ?? '150'}
+      newRsiValue={overrides.newRsiValue ?? baseProps.newRsiValue}
       symbolsLoading={overrides.symbolsLoading ?? false}
       onSubmit={overrides.onSubmit ?? vi.fn()}
       submitting={overrides.submitting}
@@ -91,5 +95,71 @@ describe('AlertComposer submit gate', () => {
     expect(
       screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled'),
     ).not.toBeNull();
+  });
+
+  it('enables RSI mode when RSI is finite even if price is blank', () => {
+    renderComposer({ mode: 'rsi', newValue: '', newRsiValue: '30' });
+    expect(screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled')).toBeNull();
+  });
+
+  it('disables RSI mode for blank or non-finite RSI', () => {
+    const { rerender } = renderComposer({ mode: 'rsi', newRsiValue: '' });
+    expect(
+      screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled'),
+    ).not.toBeNull();
+
+    rerender(
+      <AlertComposer
+        {...baseProps}
+        mode="rsi"
+        newSymbol="AAPL"
+        newValue="150"
+        newRsiValue="Infinity"
+        symbolsLoading={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled'),
+    ).not.toBeNull();
+  });
+
+  it('requires both finite price and RSI in price+RSI mode', () => {
+    const { rerender } = renderComposer({
+      mode: 'price_and_rsi',
+      newValue: '',
+      newRsiValue: '30',
+    });
+    expect(
+      screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled'),
+    ).not.toBeNull();
+
+    rerender(
+      <AlertComposer
+        {...baseProps}
+        mode="price_and_rsi"
+        newSymbol="AAPL"
+        newValue="150"
+        newRsiValue=""
+        symbolsLoading={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled'),
+    ).not.toBeNull();
+
+    rerender(
+      <AlertComposer
+        {...baseProps}
+        mode="price_and_rsi"
+        newSymbol="AAPL"
+        newValue="150"
+        newRsiValue="30"
+        symbolsLoading={false}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled')).toBeNull();
   });
 });

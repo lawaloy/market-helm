@@ -75,3 +75,47 @@ def test_engine_triggers_compound_and():
 
     assert len(events) == 1
     assert events[0]["condition_type"] == "compound"
+
+
+def _rsi_alert(alert_id: str, symbol: str) -> dict:
+    return {
+        "id": alert_id,
+        "name": f"{symbol} RSI",
+        "enabled": True,
+        "notifications": ["log"],
+        "condition": {
+            "type": "rsi_threshold",
+            "symbol": symbol,
+            "period": 14,
+            "operator": "less_than",
+            "value": 30,
+        },
+    }
+
+
+def test_evaluate_loads_rsi_history_once_per_tick():
+    storage = MagicMock()
+    storage.get_last_triggered.return_value = None
+    engine = AlertEngine(
+        [_rsi_alert("rsi-aapl", "AAPL"), _rsi_alert("rsi-msft", "MSFT")],
+        storage=storage,
+    )
+    history = {"AAPL": _falling_closes(), "MSFT": _falling_closes()}
+    stocks = [
+        {"symbol": "AAPL", "close": 80.0},
+        {"symbol": "MSFT", "close": 80.0},
+    ]
+
+    with patch(
+        "src.alerts.alert_engine.closes_by_symbol",
+        return_value=history,
+    ) as mock_closes:
+        first = engine.evaluate(stocks)
+        second = engine.evaluate(stocks)
+
+    assert {event["alert_id"] for event in first} == {"rsi-aapl", "rsi-msft"}
+    assert {event["alert_id"] for event in second} == {"rsi-aapl", "rsi-msft"}
+    assert mock_closes.call_count == 2
+    first_symbols, first_stocks = mock_closes.call_args_list[0].args
+    assert set(first_symbols) == {"AAPL", "MSFT"}
+    assert first_stocks == stocks
