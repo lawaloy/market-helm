@@ -132,6 +132,83 @@ def test_assert_projection_date_script_succeeds_when_present(
     assert module.main(["--run-date", "2026-09-18", "--data-dir", str(tmp_path)]) == 0
 
 
+def test_assert_market_bar_date_fails_when_present_outside_limit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """CI --limit is a newest-first window, not a full-store membership check."""
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    from src.storage.market_bars import upsert_market_bars
+
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 149.0}],
+        "2026-09-17",
+        data_dir=tmp_path,
+    )
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 150.0}],
+        "2026-09-18",
+        data_dir=tmp_path,
+    )
+    module = _load_script("assert_market_bar_date.py")
+    assert (
+        module.main(
+            [
+                "--trade-date",
+                "2026-09-18",
+                "--data-dir",
+                str(tmp_path),
+                "--limit",
+                "1",
+            ]
+        )
+        == 0
+    )
+    assert (
+        module.main(
+            [
+                "--trade-date",
+                "2026-09-17",
+                "--data-dir",
+                str(tmp_path),
+                "--limit",
+                "1",
+            ]
+        )
+        == 1
+    )
+
+
+def test_assert_projection_date_fails_when_present_outside_limit(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    from src.storage.projections_store import upsert_projections
+
+    upsert_projections(
+        [{"symbol": "AAPL", "current_price": 149.0}],
+        "2026-09-17",
+        data_dir=tmp_path,
+    )
+    upsert_projections(
+        [{"symbol": "AAPL", "current_price": 150.0}],
+        "2026-09-18",
+        data_dir=tmp_path,
+    )
+    module = _load_script("assert_projection_date.py")
+    assert (
+        module.main(
+            ["--run-date", "2026-09-18", "--data-dir", str(tmp_path), "--limit", "1"]
+        )
+        == 0
+    )
+    assert (
+        module.main(
+            ["--run-date", "2026-09-17", "--data-dir", str(tmp_path), "--limit", "1"]
+        )
+        == 1
+    )
+
+
 def test_print_qualified_reads_assessment_bool(tmp_path: Path) -> None:
     import importlib.util
 
