@@ -81,28 +81,55 @@ def test_projection_evidence_requires_fresh_bars_and_projection_rows() -> None:
     assert 'test -s "data/projections_${snapshot_date}.csv"' not in workflow
 
 
-def test_assert_market_bar_date_script_reports_missing(tmp_path: Path) -> None:
+def _load_script(name: str):
     import importlib.util
 
-    module_path = REPO_ROOT / "scripts" / "assert_market_bar_date.py"
-    spec = importlib.util.spec_from_file_location("assert_market_bar_date", module_path)
+    module_path = REPO_ROOT / "scripts" / name
+    spec = importlib.util.spec_from_file_location(name.removesuffix(".py"), module_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
 
+
+def test_assert_market_bar_date_script_reports_missing(tmp_path: Path) -> None:
+    module = _load_script("assert_market_bar_date.py")
     assert module.main(["--trade-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
 
 
 def test_assert_projection_date_script_reports_missing(tmp_path: Path) -> None:
-    import importlib.util
-
-    module_path = REPO_ROOT / "scripts" / "assert_projection_date.py"
-    spec = importlib.util.spec_from_file_location("assert_projection_date", module_path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
+    module = _load_script("assert_projection_date.py")
     assert module.main(["--run-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
+
+
+def test_assert_market_bar_date_script_succeeds_when_present(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    from src.storage.market_bars import upsert_market_bars
+
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 150.0}],
+        "2026-09-18",
+        data_dir=tmp_path,
+    )
+    module = _load_script("assert_market_bar_date.py")
+    assert module.main(["--trade-date", "2026-09-18", "--data-dir", str(tmp_path)]) == 0
+
+
+def test_assert_projection_date_script_succeeds_when_present(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    from src.storage.projections_store import upsert_projections
+
+    upsert_projections(
+        [{"symbol": "AAPL", "current_price": 150.0}],
+        "2026-09-18",
+        data_dir=tmp_path,
+    )
+    module = _load_script("assert_projection_date.py")
+    assert module.main(["--run-date", "2026-09-18", "--data-dir", str(tmp_path)]) == 0
 
 
 def test_print_qualified_reads_assessment_bool(tmp_path: Path) -> None:
