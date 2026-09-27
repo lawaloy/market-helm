@@ -217,7 +217,9 @@ already exist in durable storage. It is therefore safe to rerun. A nonzero exit
 status means at least one file could not be imported; the report names each
 failure. Review the reported `target` before treating the migration as complete:
 when `MARKET_HELM_DATABASE_URL` is set it is `configured_database`, otherwise it
-is the absolute sidecar path.
+is the absolute sidecar path. When no usable projections CSV exists for a date,
+the importer recovers projections embedded in that date's legacy summary and
+reports the recovery under `embedded_summary_fallbacks`.
 
 Use `--replace-existing` only when deliberately upserting legacy records for a
 date that already exists. Without it, even a partially populated durable date is

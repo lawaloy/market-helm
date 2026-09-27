@@ -6,7 +6,11 @@ import json
 
 from src.storage.legacy_market_data import backfill_legacy_market_data
 from src.storage.market_bars import load_market_bars, upsert_market_bars
-from src.storage.projections_store import load_daily_summary, load_projections
+from src.storage.projections_store import (
+    load_daily_summary,
+    load_projections,
+    upsert_daily_summary,
+)
 
 
 def _write_legacy_set(data_dir, day="2026-09-18", close=150.0):
@@ -50,6 +54,7 @@ def test_backfill_imports_all_legacy_stores(tmp_path, monkeypatch):
     }
     assert report["projections"]["rows_written"] == 1
     assert report["projections"]["invalid_rows"] == 1
+    assert report["projections"]["embedded_summary_fallbacks"] == 0
     assert report["summaries"]["rows_written"] == 1
 
     bars = load_market_bars("2026-09-18", data_dir=tmp_path)
@@ -130,3 +135,71 @@ def test_backfill_reports_configured_database_target(tmp_path, monkeypatch):
 
     assert report["target"] == "configured_database"
     assert not (tmp_path / "market_bars.sqlite").exists()
+
+
+def test_backfill_recovers_projections_embedded_in_summary(tmp_path, monkeypatch):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    (tmp_path / "summary_2026-09-18.json").write_text(
+        json.dumps(
+            {
+                "analysis": {"total_stocks": 1},
+                "projections": {
+                    "AAPL": {
+                        "symbol": "AAPL",
+                        "current_price": 150,
+                        "target_mid": 155,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = backfill_legacy_market_data(tmp_path)
+
+    assert report["errors"] == []
+    assert report["projections"]["embedded_summary_fallbacks"] == 1
+    assert report["projections"]["rows_written"] == 1
+    assert load_projections("2026-09-18", data_dir=tmp_path)[0]["source"] == (
+        "legacy_summary"
+    )
+
+
+def test_backfill_uses_summary_fallback_after_malformed_projection_csv(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    (tmp_path / "projections_2026-09-18.csv").write_text("", encoding="utf-8")
+    (tmp_path / "summary_2026-09-18.json").write_text(
+        json.dumps({"projections": {"AAPL": {"symbol": "AAPL"}}}),
+        encoding="utf-8",
+    )
+
+    report = backfill_legacy_market_data(tmp_path)
+
+    assert report["errors"][0]["file"] == "projections_2026-09-18.csv"
+    assert report["projections"]["embedded_summary_fallbacks"] == 1
+    assert [
+        row["symbol"] for row in load_projections("2026-09-18", data_dir=tmp_path)
+    ] == ["AAPL"]
+
+
+def test_backfill_recovers_embedded_projections_when_summary_already_exists(
+    tmp_path, monkeypatch
+):
+    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    upsert_daily_summary(
+        {"analysis": {"total_stocks": 1}}, "2026-09-18", data_dir=tmp_path
+    )
+    (tmp_path / "summary_2026-09-18.json").write_text(
+        json.dumps({"projections": {"AAPL": {"symbol": "AAPL"}}}),
+        encoding="utf-8",
+    )
+
+    report = backfill_legacy_market_data(tmp_path)
+
+    assert report["summaries"]["skipped_existing_files"] == 1
+    assert report["projections"]["embedded_summary_fallbacks"] == 1
+    assert [
+        row["symbol"] for row in load_projections("2026-09-18", data_dir=tmp_path)
+    ] == ["AAPL"]

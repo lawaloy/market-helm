@@ -115,6 +115,7 @@ def backfill_legacy_market_data(
         "summaries": _stats(len(files["summary"])),
         "errors": [],
     }
+    report["projections"]["embedded_summary_fallbacks"] = 0
 
     if not any(files.values()):
         return report
@@ -165,13 +166,40 @@ def backfill_legacy_market_data(
 
     for day, path in files["summary"]:
         stats = report["summaries"]
-        if day in existing_summaries and not replace_existing:
+        summary_exists = day in existing_summaries
+        if summary_exists and day in existing_projections and not replace_existing:
             stats["skipped_existing_files"] += 1
             continue
         try:
-            upsert_daily_summary(
-                _summary(path), day, data_dir=root, source="legacy_json"
-            )
+            payload = _summary(path)
+            embedded_projections = payload.get("projections")
+            if day not in existing_projections and embedded_projections:
+                try:
+                    written = upsert_projections(
+                        embedded_projections,
+                        day,
+                        data_dir=root,
+                        source="legacy_summary",
+                    )
+                    if written <= 0:
+                        raise ValueError(
+                            "embedded projections contain no valid rows"
+                        )
+                    projection_stats = report["projections"]
+                    projection_stats["rows_written"] += written
+                    projection_stats["embedded_summary_fallbacks"] += 1
+                    existing_projections.add(day)
+                except Exception as exc:
+                    report["errors"].append(
+                        {
+                            "file": path.name,
+                            "error": f"embedded projections: {exc}",
+                        }
+                    )
+            if summary_exists and not replace_existing:
+                stats["skipped_existing_files"] += 1
+                continue
+            upsert_daily_summary(payload, day, data_dir=root, source="legacy_json")
             stats["imported_files"] += 1
             stats["rows_written"] += 1
             existing_summaries.add(day)
