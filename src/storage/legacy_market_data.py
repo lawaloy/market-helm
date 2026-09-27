@@ -125,6 +125,7 @@ def backfill_legacy_market_data(
         list_projection_dates(data_dir=root, limit=_DATE_LIMIT)
     )
     existing_summaries = set(list_summary_dates(data_dir=root, limit=_DATE_LIMIT))
+    projection_csv_imported_dates: set[str] = set()
 
     for day, path in files["daily_data"]:
         stats = report["daily_data"]
@@ -161,6 +162,7 @@ def backfill_legacy_market_data(
             stats["rows_written"] += written
             stats["invalid_rows"] += max(0, len(rows) - written)
             existing_projections.add(day)
+            projection_csv_imported_dates.add(day)
         except Exception as exc:
             report["errors"].append({"file": path.name, "error": str(exc)})
 
@@ -173,7 +175,10 @@ def backfill_legacy_market_data(
         try:
             payload = _summary(path)
             embedded_projections = payload.get("projections")
-            if day not in existing_projections and embedded_projections:
+            needs_embedded_projections = day not in existing_projections or (
+                replace_existing and day not in projection_csv_imported_dates
+            )
+            if needs_embedded_projections and embedded_projections:
                 try:
                     written = upsert_projections(
                         embedded_projections,
