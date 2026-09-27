@@ -191,13 +191,40 @@ alerts require database mode and the separate worker described in
 
 Each run writes:
 
-| File                              | Contents                                       |
-| --------------------------------- | ---------------------------------------------- |
-| `data/market_bars` (sqlite/DB) | Quotes, projections, and analysis summaries |
-| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report |
-| `logs/market_helm_YYYY-MM-DD.log` | Detailed execution logs                        |
+| File                                        | Contents                                    |
+| ------------------------------------------- | ------------------------------------------- |
+| `data/market_bars.sqlite` (or app DB)       | Quotes, projections, and analysis summaries |
+| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report            |
+| `logs/market_helm_YYYY-MM-DD.log`           | Detailed execution logs                     |
 
 Set `DATA_DIR` to change the output location — see [DEPLOYMENT.md](DEPLOYMENT.md).
+
+---
+
+## Migrate legacy market-data files
+
+Current releases store quotes, projections, and daily summaries in the configured
+application database or in `DATA_DIR/market_bars.sqlite`. If an existing install
+still has dated `daily_data_*.csv`, `projections_*.csv`, or `summary_*.json`
+snapshots, import them with:
+
+```bash
+python3 scripts/backfill_market_data.py --data-dir data
+```
+
+The command prints a JSON report, retains every source file, and skips dates that
+already exist in durable storage. It is therefore safe to rerun. A nonzero exit
+status means at least one file could not be imported; the report names each
+failure. Review the reported `target` before treating the migration as complete:
+when `MARKET_HELM_DATABASE_URL` is set it is `configured_database`, otherwise it
+is the absolute sidecar path. When no usable projections CSV exists for a date,
+the importer recovers projections embedded in that date's legacy summary and
+reports the recovery under `embedded_summary_fallbacks`.
+
+Use `--replace-existing` only when deliberately upserting legacy records for a
+date that already exists. Without it, even a partially populated durable date is
+preserved; with it, matching records are updated while durable records absent
+from the legacy file remain.
 
 ---
 

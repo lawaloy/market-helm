@@ -290,45 +290,62 @@ export DATA_DIR=/var/lib/market-helm/data
 
 Point your process manager (systemd, Docker, etc.) at that environment.
 
+### Legacy market-data backfill
+
+Installations upgraded from the CSV/JSON serving path can copy their dated
+snapshots into durable storage with:
+
+```bash
+python3 scripts/backfill_market_data.py --data-dir "$DATA_DIR"
+```
+
+Back up both the legacy files and the target database first. The command does not
+modify its source files and skips dates already present in the database, so it is
+safe to rerun after a partial operational attempt. Check the JSON report and its
+`target` field: a configured `MARKET_HELM_DATABASE_URL` takes precedence over the
+sidecar path. Resolve every reported file error before removing old artifacts or
+the temporary CSV fallback. See [USAGE.md](USAGE.md#migrate-legacy-market-data)
+for `--replace-existing` upsert semantics.
+
 ---
 
 ## Environment variables (reference)
 
-| Variable                                 | Used by                         | Purpose                                                                            |
-| ---------------------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| Variable                                 | Used by                         | Purpose                                                                                     |
+| ---------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
 | `DATA_DIR`                               | Tracker, dashboard backend      | Path to durable `market_bars.sqlite` / DB (`market_bars`, `projections`, `daily_summaries`) |
-| `FINNHUB_API_KEY`                        | Tracker CLI                     | Market data (required for live fetches)                                            |
-| `CORS_ORIGINS`                           | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)        |
-| `VITE_API_URL`                           | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                             |
-| `MARKET_HELM_DATABASE_URL`               | API, worker                     | Enables hosted mode; SQLite for development or PostgreSQL for hosted use           |
-| `MARKET_HELM_AUTH_SECRET`                | Dashboard backend               | Required hosted session-signing secret; minimum 16 characters                      |
-| `MARKET_HELM_PUBLIC_URL`                 | Dashboard backend               | Safe public base URL for email verification and password-reset links               |
-| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend               | Require verified email before protected hosted operations                          |
-| `MARKET_HELM_RATE_LIMIT_ENABLED`         | Dashboard backend               | Enables API rate limiting; defaults on when database mode is enabled               |
-| `MARKET_HELM_RATE_LIMIT_GLOBAL`          | Dashboard backend               | Per-client API requests/minute (default `120`)                                     |
-| `MARKET_HELM_RATE_LIMIT_LOGIN`           | Dashboard backend               | Login attempts/client/minute (default `10`)                                        |
-| `MARKET_HELM_RATE_LIMIT_REGISTER`        | Dashboard backend               | Registrations/client/hour (default `5`)                                            |
-| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL`      | Dashboard backend               | Verification/reset email requests/client/hour (default `5`)                        |
-| `MARKET_HELM_RATE_LIMIT_EXPENSIVE`       | Dashboard backend               | Expensive write requests/client/minute (default `10`)                              |
-| `MARKET_HELM_TRUSTED_PROXY_CIDRS`        | Dashboard backend               | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For`                    |
-| `ALERT_WEBHOOK_URL`                      | Tracker (alerts)                | Default webhook when rules use `webhook` without per-rule `url`                    |
-| `ALERT_WEBHOOK_FORMAT`                   | Tracker (alerts)                | `json`, `slack`, or `discord` webhook body format                                  |
-| `DISCORD_WEBHOOK_URL`                    | Tracker (alerts)                | Default Discord incoming webhook URL when a rule has no `webhook_url`              |
-| `MARKET_HELM_ALERTS_CONFIG`              | Tracker (alerts)                | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`)              |
-| `SMTP_HOST`                              | Tracker (alerts)                | SMTP server for `email` notifications                                              |
-| `SMTP_PORT`                              | Tracker (alerts)                | SMTP port (default `587`)                                                          |
-| `SMTP_USER`                              | Tracker (alerts)                | SMTP username                                                                      |
-| `SMTP_PASSWORD`                          | Tracker (alerts)                | SMTP password or app password                                                      |
-| `ALERT_EMAIL_TO`                         | Tracker (alerts)                | Default recipients for `email` notifications                                       |
-| `ALERT_EMAIL_FROM`                       | Tracker (alerts)                | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun |
-| `ALERT_EMAIL_PROVIDER`                   | Tracker (alerts)                | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set    |
-| `SENDGRID_API_KEY`                       | Tracker (alerts)                | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid`                              |
-| `MAILGUN_API_KEY`                        | Tracker (alerts)                | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun`                                |
-| `ALERT_DELIVERY_MAX_ATTEMPTS`            | Tracker (alerts)                | Total send attempts per notification (default `3`)                                 |
-| `ALERT_DELIVERY_RETRY_BASE_SECONDS`      | Tracker (alerts)                | Initial backoff delay between retries (default `1`)                                |
-| `ALERT_DELIVERY_RETRY_MAX_SECONDS`       | Tracker (alerts)                | Max backoff delay cap (default `8`)                                                |
-| `MAILGUN_DOMAIN`                         | Tracker (alerts)                | Mailgun sending domain (e.g. `mg.yourdomain.com`)                                  |
-| `MAILGUN_API_BASE`                       | Tracker (alerts)                | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`)     |
+| `FINNHUB_API_KEY`                        | Tracker CLI                     | Market data (required for live fetches)                                                     |
+| `CORS_ORIGINS`                           | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)                 |
+| `VITE_API_URL`                           | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                                      |
+| `MARKET_HELM_DATABASE_URL`               | API, worker                     | Enables hosted mode; SQLite for development or PostgreSQL for hosted use                    |
+| `MARKET_HELM_AUTH_SECRET`                | Dashboard backend               | Required hosted session-signing secret; minimum 16 characters                               |
+| `MARKET_HELM_PUBLIC_URL`                 | Dashboard backend               | Safe public base URL for email verification and password-reset links                        |
+| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend               | Require verified email before protected hosted operations                                   |
+| `MARKET_HELM_RATE_LIMIT_ENABLED`         | Dashboard backend               | Enables API rate limiting; defaults on when database mode is enabled                        |
+| `MARKET_HELM_RATE_LIMIT_GLOBAL`          | Dashboard backend               | Per-client API requests/minute (default `120`)                                              |
+| `MARKET_HELM_RATE_LIMIT_LOGIN`           | Dashboard backend               | Login attempts/client/minute (default `10`)                                                 |
+| `MARKET_HELM_RATE_LIMIT_REGISTER`        | Dashboard backend               | Registrations/client/hour (default `5`)                                                     |
+| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL`      | Dashboard backend               | Verification/reset email requests/client/hour (default `5`)                                 |
+| `MARKET_HELM_RATE_LIMIT_EXPENSIVE`       | Dashboard backend               | Expensive write requests/client/minute (default `10`)                                       |
+| `MARKET_HELM_TRUSTED_PROXY_CIDRS`        | Dashboard backend               | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For`                             |
+| `ALERT_WEBHOOK_URL`                      | Tracker (alerts)                | Default webhook when rules use `webhook` without per-rule `url`                             |
+| `ALERT_WEBHOOK_FORMAT`                   | Tracker (alerts)                | `json`, `slack`, or `discord` webhook body format                                           |
+| `DISCORD_WEBHOOK_URL`                    | Tracker (alerts)                | Default Discord incoming webhook URL when a rule has no `webhook_url`                       |
+| `MARKET_HELM_ALERTS_CONFIG`              | Tracker (alerts)                | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`)                       |
+| `SMTP_HOST`                              | Tracker (alerts)                | SMTP server for `email` notifications                                                       |
+| `SMTP_PORT`                              | Tracker (alerts)                | SMTP port (default `587`)                                                                   |
+| `SMTP_USER`                              | Tracker (alerts)                | SMTP username                                                                               |
+| `SMTP_PASSWORD`                          | Tracker (alerts)                | SMTP password or app password                                                               |
+| `ALERT_EMAIL_TO`                         | Tracker (alerts)                | Default recipients for `email` notifications                                                |
+| `ALERT_EMAIL_FROM`                       | Tracker (alerts)                | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun          |
+| `ALERT_EMAIL_PROVIDER`                   | Tracker (alerts)                | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set             |
+| `SENDGRID_API_KEY`                       | Tracker (alerts)                | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid`                                       |
+| `MAILGUN_API_KEY`                        | Tracker (alerts)                | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun`                                         |
+| `ALERT_DELIVERY_MAX_ATTEMPTS`            | Tracker (alerts)                | Total send attempts per notification (default `3`)                                          |
+| `ALERT_DELIVERY_RETRY_BASE_SECONDS`      | Tracker (alerts)                | Initial backoff delay between retries (default `1`)                                         |
+| `ALERT_DELIVERY_RETRY_MAX_SECONDS`       | Tracker (alerts)                | Max backoff delay cap (default `8`)                                                         |
+| `MAILGUN_DOMAIN`                         | Tracker (alerts)                | Mailgun sending domain (e.g. `mg.yourdomain.com`)                                           |
+| `MAILGUN_API_BASE`                       | Tracker (alerts)                | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`)              |
 
 **Dev vs product email:** SMTP env vars suit **self-host / operator** mail (e.g. personal Gmail). For production, use a transactional provider with a verified domain — see [Transactional alert email](#transactional-alert-email) below.
 
