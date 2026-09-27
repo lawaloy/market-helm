@@ -1,18 +1,51 @@
-# MarketHelm
+<div align="center">
+  <img src="docs/assets/readme/markethelm-mark.png" alt="MarketHelm ship's helm and market chart logo" width="180">
+  <h1>MarketHelm</h1>
+  <p><strong>Stock-market monitoring, projections, and alerts—from CLI to web dashboard.</strong></p>
+  <p>
+    <a href="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml"><img src="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml/badge.svg?branch=main" alt="CI status"></a>
+    <a href="https://pypi.org/project/market-helm/"><img src="https://img.shields.io/pypi/v/market-helm?logo=pypi&logoColor=white" alt="PyPI version"></a>
+    <a href="https://pypi.org/project/market-helm/"><img src="https://img.shields.io/pypi/pyversions/market-helm?logo=python&logoColor=white" alt="Supported Python versions"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/github/license/lawaloy/market-helm" alt="MIT license"></a>
+    <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="Pull requests welcome"></a>
+  </p>
+  <p>
+    <a href="#quick-start">Quick start</a> ·
+    <a href="docs/README.md">Documentation</a> ·
+    <a href="docs/PROJECT_STATUS.md">Project status</a> ·
+    <a href="CONTRIBUTING.md">Contributing</a>
+  </p>
+</div>
 
-MarketHelm is a stock-market monitoring and analysis tool with a Python CLI and
-a web dashboard. It screens major indices, fetches market data, produces
-five-session projections, records results, and can deliver configured alerts.
-Broker execution is not implemented.
+MarketHelm screens major indices, fetches market data, produces five-session
+projections, records results, and can deliver configured alerts. Broker
+execution is not implemented; see [Project status](docs/PROJECT_STATUS.md) for
+the evidence-based feature matrix and current priorities.
 
-For the evidence-based feature matrix and current priorities, see
-[Project status](docs/PROJECT_STATUS.md).
+## Product tour
+
+The dashboard turns saved market data into an at-a-glance view of movers,
+projection confidence, recommendations, risk, and potential opportunities.
+
+![MarketHelm dashboard showing sample market movers, projection confidence, recommendations, and stock opportunities](docs/assets/readme/markethelm-dashboard.png)
+
+_Dashboard overview using deterministic sample data._
+
+Helmtower lets operators create price, RSI, or combined watches and route
+notifications through the configured email, Discord, or Slack channels.
+
+![Helmtower alert composer showing an Apple price watch and saved quote](docs/assets/readme/markethelm-alerts.png)
+
+_Helmtower alert setup using deterministic sample data._
+
+Maintainers can regenerate these images from the seeded local application with
+`cd e2e && npm run capture:readme`.
 
 ## What runs where?
 
 | Mode             | Command or entry point            | What runs                                       | Open in a browser                       |
 | ---------------- | --------------------------------- | ----------------------------------------------- | --------------------------------------- |
-| Daily tracker    | `market-helm`                     | CLI workflow; writes CSV/JSON data              | Nothing                                 |
+| Daily tracker    | `market-helm`                     | CLI workflow; stores market data and reports    | Nothing                                 |
 | Packaged web app | `market-helm-web`                 | FastAPI API and compiled React UI on one server | <http://localhost:8000>                 |
 | Web development  | FastAPI on 8000 plus Vite on 3000 | API and hot-reloading React UI                  | <http://localhost:3000>                 |
 | Hosted staging   | `docker-compose.staging.yml`      | PostgreSQL, API/compiled UI, and alert worker   | The hostname configured by the operator |
@@ -92,7 +125,7 @@ DATA_DIR=./data
 ```
 
 Run both commands from that same directory. `DATA_DIR` ensures the packaged CLI
-and dashboard use the same files:
+and dashboard use the same durable data store:
 
 ```bash
 market-helm
@@ -122,11 +155,11 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 
 ## Runtime data
 
-| Output                            | Description                       |
-| --------------------------------- | --------------------------------- |
-| `data/market_bars` (sqlite/DB) | Quotes, projections, and daily summaries |
-| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report |
-| `logs/market_helm_YYYY-MM-DD.log` | Execution logs                    |
+| Output                                      | Description                              |
+| ------------------------------------------- | ---------------------------------------- |
+| `data/market_bars.sqlite`                   | Quotes, projections, and daily summaries |
+| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report         |
+| `logs/market_helm_YYYY-MM-DD.log`           | Execution logs                           |
 
 Runtime data and credentials are not deployed from Git. Set `DATA_DIR` to an
 absolute persistent path when hosting the application.

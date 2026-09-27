@@ -2,6 +2,7 @@
   "name": "market-helm-e2e",
   "private": true,
   "scripts": {
+    "capture:readme": "node scripts/capture-readme.mjs",
     "test": "playwright test",
     "test:ui": "playwright test --ui"
   },
