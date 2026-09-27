@@ -17,6 +17,48 @@ async function capture() {
     deviceScaleFactor: 1,
   });
 
+  const fulfillJson = (route, body) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+
+  // Never read, execute, or capture a maintainer's real alert configuration.
+  await page.route('**/api/alerts/config', (route) =>
+    fulfillJson(route, {
+      exists: true,
+      config: {
+        defaults: {
+          email_to: '',
+          webhook_format: 'discord',
+          notify_email: false,
+          notify_webhook: false,
+        },
+        alerts: [],
+      },
+      channels: { email_smtp: false, email_recipients: false, webhook_url: false },
+    }),
+  );
+  await page.route('**/api/alerts/status', (route) =>
+    fulfillJson(route, {
+      checks_on_fetch: true,
+      last_data_date: null,
+      tracked_symbols: ['AAPL', 'AMZN', 'MSFT', 'NVDA', 'TSLA'],
+      active_watches: 0,
+      last_triggered_at: null,
+      latest_deliveries: [],
+    }),
+  );
+  await page.route('**/api/alerts/run', (route) =>
+    fulfillJson(route, {
+      triggered: 0,
+      last_data_date: null,
+      events: [],
+      message: null,
+    }),
+  );
+
   await page.goto(baseURL, { waitUntil: 'networkidle' });
   await page.getByText('Stocks Tracked').waitFor({ timeout: 30_000 });
   await page.waitForTimeout(2_000);
