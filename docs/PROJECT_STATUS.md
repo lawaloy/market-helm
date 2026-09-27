@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-26
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -15,10 +15,10 @@ projections, stores historical runs, and can notify users when alert rules match
 
 The repository supports two operating modes:
 
-- **Local/self-hosted mode:** market data and alert preferences are flat files.
-- **Hosted multi-user mode:** market data remains shared flat-file data, while
-  accounts, sessions, per-user alert settings, jobs, and delivery history use
-  SQLite or PostgreSQL.
+- **Local/self-hosted mode:** market data uses `DATA_DIR/market_bars.sqlite`,
+  while alert preferences remain file based.
+- **Hosted multi-user mode:** shared market data, accounts, sessions, per-user
+  alert settings, jobs, and delivery history use SQLite or PostgreSQL.
 
 Automated broker execution is a future direction, not a current capability. Its
 runtime is expected to be intraday or event-driven and separate from the
@@ -40,17 +40,17 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 ## Current capability matrix
 
-| Area                          | Status                                       | What exists                                                                                                                                                       | Important remaining work                                                                                               |
-| ----------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output, and service-boundary resilience coverage                                   | Live Finnhub smoke testing and full-market run reliability                                                             |
-| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes               |
-| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                              |
-| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                     |
-| Alerts                        | **Shipped and tested**                       | Price, RSI, and shallow compound rules, screening match, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI | Nested compounds and additional indicators; SMS/push; real-provider staging tests                                          |
-| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                     | Account export and stronger administrative/support tooling                                                             |
-| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), queue/orchestrator, persistent shared market-data volume, automated container backup/restore and recovery drills | Cut dashboard/alert reads over to `market_bars`; environment-specific managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
-| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                  |
-| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls |
+| Area                          | Status                                       | What exists                                                                                                                                                                                       | Important remaining work                                                                                                                                    |
+| ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output, and service-boundary resilience coverage                                                                   | Live Finnhub smoke testing and full-market run reliability                                                                                                  |
+| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes                                                    |
+| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                                                                   |
+| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                                                          |
+| Alerts                        | **Shipped and tested**                       | Price, RSI, and shallow compound rules, screening match, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                         | Nested compounds and additional indicators; SMS/push; real-provider staging tests                                                                           |
+| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                                                     | Account export and stronger administrative/support tooling                                                                                                  |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), durable dashboard/alert reads, legacy snapshot backfill, queue/orchestrator, and automated container backup/restore drills | Run and verify the legacy backfill per environment; remove the temporary CSV fallback; managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
+| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                                                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                                                       |
+| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls                                      |
 
 ## Hosted alerts and accounts
 
@@ -100,10 +100,11 @@ unit tests and container-only integration tests cannot fully reproduce.
 
 ## Recommended next work
 
-1. **Market data DB cutover:** slice 1 dual-writes daily bars into `market_bars`
-   (app DB or `DATA_DIR/market_bars.sqlite`). Next: backfill from existing CSVs,
-   then point `DataLoader` / alert snapshots at DB reads before dropping CSV as
-   the serving path.
+1. **Market data DB cutover:** daily bars, projections, and summaries now write to
+   the app DB or `DATA_DIR/market_bars.sqlite`; dashboard and alert reads prefer
+   durable storage. Run and verify the legacy snapshot backfill in each
+   environment, compare representative dates, then remove the temporary CSV
+   fallback and retired artifacts.
 2. **Projection validation:** the weekday post-close workflow preserves a
    cumulative forward archive and its qualification report. Keep collecting exact
    target closes until `projection_baseline.py assess` passes and the workflow
@@ -117,19 +118,20 @@ unit tests and container-only integration tests cannot fully reproduce.
    against the chosen managed PostgreSQL, ingress, monitoring, and
    transactional-email providers. This is an operator-owned release gate requiring
    credentials/evidence, not unfinished repository automation.
-3. **Alert depth:** extend beyond RSI and shallow compounds (more indicators,
+4. **Alert depth:** extend beyond RSI and shallow compounds (more indicators,
    nested rules); consider SMS/push only after hosted email is proven reliable.
-4. **Dashboard quality:** code-split routes, run accessibility/performance audits,
+5. **Dashboard quality:** code-split routes, run accessibility/performance audits,
    and decide whether saved watchlists/views belong in the product.
+
 ## Explicitly deferred
 
-| Item                                    | Reason                                                                                   |
-| --------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Automated trading                       | Requires separate intraday orchestration plus risk, compliance, broker, and audit design |
-| Nested compound / extra indicators  | RSI + shallow AND/OR cover the first technical slice; deeper nesting deferred |
-| SMS and push notifications              | Email/webhook production operation should be proven first                                |
-| International exchanges                 | Current screening is centered on S&P 500 and NASDAQ-100                                  |
-| ML/fundamental/news projections         | Current projection engine is intentionally heuristic                                     |
+| Item                               | Reason                                                                                   |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| Automated trading                  | Requires separate intraday orchestration plus risk, compliance, broker, and audit design |
+| Nested compound / extra indicators | RSI + shallow AND/OR cover the first technical slice; deeper nesting deferred            |
+| SMS and push notifications         | Email/webhook production operation should be proven first                                |
+| International exchanges            | Current screening is centered on S&P 500 and NASDAQ-100                                  |
+| ML/fundamental/news projections    | Current projection engine is intentionally heuristic                                     |
 
 ## Keeping this document current
 

@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Backfill legacy market-data files into market_bars durable storage."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.storage.legacy_market_data import backfill_legacy_market_data  # noqa: E402
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data-dir", type=Path, default=ROOT / "data")
+    parser.add_argument(
+        "--replace-existing",
+        action="store_true",
+        help="overwrite durable rows for dates that already exist",
+    )
+    args = parser.parse_args(argv)
+
+    try:
+        report = backfill_legacy_market_data(
+            args.data_dir,
+            replace_existing=args.replace_existing,
+        )
+    except Exception as exc:
+        print(json.dumps({"errors": [{"error": str(exc)}]}, indent=2), file=sys.stderr)
+        return 1
+
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 1 if report["errors"] else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
