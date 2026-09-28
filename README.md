@@ -155,11 +155,11 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 
 ## Runtime data
 
-| Output                                      | Description                              |
-| ------------------------------------------- | ---------------------------------------- |
-| `data/market_bars.sqlite`                   | Quotes, projections, and daily summaries |
-| `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report         |
-| `logs/market_helm_YYYY-MM-DD.log`           | Execution logs                           |
+| Output                                         | Description                              |
+| ---------------------------------------------- | ---------------------------------------- |
+| `data/market_bars.sqlite` or configured app DB | Quotes, projections, and daily summaries |
+| `data/projections_YYYY-MM-DD.md` (optional)    | Human-readable projection report         |
+| `logs/market_helm_YYYY-MM-DD.log`              | Execution logs                           |
 
 Runtime data and credentials are not deployed from Git. Set `DATA_DIR` to an
 absolute persistent path when hosting the application.
