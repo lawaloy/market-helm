@@ -1,7 +1,4 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
-
-const SCREENSHOT_DIR = path.join(__dirname, '..', 'screenshots');
 
 test.describe('Helmtower company picker', () => {
   test('loads prices without stuck loading dots', async ({ page }) => {
@@ -39,7 +36,15 @@ test.describe('Helmtower company picker', () => {
       timeout: 10_000,
     });
 
-    const screenshotPath = path.join(SCREENSHOT_DIR, 'alerts-picker-aapl-with-price.png');
+    // Keep local channel credentials and addresses out of captured artifacts.
+    await page.addStyleTag({
+      content: `
+        .alerts-page .space-y-6 > section:first-child,
+        .alerts-page header ul { display: none !important; }
+      `,
+    });
+
+    const screenshotPath = test.info().outputPath('alerts-picker-aapl-with-price.png');
     await page.screenshot({ path: screenshotPath, fullPage: true });
     await test.info().attach('alerts-picker-aapl-with-price', {
       path: screenshotPath,
