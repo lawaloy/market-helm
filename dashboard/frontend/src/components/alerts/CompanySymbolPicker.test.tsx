@@ -213,9 +213,7 @@ describe('CompanySymbolPicker performance', () => {
     for (let page = 1; page <= 8; page += 1) {
       list.scrollTop = list.scrollHeight - list.clientHeight;
       fireEvent.scroll(list);
-      await waitFor(() =>
-        expect(optionCount()).toBe(Math.min((page + 1) * 60, 517)),
-      );
+      await waitFor(() => expect(optionCount()).toBe(Math.min((page + 1) * 60, 517)));
     }
     expect(screen.getByText('Company 516')).toBeTruthy();
   }, 20_000);
