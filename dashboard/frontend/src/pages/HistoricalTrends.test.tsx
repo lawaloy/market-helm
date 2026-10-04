@@ -2,9 +2,22 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HistoricalTrends from './HistoricalTrends';
 
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal('ResizeObserver', ResizeObserverMock);
+
+vi.mock('../contexts/ThemeContext', () => ({
+  useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
+}));
+
 const apiMocks = vi.hoisted(() => ({
   getSummary: vi.fn(),
   getAccuracy: vi.fn(),
+  getRunProjections: vi.fn(),
   getHistorical: vi.fn(),
 }));
 
@@ -12,6 +25,7 @@ vi.mock('../services/api', () => ({
   historyApi: {
     getSummary: apiMocks.getSummary,
     getAccuracy: apiMocks.getAccuracy,
+    getRunProjections: apiMocks.getRunProjections,
   },
   stocksApi: {
     getHistorical: apiMocks.getHistorical,
@@ -80,12 +94,24 @@ describe('HistoricalTrends fetch races', () => {
   beforeEach(() => {
     apiMocks.getSummary.mockResolvedValue(summaryPayload());
     apiMocks.getAccuracy.mockResolvedValue(accuracyPayload());
+    apiMocks.getRunProjections.mockResolvedValue({
+      data: { date: '2026-08-04', totalProjections: 0, projections: [] },
+    });
     apiMocks.getHistorical.mockResolvedValue({ data: { data: [] } });
   });
 
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('opens a company directly from the dashboard forecast preview', async () => {
+    window.history.replaceState({}, '', '/historical?symbol=AAPL');
+    render(<HistoricalTrends />);
+
+    expect(await screen.findByRole('heading', { name: 'Apple Inc history' })).toBeTruthy();
+    expect(apiMocks.getHistorical).toHaveBeenCalledWith('AAPL', 30);
   });
 
   it('ignores a late summary response after unmount', async () => {
@@ -112,8 +138,179 @@ describe('HistoricalTrends fetch races', () => {
     });
 
     // Unmounted view must not throw or resurrect loading UI via late setState.
-    expect(screen.queryByText('Historical Trends')).toBeNull();
-    expect(screen.queryByText('Loading historical trends...')).toBeNull();
+    expect(screen.queryByText('Market history')).toBeNull();
+    expect(screen.queryByText('Loading market history...')).toBeNull();
+  });
+
+  it('shows an accessible run record instead of misleading one-point charts', async () => {
+    render(<HistoricalTrends />);
+
+    expect(await screen.findByRole('heading', { name: 'Market history' })).toBeTruthy();
+    expect(screen.getByText('Most recent')).toBeTruthy();
+    expect(screen.getAllByText('70.0%').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('+1.20%').length).toBeGreaterThan(0);
+    expect(document.querySelector('.recharts-wrapper')).toBeNull();
+  });
+
+  it('shows a timeline record when a company has only one recorded session', async () => {
+    apiMocks.getHistorical.mockResolvedValue({
+      data: {
+        data: [
+          {
+            date: '2026-08-04',
+            close: 100,
+            change: 1,
+            projection: { targetPrice: 105 },
+          },
+        ],
+      },
+    });
+
+    render(<HistoricalTrends />);
+
+    await screen.findByRole('heading', { name: 'Market history' });
+    fireEvent.click(screen.getByRole('button', { name: 'Company' }));
+    fireEvent.click(await screen.findByText('Apple Inc (AAPL)'));
+
+    expect(await screen.findByText('$100.00')).toBeTruthy();
+    expect(screen.getByText('$105.00')).toBeTruthy();
+    expect(screen.getByText('Most recent')).toBeTruthy();
+  });
+
+  it('opens company figure details and loads the saved target range only when needed', async () => {
+    apiMocks.getHistorical.mockResolvedValue({
+      data: {
+        data: [
+          {
+            date: '2026-08-04',
+            close: 100,
+            change: 1,
+            volume: 1000,
+            projection: { targetPrice: 105, recommendation: 'BUY', confidence: 70 },
+          },
+        ],
+      },
+    });
+    apiMocks.getRunProjections.mockResolvedValue({
+      data: {
+        date: '2026-08-04',
+        totalProjections: 1,
+        projections: [
+          {
+            symbol: 'AAPL',
+            name: 'Apple Inc',
+            recommendation: 'BUY',
+            confidence: 70,
+            expectedChange: 5,
+            currentPrice: 100,
+            targetPrice: 105,
+            targetLow: 102,
+            targetHigh: 108,
+            risk: 'Low',
+            reason: 'Saved evidence for this call.',
+          },
+        ],
+      },
+    });
+
+    render(<HistoricalTrends />);
+    await screen.findByRole('heading', { name: 'Market history' });
+    fireEvent.click(screen.getByRole('button', { name: 'Company' }));
+    fireEvent.click(await screen.findByText('Apple Inc (AAPL)'));
+    await screen.findByRole('button', { name: 'View closing price details: $100.00' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'View closing price details: $100.00' }));
+    expect(screen.getByText(/Volume: 1,000/)).toBeTruthy();
+    expect(apiMocks.getRunProjections).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View 5-trading-day target details: $105.00' }),
+    );
+    const target = await screen.findByRole('region', { name: 'target details for Aug 4, 2026' });
+    expect(target.textContent).toContain('Saved target range: $102.00 to $108.00');
+    expect(target.textContent).toContain('Saved evidence for this call.');
+    expect(apiMocks.getRunProjections).toHaveBeenCalledExactlyOnceWith('2026-08-04');
+  });
+
+  it('opens the saved companies behind a count and filters a recommendation bucket', async () => {
+    apiMocks.getSummary.mockResolvedValue(
+      summaryPayload({
+        data: [
+          {
+            date: '2026-08-04',
+            totalProjections: 3,
+            averageConfidence: 70,
+            expectedMarketMove: 1.2,
+            sentiment: 'Bullish',
+            strongBuy: 0,
+            buy: 1,
+            hold: 1,
+            sell: 1,
+            strongSell: 0,
+          },
+        ],
+        symbols: ['AAPL', 'MSFT', 'GOOGL'],
+        names: { AAPL: 'Apple Inc', MSFT: 'Microsoft', GOOGL: 'Alphabet' },
+      }),
+    );
+    apiMocks.getRunProjections.mockResolvedValue({
+      data: {
+        date: '2026-08-04',
+        totalProjections: 3,
+        projections: [
+          {
+            symbol: 'AAPL',
+            name: 'Apple Inc',
+            recommendation: 'BUY',
+            confidence: 75,
+            expectedChange: 2,
+            currentPrice: 100,
+            targetPrice: 102,
+            risk: 'Low',
+            reason: 'Momentum',
+          },
+          {
+            symbol: 'MSFT',
+            name: 'Microsoft',
+            recommendation: 'HOLD',
+            confidence: 70,
+            expectedChange: 0,
+            currentPrice: 200,
+            targetPrice: 200,
+            risk: 'Low',
+            reason: '',
+          },
+          {
+            symbol: 'GOOGL',
+            name: 'Alphabet',
+            recommendation: 'SELL',
+            confidence: 65,
+            expectedChange: -1,
+            currentPrice: 300,
+            targetPrice: 297,
+            risk: 'Medium',
+            reason: '',
+          },
+        ],
+      },
+    });
+
+    render(<HistoricalTrends />);
+    await screen.findByRole('heading', { name: 'Market history' });
+    fireEvent.click(screen.getByRole('button', { name: '3 stocks · View companies' }));
+    expect(
+      await screen.findByRole('region', { name: 'Companies on this date for Aug 4, 2026' }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Apple Inc/)).toBeTruthy();
+    expect(screen.getByText(/Microsoft/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'View 1 buy companies from Aug 4, 2026' }));
+    const filtered = await screen.findByRole('region', { name: 'buy calls for Aug 4, 2026' });
+    expect(filtered.textContent).toContain('Apple Inc');
+    expect(filtered.textContent).not.toContain('Microsoft');
+    expect(filtered.textContent).not.toContain('Alphabet');
+    expect(apiMocks.getRunProjections).toHaveBeenCalledWith('2026-08-04');
+    expect(apiMocks.getRunProjections).toHaveBeenCalledTimes(1);
   });
 
   it('ignores stale accuracy when days change before the first request settles', async () => {
@@ -143,7 +340,7 @@ describe('HistoricalTrends fetch races', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText('Historical Trends')).toBeTruthy();
+    expect(await screen.findByText('Market history')).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Time range:'), {
       target: { value: '7' },
@@ -172,7 +369,8 @@ describe('HistoricalTrends fetch races', () => {
 
     // Latest days=7 response wins; stale sampleCount 99 must not appear.
     expect(screen.queryByText('99')).toBeNull();
-    expect(await screen.findByText('2')).toBeTruthy();
+    const scoredProjections = await screen.findByText('Scored projections');
+    expect(scoredProjections.parentElement?.textContent).toContain('2');
   });
 
   it('ignores stale stock history when days change mid-flight', async () => {
@@ -205,7 +403,10 @@ describe('HistoricalTrends fetch races', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByText('Historical Trends')).toBeTruthy();
+    expect(await screen.findByText('Market history')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Company' }));
+    fireEvent.click(await screen.findByText('Apple Inc (AAPL)'));
+
     expect(apiMocks.getHistorical).toHaveBeenCalledWith('AAPL', 30);
 
     fireEvent.change(screen.getByLabelText('Time range:'), {
@@ -313,5 +514,11 @@ describe('HistoricalTrends fetch races', () => {
     expect(screen.getByText('Recent scores (newest 1 of 2)')).toBeTruthy();
     expect(screen.getByText('Correct')).toBeTruthy();
     expect(screen.getByText('Hit')).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View directional accuracy details: 60.00%' }),
+    );
+    expect(
+      screen.getByRole('region', { name: 'Directional accuracy details' }).textContent,
+    ).toContain('correctly predicted');
   });
 });

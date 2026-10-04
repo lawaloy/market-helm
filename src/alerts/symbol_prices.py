@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import Dict, List
 
+from src.storage.market_bars import latest_saved_quotes
 from src.utils.tickers import normalize_ticker
 
 logger = logging.getLogger(__name__)
@@ -24,32 +26,24 @@ def _load_env() -> None:
         pass
 
 
-def prices_from_saved_daily_data() -> Dict[str, float]:
-    """Prices from the newest market_bars snapshot."""
+def saved_quote_details() -> Dict[str, Dict[str, object]]:
+    """Saved quotes with their provider time, in file or hosted DB mode."""
     from dashboard.backend.services.data_loader import get_data_loader
 
-    prices: Dict[str, float] = {}
     try:
         loader = get_data_loader()
-        df = loader.load_daily_data()
+        data_dir = loader.data_dir
+        if not isinstance(data_dir, (str, Path)):
+            return {}
+        return latest_saved_quotes(data_dir=data_dir)
     except (ValueError, OSError, RuntimeError):
         # Unreadable data dirs / loader boot failures must not crash quote pickers.
-        return prices
+        return {}
 
-    for _, row in df.iterrows():
-        symbol = normalize_ticker(row.get("symbol"))
-        close = row.get("close", row.get("price"))
-        if not symbol or close is None:
-            continue
-        try:
-            value = float(close)
-        except (TypeError, ValueError):
-            continue
-        # float("nan") succeeds; skip so alert quotes stay JSON-safe.
-        if not math.isfinite(value):
-            continue
-        prices[symbol] = value
-    return prices
+
+def prices_from_saved_daily_data() -> Dict[str, float]:
+    """Prices from the newest recorded quote for each recently saved symbol."""
+    return {symbol: float(row["price"]) for symbol, row in saved_quote_details().items()}
 
 
 def resolve_symbol_prices(

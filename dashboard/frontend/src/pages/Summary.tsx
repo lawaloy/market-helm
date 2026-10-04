@@ -7,12 +7,13 @@ import { formatDate } from '../utils/formatters';
 
 interface SummaryProps {
   refreshKey?: number;
+  embedded?: boolean;
 }
 
 const POLL_MS = 2000;
 const MAX_WAIT_MS = 15 * 60 * 1000;
 
-const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
+const Summary: React.FC<SummaryProps> = ({ refreshKey = 0, embedded = false }) => {
   const [summary, setSummary] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [source, setSource] = useState<'ai' | 'demo'>('demo');
@@ -149,6 +150,19 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
   };
 
   if (loading) {
+    if (embedded) {
+      return (
+        <section
+          id="market-brief"
+          className="card mt-5 animate-pulse p-5 sm:p-6"
+          aria-label="Loading market brief"
+        >
+          <div className="h-3 w-28 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="mt-4 h-4 rounded bg-slate-200 dark:bg-slate-700" />
+          <div className="mt-2 h-4 w-4/5 rounded bg-slate-200 dark:bg-slate-700" />
+        </section>
+      );
+    }
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-pulse card p-8">
@@ -165,6 +179,24 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
 
   if (error) {
     const showFetchButton = error === 'show-fetch-button';
+    if (embedded) {
+      return (
+        <section id="market-brief" className="card mt-5 p-5 sm:p-6" aria-labelledby="brief-title">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-800 dark:text-emerald-300">
+            Market brief
+          </p>
+          <h2
+            id="brief-title"
+            className="mt-1 text-lg font-extrabold text-slate-950 dark:text-white"
+          >
+            Market brief unavailable
+          </h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            {showFetchButton ? 'Fetch market data to generate the first brief.' : error}
+          </p>
+        </section>
+      );
+    }
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg p-6">
@@ -200,6 +232,42 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
     );
   }
 
+  if (embedded) {
+    return (
+      <section
+        id="market-brief"
+        ref={summaryRef}
+        className="card mt-5 overflow-hidden p-5 sm:p-6"
+        aria-labelledby="brief-title"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-800 dark:text-emerald-300">
+              Market brief
+            </p>
+            <h2
+              id="brief-title"
+              className="mt-1 text-lg font-extrabold text-slate-950 dark:text-white"
+            >
+              Market highlights
+            </h2>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+            <span>{date ? formatDate(date) : '—'}</span>
+            {source === 'ai' && (
+              <span className="rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-400/10 dark:text-blue-300">
+                AI-assisted
+              </span>
+            )}
+          </div>
+        </div>
+        <p className="mt-4 max-w-5xl whitespace-pre-wrap text-sm leading-7 text-slate-700 dark:text-slate-300">
+          {summary}
+        </p>
+      </section>
+    );
+  }
+
   return (
     <div ref={summaryRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="card">
@@ -209,7 +277,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0 }) => {
           </h1>
           <div className="flex items-center gap-3 flex-wrap">
             <ExportButton captureRef={summaryRef} formats={['png', 'pdf']} label="Summary" />
-            <span className="text-sm text-slate-500 dark:text-slate-400">
+            <span className="text-sm text-slate-600 dark:text-slate-400">
               {date ? formatDate(date) : '—'}
             </span>
             {source === 'ai' && (

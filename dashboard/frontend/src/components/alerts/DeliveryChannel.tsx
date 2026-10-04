@@ -31,7 +31,7 @@ export function DeliveryChannel({
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>
+            <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">{description}</p>
           </div>
         </div>
         <Toggle enabled={enabled} onChange={onToggle} label={title} />

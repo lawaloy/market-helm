@@ -187,6 +187,13 @@ async def get_opportunities(
         # Filter by recommendation
         filtered_df = proj_df[proj_df['recommendation'] == rec_map[type]]
 
+        # An empty Series mapped below keeps a non-boolean dtype in pandas.
+        # Using it as a DataFrame mask then removes every column, causing
+        # nlargest("confidence") to raise KeyError and turning a legitimate
+        # no-matches result into a 500 response.
+        if filtered_df.empty:
+            return OpportunitiesResponse(type=type, count=0, opportunities=[])
+
         # Dirty CSV confidence (strings / object dtype) makes nlargest TypeError → 500.
         # Coerce to numeric and drop non-finite before ranking; row loop still re-checks.
         ranking_df = filtered_df.copy()

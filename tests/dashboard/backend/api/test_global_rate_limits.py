@@ -37,7 +37,9 @@ def client(tmp_path, monkeypatch):
 def test_global_rate_limit_blocks_further_api_calls_including_auth(client):
     first = client.get("/api/alerts/health")
     assert first.status_code == 200
-    assert first.json() == {"ok": True, "quotes": True}
+    assert first.json()["ok"] is True
+    assert first.json()["quotes"] is True
+    assert isinstance(first.json()["live_quotes_configured"], bool)
 
     blocked = client.get("/api/alerts/health")
     assert blocked.status_code == 429

@@ -72,18 +72,45 @@ export const formatDate = (dateStr: string): string => {
   }).format(date);
 };
 
+/** A quote's recorded market time, or a date-only legacy fallback. */
+export const formatQuoteAsOf = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const day = new Date(`${value}T12:00:00Z`);
+    return Number.isNaN(day.getTime())
+      ? null
+      : day.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          timeZone: 'UTC',
+        });
+  }
+  const moment = new Date(value);
+  return Number.isNaN(moment.getTime())
+    ? null
+    : moment.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short',
+      });
+};
+
 export const getRecommendationColor = (recommendation: string): string => {
   switch (recommendation) {
     case 'STRONG BUY':
-      return 'text-strong-buy bg-green-100 dark:bg-green-900/30';
+      return 'text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-950';
     case 'BUY':
-      return 'text-buy bg-green-50 dark:bg-green-900/20';
+      return 'text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-950';
     case 'HOLD':
-      return 'text-hold bg-slate-100 dark:bg-slate-700';
+      return 'text-slate-700 bg-slate-200 dark:text-slate-100 dark:bg-slate-700';
     case 'SELL':
-      return 'text-sell bg-amber-100 dark:bg-amber-900/30';
+      return 'text-amber-900 bg-amber-100 dark:text-amber-200 dark:bg-amber-950';
     case 'STRONG SELL':
-      return 'text-strong-sell bg-red-100 dark:bg-red-900/30';
+      return 'text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-950';
     default:
       return 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700';
   }
@@ -92,11 +119,11 @@ export const getRecommendationColor = (recommendation: string): string => {
 export const getRiskColor = (risk: string): string => {
   switch (risk) {
     case 'Low':
-      return 'text-risk-low bg-green-100 dark:bg-green-900/30';
+      return 'text-green-800 bg-green-100 dark:text-green-200 dark:bg-green-950';
     case 'Medium':
-      return 'text-risk-medium bg-amber-100 dark:bg-amber-900/30';
+      return 'text-amber-900 bg-amber-100 dark:text-amber-200 dark:bg-amber-950';
     case 'High':
-      return 'text-risk-high bg-red-100 dark:bg-red-900/30';
+      return 'text-red-800 bg-red-100 dark:text-red-200 dark:bg-red-950';
     default:
       return 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-700';
   }

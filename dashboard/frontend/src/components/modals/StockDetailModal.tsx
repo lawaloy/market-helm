@@ -58,7 +58,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-10" onClose={onClose}>
+      <Dialog as="div" className="fixed inset-0 z-50 overflow-y-auto" onClose={onClose}>
         <Transition.Child
           as={Fragment}
           enter="ease-out duration-300"
@@ -68,11 +68,11 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm" />
         </Transition.Child>
 
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4 text-center">
+        <div className="relative min-h-full overflow-y-auto overscroll-contain">
+          <div className="flex min-h-full items-center justify-center p-2 text-center sm:p-4">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -82,11 +82,11 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-3xl transform overflow-hidden rounded-2xl bg-white dark:bg-slate-800 p-6 text-left align-middle shadow-xl transition-all">
-                <div className="flex items-start justify-between mb-4">
+              <Dialog.Panel className="max-h-[calc(100dvh-1rem)] w-full max-w-3xl transform overflow-y-auto rounded-xl border border-slate-300 bg-[#f3f6f9] p-4 text-left align-middle text-slate-950 shadow-2xl transition-all sm:max-h-[calc(100dvh-2rem)] sm:p-5 dark:border-[#31435b] dark:bg-[#0e1b2a] dark:text-slate-100">
+                <div className="mb-4 flex items-start justify-between gap-4">
                   <Dialog.Title
                     as="h3"
-                    className="text-2xl font-bold text-slate-900 dark:text-slate-100"
+                    className="min-w-0 text-xl font-extrabold tracking-[-0.025em] text-slate-950 sm:text-2xl dark:text-white"
                   >
                     {loading
                       ? 'Loading...'
@@ -95,8 +95,10 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                         : symbol}
                   </Dialog.Title>
                   <button
+                    type="button"
                     onClick={onClose}
-                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    className="-mr-1 -mt-1 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-200 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f3f6f9] dark:text-slate-300 dark:hover:bg-[#1a2b3f] dark:hover:text-white dark:focus-visible:ring-offset-[#0e1b2a]"
+                    aria-label="Close stock details"
                   >
                     <XMarkIcon className="h-6 w-6" />
                   </button>
@@ -115,17 +117,17 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                 )}
 
                 {!loading && !error && stockDetail && (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Current Price */}
                     <div>
-                      <div className="flex items-baseline space-x-3 flex-wrap">
-                        <span className="text-3xl font-bold dark:text-slate-100">
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="font-data text-2xl font-medium text-slate-950 sm:text-3xl dark:text-white">
                           {formatPrice(stockDetail.currentData.price)}
                         </span>
                         <span
                           className={`text-lg font-medium ${
                             stockDetail.currentData.changePercent >= 0
-                              ? 'text-green-600 dark:text-green-400'
+                              ? 'text-green-800 dark:text-green-400'
                               : 'text-red-600 dark:text-red-400'
                           }`}
                         >
@@ -137,29 +139,29 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
 
                     {/* Projection */}
                     {stockDetail.projection && (
-                      <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
-                        <h4 className="font-semibold text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      <div className="rounded-xl border border-slate-200 bg-slate-100/80 p-4 dark:border-[#26384d] dark:bg-[#122235]">
+                        <h4 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300">
                           5-Day Projection
                         </h4>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">
                               Target Price
                             </p>
-                            <p className="text-xl font-semibold dark:text-slate-100">
+                            <p className="font-data text-xl font-medium text-slate-950 dark:text-white">
                               {formatPrice(stockDetail.projection.targetPrice)}
                             </p>
                             <p
                               className={`text-sm ${
                                 stockDetail.projection.expectedChange >= 0
-                                  ? 'text-green-600 dark:text-green-400'
+                                  ? 'text-green-800 dark:text-green-400'
                                   : 'text-red-600 dark:text-red-400'
                               }`}
                             >
                               {formatPercentage(stockDetail.projection.expectedChange)}
                             </p>
                           </div>
-                          <div className="flex items-start space-x-4">
+                          <div className="flex flex-wrap items-start gap-4">
                             <div>
                               <p className="text-sm text-slate-600 dark:text-slate-400">
                                 Recommendation
@@ -185,7 +187,17 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                             <p className="text-sm text-slate-600 dark:text-slate-400">
                               Confidence: {stockDetail.projection.confidence}%
                             </p>
-                            <div className="w-full bg-slate-200 dark:bg-slate-600 rounded-full h-2 mt-1">
+                            <div
+                              className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-300 dark:bg-slate-600"
+                              role="progressbar"
+                              aria-label="Projection confidence"
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={Math.min(
+                                100,
+                                Math.max(0, stockDetail.projection.confidence),
+                              )}
+                            >
                               <div
                                 className="bg-blue-500 h-2 rounded-full"
                                 style={{
@@ -195,8 +207,8 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                             </div>
                           </div>
                         )}
-                        <div className="mt-3 flex items-center space-x-2">
-                          <span className="text-2xl">
+                        <div className="mt-4 flex items-center gap-2">
+                          <span className="text-xl" aria-hidden="true">
                             {getTrendIcon(stockDetail.projection.trend)}
                           </span>
                           <span className="text-sm font-medium">
@@ -208,20 +220,20 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
 
                     {/* Key Metrics */}
                     <div>
-                      <h4 className="font-semibold text-sm text-slate-600 dark:text-slate-400 mb-3">
+                      <h4 className="mb-3 text-sm font-bold text-slate-700 dark:text-slate-300">
                         Key Metrics
                       </h4>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                           <p className="text-sm text-slate-600 dark:text-slate-400">Volume</p>
-                          <p className="text-lg font-semibold dark:text-slate-100">
+                          <p className="font-data text-lg font-medium text-slate-950 dark:text-white">
                             {formatVolume(stockDetail.currentData.volume)}
                           </p>
                         </div>
                         {stockDetail.currentData.marketCap && (
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Market Cap</p>
-                            <p className="text-lg font-semibold dark:text-slate-100">
+                            <p className="font-data text-lg font-medium text-slate-950 dark:text-white">
                               {formatVolume(stockDetail.currentData.marketCap)}
                             </p>
                           </div>
@@ -229,7 +241,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                         {Number.isFinite(stockDetail.technical?.momentum) && (
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Momentum</p>
-                            <p className="text-lg font-semibold dark:text-slate-100">
+                            <p className="font-data text-lg font-medium text-slate-950 dark:text-white">
                               {(stockDetail.technical?.momentum as number).toFixed(1)}
                             </p>
                           </div>
@@ -237,7 +249,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                         {Number.isFinite(stockDetail.technical?.volatility) && (
                           <div>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Volatility</p>
-                            <p className="text-lg font-semibold dark:text-slate-100">
+                            <p className="font-data text-lg font-medium text-slate-950 dark:text-white">
                               {(stockDetail.technical?.volatility as number).toFixed(1)}%
                             </p>
                           </div>
@@ -245,8 +257,8 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
                       </div>
                     </div>
 
-                    <div className="flex justify-end">
-                      <button onClick={onClose} className="btn-primary">
+                    <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-[#26384d]">
+                      <button onClick={onClose} className="btn-primary min-h-11 min-w-24">
                         Close
                       </button>
                     </div>

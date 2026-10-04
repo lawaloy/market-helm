@@ -442,3 +442,27 @@ describe('Summary load races', () => {
     expect(screen.queryByText('Stale refreshKey=1 body.')).toBeNull();
   });
 });
+
+describe('Summary dashboard brief', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('renders the summary as an embedded market brief without page-level controls', async () => {
+    apiMocks.getSummary.mockResolvedValue({
+      data: {
+        summary: 'Markets firmed into the close.',
+        date: '2026-08-05',
+        source: 'ai',
+      },
+    });
+
+    render(<Summary embedded />);
+
+    expect(await screen.findByRole('heading', { name: 'Market highlights' })).toBeTruthy();
+    expect(screen.getByText('Markets firmed into the close.')).toBeTruthy();
+    expect(screen.getByText('AI-assisted')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Summary as/i })).toBeNull();
+  });
+});

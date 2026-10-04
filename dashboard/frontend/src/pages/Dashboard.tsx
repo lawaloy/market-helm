@@ -1,15 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { marketApi, projectionsApi } from '../services/api';
+import { ArrowRightIcon, BellAlertIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { marketApi } from '../services/api';
 import KPICard from '../components/cards/KPICard';
-import OpportunityCard from '../components/cards/OpportunityCard';
-import GainersLosersChart from '../components/charts/GainersLosersChart';
-import SentimentPieChart from '../components/charts/SentimentPieChart';
-import StockTable from '../components/tables/StockTable';
-import StockDetailModal from '../components/modals/StockDetailModal';
+import ForecastPreview from '../components/cards/ForecastPreview';
+import MarketPulseChart from '../components/charts/MarketPulseChart';
 import ExportButton from '../components/common/ExportButton';
-import { formatPercentage, formatDate } from '../utils/formatters';
-import type { MarketOverview, ProjectionsSummary, StockMover, Opportunity } from '../types';
+import Summary from './Summary';
+import { formatPercentage, formatDate, formatQuoteAsOf } from '../utils/formatters';
+import type { MarketOverview, StockMover } from '../types';
 
 interface DashboardProps {
   onDataLoaded?: (date: string) => void;
@@ -50,16 +49,12 @@ export function dashboardLoadErrorMessage(err: unknown): string {
 
 const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) => {
   const [marketOverview, setMarketOverview] = useState<MarketOverview | null>(null);
-  const [projectionsSummary, setProjectionsSummary] = useState<ProjectionsSummary | null>(null);
   const [gainers, setGainers] = useState<StockMover[]>([]);
   const [losers, setLosers] = useState<StockMover[]>([]);
-  const [strongBuyOpps, setStrongBuyOpps] = useState<Opportunity[]>([]);
-  const [allOpportunities, setAllOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [secondaryLoading, setSecondaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [secondaryError, setSecondaryError] = useState<string | null>(null);
-  const [selectedStock, setSelectedStock] = useState<string | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
   const isInitialMount = useRef(true);
   /** Bumped on each load / unmount so late phase-1/phase-2 responses are ignored. */
@@ -90,15 +85,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
 
     try {
       // Phase 1: core data for fast initial render
-      const [marketRes, projectionsRes] = await Promise.all([
-        marketApi.getOverview(),
-        projectionsApi.getSummary(),
-      ]);
+      const marketRes = await marketApi.getOverview();
 
       if (generation !== loadGenerationRef.current) return;
 
       setMarketOverview(marketRes.data);
-      setProjectionsSummary(projectionsRes.data);
 
       // Notify parent of data date
       if (onDataLoaded && marketRes.data.date) {
@@ -108,32 +99,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
       // Phase 2: secondary data loads in background
       if (!silent) setSecondaryLoading(true);
       try {
-        const [gainersRes, losersRes, strongBuyRes, buyRes, holdRes, sellRes, strongSellRes] =
-          await Promise.all([
-            marketApi.getMovers('gainers', 10),
-            marketApi.getMovers('losers', 10),
-            projectionsApi.getOpportunities('STRONG_BUY', 50),
-            projectionsApi.getOpportunities('BUY', 50),
-            projectionsApi.getOpportunities('HOLD', 50),
-            projectionsApi.getOpportunities('SELL', 50),
-            projectionsApi.getOpportunities('STRONG_SELL', 50),
-          ]);
+        const [gainersRes, losersRes] = await Promise.all([
+          marketApi.getMovers('gainers', 10),
+          marketApi.getMovers('losers', 10),
+        ]);
 
         if (generation !== loadGenerationRef.current) return;
 
         setGainers(gainersRes.data.data);
         setLosers(losersRes.data.data);
-        setStrongBuyOpps(strongBuyRes.data.opportunities);
-
-        // Combine all opportunities for the table
-        const combined = [
-          ...strongBuyRes.data.opportunities,
-          ...buyRes.data.opportunities,
-          ...holdRes.data.opportunities,
-          ...sellRes.data.opportunities,
-          ...strongSellRes.data.opportunities,
-        ];
-        setAllOpportunities(combined);
       } catch (secondaryErr) {
         if (generation !== loadGenerationRef.current) return;
         console.error('Error fetching secondary data:', secondaryErr);
@@ -170,7 +144,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
           {error}
-          <button onClick={() => fetchDashboardData(false)} className="ml-4 underline">
+          <button
+            onClick={() => fetchDashboardData(false)}
+            className="ml-4 rounded px-2 py-1 font-bold hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 dark:hover:bg-red-900/40"
+          >
             Retry
           </button>
         </div>
@@ -178,139 +155,130 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
     );
   }
 
+  const averageChange = marketOverview?.averageChange ?? 0;
+  const quoteStart = formatQuoteAsOf(marketOverview?.quoteTimeStart);
+  const quoteEnd = formatQuoteAsOf(marketOverview?.quoteTimeEnd);
+
   return (
-    <div ref={dashboardRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 sr-only">Dashboard</h2>
+    <main ref={dashboardRef} className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 xl:px-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-800 dark:text-emerald-300">
+            <BoltIcon className="h-4 w-4" />
+            Market snapshot
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-[-0.04em] text-slate-950 dark:text-white">
+            Market overview
+          </h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Price moves from the latest saved market analysis.
+          </p>
+          <p className="mt-3 inline-flex flex-wrap rounded-lg border border-slate-300 bg-slate-100/70 px-3 py-2 text-sm font-medium text-slate-700 dark:border-[#31435b] dark:bg-[#122235] dark:text-slate-200">
+            {quoteStart && quoteEnd
+              ? `Saved quote times: ${quoteStart}${quoteStart === quoteEnd ? '' : ` to ${quoteEnd}`} · Not live prices`
+              : `Saved market data for ${marketOverview?.date ? formatDate(marketOverview.date) : 'the latest snapshot'} · Exact quote times unavailable · Not live prices`}
+          </p>
+        </div>
         <ExportButton
-          stocks={allOpportunities}
+          stocks={[]}
           captureRef={dashboardRef}
-          formats={['csv', 'png', 'pdf']}
+          formats={['png', 'pdf']}
           label="Dashboard"
-          className="ml-auto"
-        />
-      </div>
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <KPICard
-          title="Stocks Tracked"
-          value={marketOverview?.totalStocks || 0}
-          subtitle={`${marketOverview?.gainers || 0} gainers | ${marketOverview?.losers || 0} losers`}
-        />
-        <KPICard
-          title="Avg Confidence"
-          value={`${projectionsSummary?.averageConfidence.toFixed(1) || 0}%`}
-          subtitle={`${projectionsSummary?.totalProjections || 0} projections`}
-        />
-        <KPICard
-          title="Expected Move"
-          value={formatPercentage(projectionsSummary?.expectedMarketMove || 0)}
-          subtitle={projectionsSummary?.sentiment || 'Neutral'}
-          trend={
-            (projectionsSummary?.expectedMarketMove || 0) > 0
-              ? 'up'
-              : (projectionsSummary?.expectedMarketMove || 0) < 0
-                ? 'down'
-                : 'neutral'
-          }
-        />
-        <KPICard
-          title="Strong Buys"
-          value={projectionsSummary?.recommendations?.STRONG_BUY || 0}
-          subtitle={`${projectionsSummary?.recommendations?.BUY || 0} additional buys`}
         />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {secondaryLoading ? (
-          <div className="card p-6 animate-pulse">
-            <div className="h-5 w-32 bg-slate-200 dark:bg-slate-600 rounded mb-4"></div>
-            <div className="h-48 bg-slate-200 dark:bg-slate-600 rounded"></div>
+      <Summary embedded refreshKey={refreshKey} />
+
+      <section
+        className="card mt-5 overflow-hidden p-5 sm:p-6"
+        aria-labelledby="market-pulse-title"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2
+              id="market-pulse-title"
+              className="text-lg font-extrabold text-slate-950 dark:text-white"
+            >
+              Market pulse
+            </h2>
+            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+              Stocks with the largest price moves on the date shown.
+            </p>
           </div>
-        ) : (
-          <GainersLosersChart gainers={gainers} losers={losers} />
-        )}
-        {projectionsSummary?.recommendations &&
-          (secondaryLoading ? (
-            <div className="card p-6 animate-pulse">
-              <div className="h-5 w-44 bg-slate-200 dark:bg-slate-600 rounded mb-4"></div>
-              <div className="h-48 bg-slate-200 dark:bg-slate-600 rounded-full mx-auto w-48"></div>
-            </div>
+          <span className="font-data text-xs text-slate-600 dark:text-slate-300">
+            {marketOverview?.date ? formatDate(marketOverview.date) : ''}
+          </span>
+        </div>
+
+        <div className="mt-3">
+          {secondaryLoading ? (
+            <div className="h-[270px] animate-pulse rounded-lg bg-slate-100 dark:bg-[#122235]" />
           ) : (
-            <SentimentPieChart recommendations={projectionsSummary.recommendations} />
-          ))}
-      </div>
-
-      {/* Strong Buy Opportunities */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100">
-            STRONG BUY Opportunities ({strongBuyOpps.length})
-          </h2>
+            <MarketPulseChart gainers={gainers} losers={losers} />
+          )}
         </div>
-        {secondaryLoading ? (
-          <div className="space-y-3">
-            {[...Array(3)].map((_, idx) => (
-              <div key={idx} className="card p-4 animate-pulse">
-                <div className="h-4 w-40 bg-slate-200 dark:bg-slate-600 rounded mb-2"></div>
-                <div className="h-3 w-64 bg-slate-200 dark:bg-slate-600 rounded"></div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="space-y-3">
-              {strongBuyOpps.slice(0, 5).map((opp) => (
-                <OpportunityCard
-                  key={opp.symbol}
-                  opportunity={opp}
-                  onClick={() => setSelectedStock(opp.symbol)}
-                />
-              ))}
-            </div>
-            {strongBuyOpps.length > 5 && (
-              <div className="mt-4 text-center">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  + {strongBuyOpps.length - 5} more opportunities (see table below)
-                </p>
-              </div>
-            )}
-          </>
-        )}
-        {secondaryError && (
-          <div className="mt-4 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 rounded">
-            {secondaryError}
-            <button onClick={() => fetchDashboardData(false)} className="ml-3 underline">
-              Retry
-            </button>
-          </div>
-        )}
-      </div>
 
-      {/* Stock Table */}
-      {secondaryLoading ? (
-        <div className="card p-6 animate-pulse">
-          <div className="h-5 w-32 bg-slate-200 dark:bg-slate-600 rounded mb-4"></div>
-          <div className="space-y-2">
-            {[...Array(6)].map((_, idx) => (
-              <div key={idx} className="h-4 bg-slate-200 dark:bg-slate-600 rounded"></div>
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-5 md:grid-cols-4 dark:border-[#26384d]">
+          <KPICard
+            title="Stocks covered"
+            value={marketOverview?.totalStocks || 0}
+            subtitle="In this market snapshot"
+          />
+          <KPICard
+            title="Gainers"
+            value={marketOverview?.gainers || 0}
+            subtitle={`Largest gain ${formatPercentage(marketOverview?.maxChange ?? 0)}`}
+          />
+          <KPICard
+            title="Losers"
+            value={marketOverview?.losers || 0}
+            subtitle={`Largest drop ${formatPercentage(marketOverview?.minChange ?? 0)}`}
+          />
+          <KPICard
+            title="Average daily change"
+            value={formatPercentage(averageChange)}
+            subtitle={`${marketOverview?.unchanged || 0} unchanged`}
+            trend={averageChange > 0 ? 'up' : averageChange < 0 ? 'down' : 'neutral'}
+          />
         </div>
-      ) : (
-        <StockTable stocks={allOpportunities} onStockClick={(symbol) => setSelectedStock(symbol)} />
+      </section>
+
+      {marketOverview?.date && (
+        <ForecastPreview date={marketOverview.date} refreshKey={refreshKey} />
       )}
 
-      {/* Stock Detail Modal */}
-      {selectedStock && (
-        <StockDetailModal
-          symbol={selectedStock}
-          isOpen={!!selectedStock}
-          onClose={() => setSelectedStock(null)}
-        />
+      <section className="mt-5 flex flex-col gap-4 rounded-xl border border-slate-300 bg-[#f3f6f9] px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-[#223248] dark:bg-[#0e1b2a]">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-500">
+            <BellAlertIcon className="h-5 w-5" />
+          </span>
+          <div>
+            <h2 className="text-sm font-extrabold text-slate-950 dark:text-white">Helmtower</h2>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Keep watch on price and RSI conditions while you are away.
+            </p>
+          </div>
+        </div>
+        <a
+          href="/alerts"
+          className="inline-flex items-center gap-2 text-sm font-bold text-emerald-800 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+        >
+          Manage alerts <ArrowRightIcon className="h-4 w-4" />
+        </a>
+      </section>
+
+      {secondaryError && (
+        <div className="mt-5 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+          {secondaryError}
+          <button
+            onClick={() => fetchDashboardData(false)}
+            className="ml-3 rounded px-2 py-1 font-bold hover:bg-amber-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+          >
+            Retry
+          </button>
+        </div>
       )}
-    </div>
+    </main>
   );
 };
 

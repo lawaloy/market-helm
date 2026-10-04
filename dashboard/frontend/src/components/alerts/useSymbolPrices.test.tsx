@@ -15,15 +15,37 @@ vi.mock('../../services/api', () => ({
 import api, { alertsApi } from '../../services/api';
 
 function ProbeHarness({ symbols }: { symbols?: string[] }) {
-  const { apiReady, quotesUnavailable, symbolPrices, fetchPricesFor, pricingPending, mergePrices } =
-    useSymbolPrices();
+  const {
+    apiReady,
+    quotesUnavailable,
+    liveQuotesConfigured,
+    symbolPrices,
+    quoteMeta,
+    fetchPricesFor,
+    retryPriceFor,
+    pricingPending,
+    attemptedPrices,
+    mergePrices,
+  } = useSymbolPrices();
 
   return (
     <div>
       <span data-testid="ready">{apiReady ? 'ready' : 'loading'}</span>
       <span data-testid="unavailable">{quotesUnavailable ? 'yes' : 'no'}</span>
+      <span data-testid="configured">{liveQuotesConfigured ? 'yes' : 'no'}</span>
       <span data-testid="prices">{JSON.stringify(symbolPrices)}</span>
+      <span data-testid="meta">{JSON.stringify(quoteMeta)}</span>
       <span data-testid="pending">{pricingPending.size}</span>
+      <span data-testid="attempted">{[...attemptedPrices].sort().join(',')}</span>
+      <button
+        type="button"
+        data-testid="retry"
+        onClick={() => {
+          void retryPriceFor('AAPL');
+        }}
+      >
+        retry
+      </button>
       <button
         type="button"
         data-testid="fetch"
@@ -107,6 +129,38 @@ describe('useSymbolPrices', () => {
       expect(screen.getByTestId('ready').textContent).toBe('ready');
     });
     expect(screen.getByTestId('unavailable').textContent).toBe('yes');
+  });
+
+  it('does not attempt live quotes without a server-side market-data key', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({
+      data: { ok: true, live_quotes_configured: false },
+    });
+    render(<ProbeHarness />);
+    await waitFor(() => expect(screen.getByTestId('ready').textContent).toBe('ready'));
+    expect(screen.getByTestId('configured').textContent).toBe('no');
+    expect(screen.getByTestId('unavailable').textContent).toBe('yes');
+    await act(async () => screen.getByTestId('fetch').click());
+    expect(alertsApi.getQuotes).not.toHaveBeenCalled();
+  });
+
+  it('retains quote provenance and lets a missing price be retried', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { ok: true } });
+    vi.mocked(alertsApi.getQuotes)
+      .mockResolvedValueOnce({ data: { prices: {} } } as never)
+      .mockResolvedValueOnce({
+        data: {
+          prices: { AAPL: 150 },
+          quote_meta: { AAPL: { source: 'lookup', as_of: null } },
+        },
+      } as never);
+    render(<ProbeHarness />);
+    await waitFor(() => expect(screen.getByTestId('ready').textContent).toBe('ready'));
+    await act(async () => screen.getByTestId('fetch').click());
+    await waitFor(() => expect(screen.getByTestId('attempted').textContent).toBe('AAPL'));
+    await act(async () => screen.getByTestId('retry').click());
+    await waitFor(() => expect(alertsApi.getQuotes).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByTestId('prices').textContent).toContain('150'));
+    expect(screen.getByTestId('meta').textContent).toContain('lookup');
   });
 
   it('sets quotesUnavailable when health probe throws', async () => {
@@ -209,6 +263,9 @@ describe('useSymbolPrices', () => {
 
     await waitFor(() => {
       expect(alertsApi.getQuotes).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('attempted').textContent).toBe('MSFT');
     });
 
     await act(async () => {

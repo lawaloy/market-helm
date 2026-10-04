@@ -63,6 +63,24 @@ describe('AlertComposer submit gate', () => {
     expect(screen.getByRole('button', { name: /set watch/i }).getAttribute('disabled')).toBeNull();
   });
 
+  it('does not describe a saved quote as a current price', () => {
+    render(
+      <AlertComposer
+        {...baseProps}
+        newSymbol="AAPL"
+        newValue="150"
+        symbolsLoading={false}
+        onSubmit={() => {}}
+        prices={{ AAPL: 180.5 }}
+        quoteMeta={{ AAPL: { source: 'saved', as_of: '2026-10-02' } }}
+      />,
+    );
+    expect(
+      screen.getByText(/Reference price \$180\.50.*Saved price as of Oct 2, 2026/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/now \$180\.50/)).toBeNull();
+  });
+
   it('disables Set watch when the price is blank', () => {
     renderComposer({ newValue: '' });
     expect(

@@ -77,7 +77,7 @@ const AccountRecovery: React.FC<Props> = ({ mode }) => {
         </form>
         <Link
           to="/sign-in"
-          className="mt-5 block text-center text-sm text-teal-600 hover:underline"
+          className="mt-5 block text-center text-sm text-teal-600 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
         >
           Back to sign in
         </Link>

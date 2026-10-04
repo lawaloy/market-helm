@@ -64,7 +64,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
     <div className={`relative ${className}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors"
+        className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-[#31435b] dark:bg-[#101f30] dark:text-slate-200 dark:hover:border-[#455c78] dark:hover:bg-[#15283d]"
         title={`Export ${label}`}
       >
         <ArrowDownTrayIcon className="h-5 w-5" />
@@ -73,7 +73,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute right-0 mt-1 w-56 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 shadow-lg z-20 py-1">
+          <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-[#31435b] dark:bg-[#101f30]">
             {formats.includes('csv') && (
               <button
                 onClick={() => handleExport('csv')}

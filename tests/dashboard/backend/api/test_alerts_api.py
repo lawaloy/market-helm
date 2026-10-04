@@ -1,10 +1,14 @@
 """Tests for dashboard alerts settings API."""
 
+import asyncio
 import json
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture
@@ -189,6 +193,7 @@ class TestAlertsConfigAPI:
         assert "AAPL" in data["symbols"]
         assert data["names"]["AAPL"] == "Apple Inc."
         assert "prices" in data
+        assert r.headers["cache-control"] == "private, max-age=300"
 
     def test_post_quotes(self, client, monkeypatch):
         monkeypatch.setattr(
@@ -2037,3 +2042,45 @@ class TestAlertsConfigAPI:
         )
         assert normalized["defaults"]["webhook_format"] == "discord"
         assert _normalize_config(None) == {"defaults": {}, "alerts": []}
+
+
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_slow_quote_lookup_does_not_block_other_requests(monkeypatch, method):
+    """Live quote latency must not stall the dashboard's async request loop."""
+    from dashboard.backend.main import app
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_resolver(symbols, fetch_missing=True):
+        started.set()
+        release.wait(timeout=8)
+        return {"AAPL": 180.0}
+
+    monkeypatch.setattr("dashboard.backend.api.alerts.resolve_symbol_prices", slow_resolver)
+
+    async def exercise():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://testserver"
+        ) as client:
+            if method == "get":
+                quote_task = asyncio.create_task(
+                    client.get("/api/alerts/quotes", params={"symbols": "AAPL"})
+                )
+            else:
+                quote_task = asyncio.create_task(
+                    client.post("/api/alerts/quotes", json={"symbols": ["AAPL"]})
+                )
+            try:
+                assert await asyncio.to_thread(started.wait, 5)
+                before = time.monotonic()
+                health = await client.get("/api/alerts/health")
+                assert time.monotonic() - before < 3.5
+                assert health.status_code == 200
+            finally:
+                release.set()
+                quote = await quote_task
+            assert quote.status_code == 200
+            assert quote.json()["prices"] == {"AAPL": 180.0}
+
+    asyncio.run(exercise())

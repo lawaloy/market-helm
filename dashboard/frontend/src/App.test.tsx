@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -51,14 +51,6 @@ vi.mock('./pages/HistoricalTrends', () => ({
   ),
 }));
 
-vi.mock('./pages/Summary', () => ({
-  default: () => (
-    <main>
-      <h1>Summary route</h1>
-    </main>
-  ),
-}));
-
 vi.mock('./pages/AlertsSettings', () => ({
   default: () => (
     <main>
@@ -94,7 +86,6 @@ describe('App routing', () => {
   it.each([
     ['/', 'Dashboard', 'Dashboard route', 'border-blue-500'],
     ['/historical', 'Historical Trends', 'Historical Trends route', 'border-blue-500'],
-    ['/summary', 'Summary', 'Summary route', 'border-blue-500'],
     ['/alerts', 'Helmtower', 'Helmtower route', 'border-teal-500'],
   ])('renders %s with the matching active nav link', (path, linkName, heading, activeClass) => {
     window.history.pushState({}, '', path);
@@ -108,14 +99,37 @@ describe('App routing', () => {
   it('navigates between dashboard routes without a full reload', () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole('link', { name: 'Summary' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Historical Trends' }));
 
-    expect(window.location.pathname).toBe('/summary');
-    expect(screen.getByRole('heading', { name: 'Summary route' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Summary' }).className).toContain('border-blue-500');
+    expect(window.location.pathname).toBe('/historical');
+    expect(screen.getByRole('heading', { name: 'Historical Trends route' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Historical Trends' }).className).toContain(
+      'border-blue-500',
+    );
     expect(screen.getByRole('link', { name: 'Dashboard' }).className).toContain(
       'border-transparent',
     );
+  });
+
+  it('uses the brand lockup as a home link from every page', () => {
+    window.history.pushState({}, '', '/historical');
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('link', { name: 'MarketHelm home' }));
+
+    expect(window.location.pathname).toBe('/');
+    expect(screen.getByRole('heading', { name: 'Dashboard route' })).toBeTruthy();
+  });
+
+  it('redirects the retired Summary route to the Dashboard market brief', async () => {
+    window.history.pushState({}, '', '/summary');
+
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/'));
+    expect(window.location.hash).toBe('#market-brief');
+    expect(screen.getByRole('heading', { name: 'Dashboard route' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'Summary' })).toBeNull();
   });
 
   it('auto-fetches missing data, polls refresh status, and rechecks alerts after success', async () => {

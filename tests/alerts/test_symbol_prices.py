@@ -2,20 +2,28 @@
 
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
-
-from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.alerts.symbol_prices import (
+    prices_from_saved_daily_data,
+    resolve_symbol_prices,
+    saved_quote_details,
+)
+from src.storage.market_bars import upsert_market_bars, latest_saved_quotes
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data(mock_get_loader):
-    loader = MagicMock()
-    loader.load_daily_data.return_value = pd.DataFrame(
-        [{"symbol": "AAPL", "close": 180.5}, {"symbol": "GOOGL", "close": 170.25}]
+def test_prices_from_saved_daily_data(mock_get_loader, tmp_path):
+    mock_get_loader.return_value.data_dir = tmp_path
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 180.5}, {"symbol": "GOOGL", "close": 170.25}],
+        "2026-10-02", data_dir=tmp_path,
     )
-    mock_get_loader.return_value = loader
-
     assert prices_from_saved_daily_data() == {"AAPL": 180.5, "GOOGL": 170.25}
+
+
+@patch("dashboard.backend.services.data_loader.get_data_loader")
+def test_saved_quote_details_ignores_mock_data_directory(mock_get_loader):
+    assert saved_quote_details() == {}
+    assert isinstance(mock_get_loader.return_value.data_dir, MagicMock)
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
@@ -64,38 +72,41 @@ def test_resolve_symbol_prices_returns_empty_for_blank_only_input():
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data_skips_invalid_symbol_tokens(mock_get_loader):
+def test_prices_from_saved_daily_data_skips_invalid_symbol_tokens(mock_get_loader, tmp_path):
     """None/NaN/blank symbols must not enter the quote map as NONE/NAN."""
-    loader = MagicMock()
-    loader.load_daily_data.return_value = pd.DataFrame(
+    upsert_market_bars(
         [
             {"symbol": "AAPL", "close": 180.5},
             {"symbol": None, "close": 1.0},
             {"symbol": float("nan"), "close": 2.0},
             {"symbol": "  ", "close": 3.0},
             {"symbol": " msft ", "close": 400.0},
-        ]
+        ],
+        "2026-10-02", data_dir=tmp_path,
     )
-    mock_get_loader.return_value = loader
+    mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5, "MSFT": 400.0}
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_get_loader):
-    loader = MagicMock()
-    loader.load_daily_data.return_value = pd.DataFrame(
+def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_get_loader, tmp_path):
+    upsert_market_bars(
         [
             {"symbol": "AAPL", "close": 180.5},
             {"symbol": "", "close": 12.0},
             {"symbol": "BAD", "close": "n/a"},
-        ]
+        ],
+        "2026-10-02", data_dir=tmp_path,
     )
-    mock_get_loader.return_value = loader
+    mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5}
 
-    loader.load_daily_data.return_value = pd.DataFrame(
-        [{"symbol": "GOOG", "price": 140.0}]
+    next_dir = tmp_path / "next"
+    upsert_market_bars(
+        [{"symbol": "GOOG", "price": 140.0}],
+        "2026-10-02", data_dir=next_dir,
     )
+    mock_get_loader.return_value.data_dir = next_dir
     assert prices_from_saved_daily_data() == {"GOOG": 140.0}
 
     mock_get_loader.side_effect = ValueError("No daily data files found")
@@ -117,16 +128,16 @@ def test_prices_from_saved_daily_data_soft_fails_loader_runtime_error(mock_get_l
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data_keeps_zero_close(mock_get_loader):
+def test_prices_from_saved_daily_data_keeps_zero_close(mock_get_loader, tmp_path):
     """A $0 saved close must still seed the picker; `if not close` would refetch."""
-    loader = MagicMock()
-    loader.load_daily_data.return_value = pd.DataFrame(
+    upsert_market_bars(
         [
             {"symbol": "AAPL", "close": 0},
             {"symbol": "MSFT", "close": 400.0},
-        ]
+        ],
+        "2026-10-02", data_dir=tmp_path,
     )
-    mock_get_loader.return_value = loader
+    mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 0.0, "MSFT": 400.0}
 
 
@@ -158,19 +169,33 @@ def test_resolve_symbol_prices_keeps_zero_live_quote(_mock_saved, mock_fetcher_c
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader):
+def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader, tmp_path):
     """NaN/inf closes must not enter the quote map as JSON-null floats."""
-    loader = MagicMock()
-    loader.load_daily_data.return_value = pd.DataFrame(
+    upsert_market_bars(
         [
             {"symbol": "AAPL", "close": 180.5},
             {"symbol": "NAN", "close": float("nan")},
             {"symbol": "INF", "close": float("inf")},
             {"symbol": "NINF", "close": float("-inf")},
-        ]
+        ],
+        "2026-10-02", data_dir=tmp_path,
     )
-    mock_get_loader.return_value = loader
+    mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5}
+
+
+def test_latest_saved_quote_uses_provider_time_across_weekend_snapshots(tmp_path):
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 100, "quote_timestamp": "2026-10-02T15:07:00+00:00"}],
+        "2026-10-02", data_dir=tmp_path,
+    )
+    upsert_market_bars(
+        [{"symbol": "AAPL", "close": 101, "quote_timestamp": "2026-10-02T20:00:00+00:00"}],
+        "2026-10-03", data_dir=tmp_path,
+    )
+    assert latest_saved_quotes(data_dir=tmp_path)["AAPL"] == {
+        "price": 101.0, "as_of": "2026-10-02T20:00:00+00:00"
+    }
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
