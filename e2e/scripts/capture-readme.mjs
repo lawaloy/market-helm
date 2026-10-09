@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '..', '..');
-const outputDir = path.join(repoRoot, 'docs', 'assets', 'readme');
+const outputDir = process.env.README_CAPTURE_OUT ?? path.join(repoRoot, 'docs', 'assets', 'readme');
 const baseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:8000';
 const demoDate = '2026-09-25';
 const demoStocks = [
@@ -89,7 +89,7 @@ async function capture() {
     browser = await chromium.launch();
     const page = await browser.newPage({
       viewport: { width: 1440, height: 1024 },
-      deviceScaleFactor: 1,
+      deviceScaleFactor: Number(process.env.README_CAPTURE_SCALE ?? 1),
     });
     const browserErrors = [];
     page.on('console', (message) => {
