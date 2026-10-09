@@ -192,7 +192,7 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0, embedded = false }) =
             Market brief unavailable
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            {showFetchButton ? 'Fetch market data to generate the first brief.' : error}
+            {showFetchButton ? 'Use Fetch New to generate the first brief.' : error}
           </p>
         </section>
       );
@@ -253,7 +253,6 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0, embedded = false }) =
             </h2>
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-            <span>{date ? formatDate(date) : '—'}</span>
             {source === 'ai' && (
               <span className="rounded-full bg-blue-100 px-2 py-1 font-semibold text-blue-800 dark:bg-blue-400/10 dark:text-blue-300">
                 AI-assisted

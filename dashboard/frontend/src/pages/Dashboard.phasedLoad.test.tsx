@@ -115,22 +115,8 @@ describe('Dashboard phased load and fetch races', () => {
     expect(screen.getByTestId('forecast-preview').textContent).toContain('2026-08-05');
     expect(screen.queryByRole('heading', { name: 'Top opportunity' })).toBeNull();
   });
-
-  it('labels the saved quote time instead of implying current prices', async () => {
-    apiMocks.getOverview.mockResolvedValue({
-      data: {
-        ...overview('2026-10-02', 10),
-        quoteTimeStart: '2026-10-02T15:07:00+00:00',
-        quoteTimeEnd: '2026-10-02T15:07:30+00:00',
-      },
-    });
-    render(<Dashboard />);
-    expect(await screen.findByText(/Saved quote times: .*Not live prices/)).toBeTruthy();
-  });
-
   it('ignores a late phase-1 response after unmount', async () => {
     let resolveOverview: ((value: unknown) => void) | undefined;
-    const onDataLoaded = vi.fn();
     apiMocks.getOverview.mockImplementation(
       () =>
         new Promise((resolve) => {
@@ -138,7 +124,7 @@ describe('Dashboard phased load and fetch races', () => {
         }),
     );
 
-    render(<Dashboard onDataLoaded={onDataLoaded} />);
+    render(<Dashboard />);
     await act(async () => {
       await Promise.resolve();
     });
@@ -151,22 +137,18 @@ describe('Dashboard phased load and fetch races', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-
-    expect(onDataLoaded).not.toHaveBeenCalled();
     expect(screen.queryByText('999')).toBeNull();
     expect(screen.queryByText('Loading dashboard...')).toBeNull();
   });
 
   it('ignores a slower refreshKey load when a newer refresh completes first', async () => {
-    const onDataLoaded = vi.fn();
     mockPhase1('2026-08-05', 100);
     mockPhase2Success('AAPL');
 
-    const view = render(<Dashboard refreshKey={0} onDataLoaded={onDataLoaded} />);
+    const view = render(<Dashboard refreshKey={0} />);
     expect(await screen.findByTestId('kpi-Stocks covered')).toBeTruthy();
     expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('100');
     expect(await screen.findByText('AAPL,LOSS')).toBeTruthy();
-    onDataLoaded.mockClear();
 
     let resolveStaleOverview: ((value: unknown) => void) | undefined;
     let silentCalls = 0;
@@ -183,14 +165,14 @@ describe('Dashboard phased load and fetch races', () => {
     mockPhase2Success('TSLA');
 
     // First silent refresh hangs in phase 1.
-    view.rerender(<Dashboard refreshKey={1} onDataLoaded={onDataLoaded} />);
+    view.rerender(<Dashboard refreshKey={1} />);
     await act(async () => {
       await Promise.resolve();
     });
     expect(silentCalls).toBe(1);
 
     // Second silent refresh completes while the first is still pending.
-    view.rerender(<Dashboard refreshKey={2} onDataLoaded={onDataLoaded} />);
+    view.rerender(<Dashboard refreshKey={2} />);
     await act(async () => {
       await Promise.resolve();
       await Promise.resolve();
@@ -209,9 +191,5 @@ describe('Dashboard phased load and fetch races', () => {
     expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('250');
     expect(screen.queryByText('AAPL,LOSS')).toBeNull();
     expect(screen.getByTestId('market-pulse').textContent).toBe('TSLA,LOSS');
-    // Stale generation must not call onDataLoaded with the older overview date.
-    expect(onDataLoaded).not.toHaveBeenCalledWith(
-      expect.stringMatching(/August 1|2026-08-01|Aug 1/i),
-    );
   });
 });

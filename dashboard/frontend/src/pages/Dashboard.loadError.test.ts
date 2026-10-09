@@ -18,7 +18,7 @@ function axiosError(status?: number, detail?: unknown) {
 describe('dashboardLoadErrorMessage', () => {
   it('maps 404 to the empty-data guidance', () => {
     const msg = dashboardLoadErrorMessage(axiosError(404));
-    expect(msg).toContain('No market data yet');
+    expect(msg).toContain('No data yet');
     expect(msg).toContain('Fetch New');
   });
 

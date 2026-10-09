@@ -6,7 +6,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import api from '../../services/api';
 
 interface HeaderProps {
-  dataDate?: string;
   onRefreshComplete?: () => void;
   onQuickRefresh?: () => void;
   /** True when app is fetching latest data in background (no user action) */
@@ -14,7 +13,6 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({
-  dataDate,
   onRefreshComplete,
   onQuickRefresh,
   backgroundFetching,
@@ -195,12 +193,6 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex h-full items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3 lg:gap-4">
             <h1 className="sr-only">MarketHelm</h1>
-            {dataDate && (
-              <div className="hidden text-xs text-slate-600 xl:block dark:text-slate-400">
-                <span className="font-semibold uppercase tracking-[0.14em]">Market data</span>{' '}
-                <span className="text-slate-700 dark:text-slate-200">· {dataDate}</span>
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <div

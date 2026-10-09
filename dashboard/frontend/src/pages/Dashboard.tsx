@@ -7,11 +7,10 @@ import ForecastPreview from '../components/cards/ForecastPreview';
 import MarketPulseChart from '../components/charts/MarketPulseChart';
 import ExportButton from '../components/common/ExportButton';
 import Summary from './Summary';
-import { formatPercentage, formatDate, formatQuoteAsOf } from '../utils/formatters';
+import { formatPercentage } from '../utils/formatters';
 import type { MarketOverview, StockMover } from '../types';
 
 interface DashboardProps {
-  onDataLoaded?: (date: string) => void;
   refreshKey?: number;
 }
 
@@ -21,7 +20,7 @@ export function dashboardLoadErrorMessage(err: unknown): string {
     const status = err.response?.status;
     if (status === 404) {
       return (
-        'No market data yet. Use "Fetch New" in the header (needs a Finnhub API key set on the server), ' +
+        'No data yet. Use "Fetch New" in the header (needs a Finnhub API key set on the server), ' +
         'or run the market-helm CLI once to populate the data folder.'
       );
     }
@@ -47,7 +46,7 @@ export function dashboardLoadErrorMessage(err: unknown): string {
   return 'Service is temporarily unavailable. Please try again later.';
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) => {
+const Dashboard: React.FC<DashboardProps> = ({ refreshKey = 0 }) => {
   const [marketOverview, setMarketOverview] = useState<MarketOverview | null>(null);
   const [gainers, setGainers] = useState<StockMover[]>([]);
   const [losers, setLosers] = useState<StockMover[]>([]);
@@ -90,11 +89,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
       if (generation !== loadGenerationRef.current) return;
 
       setMarketOverview(marketRes.data);
-
-      // Notify parent of data date
-      if (onDataLoaded && marketRes.data.date) {
-        onDataLoaded(formatDate(marketRes.data.date));
-      }
 
       // Phase 2: secondary data loads in background
       if (!silent) setSecondaryLoading(true);
@@ -156,8 +150,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
   }
 
   const averageChange = marketOverview?.averageChange ?? 0;
-  const quoteStart = formatQuoteAsOf(marketOverview?.quoteTimeStart);
-  const quoteEnd = formatQuoteAsOf(marketOverview?.quoteTimeEnd);
 
   return (
     <main ref={dashboardRef} className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 xl:px-8">
@@ -172,11 +164,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
             Price moves from the latest saved market analysis.
-          </p>
-          <p className="mt-3 inline-flex flex-wrap rounded-lg border border-slate-300 bg-slate-100/70 px-3 py-2 text-sm font-medium text-slate-700 dark:border-[#31435b] dark:bg-[#122235] dark:text-slate-200">
-            {quoteStart && quoteEnd
-              ? `Saved quote times: ${quoteStart}${quoteStart === quoteEnd ? '' : ` to ${quoteEnd}`} · Not live prices`
-              : `Saved market data for ${marketOverview?.date ? formatDate(marketOverview.date) : 'the latest snapshot'} · Exact quote times unavailable · Not live prices`}
           </p>
         </div>
         <ExportButton
@@ -202,12 +189,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onDataLoaded, refreshKey = 0 }) =
               Market pulse
             </h2>
             <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-              Stocks with the largest price moves on the date shown.
+              Stocks with the largest price moves.
             </p>
           </div>
-          <span className="font-data text-xs text-slate-600 dark:text-slate-300">
-            {marketOverview?.date ? formatDate(marketOverview.date) : ''}
-          </span>
         </div>
 
         <div className="mt-3">
