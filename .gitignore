@@ -10,6 +10,8 @@ venv/
 .venv-audit/
 .pytest_cache/
 .pytest_*/
+# Local uv invocation; Python dependencies are managed with requirements files.
+/uv.lock
 ENV/
 build/
 develop-eggs/
