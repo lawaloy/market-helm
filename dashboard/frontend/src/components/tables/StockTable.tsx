@@ -204,7 +204,7 @@ const StockTable: React.FC<StockTableProps> = ({ stocks, onStockClick, asOfDate 
       {paginatedStocks.length === 0 ? (
         <p className="px-5 py-10 text-center text-sm text-slate-700 dark:text-slate-300">
           {stocks.length === 0
-            ? 'No stock forecasts are available yet. Fetch new market data to create them.'
+            ? 'No stock forecasts are available yet. Use Fetch New to create them.'
             : 'No forecasts match that recommendation.'}
         </p>
       ) : (

@@ -20,7 +20,6 @@ import api, { alertsApi } from './services/api';
 
 function App() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const [dataDate, setDataDate] = useState<string>('');
   const [backgroundFetching, setBackgroundFetching] = useState(false);
   /** Bumped on unmount so StrictMode remount / navigation cannot apply late setState. */
   const autofetchGenerationRef = useRef(0);
@@ -157,16 +156,12 @@ function App() {
 
             <div className="lg:pl-56">
               <Header
-                dataDate={dataDate}
                 onRefreshComplete={handleRefreshComplete}
                 onQuickRefresh={handleQuickRefresh}
                 backgroundFetching={backgroundFetching}
               />
               <Routes>
-                <Route
-                  path="/"
-                  element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />}
-                />
+                <Route path="/" element={<Dashboard refreshKey={refreshKey} />} />
                 <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
                 <Route path="/summary" element={<Navigate to="/#market-brief" replace />} />
                 <Route path="/sign-in" element={<SignIn />} />

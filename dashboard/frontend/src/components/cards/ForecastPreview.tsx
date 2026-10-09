@@ -3,7 +3,7 @@ import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router';
 import { historyApi } from '../../services/api';
 import type { RunProjection } from '../../types';
-import { formatDate, formatPercentage, formatPrice, getCompanyName } from '../../utils/formatters';
+import { formatPercentage, formatPrice, getCompanyName } from '../../utils/formatters';
 
 function ForecastList({ title, rows }: { title: string; rows: RunProjection[] }) {
   return (
@@ -116,7 +116,7 @@ export default function ForecastPreview({
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-            The model's largest projected rises and falls from {formatDate(date)}.
+            Biggest projected price moves over the next five trading days.
           </p>
         </div>
         <Link

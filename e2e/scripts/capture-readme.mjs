@@ -282,7 +282,8 @@ async function capture() {
     await page.waitForTimeout(2_000);
     await page.screenshot({
       path: path.join(outputDir, 'markethelm-dashboard.png'),
-      fullPage: true,
+      // Keep the README image focused on the first screen: overview, market pulse, and KPIs.
+      clip: { x: 0, y: 0, width: 1440, height: 800 },
     });
 
     await page.getByRole('button', { name: 'Toggle theme' }).click();

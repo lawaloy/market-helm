@@ -1,6 +1,6 @@
 # Project status and roadmap
 
-**Last updated:** 2026-09-26
+**Last updated:** 2026-10-09
 
 This is the authoritative inventory of what MarketHelm currently ships, what is
 covered by automated tests, and what remains unfinished. Deployment instructions
@@ -122,6 +122,54 @@ unit tests and container-only integration tests cannot fully reproduce.
    nested rules); consider SMS/push only after hosted email is proven reliable.
 5. **Dashboard quality:** code-split routes, run accessibility/performance audits,
    and decide whether saved watchlists/views belong in the product.
+
+## Live prices roadmap
+
+**Status: planned, not implemented.** Quotes and dashboard data are batch/refresh
+based today. "Fetch New" starts a background tracker run, and the UI labels prices
+as saved quotes ("Not live prices"). Live prices are a long-term product goal; this
+section records the intended order of work. It is a plan, not an implementation claim.
+
+### Principles
+
+- Keep batch projections and saved quotes as the reliable fallback. Live prices
+  layer on top and must degrade to the saved-quote labels when the feed is down.
+- Keep the provider behind the existing boundary in `src/services/api_client.py` so
+  the data source can change without touching the dashboard or alert rules.
+- Hosted mode (shared database, per-user alerts) is the target. Local file mode
+  stays supported for development but is not the customer path.
+
+### Proposed phases
+
+1. **Finish the market data database cutover** (see Recommended next work). Live
+   quotes need a durable shared store first, and the temporary CSV fallback should be
+   gone before a second data path is added.
+2. **Choose and validate a live-quote provider.** Confirm that the chosen plan
+   allows the needed symbol count, update rate, and redistribution to end users.
+   Open question: whether the current Finnhub plan is sufficient or another
+   provider is required.
+3. **Add a quote service in the backend.** A long-running component that holds the
+   provider connection, normalizes ticks, and writes the latest quote and intraday
+   bars to the shared store. Open question: whether it runs inside the existing
+   worker process or as its own service.
+4. **Deliver live quotes to the dashboard.** Add a push or short-interval polling
+   endpoint (WebSocket or server-sent events), show a "Live" or "Delayed" state with
+   the quote time, and keep the existing "Not live prices" label whenever the feed
+   is unavailable.
+5. **Make alerts react to live quotes.** The alert worker evaluates on a schedule
+   today. Extend price rules to evaluate against the latest live quote while
+   keeping cooldowns and delivery retries, and do not change RSI/compound semantics
+   until intraday bars are available.
+6. **Operational readiness.** Rate limits and per-tenant fan-out limits,
+   reconnect/backoff behavior, market-hours handling for XNYS sessions, metrics and
+   health checks for feed lag, and staging verification against the real provider.
+
+### Not in scope for this roadmap
+
+- Automated trading and broker execution (see Explicitly deferred). It would depend
+  on this work but needs its own risk, compliance, and audit design.
+- Changing projection or confidence scoring. Projections stay batch-based and
+  evidence-led.
 
 ## Explicitly deferred
 

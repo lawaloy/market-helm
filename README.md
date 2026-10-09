@@ -26,18 +26,24 @@ the evidence-based feature matrix and current priorities.
 
 The dashboard turns saved market data into an at-a-glance view of movers,
 projection confidence, recommendations, risk, and potential opportunities.
-
-![MarketHelm dashboard showing sample market movers, projection confidence, recommendations, and stock opportunities](docs/assets/readme/markethelm-dashboard.png)
-
-_Dashboard overview using deterministic sample data._
-
 Helmtower lets operators create price, RSI, or combined watches and route
-notifications through the configured email, Discord, or Slack channels.
+notifications through the configured email, Discord, or Slack channels. Select an
+image to view it full size.
 
-![Helmtower alert composer showing an Apple price watch and saved quote](docs/assets/readme/markethelm-alerts.png)
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/markethelm-dashboard.png"><img src="docs/assets/readme/markethelm-dashboard.png" alt="MarketHelm dashboard showing a market brief, biggest gainers and decliners, and market summary stats from sample data" width="440"></a>
+      <br><sub>Dashboard overview</sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/assets/readme/markethelm-alerts.png"><img src="docs/assets/readme/markethelm-alerts.png" alt="Helmtower alert composer showing an Apple price watch and saved quote" width="440"></a>
+      <br><sub>Helmtower alert setup</sub>
+    </td>
+  </tr>
+</table>
 
-_Helmtower alert setup using deterministic sample data._
-
+Both images use deterministic sample data.
 Maintainers can regenerate these images from the seeded local application with
 `cd e2e && npm run capture:readme`.
 

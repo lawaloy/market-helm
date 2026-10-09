@@ -150,7 +150,7 @@ describe('Header refresh controls', () => {
 
     render(
       <MemoryRouter>
-        <Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />
+        <Header onRefreshComplete={onRefreshComplete} />
       </MemoryRouter>,
     );
 
@@ -192,13 +192,7 @@ describe('Header refresh controls', () => {
     const onQuickRefresh = vi.fn();
     const onRefreshComplete = vi.fn();
 
-    render(
-      <Header
-        dataDate="2026-06-07"
-        onQuickRefresh={onQuickRefresh}
-        onRefreshComplete={onRefreshComplete}
-      />,
-    );
+    render(<Header onQuickRefresh={onQuickRefresh} onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     expect(onQuickRefresh).toHaveBeenCalledTimes(1);
@@ -242,13 +236,7 @@ describe('Header refresh controls', () => {
     const onQuickRefresh = vi.fn();
     const onRefreshComplete = vi.fn();
 
-    render(
-      <Header
-        dataDate="2026-06-07"
-        onQuickRefresh={onQuickRefresh}
-        onRefreshComplete={onRefreshComplete}
-      />,
-    );
+    render(<Header onQuickRefresh={onQuickRefresh} onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -282,7 +270,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
+    render(<Header onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -333,7 +321,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
+    render(<Header onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {
@@ -379,7 +367,7 @@ describe('Header refresh controls', () => {
       return { data: { message: 'Refresh started in background' } };
     });
 
-    render(<Header dataDate="2026-06-07" />);
+    render(<Header />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {
@@ -415,7 +403,7 @@ describe('Header refresh controls', () => {
     });
     const onRefreshComplete = vi.fn();
 
-    render(<Header dataDate="2026-06-07" onRefreshComplete={onRefreshComplete} />);
+    render(<Header onRefreshComplete={onRefreshComplete} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
 
@@ -447,7 +435,7 @@ describe('Header refresh controls', () => {
     });
     const onQuickRefresh = vi.fn();
 
-    render(<Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />);
+    render(<Header onQuickRefresh={onQuickRefresh} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(onQuickRefresh).toHaveBeenCalledTimes(1);
@@ -473,7 +461,7 @@ describe('Header refresh controls', () => {
     vi.useFakeTimers();
     const onQuickRefresh = vi.fn();
 
-    render(<Header dataDate="2026-06-07" onQuickRefresh={onQuickRefresh} />);
+    render(<Header onQuickRefresh={onQuickRefresh} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
     expect(screen.getByText('Reloading data...')).toBeTruthy();
@@ -490,7 +478,7 @@ describe('Header refresh controls', () => {
     vi.useFakeTimers();
     apiMocks.post.mockRejectedValueOnce(new Error('network'));
 
-    render(<Header dataDate="2026-06-07" />);
+    render(<Header />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {
@@ -507,7 +495,7 @@ describe('Header refresh controls', () => {
       data: { is_running: false, last_status: 'idle', progress: '' },
     });
 
-    render(<Header dataDate="2026-06-07" />);
+    render(<Header />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {
@@ -538,7 +526,7 @@ describe('Header refresh controls', () => {
       return { data: { message: 'Refresh started' } };
     });
 
-    render(<Header dataDate="2026-06-07" />);
+    render(<Header />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Fetch New' }));
     await act(async () => {

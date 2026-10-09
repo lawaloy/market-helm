@@ -15,7 +15,7 @@ test.describe('MarketHelm smoke', () => {
 
     const errorBanner = page
       .locator('text=Service is temporarily unavailable')
-      .or(page.locator('text=No market data yet'));
+      .or(page.locator('text=No data yet'));
     await expect(errorBanner).toHaveCount(0, { timeout: 20_000 });
 
     await expect(page.getByRole('navigation')).toBeVisible();
