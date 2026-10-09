@@ -152,6 +152,23 @@ async function capture() {
         riskProfile: { Low: 1, Medium: 3, High: 1 },
       }),
     );
+    await page.route(`**/api/history/runs/${demoDate}/projections`, (route) =>
+      fulfillJson(route, {
+        date: demoDate,
+        totalProjections: demoStocks.length,
+        projections: demoStocks.map((stock) => ({
+          symbol: stock.symbol,
+          name: stock.name,
+          recommendation: stock.recommendation,
+          confidence: stock.confidence,
+          expectedChange: stock.expectedChange,
+          currentPrice: stock.price,
+          targetPrice: stock.targetPrice,
+          risk: stock.risk,
+          reason: 'Representative sample',
+        })),
+      }),
+    );
     await page.route('**/api/summary', (route) =>
       fulfillJson(route, {
         summary:
@@ -261,7 +278,7 @@ async function capture() {
     );
 
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.getByText('Stocks Tracked').waitFor({ timeout: 30_000 });
+    await page.getByText('Stocks covered').waitFor({ timeout: 30_000 });
     await page.waitForTimeout(2_000);
     await page.screenshot({
       path: path.join(outputDir, 'markethelm-dashboard.png'),
