@@ -1,6 +1,6 @@
 {
   "name": "market-helm-web",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "private": true,
   "packageManager": "npm@10.9.8",
   "engines": {
@@ -24,17 +24,17 @@
     "@emnapi/core": "1.11.3",
     "@emnapi/runtime": "1.11.3",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^26.6.3",
+    "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.6.1",
-    "jsdom": "^30.1.1",
-    "postcss": "^8.5.28",
+    "jsdom": "^30.1.2",
+    "postcss": "^8.5.29",
     "prettier": "3.9.9",
     "tailwindcss": "^4.1.18",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2",
+    "vite": "^8.3.3",
     "vitest": "^5.0.3"
   },
   "scripts": {
