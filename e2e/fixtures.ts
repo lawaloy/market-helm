@@ -1,4 +1,19 @@
 import { expect, test as base } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+/** Put picker tests in the configured state without writing local alert settings. */
+export async function stubReadyAlertsConfig(page: Page) {
+  await page.route('**/api/alerts/config', (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        exists: true,
+        config: { defaults: {}, alerts: [] },
+        channels: { email_smtp: false, email_recipients: false, webhook_url: false },
+      },
+    }),
+  );
+}
 
 /**
  * Browser tests must never start a live market refresh. CI seeds deterministic

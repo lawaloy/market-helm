@@ -120,7 +120,7 @@
   }
 
   .alerts-cta {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-6 py-2.5 text-sm font-bold text-emerald-950 shadow-[0_8px_24px_rgb(16_185_129/0.16)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:shadow-none dark:disabled:bg-slate-700 dark:disabled:text-slate-100;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-6 py-2.5 text-sm font-bold text-emerald-950 shadow-[0_8px_24px_rgb(16_185_129/0.16)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-700 disabled:shadow-none disabled:transition-none dark:disabled:bg-slate-700 dark:disabled:text-slate-100;
   }
 
   .alerts-channel {

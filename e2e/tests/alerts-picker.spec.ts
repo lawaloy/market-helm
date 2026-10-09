@@ -1,4 +1,8 @@
-import { expect, test } from '../fixtures';
+import { expect, stubReadyAlertsConfig, test } from '../fixtures';
+
+test.beforeEach(async ({ page }) => {
+  await stubReadyAlertsConfig(page);
+});
 
 test.describe('Helmtower company picker', () => {
   test('finds a company near the end of the catalog and reopens at that company', async ({
@@ -8,11 +12,6 @@ test.describe('Helmtower company picker', () => {
     await expect(page.getByRole('heading', { name: 'Price alerts' })).toBeVisible({
       timeout: 20_000,
     });
-
-    const startButton = page.getByRole('button', { name: /Start watching/i });
-    if (await startButton.isVisible().catch(() => false)) {
-      await startButton.click();
-    }
 
     const pickerButton = page.getByRole('button', { name: 'Open company list' });
     const companyInput = page.getByRole('combobox', { name: 'Company' });
@@ -62,12 +61,6 @@ test.describe('Helmtower company picker', () => {
       timeout: 15_000,
     });
 
-    const startButton = page.getByRole('button', { name: /Start watching/i });
-    if (await startButton.isVisible().catch(() => false)) {
-      await startButton.click();
-      await expect(page.getByText('How to reach you')).toBeVisible({ timeout: 10_000 });
-    }
-
     await page.getByRole('button', { name: 'Open company list' }).click();
     await expect(page.getByRole('combobox', { name: 'Company' })).toBeVisible();
 
@@ -81,7 +74,11 @@ test.describe('Helmtower company picker', () => {
     const priceText = await price.innerText();
     await appleOption.click();
     await expect(page.getByRole('combobox', { name: 'Company' })).toHaveValue(/Apple.*AAPL/);
-    await expect(page.getByText(priceText, { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('combobox', { name: 'Company' }).locator('..').getByText(priceText, {
+        exact: true,
+      }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Open company list' }).click();
 
     // Keep local channel credentials and addresses out of captured artifacts.

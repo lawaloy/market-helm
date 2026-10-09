@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
-import { expect, test } from '../fixtures';
+import { expect, stubReadyAlertsConfig, test } from '../fixtures';
 
 const wcagTags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
@@ -81,6 +81,7 @@ test.describe('WCAG A/AA accessibility', () => {
     });
 
     test(`${theme} theme Helmtower company picker stays bounded`, async ({ page }) => {
+      await stubReadyAlertsConfig(page);
       await page.addInitScript(
         ([key, value]) => localStorage.setItem(key, value),
         ['market-helm-theme', theme],
@@ -90,12 +91,15 @@ test.describe('WCAG A/AA accessibility', () => {
         timeout: 30_000,
       });
 
+      const pickerButton = page.getByRole('button', { name: 'Open company list' });
+      await expect(pickerButton).toBeVisible();
+
       const quoteRequests: string[] = [];
       page.on('request', (request) => {
         if (request.url().includes('/api/alerts/quotes')) quoteRequests.push(request.url());
       });
 
-      await page.getByRole('button', { name: 'Open company list' }).click();
+      await pickerButton.click();
       const search = page.getByRole('combobox', { name: 'Company' });
       await expect(search).toBeVisible();
       expect(await page.getByRole('option').count()).toBeLessThanOrEqual(60);
