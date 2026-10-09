@@ -8,7 +8,7 @@ For crisp text, capture at 2x into a temp folder first:
     python scripts/compose_readme_hero.py --dashboard /tmp/readme-2x/markethelm-dashboard.png \
         --alerts /tmp/readme-2x/markethelm-alerts.png --font /path/to/Inter-Variable.ttf
 
-Requires Pillow and the Inter variable font. Shows sample data only.
+Requires Pillow and the Inter variable font.
 """
 
 import argparse
@@ -255,9 +255,6 @@ for t, x, wd_ in zip(items, xs, widths):
     d.text(
         (x + pad + ic + S(10), y + (ph - S(21)) // 2 - S(2)), t, font=fp, fill=(190, 246, 220, 255)
     )
-fn = font(14, 500)
-note = "Sample data shown"
-d.text((W - S(90) - d.textlength(note, font=fn), S(1030)), note, font=fn, fill=(105, 126, 148, 255))
 
 out = bg.convert("RGB").resize((2000, int(2000 * H / W)), Image.LANCZOS)
 out.save(args.out, optimize=True)
