@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from dashboard.backend.api.history import (
+    _load_index_symbol_names,
     _resolve_company_names,
     build_symbol_catalog,
     load_index_symbol_names,
@@ -96,3 +97,30 @@ def test_load_index_symbol_names_normalizes_and_skips_bad_symbols():
     assert names == {"AAPL": "Apple Inc.", "MSFT": "Microsoft"}
     assert "NONE" not in names
     assert "NAN" not in names
+
+
+def test_load_index_symbol_names_reuses_static_provider_catalog():
+    """Repeated API calls must not rebuild the 500-company index catalog."""
+    _load_index_symbol_names.cache_clear()
+    provider_calls = 0
+
+    class _FakePyTickerSymbols:
+        def __init__(self):
+            nonlocal provider_calls
+            provider_calls += 1
+
+        def get_stocks_by_index(self, index_name):
+            if index_name == "S&P 500":
+                return [{"symbol": "AAPL", "name": "Apple Inc."}]
+            return []
+
+    fake_module = MagicMock()
+    fake_module.PyTickerSymbols = _FakePyTickerSymbols
+
+    with patch.dict("sys.modules", {"pytickersymbols": fake_module}):
+        first = load_index_symbol_names()
+        first["AAPL"] = "mutated"
+        second = load_index_symbol_names()
+
+    assert provider_calls == 1
+    assert second == {"AAPL": "Apple Inc."}

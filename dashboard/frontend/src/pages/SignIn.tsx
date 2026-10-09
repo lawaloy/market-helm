@@ -194,7 +194,7 @@ const SignIn: React.FC = () => {
           {mode === 'sign-in' && (
             <Link
               to="/forgot-password"
-              className="block text-center text-sm text-teal-600 hover:underline"
+              className="block text-center text-sm text-teal-600 hover:text-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
             >
               Forgot your password?
             </Link>

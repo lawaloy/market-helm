@@ -34,11 +34,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return 'light';
     const stored = readStoredTheme();
     if (stored) return stored;
-    try {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } catch {
-      return 'light';
-    }
+    return 'dark';
   });
 
   useEffect(() => {

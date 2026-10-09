@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: ${MARKET_HELM_POSTGRES_IMAGE:-postgres:16-alpine}
     restart: unless-stopped
     environment:
       POSTGRES_DB: markethelm
@@ -13,7 +13,12 @@ services:
       timeout: 5s
       retries: 12
   api:
-    build: { context: ., dockerfile: Dockerfile.web }
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NODE_BASE_IMAGE: ${MARKET_HELM_NODE_BASE_IMAGE:-node:22.23.2-alpine}
+        PYTHON_BASE_IMAGE: ${MARKET_HELM_PYTHON_BASE_IMAGE:-python:3.12-slim}
     restart: unless-stopped
     env_file: ${MARKET_HELM_ENV_FILE:-.env.staging}
     environment:
@@ -35,7 +40,12 @@ services:
       timeout: 5s
       retries: 8
   worker:
-    build: { context: ., dockerfile: Dockerfile.web }
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        NODE_BASE_IMAGE: ${MARKET_HELM_NODE_BASE_IMAGE:-node:22.23.2-alpine}
+        PYTHON_BASE_IMAGE: ${MARKET_HELM_PYTHON_BASE_IMAGE:-python:3.12-slim}
     restart: unless-stopped
     command: ['market-helm', 'alerts', 'run', '--loop']
     healthcheck:

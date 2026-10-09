@@ -2,6 +2,7 @@
 Market API endpoints
 """
 import math
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -95,6 +96,18 @@ def _safe_volume(value: Any) -> int:
         return 0
 
 
+def _quote_time(value: Any) -> Optional[datetime]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
 def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[str, Any]) -> str:
     """Generate a template-based summary when ai_summary is not in the JSON."""
     # Corrupt summary JSON can nest strings/lists where objects/arrays are
@@ -118,7 +131,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
         sentiment = "mixed"
 
     summary_parts.append(
-        f"Today's market showed {sentiment} sentiment with {gainers} gainers and {losers} losers, "
+        f"This saved market snapshot showed {sentiment} sentiment with {gainers} gainers and {losers} losers, "
         f"averaging {avg_change:.2f}% change overall."
     )
 
@@ -180,6 +193,14 @@ async def get_market_overview():
         change = _numeric_change_percent(df)
 
         # Calculate overall statistics
+        quote_times = (
+            [_quote_time(value) for value in df["quote_timestamp"]]
+            if "quote_timestamp" in df.columns
+            else []
+        )
+        complete_quote_times = (
+            len(quote_times) == len(df) and all(value is not None for value in quote_times)
+        )
         total_stocks = len(df)
         gainers = int((change > 0).sum())
         losers = int((change < 0).sum())
@@ -209,6 +230,8 @@ async def get_market_overview():
         
         return MarketOverview(
             date=date,
+            quoteTimeStart=min(quote_times).isoformat() if complete_quote_times else None,
+            quoteTimeEnd=max(quote_times).isoformat() if complete_quote_times else None,
             totalStocks=total_stocks,
             gainers=gainers,
             losers=losers,
@@ -278,6 +301,7 @@ async def get_top_movers(
                 change=change,
                 changePercent=change_percent,
                 volume=_safe_volume(row.get('volume', 0)),
+                quoteTimestamp=(timestamp.isoformat() if (timestamp := _quote_time(row.get('quote_timestamp'))) else None),
             ))
         
         return MoversResponse(type=type, data=movers)

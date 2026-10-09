@@ -53,31 +53,32 @@ describe('StockTable recommendation filter', () => {
 
   it('filters by recommendation rating, not Bullish/Bearish trend', () => {
     render(<StockTable stocks={stocks} />);
+    const table = screen.getByRole('table');
 
-    expect(screen.getByText('AAPL')).toBeTruthy();
-    expect(screen.getByText('MSFT')).toBeTruthy();
-    expect(screen.getByText('TSLA')).toBeTruthy();
+    expect(within(table).getByText('AAPL')).toBeTruthy();
+    expect(within(table).getByText('MSFT')).toBeTruthy();
+    expect(within(table).getByText('TSLA')).toBeTruthy();
 
     // Badge column shows recommendation (BUY/HOLD/SELL), not trend.
-    expect(screen.getByText('STRONG BUY')).toBeTruthy();
-    expect(screen.getByText('HOLD')).toBeTruthy();
-    expect(screen.getByText('SELL')).toBeTruthy();
+    expect(within(table).getByText('STRONG BUY')).toBeTruthy();
+    expect(within(table).getByText('HOLD')).toBeTruthy();
+    expect(within(table).getByText('SELL')).toBeTruthy();
     expect(screen.queryByText('Bullish')).toBeNull();
 
     const filter = screen.getByDisplayValue('All');
     fireEvent.change(filter, { target: { value: 'BUY' } });
 
-    expect(screen.getByText('AAPL')).toBeTruthy();
-    expect(screen.queryByText('MSFT')).toBeNull();
-    expect(screen.queryByText('TSLA')).toBeNull();
+    expect(within(table).getByText('AAPL')).toBeTruthy();
+    expect(within(table).queryByText('MSFT')).toBeNull();
+    expect(within(table).queryByText('TSLA')).toBeNull();
 
     fireEvent.change(filter, { target: { value: 'HOLD' } });
-    expect(screen.getByText('MSFT')).toBeTruthy();
-    expect(screen.queryByText('AAPL')).toBeNull();
+    expect(within(table).getByText('MSFT')).toBeTruthy();
+    expect(within(table).queryByText('AAPL')).toBeNull();
 
     fireEvent.change(filter, { target: { value: 'SELL' } });
-    expect(screen.getByText('TSLA')).toBeTruthy();
-    expect(screen.queryByText('MSFT')).toBeNull();
+    expect(within(table).getByText('TSLA')).toBeTruthy();
+    expect(within(table).queryByText('MSFT')).toBeNull();
   });
 
   it('treats STRONG SELL as part of the Sell filter bucket', () => {
@@ -173,11 +174,7 @@ describe('StockTable non-finite display and pagination clamp', () => {
     expect(within(table).getByText('OK')).toBeTruthy();
     expect(within(table).queryByText('Poison')).toBeNull();
     expect(table.textContent).not.toMatch(/\$∞|\$NaN|Infinity|NaN/);
-    // Searching must not throw when a sibling row had a bad symbol (already filtered).
-    fireEvent.change(screen.getByPlaceholderText('Search stocks...'), {
-      target: { value: 'ok' },
-    });
-    expect(within(table).getByText('OK')).toBeTruthy();
+    expect(screen.queryByRole('searchbox')).toBeNull();
   });
 
   it('clamps to page 1 when a filter shrinks results below the current page', () => {
@@ -193,13 +190,69 @@ describe('StockTable non-finite display and pagination clamp', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByText('Page 2 of 2')).toBeTruthy();
-    expect(screen.getByText('S20')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByText('S20')).toBeTruthy();
 
     fireEvent.change(screen.getByDisplayValue('All'), {
       target: { value: 'BUY' },
     });
 
-    expect(screen.getByText('S00')).toBeTruthy();
+    expect(within(screen.getByRole('table')).getByText('S00')).toBeTruthy();
     expect(screen.queryByText('Page 2 of')).toBeNull();
+  });
+});
+
+describe('Stock forecasts experience', () => {
+  afterEach(cleanup);
+
+  it('explains the forecast purpose, date, and unvalidated score without a list search', () => {
+    render(<StockTable stocks={[opportunity({})]} asOfDate="2026-10-02" />);
+
+    expect(screen.getByRole('heading', { name: 'Stock forecasts' })).toBeTruthy();
+    expect(screen.getByText(/1 stock · Oct 2, 2026/)).toBeTruthy();
+    expect(screen.getByText(/Accuracy has not been established/)).toBeTruthy();
+    expect(screen.getByText(/not measured probabilities/)).toBeTruthy();
+    expect(screen.queryByText('Why are these stocks here?')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(
+      within(screen.getByRole('table')).getByRole('columnheader', { name: 'Forecast change' }),
+    ).toBeTruthy();
+  });
+
+  it('sorts by forecast change and opens the chosen company details', () => {
+    const onStockClick = vi.fn();
+    render(
+      <StockTable
+        stocks={[
+          opportunity({ symbol: 'LOW', name: 'Low Co', expectedChange: -3 }),
+          opportunity({ symbol: 'HIGH', name: 'High Co', expectedChange: 8 }),
+        ]}
+        onStockClick={onStockClick}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Sort by' }), {
+      target: { value: 'change' },
+    });
+    const rows = within(screen.getByRole('table')).getAllByRole('row');
+    expect(rows[1].textContent).toContain('HIGH');
+    expect(rows[2].textContent).toContain('LOW');
+
+    fireEvent.click(
+      within(screen.getByRole('table')).getByRole('button', { name: /View details for High Co/ }),
+    );
+    expect(onStockClick).toHaveBeenCalledWith('HIGH');
+    fireEvent.click(screen.getAllByRole('button', { name: /View details for Low Co/ })[0]);
+    expect(onStockClick).toHaveBeenCalledWith('LOW');
+  });
+
+  it('gives a useful empty state for missing data and unmatched recommendations', () => {
+    const { rerender } = render(<StockTable stocks={[]} />);
+    expect(screen.getByText(/No stock forecasts are available yet/)).toBeTruthy();
+
+    rerender(<StockTable stocks={[opportunity({})]} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Recommendation' }), {
+      target: { value: 'SELL' },
+    });
+    expect(screen.getByText(/No forecasts match that recommendation/)).toBeTruthy();
   });
 });

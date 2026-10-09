@@ -27,7 +27,9 @@ def test_alerts_health_remains_open_without_auth(client, multi_user_env):
     """Picker / useSymbolPrices probes health before a session exists."""
     r = client.get("/api/alerts/health")
     assert r.status_code == 200
-    assert r.json() == {"ok": True, "quotes": True}
+    assert r.json()["ok"] is True
+    assert r.json()["quotes"] is True
+    assert isinstance(r.json()["live_quotes_configured"], bool)
 
 
 def test_alerts_health_still_ok_with_bearer(client, multi_user_env):

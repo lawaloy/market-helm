@@ -47,7 +47,7 @@ export function PlatformChip({
       ? 'bg-[#5865F2] text-white shadow-md shadow-[#5865F2]/30'
       : accent === 'slack'
         ? 'bg-[#4A154B] text-white shadow-md shadow-[#4A154B]/30'
-        : 'bg-teal-600 text-white shadow-md shadow-teal-600/25';
+        : 'bg-teal-700 text-white shadow-md shadow-teal-700/25';
 
   return (
     <button

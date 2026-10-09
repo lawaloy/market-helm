@@ -149,14 +149,14 @@ export function RuleCard({
               <button
                 type="button"
                 onClick={saveEdit}
-                className="text-xs font-medium text-teal-600 hover:underline"
+                className="rounded text-xs font-medium text-teal-800 hover:text-teal-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-400"
               >
                 Save
               </button>
               <button
                 type="button"
                 onClick={() => setEditing(false)}
-                className="text-xs font-medium text-slate-500 hover:underline"
+                className="rounded text-xs font-medium text-slate-500 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 dark:hover:text-slate-200"
               >
                 Cancel
               </button>
@@ -168,8 +168,8 @@ export function RuleCard({
                 <span
                   className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-medium ${
                     isRise
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
-                      : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                      ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                      : 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
                   }`}
                 >
                   {isRise ? (
@@ -186,7 +186,7 @@ export function RuleCard({
             )
           )}
           {!isPrice && (
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               {formatCondition(rule)}
             </p>
           )}

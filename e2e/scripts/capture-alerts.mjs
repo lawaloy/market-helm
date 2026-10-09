@@ -24,9 +24,9 @@ async function run() {
 
   await page.waitForSelector('text=Notify me when', { timeout: 15000 });
 
-  const companyPicker = page.getByRole('button', { name: 'Company' });
+  const companyPicker = page.getByRole('button', { name: 'Open company list' });
   await companyPicker.click();
-  await page.getByPlaceholder('Search Apple, AAPL…').waitFor({ timeout: 5000 });
+  await page.getByRole('combobox', { name: 'Company' }).waitFor({ timeout: 5000 });
   await page.screenshot({
     path: path.join(outDir, 'alerts-company-dropdown.png'),
     fullPage: true,

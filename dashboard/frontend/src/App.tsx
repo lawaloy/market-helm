@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, Link } from 'react-router';
+import {
+  BellAlertIcon,
+  ChartBarSquareIcon,
+  ChartPieIcon,
+  ClockIcon,
+} from '@heroicons/react/24/outline';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/layout/Header';
 import RequireAuth from './components/auth/RequireAuth';
 import Dashboard from './pages/Dashboard';
 import HistoricalTrends from './pages/HistoricalTrends';
-import Summary from './pages/Summary';
 import AlertsSettings from './pages/AlertsSettings';
 import SignIn from './pages/SignIn';
 import AccountRecovery from './pages/AccountRecovery';
@@ -101,96 +106,91 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <BrowserRouter>
-          <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-            <Header
-              dataDate={dataDate}
-              onRefreshComplete={handleRefreshComplete}
-              onQuickRefresh={handleQuickRefresh}
-              backgroundFetching={backgroundFetching}
-            />
-            <div className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <nav className="flex gap-6">
-                  <NavLink
-                    to="/"
-                    end
-                    className={({ isActive }) =>
-                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                      }`
-                    }
-                  >
-                    Dashboard
-                  </NavLink>
-                  <NavLink
-                    to="/historical"
-                    className={({ isActive }) =>
-                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                      }`
-                    }
-                  >
-                    Historical Trends
-                  </NavLink>
-                  <NavLink
-                    to="/summary"
-                    className={({ isActive }) =>
-                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                      }`
-                    }
-                  >
-                    Summary
-                  </NavLink>
-                  <NavLink
-                    to="/alerts"
-                    className={({ isActive }) =>
-                      `py-4 px-1 border-b-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'border-teal-500 text-teal-600 dark:text-teal-400'
-                          : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
-                      }`
-                    }
-                  >
-                    Helmtower
-                  </NavLink>
-                </nav>
+          <div className="min-h-screen bg-[#e5ebf1] dark:bg-[#08111d]">
+            <aside className="relative z-30 flex w-full flex-col border-b border-slate-300 bg-[#f3f6f9] lg:fixed lg:inset-y-0 lg:left-0 lg:w-56 lg:border-b-0 lg:border-r dark:border-[#223248] dark:bg-[#091522]">
+              <div className="h-20 border-b border-slate-200 px-3 dark:border-[#223248]">
+                <Link
+                  to="/"
+                  aria-label="MarketHelm home"
+                  className="flex h-full items-center gap-3 rounded-lg px-2 text-slate-950 outline-none transition hover:bg-slate-200/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 dark:text-slate-50 dark:hover:bg-[#101f30]"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-500">
+                    <ChartBarSquareIcon className="h-6 w-6" aria-hidden="true" />
+                  </span>
+                  <span className="text-lg font-extrabold tracking-[-0.03em]">MarketHelm</span>
+                </Link>
               </div>
+              <nav
+                className="flex gap-1 overflow-x-auto px-3 py-2 lg:flex-1 lg:flex-col lg:gap-0 lg:space-y-1 lg:py-6"
+                aria-label="Primary navigation"
+              >
+                {[
+                  { to: '/', end: true, label: 'Dashboard', icon: ChartPieIcon },
+                  { to: '/historical', label: 'Historical Trends', icon: ClockIcon },
+                  { to: '/alerts', label: 'Helmtower', icon: BellAlertIcon },
+                ].map(({ to, end, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    className={({ isActive }) =>
+                      `group flex shrink-0 items-center gap-3 rounded-lg border-b-2 px-3 py-3 text-sm font-semibold transition lg:border-b-0 lg:border-l-2 ${
+                        isActive
+                          ? label === 'Helmtower'
+                            ? 'border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300'
+                            : 'border-blue-500 bg-slate-100 text-slate-950 dark:bg-[#15263a] dark:text-white'
+                          : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-[#101f30] dark:hover:text-slate-100'
+                      }`
+                    }
+                  >
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </nav>
+              <div className="hidden border-t border-slate-300 px-5 py-5 text-xs leading-5 text-slate-600 lg:block dark:border-[#223248] dark:text-slate-400">
+                Evidence before action.
+                <br />
+                Risk stays visible.
+              </div>
+            </aside>
+
+            <div className="lg:pl-56">
+              <Header
+                dataDate={dataDate}
+                onRefreshComplete={handleRefreshComplete}
+                onQuickRefresh={handleQuickRefresh}
+                backgroundFetching={backgroundFetching}
+              />
+              <Routes>
+                <Route
+                  path="/"
+                  element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />}
+                />
+                <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
+                <Route path="/summary" element={<Navigate to="/#market-brief" replace />} />
+                <Route path="/sign-in" element={<SignIn />} />
+                <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
+                <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
+                <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
+                <Route
+                  path="/account"
+                  element={
+                    <RequireAuth>
+                      <AccountSettings />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/alerts"
+                  element={
+                    <RequireAuth>
+                      <AlertsSettings />
+                    </RequireAuth>
+                  }
+                />
+              </Routes>
             </div>
-            <Routes>
-              <Route
-                path="/"
-                element={<Dashboard refreshKey={refreshKey} onDataLoaded={setDataDate} />}
-              />
-              <Route path="/historical" element={<HistoricalTrends refreshKey={refreshKey} />} />
-              <Route path="/summary" element={<Summary refreshKey={refreshKey} />} />
-              <Route path="/sign-in" element={<SignIn />} />
-              <Route path="/forgot-password" element={<AccountRecovery mode="forgot" />} />
-              <Route path="/reset-password" element={<AccountRecovery mode="reset" />} />
-              <Route path="/verify-email" element={<AccountRecovery mode="verify" />} />
-              <Route
-                path="/account"
-                element={
-                  <RequireAuth>
-                    <AccountSettings />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/alerts"
-                element={
-                  <RequireAuth>
-                    <AlertsSettings />
-                  </RequireAuth>
-                }
-              />
-            </Routes>
           </div>
         </BrowserRouter>
       </AuthProvider>

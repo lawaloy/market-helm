@@ -1,23 +1,17 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Dashboard from './Dashboard';
-import type { MarketOverview, Opportunity, ProjectionsSummary } from '../types';
+import type { MarketOverview, StockMover } from '../types';
 
 const apiMocks = vi.hoisted(() => ({
   getOverview: vi.fn(),
   getMovers: vi.fn(),
-  getSummary: vi.fn(),
-  getOpportunities: vi.fn(),
 }));
 
 vi.mock('../services/api', () => ({
   marketApi: {
     getOverview: apiMocks.getOverview,
     getMovers: apiMocks.getMovers,
-  },
-  projectionsApi: {
-    getSummary: apiMocks.getSummary,
-    getOpportunities: apiMocks.getOpportunities,
   },
 }));
 
@@ -27,32 +21,26 @@ vi.mock('../components/cards/KPICard', () => ({
   ),
 }));
 
-vi.mock('../components/cards/OpportunityCard', () => ({
-  default: ({ opportunity }: { opportunity: Opportunity }) => (
-    <div data-testid={`opp-${opportunity.symbol}`}>{opportunity.symbol}</div>
+vi.mock('../components/charts/MarketPulseChart', () => ({
+  default: ({ gainers, losers }: { gainers: StockMover[]; losers: StockMover[] }) => (
+    <div data-testid="market-pulse">
+      {[...gainers, ...losers].map((stock) => stock.symbol).join(',')}
+    </div>
   ),
 }));
 
-vi.mock('../components/charts/GainersLosersChart', () => ({
-  default: () => <div data-testid="gainers-losers-chart" />,
-}));
-
-vi.mock('../components/charts/SentimentPieChart', () => ({
-  default: () => <div data-testid="sentiment-pie-chart" />,
-}));
-
-vi.mock('../components/tables/StockTable', () => ({
-  default: ({ stocks }: { stocks: Opportunity[] }) => (
-    <div data-testid="stock-table">{stocks.map((s) => s.symbol).join(',')}</div>
+vi.mock('../components/cards/ForecastPreview', () => ({
+  default: ({ date }: { date: string }) => (
+    <section data-testid="forecast-preview">Forecast preview for {date}</section>
   ),
-}));
-
-vi.mock('../components/modals/StockDetailModal', () => ({
-  default: () => null,
 }));
 
 vi.mock('../components/common/ExportButton', () => ({
   default: () => <button type="button">Export</button>,
+}));
+
+vi.mock('./Summary', () => ({
+  default: () => <section data-testid="market-brief">Market brief</section>,
 }));
 
 function overview(date: string, totalStocks: number): MarketOverview {
@@ -69,54 +57,17 @@ function overview(date: string, totalStocks: number): MarketOverview {
   };
 }
 
-function projectionsSummary(strongBuy = 2): ProjectionsSummary {
-  return {
-    date: '2026-08-05',
-    targetDate: '2026-08-06',
-    totalProjections: 10,
-    averageConfidence: 72.5,
-    expectedMarketMove: 1.2,
-    sentiment: 'Bullish',
-    recommendations: {
-      STRONG_BUY: strongBuy,
-      BUY: 3,
-      HOLD: 4,
-      SELL: 1,
-      STRONG_SELL: 0,
-    },
-    trends: {},
-    riskProfile: {},
-  };
-}
-
-function opportunity(symbol: string): Opportunity {
-  return {
-    symbol,
-    name: `${symbol} Inc`,
-    currentPrice: 100,
-    targetPrice: 110,
-    expectedChange: 10,
-    confidence: 80,
-    risk: 'Low',
-    recommendation: 'STRONG BUY',
-    trend: 'Bullish',
-    reason: 'momentum',
-    volume: 1_000_000,
-  };
-}
-
 function mockPhase1(date: string, totalStocks: number) {
   apiMocks.getOverview.mockResolvedValue({ data: overview(date, totalStocks) });
-  apiMocks.getSummary.mockResolvedValue({ data: projectionsSummary() });
 }
 
-function mockPhase2Success(strongBuySymbol = 'AAPL') {
+function mockPhase2Success(gainerSymbol = 'GAIN') {
   apiMocks.getMovers.mockImplementation(async (type: string) => ({
     data: {
       type,
       data: [
         {
-          symbol: type === 'gainers' ? 'GAIN' : 'LOSS',
+          symbol: type === 'gainers' ? gainerSymbol : 'LOSS',
           name: 'Mover',
           price: 10,
           change: type === 'gainers' ? 1 : -1,
@@ -124,13 +75,6 @@ function mockPhase2Success(strongBuySymbol = 'AAPL') {
           volume: 1000,
         },
       ],
-    },
-  }));
-  apiMocks.getOpportunities.mockImplementation(async (type: string) => ({
-    data: {
-      type,
-      count: type === 'STRONG_BUY' ? 1 : 0,
-      opportunities: type === 'STRONG_BUY' ? [opportunity(strongBuySymbol)] : [],
     },
   }));
 }
@@ -152,17 +96,36 @@ describe('Dashboard phased load and fetch races', () => {
     render(<Dashboard />);
 
     expect(await screen.findByText('Some sections failed to load. You can retry.')).toBeTruthy();
-    expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('100');
-    // Phase-1 KPIs stay up; phase-2 sections stay empty until Retry.
-    expect(screen.getByTestId('stock-table').textContent).toBe('');
-    expect(screen.queryByTestId('opp-AAPL')).toBeNull();
+    expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('100');
+    // Phase-1 observed metrics stay up; phase-2 chart stays empty until Retry.
+    expect(screen.getByTestId('market-pulse').textContent).toBe('');
 
     mockPhase2Success('MSFT');
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(await screen.findByTestId('opp-MSFT')).toBeTruthy();
+    expect(await screen.findByText('MSFT,LOSS')).toBeTruthy();
     expect(screen.queryByText('Some sections failed to load. You can retry.')).toBeNull();
-    expect(screen.getByTestId('stock-table').textContent).toContain('MSFT');
+  });
+
+  it('shows a dated forecast preview without restoring unsupported rankings', async () => {
+    render(<Dashboard />);
+
+    expect(await screen.findByTestId('market-pulse')).toBeTruthy();
+    expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('100');
+    expect(screen.getByTestId('forecast-preview').textContent).toContain('2026-08-05');
+    expect(screen.queryByRole('heading', { name: 'Top opportunity' })).toBeNull();
+  });
+
+  it('labels the saved quote time instead of implying current prices', async () => {
+    apiMocks.getOverview.mockResolvedValue({
+      data: {
+        ...overview('2026-10-02', 10),
+        quoteTimeStart: '2026-10-02T15:07:00+00:00',
+        quoteTimeEnd: '2026-10-02T15:07:30+00:00',
+      },
+    });
+    render(<Dashboard />);
+    expect(await screen.findByText(/Saved quote times: .*Not live prices/)).toBeTruthy();
   });
 
   it('ignores a late phase-1 response after unmount', async () => {
@@ -200,13 +163,12 @@ describe('Dashboard phased load and fetch races', () => {
     mockPhase2Success('AAPL');
 
     const view = render(<Dashboard refreshKey={0} onDataLoaded={onDataLoaded} />);
-    expect(await screen.findByTestId('kpi-Stocks Tracked')).toBeTruthy();
-    expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('100');
-    expect(await screen.findByTestId('opp-AAPL')).toBeTruthy();
+    expect(await screen.findByTestId('kpi-Stocks covered')).toBeTruthy();
+    expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('100');
+    expect(await screen.findByText('AAPL,LOSS')).toBeTruthy();
     onDataLoaded.mockClear();
 
     let resolveStaleOverview: ((value: unknown) => void) | undefined;
-    let resolveStaleSummary: ((value: unknown) => void) | undefined;
     let silentCalls = 0;
 
     apiMocks.getOverview.mockImplementation(() => {
@@ -217,14 +179,6 @@ describe('Dashboard phased load and fetch races', () => {
         });
       }
       return Promise.resolve({ data: overview('2026-08-07', 250) });
-    });
-    apiMocks.getSummary.mockImplementation(() => {
-      if (silentCalls === 1) {
-        return new Promise((resolve) => {
-          resolveStaleSummary = resolve;
-        });
-      }
-      return Promise.resolve({ data: projectionsSummary(7) });
     });
     mockPhase2Success('TSLA');
 
@@ -242,20 +196,19 @@ describe('Dashboard phased load and fetch races', () => {
       await Promise.resolve();
     });
 
-    expect(await screen.findByTestId('kpi-Stocks Tracked')).toBeTruthy();
-    expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('250');
-    expect(await screen.findByTestId('opp-TSLA')).toBeTruthy();
+    expect(await screen.findByTestId('kpi-Stocks covered')).toBeTruthy();
+    expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('250');
+    expect(await screen.findByText('TSLA,LOSS')).toBeTruthy();
 
     await act(async () => {
       resolveStaleOverview?.({ data: overview('2026-08-01', 1) });
-      resolveStaleSummary?.({ data: projectionsSummary(99) });
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(screen.getByTestId('kpi-Stocks Tracked').textContent).toBe('250');
-    expect(screen.queryByTestId('opp-AAPL')).toBeNull();
-    expect(screen.getByTestId('opp-TSLA')).toBeTruthy();
+    expect(screen.getByTestId('kpi-Stocks covered').textContent).toBe('250');
+    expect(screen.queryByText('AAPL,LOSS')).toBeNull();
+    expect(screen.getByTestId('market-pulse').textContent).toBe('TSLA,LOSS');
     // Stale generation must not call onDataLoaded with the older overview date.
     expect(onDataLoaded).not.toHaveBeenCalledWith(
       expect.stringMatching(/August 1|2026-08-01|Aug 1/i),

@@ -3,7 +3,9 @@ Historical trends API endpoints
 """
 import logging
 import math
-from fastapi import APIRouter, HTTPException, Query
+from datetime import date as calendar_date
+from functools import lru_cache
+from fastapi import APIRouter, HTTPException, Path, Query
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
@@ -42,15 +44,12 @@ def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> 
     return _safe_float(series[finite].mean(), default)
 
 
-def load_index_symbol_names() -> dict:
-    """
-    Symbol -> company name for major US indices (S&P 500, NASDAQ 100, Dow Jones).
-    """
+@lru_cache(maxsize=4)
+def _load_index_symbol_names(provider_class: type) -> tuple[tuple[str, str], ...]:
+    """Build the static index catalog once per provider implementation."""
     result = {}
     try:
-        from pytickersymbols import PyTickerSymbols
-
-        data = PyTickerSymbols()
+        data = provider_class()
         for index_name in ["S&P 500", "NASDAQ 100", "Dow Jones"]:
             try:
                 for stock in data.get_stocks_by_index(index_name):
@@ -62,7 +61,16 @@ def load_index_symbol_names() -> dict:
                 continue
     except Exception:
         pass
-    return result
+    return tuple(result.items())
+
+
+def load_index_symbol_names() -> dict:
+    """Symbol -> company name for major US indices, cached for the process lifetime."""
+    try:
+        from pytickersymbols import PyTickerSymbols
+    except Exception:
+        return {}
+    return dict(_load_index_symbol_names(PyTickerSymbols))
 
 
 def _resolve_company_names(symbols: list) -> dict:
@@ -136,6 +144,41 @@ class HistoricalSummaryResponse(BaseModel):
     lastDate: str
     symbols: List[str] = []
     names: dict = {}
+
+
+class RunProjection(BaseModel):
+    """One saved projection in a historical run."""
+
+    symbol: str
+    name: str
+    recommendation: str
+    confidence: Optional[float] = None
+    expectedChange: Optional[float] = None
+    currentPrice: Optional[float] = None
+    targetPrice: Optional[float] = None
+    targetLow: Optional[float] = None
+    targetHigh: Optional[float] = None
+    risk: str
+    reason: str = ""
+
+
+class RunProjectionsResponse(BaseModel):
+    date: str
+    totalProjections: int
+    projections: List[RunProjection]
+
+
+def _optional_finite(value: Any) -> Optional[float]:
+    """Keep missing or non-finite stored values out of JSON responses."""
+    result = _safe_float(value, default=float("nan"))
+    return result if math.isfinite(result) else None
+
+
+def _display_text(value: Any, fallback: str = "") -> str:
+    if value is None:
+        return fallback
+    text = str(value).strip()
+    return fallback if not text or text.lower() in {"nan", "none", "<na>"} else text
 
 
 class AccuracySample(BaseModel):
@@ -343,6 +386,46 @@ async def get_historical_summary(
         raise HTTPException(status_code=404, detail="No data available.")
     except Exception:
         raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
+
+
+@router.get("/runs/{run_date}/projections", response_model=RunProjectionsResponse)
+async def get_run_projections(
+    run_date: calendar_date = Path(..., description="Recorded run date"),
+):
+    """Expose the saved rows behind a timeline count for one date."""
+    day = run_date.isoformat()
+    try:
+        df = get_data_loader().load_projections(day)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="No projections found for this run.")
+    except Exception:
+        logger.exception("Unable to load projections for run %s", day)
+        raise HTTPException(status_code=500, detail="Something went wrong. Please try again.")
+
+    projections = []
+    for _, row in df.iterrows():
+        symbol = normalize_ticker(row.get("symbol"))
+        if not symbol:
+            continue
+        projections.append(RunProjection(
+            symbol=symbol,
+            name=_display_text(row.get("name"), symbol),
+            recommendation=_display_text(row.get("recommendation"), "Unrated"),
+            confidence=_optional_finite(row.get("confidence")),
+            expectedChange=_optional_finite(row.get("expected_change_percent")),
+            currentPrice=_optional_finite(row.get("current_price")),
+            targetPrice=_optional_finite(row.get("target_mid")),
+            targetLow=_optional_finite(row.get("target_low")),
+            targetHigh=_optional_finite(row.get("target_high")),
+            risk=_display_text(row.get("risk_level"), "Unknown"),
+            reason=_display_text(row.get("reason")),
+        ))
+
+    return RunProjectionsResponse(
+        date=day,
+        totalProjections=len(df),
+        projections=projections,
+    )
 
 
 @router.get("/accuracy", response_model=ProjectionAccuracyResponse)

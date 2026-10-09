@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from dashboard.backend.auth import require_user_id
@@ -32,7 +34,11 @@ from src.cli.alerts_commands import _load_env, run_alert_test
 
 from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.services.data_loader import get_data_loader
-from src.alerts.symbol_prices import prices_from_saved_daily_data, resolve_symbol_prices
+from src.alerts.symbol_prices import (
+    prices_from_saved_daily_data,
+    resolve_symbol_prices,
+    saved_quote_details,
+)
 from src.utils.tickers import normalize_ticker
 from src.storage.alert_watches import InvalidAlertWatchConfig, validate_watches_config
 
@@ -102,6 +108,25 @@ class SymbolQuotesRequest(BaseModel):
 
 class SymbolQuotesResponse(BaseModel):
     prices: Dict[str, float] = Field(default_factory=dict)
+    quote_meta: Dict[str, Dict[str, Optional[str]]] = Field(default_factory=dict)
+
+
+def _quote_meta(prices: Dict[str, float]) -> Dict[str, Dict[str, Optional[str]]]:
+    """Identify saved prices without claiming that a lookup returned a fresh trade."""
+    saved = saved_quote_details()
+    retrieved_at = datetime.now(timezone.utc).isoformat()
+    return {
+        symbol: {
+            "source": "saved" if symbol in saved and saved[symbol]["price"] == price else "lookup",
+            "as_of": str(saved[symbol]["as_of"])
+            if symbol in saved and saved[symbol]["price"] == price
+            else None,
+            "retrieved_at": None
+            if symbol in saved and saved[symbol]["price"] == price
+            else retrieved_at,
+        }
+        for symbol, price in prices.items()
+    }
 
 
 def _empty_config() -> Dict[str, Any]:
@@ -388,11 +413,17 @@ async def post_alerts_init(
 @router.get("/health")
 async def alerts_health() -> Dict[str, bool]:
     """Lightweight probe so the UI can detect a stale dashboard backend."""
-    return {"ok": True, "quotes": True}
+    _load_env()
+    return {
+        "ok": True,
+        "quotes": True,
+        "live_quotes_configured": bool(os.environ.get("FINNHUB_API_KEY")),
+    }
 
 
 @router.get("/symbols")
 async def get_alert_symbol_catalog(
+    response: Response,
     _user_id: Optional[str] = Depends(require_user_id),
 ):
     """Searchable company list for alert setup (major US indices + tracked symbols).
@@ -400,10 +431,12 @@ async def get_alert_symbol_catalog(
     Hosted mode requires auth so anonymous clients cannot scrape the catalog /
     tracked-symbol metadata. File mode (``require_user_id`` → ``None``) stays open.
     """
+    response.headers["Cache-Control"] = "private, max-age=300"
     symbols, names = build_symbol_catalog()
 
     tracked: List[str] = []
     saved_prices = prices_from_saved_daily_data()
+    saved_meta = _quote_meta(saved_prices)
     try:
         loader = get_data_loader()
         df = loader.load_projections()
@@ -423,6 +456,7 @@ async def get_alert_symbol_catalog(
         "count": len(symbols),
         "tracked_symbols": tracked,
         "prices": {symbol: saved_prices[symbol] for symbol in symbols if symbol in saved_prices},
+        "quote_meta": {symbol: saved_meta[symbol] for symbol in symbols if symbol in saved_meta},
     }
 
 
@@ -442,7 +476,8 @@ async def get_symbol_quotes(
     ][:15]
     if not parsed:
         return SymbolQuotesResponse(prices={})
-    return SymbolQuotesResponse(prices=resolve_symbol_prices(parsed, fetch_missing=True))
+    prices = await run_in_threadpool(resolve_symbol_prices, parsed, fetch_missing=True)
+    return SymbolQuotesResponse(prices=prices, quote_meta=_quote_meta(prices))
 
 
 @router.post("/quotes", response_model=SymbolQuotesResponse)
@@ -461,7 +496,8 @@ async def post_symbol_quotes(
     ][:15]
     if not symbols:
         return SymbolQuotesResponse(prices={})
-    return SymbolQuotesResponse(prices=resolve_symbol_prices(symbols, fetch_missing=True))
+    prices = await run_in_threadpool(resolve_symbol_prices, symbols, fetch_missing=True)
+    return SymbolQuotesResponse(prices=prices, quote_meta=_quote_meta(prices))
 
 
 @router.get("/status", response_model=AlertsStatusResponse)

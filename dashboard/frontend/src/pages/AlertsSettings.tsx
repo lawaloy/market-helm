@@ -56,8 +56,18 @@ const AlertsSettings: React.FC = () => {
   const [symbolsLoading, setSymbolsLoading] = useState(true);
   /** Bumped on unmount / superseded loadConfig so late config/status responses are ignored. */
   const loadGenerationRef = useRef(0);
-  const { symbolPrices, mergePrices, pricingPending, quotesUnavailable, apiReady, fetchPricesFor } =
-    useSymbolPrices();
+  const {
+    symbolPrices,
+    quoteMeta,
+    mergePrices,
+    pricingPending,
+    attemptedPrices,
+    quotesUnavailable,
+    liveQuotesConfigured,
+    apiReady,
+    fetchPricesFor,
+    retryPriceFor,
+  } = useSymbolPrices();
 
   const userRules = useMemo(
     () => config.alerts.filter((rule) => !isSampleRule(rule)),
@@ -147,11 +157,11 @@ const AlertsSettings: React.FC = () => {
     const load = async () => {
       setSymbolsLoading(true);
       try {
-        const { options, prices } = await loadSymbolCatalog();
+        const { options, prices, quoteMeta: savedMeta } = await loadSymbolCatalog();
         if (cancelled) return;
         setSymbolOptions(options);
         if (Object.keys(prices).length > 0) {
-          mergePrices(prices);
+          mergePrices(prices, savedMeta);
         }
         if (options.length > 0) {
           const preferred = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META'];
@@ -509,10 +519,13 @@ const AlertsSettings: React.FC = () => {
       symbolOptions={symbolOptions}
       symbolsLoading={symbolsLoading}
       prices={symbolPrices}
+      quoteMeta={quoteMeta}
       pendingPrices={pricingPending}
+      attemptedPrices={attemptedPrices}
       quotesUnavailable={quotesUnavailable}
       apiReady={apiReady}
       onFetchPrices={(symbols) => void fetchPricesFor(symbols)}
+      onRetryPrice={(symbol) => void retryPriceFor(symbol)}
       onSymbolChange={setNewSymbol}
       onOperatorChange={setNewOperator}
       onValueChange={setNewValue}
@@ -555,7 +568,7 @@ const AlertsSettings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="alerts-page mx-auto max-w-2xl px-4 py-16 sm:px-6">
+      <div className="alerts-page mx-auto max-w-5xl px-4 py-16 sm:px-6">
         <div className="space-y-4">
           <div className="h-8 w-48 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-700" />
           <div className="h-4 w-64 animate-pulse rounded bg-slate-100 dark:bg-slate-800" />
@@ -573,15 +586,15 @@ const AlertsSettings: React.FC = () => {
       />
       <AlertsToast error={error} success={success} />
 
-      <div className="relative mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        <header className="mb-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-600 dark:text-teal-400">
+      <div className="relative mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <header className="mb-8 border-b border-slate-200 pb-6 dark:border-[#223248]">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-800 dark:text-emerald-400">
             Helmtower
           </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+          <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-slate-950 dark:text-white">
             Price alerts
           </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Your portfolio lookout</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Your portfolio lookout</p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 sm:whitespace-nowrap">
             Set a target, walk away. We&apos;ll tap you the moment the market moves your way.
           </p>
@@ -607,19 +620,19 @@ const AlertsSettings: React.FC = () => {
             </div>
           )}
           {exists && alertStatus?.last_triggered_at && (
-            <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <p className="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
               Last alert: {new Date(alertStatus.last_triggered_at).toLocaleString()}.
             </p>
           )}
           {exists && (alertStatus?.latest_deliveries?.length ?? 0) > 0 && (
-            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
               {alertStatus!.latest_deliveries.map((entry) => (
                 <li
                   key={`${entry.channel}-${entry.timestamp}`}
                   className={
                     entry.success
-                      ? 'text-slate-500 dark:text-slate-400'
-                      : 'text-amber-700 dark:text-amber-300'
+                      ? 'text-slate-600 dark:text-slate-400'
+                      : 'text-amber-800 dark:text-amber-300'
                   }
                 >
                   {formatDeliveryStatusLine(entry)}
@@ -628,9 +641,10 @@ const AlertsSettings: React.FC = () => {
             </ul>
           )}
           {quotesUnavailable && (
-            <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-              Live prices are unavailable — stop the old server on port 8000, then run{' '}
-              <code className="font-mono">scripts/restart-dashboard-backend.ps1</code> and refresh.
+            <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+              {liveQuotesConfigured === false
+                ? 'Live prices are not configured on this server. Saved prices remain visible; ask the site administrator to configure market-data access.'
+                : 'Live price lookup is unavailable. Saved prices remain visible; try reloading the page or contact the site administrator.'}
             </p>
           )}
         </header>
@@ -664,7 +678,7 @@ const AlertsSettings: React.FC = () => {
               <h2 className="text-sm font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 How to reach you
               </h2>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                 Choose one or both — every watch uses the same channels.
               </p>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -702,7 +716,7 @@ const AlertsSettings: React.FC = () => {
                   description="Channel notifications"
                 >
                   {channels?.webhook_url && (
-                    <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-400">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       Connected
                     </p>
@@ -741,7 +755,7 @@ const AlertsSettings: React.FC = () => {
 
               {notifyWebhook && (
                 <label htmlFor="webhook-url" className="mt-4 block">
-                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
                     Webhook URL
                   </span>
                   <input
@@ -758,7 +772,7 @@ const AlertsSettings: React.FC = () => {
                     }
                     className={`${webhookInputClass} mt-1.5`}
                   />
-                  <span className="mt-1.5 block text-xs text-slate-400 dark:text-slate-500">
+                  <span className="mt-1.5 block text-xs text-slate-600 dark:text-slate-400">
                     Stored on your server only — never shown in the UI after saving.
                   </span>
                 </label>

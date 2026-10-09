@@ -88,8 +88,31 @@ async function capture() {
   try {
     browser = await chromium.launch();
     const page = await browser.newPage({
-      viewport: { width: 1440, height: 960 },
+      viewport: { width: 1440, height: 1024 },
       deviceScaleFactor: 1,
+    });
+    const browserErrors = [];
+    page.on('console', (message) => {
+      if (message.type() !== 'error') return;
+
+      const text = message.text();
+      if (text.includes('status of 501 (Not Implemented)')) {
+        return;
+      }
+
+      browserErrors.push(`console: ${text}`);
+    });
+    page.on('pageerror', (error) => browserErrors.push(`page: ${error.message}`));
+    page.on('response', (response) => {
+      if (response.status() < 400) return;
+
+      const url = new URL(response.url());
+      const event = `response: ${response.status()} ${url.pathname}`;
+      if (response.status() === 501 && url.pathname === '/api/auth/me') {
+        return;
+      }
+
+      browserErrors.push(event);
     });
 
     const fulfillJson = (route, body) =>
@@ -127,6 +150,31 @@ async function capture() {
         recommendations: { STRONG_BUY: 1, BUY: 1, HOLD: 1, SELL: 1, STRONG_SELL: 1 },
         trends: { Bullish: 2, Neutral: 1, Bearish: 2 },
         riskProfile: { Low: 1, Medium: 3, High: 1 },
+      }),
+    );
+    await page.route(`**/api/history/runs/${demoDate}/projections`, (route) =>
+      fulfillJson(route, {
+        date: demoDate,
+        totalProjections: demoStocks.length,
+        projections: demoStocks.map((stock) => ({
+          symbol: stock.symbol,
+          name: stock.name,
+          recommendation: stock.recommendation,
+          confidence: stock.confidence,
+          expectedChange: stock.expectedChange,
+          currentPrice: stock.price,
+          targetPrice: stock.targetPrice,
+          risk: stock.risk,
+          reason: 'Representative sample',
+        })),
+      }),
+    );
+    await page.route('**/api/summary', (route) =>
+      fulfillJson(route, {
+        summary:
+          'Market breadth was balanced. Apple led the opportunity set while risk remained visible across the watchlist.',
+        date: demoDate,
+        source: 'demo',
       }),
     );
     await page.route('**/api/market/movers**', (route) => {
@@ -230,14 +278,20 @@ async function capture() {
     );
 
     await page.goto(baseURL, { waitUntil: 'networkidle' });
-    await page.getByText('Stocks Tracked').waitFor({ timeout: 30_000 });
+    await page.getByText('Stocks covered').waitFor({ timeout: 30_000 });
     await page.waitForTimeout(2_000);
     await page.screenshot({
       path: path.join(outputDir, 'markethelm-dashboard.png'),
       fullPage: true,
     });
 
-    await page.goto(`${baseURL}/alerts`, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await page.locator('html:not(.dark)').waitFor({ timeout: 5_000 });
+    await page.getByRole('button', { name: 'Toggle theme' }).click();
+    await page.locator('html.dark').waitFor({ timeout: 5_000 });
+
+    await page.getByRole('link', { name: 'Helmtower' }).click();
+    await page.waitForURL('**/alerts');
     await page.getByText('Price alerts').waitFor({ timeout: 30_000 });
     await page.getByText('Notify me when').waitFor({ timeout: 15_000 });
     await page.addStyleTag({
@@ -246,8 +300,8 @@ async function capture() {
         .alerts-page header ul { display: none !important; }
       `,
     });
-    await page.getByRole('button', { name: 'Company' }).click();
-    const search = page.getByPlaceholder(/Search Apple/);
+    await page.getByRole('button', { name: 'Open company list' }).click();
+    const search = page.getByRole('combobox', { name: 'Company' });
     await search.fill('Apple');
     await page.locator('[data-symbol="AAPL"]').waitFor({ timeout: 15_000 });
     await page.waitForTimeout(300);
@@ -255,6 +309,10 @@ async function capture() {
       path: path.join(outputDir, 'markethelm-alerts.png'),
       fullPage: true,
     });
+
+    if (browserErrors.length > 0) {
+      throw new Error(`Browser errors detected:\n${browserErrors.join('\n')}`);
+    }
   } finally {
     await browser?.close();
   }

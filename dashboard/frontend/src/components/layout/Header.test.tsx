@@ -127,7 +127,7 @@ describe('Header refresh controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect((await screen.findByRole('alert')).textContent).toBe(
-      'Sign out failed. Your session is still active; please try again.',
+      'Sign out failed. You are still signed in; please try again.',
     );
     expect(screen.getByText('user@example.com')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();

@@ -1009,6 +1009,57 @@ class TestMarketAPIErrors:
 class TestHistorySummaryAPI:
     """Historical projections summary endpoint."""
 
+    def test_run_projections_returns_saved_rows_for_requested_date(
+        self, client, temp_data_dir
+    ):
+        seed_projections(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {
+                    "symbol": "AAPL",
+                    "name": "Apple Inc.",
+                    "current_price": 100.0,
+                    "target_mid": 105.0,
+                    "target_low": 102.0,
+                    "target_high": 108.0,
+                    "confidence": 75.0,
+                    "expected_change_percent": 5.0,
+                    "recommendation": "BUY",
+                    "risk_level": "Low",
+                    "reason": "Positive momentum",
+                },
+                {
+                    "symbol": "MSFT",
+                    "name": "Microsoft",
+                    "current_price": 200.0,
+                    "target_mid": 198.0,
+                    "confidence": float("nan"),
+                    "expected_change_percent": -1.0,
+                    "recommendation": "SELL",
+                },
+            ],
+        )
+
+        response = client.get("/api/history/runs/2026-01-15/projections")
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["date"] == "2026-01-15"
+        assert body["totalProjections"] == 2
+        assert {row["symbol"] for row in body["projections"]} == {"AAPL", "MSFT"}
+        apple = next(row for row in body["projections"] if row["symbol"] == "AAPL")
+        assert apple["targetPrice"] == 105.0
+        assert apple["targetLow"] == 102.0
+        assert apple["targetHigh"] == 108.0
+        assert apple["reason"] == "Positive momentum"
+        microsoft = next(row for row in body["projections"] if row["symbol"] == "MSFT")
+        assert microsoft["confidence"] is None
+
+    def test_run_projections_missing_or_invalid_date(self, client):
+        assert client.get("/api/history/runs/2026-01-14/projections").status_code == 404
+        assert client.get("/api/history/runs/not-a-date/projections").status_code == 422
+
     def test_history_summary_coerces_all_nan_means(
         self, client, mock_data_loader, temp_data_dir
     ):
@@ -1360,6 +1411,41 @@ class TestHistorySummaryAPI:
         assert data["type"] == "STRONG_BUY"
         assert data["count"] == 0
         assert data["opportunities"] == []
+
+    def test_opportunities_empty_when_requested_bucket_has_no_matches(self, temp_data_dir):
+        """A valid but empty recommendation bucket must return 200, not 500."""
+        import dashboard.backend.api.projections
+
+        mock_loader = MagicMock()
+        mock_loader.get_latest_date.return_value = "2026-01-15"
+        mock_loader.load_projections.return_value = pd.DataFrame(
+            {
+                "symbol": ["AAPL"],
+                "recommendation": ["HOLD"],
+                "confidence": [80.0],
+            }
+        )
+        mock_loader.load_daily_data.return_value = pd.DataFrame(
+            {"symbol": ["AAPL"], "close": [150.0], "volume": [1_000_000]}
+        )
+        with patch.object(
+            dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
+        ):
+            from fastapi.testclient import TestClient
+            from dashboard.backend.main import app
+
+            client = TestClient(app)
+            r = client.get(
+                "/api/projections/opportunities",
+                params={"type": "STRONG_BUY", "limit": 5},
+            )
+
+        assert r.status_code == 200
+        assert r.json() == {
+            "type": "STRONG_BUY",
+            "count": 0,
+            "opportunities": [],
+        }
 
     def test_projections_summary_coerces_all_nan_means(self, temp_data_dir):
         """All-NaN confidence/expected change must yield finite 0.0, not null JSON."""

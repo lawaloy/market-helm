@@ -9,6 +9,8 @@ export interface IndexData {
 
 export interface MarketOverview {
   date: string;
+  quoteTimeStart?: string | null;
+  quoteTimeEnd?: string | null;
   totalStocks: number;
   gainers: number;
   losers: number;
@@ -26,6 +28,13 @@ export interface StockMover {
   change: number;
   changePercent: number;
   volume: number;
+  quoteTimestamp?: string | null;
+}
+
+export interface QuoteMeta {
+  source: 'saved' | 'lookup';
+  as_of: string | null;
+  retrieved_at?: string | null;
 }
 
 export interface MoversResponse {
@@ -138,6 +147,26 @@ export interface HistoricalSummaryResponse {
   lastDate: string;
   symbols?: string[];
   names?: Record<string, string>;
+}
+
+export interface RunProjection {
+  symbol: string;
+  name: string;
+  recommendation: string;
+  confidence: number | null;
+  expectedChange: number | null;
+  currentPrice: number | null;
+  targetPrice: number | null;
+  targetLow: number | null;
+  targetHigh: number | null;
+  risk: string;
+  reason: string;
+}
+
+export interface RunProjectionsResponse {
+  date: string;
+  totalProjections: number;
+  projections: RunProjection[];
 }
 
 export interface AccuracyAggregate {

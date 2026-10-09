@@ -1,7 +1,7 @@
 # Smoke-test the built SPA + API like production, and leave a PR comment with results.
 #
-# Screenshots: always in workflow Artifacts. Optional best-effort inline images via transfer.sh
-# (ephemeral; may fail). GitHub does not allow embedding private artifact URLs in comments.
+# Screenshots stay in workflow artifacts; the PR comment links to the run.
+# Avoid uploading captured pages to third-party hosts or delaying CI on their availability.
 
 name: PR E2E
 
@@ -110,29 +110,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      - name: Build sticky PR comment (artifacts + optional hosted images)
+      - name: Build sticky PR comment (artifacts)
         if: always() && github.event.pull_request.head.repo.full_name == github.repository
         run: |
           set +e
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-
-          host_png() {
-            local f="$1"
-            local base u
-            base=$(basename "$f")
-            u=$(curl -fsS --connect-timeout 20 --max-time 90 --upload-file "$f" "https://transfer.sh/$base" | tr -d '\r\n')
-            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
-              echo "$u"
-              return 0
-            fi
-            u=$(curl -fsS --connect-timeout 20 --max-time 90 -F "file=@${f}" "https://0x0.st" | tr -d '\r\n')
-            if [ -n "$u" ] && echo "$u" | grep -qE '^https?://'; then
-              echo "$u"
-              return 0
-            fi
-            echo ""
-            return 1
-          }
 
           {
             echo "## E2E smoke (curl + Playwright)"
@@ -147,33 +129,6 @@ jobs:
             echo "_PNGs:_ workflow run → Artifacts → **e2e-test-results** (unzip the archive)."
             echo "_Playwright HTML report:_ workflow run → Artifacts → **playwright-report**."
             echo ""
-            echo "### Inline preview"
-            echo ""
-            if [ ! -d e2e/test-results ]; then
-              echo "_No PNG files under \`e2e/test-results\` (run may have failed before capture)._"
-            else
-              mapfile -d '' -t PNGS < <(find e2e/test-results -type f -name '*.png' -print0 | sort -z)
-              if [ "${#PNGS[@]}" -eq 0 ]; then
-                echo "_No PNG files found._"
-              else
-                any_inline=0
-                for f in "${PNGS[@]}"; do
-                  base=$(basename "$f")
-                  url=$(host_png "$f")
-                  if [ -n "$url" ]; then
-                    any_inline=1
-                    printf '![%s](%s)\n\n' "$base" "$url"
-                  fi
-                done
-                if [ "$any_inline" -eq 0 ]; then
-                  echo "Open the artifact above to review screenshots — PNGs include:"
-                  echo ""
-                  for abs in "${PNGS[@]}"; do
-                    echo "- \`$(basename "$abs")\`"
-                  done
-                fi
-              fi
-            fi
           } > e2e/pr-comment.md
 
       - name: Comment on PR with results

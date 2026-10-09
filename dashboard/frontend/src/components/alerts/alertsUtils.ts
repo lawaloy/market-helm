@@ -1,6 +1,6 @@
-import { getCompanyName } from '../../utils/formatters';
+import { formatQuoteAsOf, getCompanyName } from '../../utils/formatters';
 import { alertsApi, historyApi } from '../../services/api';
-import type { AlertRule, AlertsConfig, ChannelStatus } from '../../types';
+import type { AlertRule, AlertsConfig, ChannelStatus, QuoteMeta } from '../../types';
 
 export type SymbolOption = {
   value: string;
@@ -67,6 +67,18 @@ export function parseFinitePrice(raw: string): number | null {
 export function formatQuotePrice(value: number | undefined | null): string | null {
   if (value == null || !Number.isFinite(Number(value))) return null;
   return `$${formatPrice(value)}`;
+}
+
+export function quoteContext(meta: QuoteMeta | undefined): string {
+  if (!meta) return 'Quote time unavailable';
+  const asOf = formatQuoteAsOf(meta.as_of);
+  if (meta.source === 'saved')
+    return asOf ? `Saved price as of ${asOf}` : 'Saved price; time unavailable';
+  if (asOf) return `Quote as of ${asOf}`;
+  const retrievedAt = formatQuoteAsOf(meta.retrieved_at);
+  return retrievedAt
+    ? `Looked up ${retrievedAt}; market quote time unavailable`
+    : 'Price returned by market-data lookup; quote time unavailable';
 }
 
 export function formatCondition(rule: AlertRule): string {
@@ -292,40 +304,37 @@ export function parseSymbolCatalog(data: unknown): SymbolOption[] | null {
 export async function loadSymbolCatalog(): Promise<{
   options: SymbolOption[];
   prices: Record<string, number>;
+  quoteMeta: Record<string, QuoteMeta>;
 }> {
   let best: SymbolOption[] = [];
   let prices: Record<string, number> = {};
+  let quoteMeta: Record<string, QuoteMeta> = {};
 
   const consider = (data: unknown) => {
     const options = parseSymbolCatalog(data);
     if (!options) return;
     if (options.length > best.length) best = options;
     if (data && typeof data === 'object' && data !== null && 'prices' in data) {
-      const payload = data as { prices?: Record<string, number> };
+      const payload = data as {
+        prices?: Record<string, number>;
+        quote_meta?: Record<string, QuoteMeta>;
+      };
       if (payload.prices) prices = { ...prices, ...payload.prices };
+      if (payload.quote_meta) quoteMeta = { ...quoteMeta, ...payload.quote_meta };
     }
   };
 
-  try {
-    consider((await alertsApi.getSymbols()).data);
-  } catch {
-    // stale backend
+  const sources = await Promise.allSettled([
+    alertsApi.getSymbols().then((response) => response.data),
+    historyApi.getSymbols().then((response) => response.data),
+    fetch('/symbols-catalog.json').then(async (response) => (response.ok ? response.json() : null)),
+  ]);
+
+  for (const source of sources) {
+    if (source.status === 'fulfilled') consider(source.value);
   }
 
-  try {
-    consider((await historyApi.getSymbols()).data);
-  } catch {
-    // ignore
-  }
-
-  try {
-    const res = await fetch('/symbols-catalog.json');
-    if (res.ok) consider(await res.json());
-  } catch {
-    // ignore
-  }
-
-  if (best.length > 0) return { options: best, prices };
+  if (best.length > 0) return { options: best, prices, quoteMeta };
   throw new Error('Company list unavailable');
 }
 

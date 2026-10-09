@@ -328,3 +328,62 @@ def list_market_bar_dates(
             (limit_n,),
         ).fetchall()
     return [str(row["trade_date"]) for row in rows]
+
+
+def latest_saved_quotes(
+    *,
+    data_dir: Optional[str | Path] = None,
+    snapshot_limit: int = 7,
+) -> Dict[str, Dict[str, Any]]:
+    """Newest recorded quote per symbol from recent snapshots.
+
+    Fetches can run on a weekend while Finnhub's quote still belongs to the
+    preceding market session. Rank by the provider timestamp, not the storage
+    date, and retain that timestamp so clients never present a saved quote as
+    a live price. Limit the scan so abandoned symbols do not linger forever.
+    """
+    with market_bars_connection(data_dir=data_dir) as conn:
+        ensure_market_bars_schema(conn)
+        rows = conn.execute(
+            """
+            SELECT trade_date, symbol, close, quote_timestamp, written_at
+            FROM market_bars
+            WHERE trade_date IN (
+                SELECT DISTINCT trade_date FROM market_bars
+                ORDER BY trade_date DESC LIMIT ?
+            )
+            ORDER BY trade_date DESC
+            """,
+            (snapshot_limit,),
+        ).fetchall()
+
+    newest: Dict[str, Dict[str, Any]] = {}
+    ranks: Dict[str, tuple[int, datetime, str, str]] = {}
+    for row in rows:
+        symbol = normalize_ticker(row["symbol"])
+        price = _finite_or_none(row["close"])
+        if not symbol or price is None:
+            continue
+        trade_date = str(row["trade_date"])
+        quote_time = _optional_text(row["quote_timestamp"])
+        try:
+            quote_at = (
+                datetime.fromisoformat(quote_time.replace("Z", "+00:00"))
+                if quote_time
+                else None
+            )
+            if quote_at is not None and quote_at.tzinfo is not None:
+                quote_at = quote_at.astimezone(timezone.utc)
+        except ValueError:
+            quote_at = None
+        has_provider_time = quote_at is not None and quote_at.tzinfo is not None
+        if not has_provider_time:
+            quote_time = None
+            quote_at = datetime.fromisoformat(trade_date).replace(tzinfo=timezone.utc)
+        written_at = _optional_text(row["written_at"]) or ""
+        rank = (1 if has_provider_time else 0, quote_at, trade_date, written_at)
+        if symbol in ranks and rank <= ranks[symbol]:
+            continue
+        ranks[symbol] = rank
+        newest[symbol] = {"price": price, "as_of": quote_time or trade_date}
+    return newest

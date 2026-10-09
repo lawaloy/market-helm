@@ -183,28 +183,28 @@ const Header: React.FC<HeaderProps> = ({
     try {
       await logout();
     } catch {
-      setLogoutError('Sign out failed. Your session is still active; please try again.');
+      setLogoutError('Sign out failed. You are still signed in; please try again.');
     } finally {
       setIsLoggingOut(false);
     }
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700 sticky top-0 z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">📊 MarketHelm</h1>
+    <header className="sticky top-0 z-20 h-20 border-b border-slate-300 bg-[#f3f6f9]/95 backdrop-blur dark:border-[#223248] dark:bg-[#0b1725]/95">
+      <div className="h-full px-4 sm:px-6 xl:px-8">
+        <div className="flex h-full items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3 lg:gap-4">
+            <h1 className="sr-only">MarketHelm</h1>
             {dataDate && (
-              <div className="text-sm text-slate-600 dark:text-slate-400">
-                <span className="font-medium">Data from:</span>{' '}
-                <span className="font-semibold">{dataDate}</span>
+              <div className="hidden text-xs text-slate-600 xl:block dark:text-slate-400">
+                <span className="font-semibold uppercase tracking-[0.14em]">Market data</span>{' '}
+                <span className="text-slate-700 dark:text-slate-200">· {dataDate}</span>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
             <div
-              className={`text-sm text-slate-600 dark:text-slate-400 max-w-xs truncate transition-opacity duration-200 ${
+              className={`hidden max-w-xs truncate text-xs text-slate-600 transition-opacity duration-200 md:block dark:text-slate-400 ${
                 refreshMessage || backgroundFetching ? 'opacity-100' : 'opacity-0'
               }`}
             >
@@ -212,29 +212,29 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             <button
               onClick={handleQuickRefresh}
-              className="flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium bg-green-500 text-white hover:bg-green-600 transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-[#31435b] dark:bg-[#101f30] dark:text-slate-200 dark:hover:border-[#455c78] dark:hover:bg-[#15283d]"
               title="Reload data from files (instant)"
             >
-              <ArrowPathIcon className="h-5 w-5" />
-              <span>Reload</span>
+              <ArrowPathIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Reload</span>
             </button>
             <button
               onClick={handleFullRefresh}
               disabled={isRefreshing}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition ${
                 isRefreshing
-                  ? 'bg-slate-300 text-slate-600 cursor-not-allowed dark:bg-slate-600 dark:text-slate-400'
-                  : 'bg-blue-500 text-white hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700'
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-[#1b2a3c] dark:text-slate-500'
+                  : 'bg-emerald-500 text-[#06140f] shadow-[0_8px_24px_rgba(16,185,129,0.16)] hover:bg-emerald-400'
               }`}
               title="Reload saved data instantly and fetch fresh data in background"
             >
-              <ArrowPathIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>{isRefreshing ? 'Fetching...' : 'Fetch New'}</span>
+              <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">{isRefreshing ? 'Fetching...' : 'Fetch New'}</span>
             </button>
             {isRefreshing && (
               <button
                 onClick={handleCancelRefresh}
-                className="flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                className="inline-flex items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-500/20 dark:text-red-300"
                 title="Cancel the current refresh job"
               >
                 <span>Cancel</span>
@@ -242,7 +242,7 @@ const Header: React.FC<HeaderProps> = ({
             )}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-md text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-[#15283d] dark:hover:text-white"
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
               aria-label="Toggle theme"
             >

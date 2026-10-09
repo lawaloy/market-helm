@@ -1,6 +1,7 @@
 import { BellAlertIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import { CompanySymbolPicker } from './CompanySymbolPicker';
-import { formatPrice, formatQuotePrice, type SymbolOption } from './alertsUtils';
+import { formatPrice, formatQuotePrice, quoteContext, type SymbolOption } from './alertsUtils';
+import type { QuoteMeta } from '../../types';
 
 export type ComposerMode = 'price' | 'rsi' | 'price_and_rsi';
 
@@ -15,8 +16,11 @@ export function AlertComposer({
   symbolOptions,
   symbolsLoading,
   prices,
+  quoteMeta,
   pendingPrices,
+  attemptedPrices,
   onFetchPrices,
+  onRetryPrice,
   quotesUnavailable = false,
   apiReady = true,
   onSymbolChange,
@@ -48,8 +52,11 @@ export function AlertComposer({
   submitting?: boolean;
   canActivate?: boolean;
   prices: Record<string, number>;
+  quoteMeta?: Record<string, QuoteMeta>;
   pendingPrices?: Set<string>;
+  attemptedPrices?: Set<string>;
   onFetchPrices?: (symbols: string[]) => void;
+  onRetryPrice?: (symbol: string) => void;
   quotesUnavailable?: boolean;
   apiReady?: boolean;
 }) {
@@ -66,6 +73,7 @@ export function AlertComposer({
   const previewVerb = newOperator === 'greater_than' ? 'rises above' : 'falls below';
   const previewRsiVerb = newRsiOperator === 'greater_than' ? 'rises above' : 'falls below';
   const currentPrice = formatQuotePrice(prices[newSymbol.trim().toUpperCase()]);
+  const currentQuoteMeta = quoteMeta?.[newSymbol.trim().toUpperCase()];
   const needsPrice = mode === 'price' || mode === 'price_and_rsi';
   const needsRsi = mode === 'rsi' || mode === 'price_and_rsi';
   const canSubmit =
@@ -80,7 +88,7 @@ export function AlertComposer({
       {headline && (
         <div className="mb-4 flex items-center gap-2">
           <SparklesIcon className="h-4 w-4 text-teal-500" />
-          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-teal-600 dark:text-teal-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.15em] text-teal-800 dark:text-teal-400">
             {headline}
           </p>
         </div>
@@ -99,7 +107,7 @@ export function AlertComposer({
             onClick={() => onModeChange(value)}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
               mode === value
-                ? 'bg-teal-600 text-white shadow-sm'
+                ? 'bg-teal-700 text-white shadow-sm'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
             }`}
           >
@@ -108,7 +116,7 @@ export function AlertComposer({
         ))}
       </div>
       <div className="flex flex-nowrap items-center gap-x-2 overflow-x-auto text-base leading-relaxed text-slate-600 dark:text-slate-300">
-        <span className="shrink-0 whitespace-nowrap font-medium text-slate-500 dark:text-slate-400">
+        <span className="shrink-0 whitespace-nowrap font-medium text-slate-600 dark:text-slate-400">
           Notify me when
         </span>
         <CompanySymbolPicker
@@ -117,7 +125,9 @@ export function AlertComposer({
           options={symbolOptions}
           loading={symbolsLoading}
           prices={prices}
+          quoteMeta={quoteMeta}
           pendingPrices={pendingPrices}
+          attemptedPrices={attemptedPrices}
           onFetchPrices={onFetchPrices}
           quotesUnavailable={quotesUnavailable}
           apiReady={apiReady}
@@ -133,7 +143,7 @@ export function AlertComposer({
               <option value="less_than">falls below</option>
               <option value="greater_than">rises above</option>
             </select>
-            <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-slate-500 dark:text-slate-400">
+            <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-slate-600 dark:text-slate-400">
               $
               <input
                 type="number"
@@ -149,9 +159,11 @@ export function AlertComposer({
         {needsRsi ? (
           <>
             {needsPrice ? (
-              <span className="shrink-0 font-medium text-slate-400">and RSI(14)</span>
+              <span className="shrink-0 font-medium text-slate-600 dark:text-slate-400">
+                and RSI(14)
+              </span>
             ) : (
-              <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">
+              <span className="shrink-0 font-medium text-slate-600 dark:text-slate-400">
                 RSI(14)
               </span>
             )}
@@ -175,7 +187,7 @@ export function AlertComposer({
           </>
         ) : null}
       </div>
-      <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-3 text-sm text-slate-600 dark:text-slate-400">
         You&apos;ll be informed when{' '}
         <span className="font-semibold text-slate-700 dark:text-slate-200">{previewName}</span>{' '}
         {needsPrice ? (
@@ -195,19 +207,30 @@ export function AlertComposer({
             </span>
           </>
         ) : null}
-        {currentPrice ? (
-          <>
-            {' '}
-            <span className="text-slate-400">· now {currentPrice}</span>
-          </>
-        ) : null}
       </p>
-      {needsRsi ? (
-        <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
-          RSI(14) needs 15 daily closes. We pull those from Finnhub when an API key is configured;
-          otherwise we fall back to saved daily history.
+      {currentPrice && (
+        <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+          Reference price {currentPrice} · {quoteContext(currentQuoteMeta)}.{' '}
+          {currentQuoteMeta?.source === 'saved' ? 'Not live.' : 'Not guaranteed real-time.'}
         </p>
-      ) : null}
+      )}
+      {!currentPrice &&
+        !symbolsLoading &&
+        (attemptedPrices?.has(newSymbol.toUpperCase()) || quotesUnavailable) && (
+          <p role="status" className="mt-1 text-xs text-amber-800 dark:text-amber-300">
+            No saved or live price is available for {newSymbol}. The watch can be set, but price
+            checks need a future quote.
+            {!quotesUnavailable && onRetryPrice && (
+              <button
+                type="button"
+                onClick={() => onRetryPrice(newSymbol)}
+                className="ml-2 rounded px-1 font-bold text-teal-700 hover:bg-teal-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-300"
+              >
+                Try price again
+              </button>
+            )}
+          </p>
+        )}
       <button
         type="button"
         onClick={onSubmit}
