@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/assets/readme/markethelm-mark.png" alt="MarketHelm ship's helm and market chart logo" width="180">
   <h1>MarketHelm</h1>
-  <p><strong>Stock-market monitoring, projections, and alerts—from CLI to web dashboard.</strong></p>
+  <p><strong>Stock-market monitoring, projections, and alertsÃ¢â‚¬â€from CLI to web dashboard.</strong></p>
   <p>
     <a href="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml"><img src="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml/badge.svg?branch=main" alt="CI status"></a>
     <a href="https://pypi.org/project/market-helm/"><img src="https://img.shields.io/pypi/v/market-helm?logo=pypi&logoColor=white" alt="PyPI version"></a>
@@ -10,9 +10,9 @@
     <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="Pull requests welcome"></a>
   </p>
   <p>
-    <a href="#quick-start">Quick start</a> ·
-    <a href="docs/README.md">Documentation</a> ·
-    <a href="docs/PROJECT_STATUS.md">Project status</a> ·
+    <a href="#quick-start">Quick start</a> Ã‚Â·
+    <a href="docs/README.md">Documentation</a> Ã‚Â·
+    <a href="docs/PROJECT_STATUS.md">Project status</a> Ã‚Â·
     <a href="CONTRIBUTING.md">Contributing</a>
   </p>
 </div>
@@ -27,25 +27,15 @@ the evidence-based feature matrix and current priorities.
 The dashboard turns saved market data into an at-a-glance view of movers,
 projection confidence, recommendations, risk, and potential opportunities.
 Helmtower lets operators create price, RSI, or combined watches and route
-notifications through the configured email, Discord, or Slack channels. Select an
-image to view it full size.
+notifications through the configured email, Discord, or Slack channels.
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <a href="docs/assets/readme/markethelm-dashboard.png"><img src="docs/assets/readme/markethelm-dashboard.png" alt="MarketHelm dashboard showing a market brief, biggest gainers and decliners, and market summary stats from sample data" width="440"></a>
-      <br><sub>Dashboard overview</sub>
-    </td>
-    <td align="center" width="50%">
-      <a href="docs/assets/readme/markethelm-alerts.png"><img src="docs/assets/readme/markethelm-alerts.png" alt="Helmtower alert composer showing an Apple price watch and saved quote" width="440"></a>
-      <br><sub>Helmtower alert setup</sub>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <a href="docs/assets/readme/markethelm-hero.png"><img src="docs/assets/readme/markethelm-hero.png" alt="MarketHelm dashboard with a market brief, biggest gainers and decliners, and a Helmtower price alert for Apple" width="900"></a>
+</p>
 
-Both images use deterministic sample data.
-Maintainers can regenerate these images from the seeded local application with
-`cd e2e && npm run capture:readme`.
+Select the image to view it full size.
+Maintainers can regenerate the dashboard and alerts captures that make up this image from the seeded local application with
+`cd e2e && npm run capture:readme`. The hero itself is composed from those captures by `scripts/compose_readme_hero.py` (see the docstring for the 2x capture command).
 
 ## What runs where?
 
