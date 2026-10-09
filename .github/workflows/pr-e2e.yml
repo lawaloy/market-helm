@@ -1,7 +1,7 @@
 # Smoke-test the built SPA + API like production, and leave a PR comment with results.
 #
-# Screenshots: always in workflow Artifacts. Optional best-effort inline images via transfer.sh
-# (ephemeral; may fail). GitHub does not allow embedding private artifact URLs in comments.
+# Screenshots stay in workflow artifacts; the PR comment links to the run.
+# Avoid uploading captured pages to third-party hosts or delaying CI on their availability.
 
 name: PR E2E
 
