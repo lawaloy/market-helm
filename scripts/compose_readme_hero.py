@@ -153,14 +153,6 @@ win = Image.new("RGB", (dw, dh + bar), (11, 22, 36))
 wd = ImageDraw.Draw(win)
 for i, c in enumerate([(255, 95, 87), (254, 188, 46), (40, 200, 64)]):
     wd.ellipse((S(18 + i * 22), S(13), S(30 + i * 22), S(25)), fill=c)
-fu = font(13, 500)
-url = "localhost:8000"
-uw = wd.textlength(url, font=fu)
-px0 = (dw - uw) / 2 - S(16)
-wd.rounded_rectangle(
-    (px0, S(8), px0 + uw + S(32), S(30)), S(11), fill=(19, 34, 52), outline=(40, 58, 80)
-)
-wd.text((px0 + S(16), S(11)), url, font=fu, fill=(125, 145, 168))
 win.paste(dash, (0, bar))
 wx, wy = S(90), S(272)
 box = (wx, wy, wx + dw, wy + dh + bar)
