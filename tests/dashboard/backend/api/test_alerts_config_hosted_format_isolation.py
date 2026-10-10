@@ -6,8 +6,8 @@ import pytest
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "hosted-format.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -62,14 +62,14 @@ def test_hosted_get_keeps_explicit_tenant_webhook_format(client, multi_user_env,
 
 
 def test_file_mode_get_still_surfaces_env_webhook_format(client, tmp_path, monkeypatch):
-    # GET reloads ~/.market-helm/.env with override; a leftover Discord format
+    # GET reloads ~/.markethelm/.env with override; a leftover Discord format
     # would beat process-wide ALERT_WEBHOOK_FORMAT=slack.
     user_dir = tmp_path / "user-config"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     config_path = tmp_path / "alerts.json"
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
 

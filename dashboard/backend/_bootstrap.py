@@ -5,8 +5,9 @@ Order matters and is preserved from the original ``main.py`` preamble:
 1. configure logging so import-time log records use the dashboard format;
 2. make the repo root importable when running from a source checkout (so ``src``
    and ``dashboard`` resolve, including ``python main.py`` inside ``backend/``);
-3. load ``.env`` files (cwd, repo root, then ``~/.market-helm/.env``) so modules that
-   read environment variables at import time see them.
+3. load ``.env`` files (cwd, repo root, then ``~/.markethelm/.env``, or the legacy
+   ``~/.market-helm/.env`` until it is migrated) so modules that read environment variables at
+   import time see them.
 """
 
 import logging
@@ -36,7 +37,11 @@ try:
         if (_p / "main.py").is_file() and (_p / ".env").is_file():
             load_dotenv(_p / ".env")
             break
-    _user_env = Path.home() / ".market-helm" / ".env"
+    # ~/.markethelm is canonical; fall back to the pre-rename ~/.market-helm until it is migrated.
+    _user_dir = Path.home() / ".markethelm"
+    if not _user_dir.exists() and (Path.home() / ".market-helm").exists():
+        _user_dir = Path.home() / ".market-helm"
+    _user_env = _user_dir / ".env"
     if _user_env.is_file():
         load_dotenv(_user_env, override=True)
 except ImportError:

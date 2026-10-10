@@ -25,7 +25,7 @@ def test_default_data_dir_uses_user_config_when_installed_in_site_packages(monke
     )
     fake_module.parent.mkdir(parents=True)
     fake_module.write_text("# stub\n", encoding="utf-8")
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     user_dir.mkdir()
 
     monkeypatch.setattr(data_loader, "__file__", str(fake_module))

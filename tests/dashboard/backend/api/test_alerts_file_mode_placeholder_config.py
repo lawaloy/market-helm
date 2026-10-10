@@ -21,19 +21,19 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def file_mode(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
-    # Do not load host ~/.market-helm/.env into channel status.
+    # Do not load host ~/.markethelm/.env into channel status.
     monkeypatch.setattr("dashboard.backend.api.alerts._load_env", lambda: None)
-    user_dir = tmp_path / "market-helm"
+    user_dir = tmp_path / "markethelm"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     config_path = user_dir / "alerts.json"
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     return config_path
 
 

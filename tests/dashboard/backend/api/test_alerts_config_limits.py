@@ -17,8 +17,8 @@ def client():
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "config-limits.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -27,8 +27,8 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def file_mode(tmp_path, monkeypatch):
     config_path = tmp_path / "alerts.json"
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     return config_path
 
 

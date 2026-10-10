@@ -9,7 +9,7 @@ from tests.helpers.market_bars import seed_daily_bars, seed_projections
 
 
 def test_backtest_cli_writes_strict_json_report(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     seed_daily_bars(data_dir, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])

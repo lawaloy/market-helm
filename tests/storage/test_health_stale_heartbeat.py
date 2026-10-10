@@ -12,7 +12,7 @@ from src.storage.health import record_worker_heartbeat
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     path = tmp_path / "stale-heartbeat.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
     # Pin the worker interval so the HTTP probe's stale window is deterministic:
     # stale_after = interval * 2 + 30 = 150s.
     monkeypatch.setenv("ALERT_CHECK_INTERVAL_SECONDS", "60")

@@ -20,11 +20,11 @@ def test_register_with_bad_auth_secret_leaves_no_user(
 ) -> None:
     """Bad AUTH_SECRET previously created the row then 500'd on token signing."""
     db_path = tmp_path / "register-atomic.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     if secret is None:
-        monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+        monkeypatch.delenv("MARKETHELM_AUTH_SECRET", raising=False)
     else:
-        monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", secret)
+        monkeypatch.setenv("MARKETHELM_AUTH_SECRET", secret)
     from src.storage.database import get_connection, init_database
 
     init_database()
@@ -35,7 +35,7 @@ def test_register_with_bad_auth_secret_leaves_no_user(
         json={"email": email, "password": "password123"},
     )
     assert r.status_code == 500
-    assert "MARKET_HELM_AUTH_SECRET" in r.json()["detail"]
+    assert "MARKETHELM_AUTH_SECRET" in r.json()["detail"]
 
     with get_connection() as conn:
         row = conn.execute(
@@ -48,8 +48,8 @@ def test_register_with_bad_auth_secret_leaves_no_user(
 def test_register_succeeds_after_fixing_auth_secret(client, tmp_path, monkeypatch) -> None:
     """Retry must succeed once AUTH_SECRET is configured (no stuck orphan)."""
     db_path = tmp_path / "register-retry.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.delenv("MARKETHELM_AUTH_SECRET", raising=False)
     from src.storage.database import init_database
 
     init_database()
@@ -61,7 +61,7 @@ def test_register_succeeds_after_fixing_auth_secret(client, tmp_path, monkeypatc
     )
     assert failed.status_code == 500
 
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     ok = client.post(
         "/api/auth/register",
         json={"email": email, "password": "password123"},

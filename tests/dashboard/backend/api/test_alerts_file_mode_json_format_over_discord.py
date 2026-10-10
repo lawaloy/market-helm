@@ -23,16 +23,16 @@ DISCORD_URL = "https://discord.com/api/webhooks/local/token"
 
 @pytest.fixture
 def file_mode(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("ALERT_EMAIL_TO", raising=False)
-    user_dir = tmp_path / "market-helm"
+    user_dir = tmp_path / "markethelm"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     # GET reloads user dotenv; keep process env from being overwritten by host files.
     monkeypatch.setattr("dashboard.backend.api.alerts._load_env", lambda: None)
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(user_dir / "alerts.json"))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(user_dir / "alerts.json"))
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", " JSON ")
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", DISCORD_URL)
     return user_dir

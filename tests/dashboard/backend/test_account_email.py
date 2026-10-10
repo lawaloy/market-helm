@@ -36,7 +36,7 @@ def configured_backend(monkeypatch):
     ],
 )
 def test_unsafe_public_url_does_not_send(configured_backend, monkeypatch, public_url):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", public_url)
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", public_url)
     sent = send_account_email(
         recipient="user@example.com",
         purpose="reset_password",
@@ -47,7 +47,7 @@ def test_unsafe_public_url_does_not_send(configured_backend, monkeypatch, public
 
 
 def test_https_public_url_embeds_verify_link(configured_backend, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
     sent = send_account_email(
         recipient="user@example.com",
         purpose="verify_email",
@@ -62,7 +62,7 @@ def test_https_public_url_embeds_verify_link(configured_backend, monkeypatch):
 
 
 def test_localhost_http_embeds_reset_link(configured_backend, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "http://127.0.0.1:3000")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "http://127.0.0.1:3000")
     sent = send_account_email(
         recipient="user@example.com",
         purpose="reset_password",
@@ -75,7 +75,7 @@ def test_localhost_http_embeds_reset_link(configured_backend, monkeypatch):
 
 
 def test_missing_from_address_does_not_send(configured_backend, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
     monkeypatch.setattr(
         "dashboard.backend.account_email._platform_from_address",
         lambda: None,
@@ -92,7 +92,7 @@ def test_missing_from_address_does_not_send(configured_backend, monkeypatch):
 
 
 def test_localhost_hostname_public_url_embeds_verify_link(configured_backend, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "http://localhost:3000")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "http://localhost:3000")
     sent = send_account_email(
         recipient="user@example.com",
         purpose="verify_email",
@@ -104,7 +104,7 @@ def test_localhost_hostname_public_url_embeds_verify_link(configured_backend, mo
 
 
 def test_missing_backend_does_not_send(monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
     monkeypatch.setattr(
         "dashboard.backend.account_email.build_email_backend",
         lambda _cfg: None,

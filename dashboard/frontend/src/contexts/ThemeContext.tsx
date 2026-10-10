@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { migrateLegacyStorageKey } from '../utils/legacyStorage';
 
 type Theme = 'light' | 'dark';
 
@@ -9,9 +10,10 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'market-helm-theme';
+const STORAGE_KEY = 'markethelm-theme';
 
 function readStoredTheme(): Theme | null {
+  migrateLegacyStorageKey(STORAGE_KEY, 'market-helm-theme');
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === 'dark' || stored === 'light') return stored;

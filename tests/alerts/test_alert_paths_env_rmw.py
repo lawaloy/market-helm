@@ -12,7 +12,7 @@ from src.alerts.alert_paths import update_user_env_vars
 
 def test_concurrent_update_user_env_vars_preserves_all_keys(tmp_path: Path, monkeypatch) -> None:
     """Two racing updates for distinct keys keep both after unlock."""
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     env_file.write_text("SHARED_KEEP=1\n", encoding="utf-8")
@@ -45,7 +45,7 @@ def test_concurrent_update_user_env_vars_preserves_all_keys(tmp_path: Path, monk
 
 
 def test_update_user_env_vars_atomic_replace_leaves_no_tmp(tmp_path: Path, monkeypatch) -> None:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     env_file.write_text("ALERT_EMAIL_TO=old@example.com\n", encoding="utf-8")
@@ -59,7 +59,7 @@ def test_update_user_env_vars_atomic_replace_leaves_no_tmp(tmp_path: Path, monke
 
 
 def test_update_user_env_vars_retries_transient_replace_lock(tmp_path: Path, monkeypatch) -> None:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
     real_replace = os.replace

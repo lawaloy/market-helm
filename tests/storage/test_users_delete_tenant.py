@@ -26,7 +26,7 @@ from src.storage.users import (
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "account-delete-tenant.db"
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{db_path.as_posix()}",
     )
     init_database()

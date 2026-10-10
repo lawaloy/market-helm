@@ -103,7 +103,7 @@ def test_assert_projection_date_script_reports_missing(tmp_path: Path) -> None:
 
 
 def test_assert_market_bar_date_script_succeeds_when_present(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     from src.storage.market_bars import upsert_market_bars
 
     upsert_market_bars(
@@ -116,7 +116,7 @@ def test_assert_market_bar_date_script_succeeds_when_present(tmp_path: Path, mon
 
 
 def test_assert_projection_date_script_succeeds_when_present(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     from src.storage.projections_store import upsert_projections
 
     upsert_projections(
@@ -132,7 +132,7 @@ def test_assert_market_bar_date_fails_when_present_outside_limit(
     tmp_path: Path, monkeypatch
 ) -> None:
     """CI --limit is a newest-first window, not a full-store membership check."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     from src.storage.market_bars import upsert_market_bars
 
     upsert_market_bars(
@@ -177,7 +177,7 @@ def test_assert_market_bar_date_fails_when_present_outside_limit(
 def test_assert_projection_date_fails_when_present_outside_limit(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     from src.storage.projections_store import upsert_projections
 
     upsert_projections(

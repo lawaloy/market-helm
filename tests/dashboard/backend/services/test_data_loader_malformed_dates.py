@@ -13,7 +13,7 @@ from tests.helpers.market_bars import seed_simple_bars
 
 @pytest.fixture
 def data_dir(tmp_path: Path, monkeypatch) -> Path:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     return tmp_path
 
 

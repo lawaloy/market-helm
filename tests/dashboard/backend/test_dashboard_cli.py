@@ -1,4 +1,4 @@
-"""Tests for the market-helm-web console entrypoint."""
+"""Tests for the markethelm-web console entrypoint."""
 
 from unittest.mock import patch
 

@@ -67,7 +67,7 @@ def test_missing_target_close_does_not_roll_forward():
 
 
 def test_data_dir_loader_reads_market_bars(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-07-02", [{"symbol": "AAPL", "close": 100.0}])
     seed_daily_bars(tmp_path, "2026-07-10", [{"symbol": "AAPL", "close": 108.0}])
     seed_projections(tmp_path, "2026-07-02", [_projection()])
@@ -84,7 +84,7 @@ def test_data_dir_loader_reads_market_bars(tmp_path, monkeypatch):
 
 
 def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(
         tmp_path,
         "2026-07-12",
@@ -115,7 +115,7 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path, mo
 
 
 def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(
         tmp_path,
         "2026-07-10",
@@ -151,7 +151,7 @@ def test_timezone_aware_generation_time_controls_exact_target_session():
 
 
 def test_projection_only_archive_preserves_counts(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     # Empty-symbol rows are rejected by the store; seed an invalid target instead.
     seed_projections(
         tmp_path,

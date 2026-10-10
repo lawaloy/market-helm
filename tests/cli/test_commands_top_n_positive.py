@@ -7,7 +7,7 @@ import pytest
 
 @pytest.mark.parametrize("value", ["0", "-1", "-50"])
 def test_main_rejects_non_positive_top_n(value, monkeypatch):
-    monkeypatch.setattr("sys.argv", ["market-helm", "--top-n", value])
+    monkeypatch.setattr("sys.argv", ["markethelm", "--top-n", value])
 
     with patch("src.cli.commands.StockTrackerWorkflow") as ctor:
         with patch("src.cli.commands.display_results"):
@@ -21,7 +21,7 @@ def test_main_rejects_non_positive_top_n(value, monkeypatch):
 
 
 def test_main_accepts_positive_top_n(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["market-helm", "--top-n", "7"])
+    monkeypatch.setattr("sys.argv", ["markethelm", "--top-n", "7"])
     workflow = MagicMock()
     workflow.run.return_value = {"success": True, "analysis": {}, "metadata": {}}
 

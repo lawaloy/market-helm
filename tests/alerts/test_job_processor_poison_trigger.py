@@ -14,7 +14,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_users(tmp_path, monkeypatch):
     db_path = tmp_path / "poison-trigger.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     poison = create_user("poison-trigger@example.com", "password123")["id"]
     sibling = create_user("sibling-trigger@example.com", "password123")["id"]

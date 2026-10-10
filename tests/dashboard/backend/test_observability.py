@@ -10,7 +10,7 @@ from dashboard.backend.observability import ObservabilityMiddleware
 
 
 def test_liveness_readiness_and_metrics_file_mode(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     client = TestClient(app)
     live = client.get("/health/live", headers={"X-Request-ID": "probe-123"})
     assert live.status_code == 200
@@ -23,7 +23,7 @@ def test_liveness_readiness_and_metrics_file_mode(monkeypatch):
 
 def test_readiness_reports_database_schema(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'health.db').as_posix()}"
+        "MARKETHELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'health.db').as_posix()}"
     )
     from src.storage.database import LATEST_SCHEMA_VERSION, init_database
 

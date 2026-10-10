@@ -1,6 +1,6 @@
 """Explicit off aliases must not enable hosted email-verification gates.
 
-Deployments commonly set ``MARKET_HELM_REQUIRE_EMAIL_VERIFICATION`` to
+Deployments commonly set ``MARKETHELM_REQUIRE_EMAIL_VERIFICATION`` to
 ``0``/``false``/``no``/``off`` to disable the gate (Docker Compose, systemd).
 ``_verification_required`` is duplicated in ``dashboard.backend.auth``
 (require_user_id / GET /api/auth/me) and ``dashboard.backend.api.auth``
@@ -16,11 +16,11 @@ import pytest
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'verify-off-aliases.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
     from src.storage.database import init_database
 
     init_database()
@@ -33,7 +33,7 @@ def client(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("flag", ["0", "false", "no", "off"])
 def test_unverified_session_allowed_for_verification_env_off_aliases(client, monkeypatch, flag):
-    monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", flag)
+    monkeypatch.setenv("MARKETHELM_REQUIRE_EMAIL_VERIFICATION", flag)
     monkeypatch.setattr(
         "dashboard.backend.api.auth.send_account_email",
         lambda **_kwargs: True,

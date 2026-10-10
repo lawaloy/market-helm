@@ -17,7 +17,7 @@ from src.storage.market_bars import (
 @pytest.fixture
 def app_db(tmp_path, monkeypatch):
     db_path = tmp_path / "app.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return db_path
 
@@ -64,7 +64,7 @@ def test_upsert_replaces_same_trade_date_symbol(app_db):
 
 
 def test_sidecar_sqlite_when_database_disabled(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     written = upsert_market_bars(
@@ -79,7 +79,7 @@ def test_sidecar_sqlite_when_database_disabled(tmp_path, monkeypatch):
 
 
 def test_save_daily_data_writes_bars_not_csv(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     data_dir = tmp_path / "data"
     storage = DataStorage(data_dir=str(data_dir))
     location = storage.save_daily_data(
@@ -97,7 +97,7 @@ def test_save_daily_data_writes_bars_not_csv(tmp_path, monkeypatch):
 
 
 def test_save_daily_data_raises_when_no_valid_bars(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     storage = DataStorage(data_dir=str(tmp_path))
     with pytest.raises(ValueError, match="No valid market bars"):
         storage.save_daily_data([{"symbol": "AAPL", "close": float("nan")}])

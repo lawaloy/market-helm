@@ -9,7 +9,7 @@ def test_get_quotes_caps_symbols_before_resolving(monkeypatch):
     from dashboard.backend.main import app
 
     client = TestClient(app)
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
 
     captured = {}
 

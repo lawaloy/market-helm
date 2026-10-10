@@ -6,7 +6,7 @@ Usage (from repo root):
   python scripts/smoke_alerts_live.py --webhook-url https://hooks.slack.com/...
   python scripts/smoke_alerts_live.py --discord-webhook-url https://discord.com/api/webhooks/...
 
-Requires SMTP_* and ALERT_EMAIL_TO in .env or ~/.market-helm/.env for email.
+Requires SMTP_* and ALERT_EMAIL_TO in .env or ~/.markethelm/.env for email.
 Webhook defaults to https://httpbin.org/post when ALERT_WEBHOOK_URL is unset.
 Discord uses --discord-webhook-url or DISCORD_WEBHOOK_URL (falls back to httpbin).
 """
@@ -164,7 +164,7 @@ def main() -> int:
         include_email=include_email,
         discord_webhook_url=None if args.skip_webhook else args.discord_webhook_url,
     )
-    config_path = Path(tempfile.mkdtemp(prefix="market-helm-alerts-smoke-")) / "alerts.json"
+    config_path = Path(tempfile.mkdtemp(prefix="markethelm-alerts-smoke-")) / "alerts.json"
     config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
     print(f"Smoke config: {config_path}\n")
 

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import logging
-import os
 from urllib.parse import urljoin, urlparse
 
 from src.alerts.notifiers.email_delivery import _platform_from_address, build_email_backend
+from src.core.compat import get_env
 
 logger = logging.getLogger(__name__)
 
 
 def send_account_email(*, recipient: str, purpose: str, token: str) -> bool:
-    raw_url = (os.environ.get("MARKET_HELM_PUBLIC_URL") or "").strip()
+    raw_url = (get_env("MARKETHELM_PUBLIC_URL") or "").strip()
     parsed = urlparse(raw_url)
     local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}
     if (
@@ -24,7 +24,7 @@ def send_account_email(*, recipient: str, purpose: str, token: str) -> bool:
         or parsed.query
         or parsed.fragment
     ):
-        logger.error("Account email requires a safe MARKET_HELM_PUBLIC_URL")
+        logger.error("Account email requires a safe MARKETHELM_PUBLIC_URL")
         return False
     base_url = raw_url.rstrip("/") + "/"
     route = "verify-email" if purpose == "verify_email" else "reset-password"

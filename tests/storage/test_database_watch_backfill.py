@@ -36,7 +36,7 @@ def _price_config(alert_id: str, symbol: str) -> dict:
 
 def test_backfill_skips_unparseable_json_and_keeps_sibling_watches(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "backfill-json.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     good_user = create_user("backfill-good@example.com", "password123")["id"]
     bad_user = create_user("backfill-bad@example.com", "password123")["id"]
@@ -82,7 +82,7 @@ def test_stale_backfill_cannot_restore_watches_over_newer_save(tmp_path, monkeyp
     persisted.
     """
     db_path = tmp_path / "backfill-race.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     user_id = create_user("backfill-race@example.com", "password123")["id"]
     save_user_alerts_config(user_id, _price_config("aapl_drop", "AAPL"))
@@ -137,7 +137,7 @@ def test_backfill_skips_invalid_watch_config_and_keeps_sibling_watches(
     other tenant unindexed after worker/login init_database.
     """
     db_path = tmp_path / "backfill-invalid.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     good_user = create_user("backfill-valid@example.com", "password123")["id"]
     bad_user = create_user("backfill-invalid@example.com", "password123")["id"]

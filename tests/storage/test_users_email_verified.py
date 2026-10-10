@@ -6,7 +6,7 @@ from src.storage.users import create_user, get_user_by_id, mark_email_verified
 
 def test_second_mark_email_verified_keeps_original_timestamp(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "email-verified.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     user = create_user("verify-once@example.com", "password123")
     assert get_user_by_id(user["id"])["email_verified"] is False

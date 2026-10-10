@@ -83,8 +83,8 @@ def _request_without_client(forwarded: str = "") -> Request:
 
 
 def test_middleware_returns_standard_limit_headers_and_429(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(
         rate_limit,
         "configured_rules",
@@ -106,7 +106,7 @@ def test_middleware_returns_standard_limit_headers_and_429(monkeypatch) -> None:
 
 
 def test_non_api_routes_are_not_limited(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(
         rate_limit,
         "configured_rules",
@@ -119,18 +119,18 @@ def test_non_api_routes_are_not_limited(monkeypatch) -> None:
 
 
 def test_forwarded_header_ignored_from_untrusted_peer(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     assert client_ip(_request("203.0.113.5", "198.51.100.7")) == "203.0.113.5"
 
 
 def test_forwarded_chain_uses_first_untrusted_hop_from_right(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8,192.0.2.0/24")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8,192.0.2.0/24")
     request = _request("10.0.0.5", "198.51.100.9, 192.0.2.10")
     assert client_ip(request) == "198.51.100.9"
 
 
 def test_backend_failure_returns_503(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///unused.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///unused.db")
     monkeypatch.setattr(
         rate_limit,
         "configured_rules",
@@ -158,8 +158,8 @@ def test_hosted_check_rate_limits_uses_database_usage_not_memory(monkeypatch) ->
     """
     from src.storage.rate_limits import RateLimitUsage
 
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///hosted.db")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
 
     def fake_consume(key, *, now, window_seconds):
@@ -181,20 +181,20 @@ def test_hosted_check_rate_limits_uses_database_usage_not_memory(monkeypatch) ->
 
 
 def test_invalid_enabled_value_falls_back_to_hosted_default(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "maybe")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///hosted.db")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "maybe")
     assert rate_limit.rate_limiting_enabled() is True
 
 
 def test_hosted_false_override_skips_limits_and_does_not_503(monkeypatch) -> None:
-    """MARKET_HELM_RATE_LIMIT_ENABLED=false must disable hosted limiting.
+    """MARKETHELM_RATE_LIMIT_ENABLED=false must disable hosted limiting.
 
     Database mode turns limits on by default, and a broken consume_rate_limit
     fail-closes every /api/ request with 503. An explicit false override must
     skip consume so a limit-1 rule cannot 429 and a failing backend cannot 503.
     """
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///hosted.db")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "false")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///hosted.db")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "false")
     monkeypatch.setattr(
         rate_limit,
         "configured_rules",
@@ -221,16 +221,16 @@ def test_hosted_false_override_skips_limits_and_does_not_503(monkeypatch) -> Non
 
 def test_invalid_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
     """Garbage X-Forwarded-For from a trusted proxy must not skip to a later hop."""
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     assert client_ip(_request("10.0.0.5", "not-an-ip, 198.51.100.9")) == "10.0.0.5"
 
 
 def test_poisoned_rate_limit_env_clamps_to_safe_bounds(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "999999999")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "not-a-number")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "0")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "-5")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "999999999")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_REGISTER", "999999999")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_LOGIN", "not-a-number")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_GLOBAL", "0")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_EXPENSIVE", "-5")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", "999999999")
     rules = {rule.name: rule for rule in rate_limit.configured_rules()}
     assert rules["auth-register"].limit == 1000
     assert rules["auth-login"].limit == 10
@@ -263,7 +263,7 @@ def test_auth_email_rule_covers_request_endpoints_not_confirm() -> None:
 
 def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
     secret_value = "invalid-secret-proxy-value"
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", secret_value)
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", secret_value)
     assert client_ip(_request("203.0.113.5")) == "203.0.113.5"
     assert secret_value not in caplog.text
 
@@ -271,13 +271,13 @@ def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
 def test_invalid_proxy_cidr_is_skipped_without_disabling_valid_peers(
     monkeypatch,
 ) -> None:
-    """One junk CIDR must not disable the rest of MARKET_HELM_TRUSTED_PROXY_CIDRS.
+    """One junk CIDR must not disable the rest of MARKETHELM_TRUSTED_PROXY_CIDRS.
 
     If ValueError aborted the whole parser, X-Forwarded-For would be ignored
     and every client behind the proxy would share the proxy's rate-limit bucket.
     """
     monkeypatch.setenv(
-        "MARKET_HELM_TRUSTED_PROXY_CIDRS",
+        "MARKETHELM_TRUSTED_PROXY_CIDRS",
         "not-a-cidr, 10.0.0.0/8, also-bad",
     )
     request = _request("10.0.0.5", "198.51.100.9")
@@ -286,8 +286,8 @@ def test_invalid_proxy_cidr_is_skipped_without_disabling_valid_peers(
 
 def test_rate_limit_buckets_are_isolated_by_client_ip(monkeypatch) -> None:
     """Dropping identity from the bucket key would make every client share one counter."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
     rules = (RateLimitRule("test", 1, 60),)
     now = 1_700_000_000
@@ -304,44 +304,44 @@ def test_rate_limit_buckets_are_isolated_by_client_ip(monkeypatch) -> None:
 
 
 def test_empty_forwarded_header_from_trusted_proxy_uses_peer(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     assert client_ip(_request("10.0.0.5", "")) == "10.0.0.5"
 
 
 def test_all_trusted_hops_use_leftmost_forwarded_address(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     request = _request("10.0.0.5", "10.0.0.9, 10.0.0.8")
     assert client_ip(request) == "10.0.0.9"
 
 
 def test_ipv6_client_behind_trusted_ipv4_proxy(monkeypatch) -> None:
     """IPv6 clients behind an IPv4 hop must not share the proxy's rate-limit bucket."""
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     request = _request("10.0.0.5", "2001:db8::9")
     assert client_ip(request) == "2001:db8::9"
 
 
 def test_forwarded_header_ignored_from_untrusted_ipv6_peer(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32")
     assert client_ip(_request("203.0.113.5", "2001:db8::9")) == "203.0.113.5"
 
 
 def test_ipv6_forwarded_chain_uses_first_untrusted_hop(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32,10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32,10.0.0.0/8")
     request = _request("10.0.0.5", "198.51.100.9, 2001:db8::10")
     assert client_ip(request) == "198.51.100.9"
 
 
 def test_bracketed_ipv6_forwarded_hop_falls_back_to_peer(monkeypatch) -> None:
     """Bracketed X-Forwarded-For tokens are not valid IP literals; do not skip them."""
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     assert client_ip(_request("10.0.0.5", "[2001:db8::9], 198.51.100.9")) == "10.0.0.5"
 
 
 def test_rate_limit_buckets_are_isolated_by_ipv6_client_ip(monkeypatch) -> None:
     """IPv6 identities must hash separately so two clients cannot exhaust one bucket."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
     rules = (RateLimitRule("test", 1, 60),)
     now = 1_700_000_000
@@ -364,8 +364,8 @@ def test_memory_rate_limit_window_resets_after_expiry(monkeypatch) -> None:
     uses ``_MemoryCounters``; if the bucket key drops ``window_start`` (or the
     window never advances), a limit-2 rule 429s the same client forever.
     """
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
     rules = (RateLimitRule("test", 2, 60),)
     now = 1_700_000_000
@@ -395,12 +395,12 @@ def test_missing_client_ignores_forwarded_header(monkeypatch) -> None:
     """An unparseable peer must not honor X-Forwarded-For.
 
     ``client_ip`` only trusts XFF when the socket peer is a real IP inside
-    ``MARKET_HELM_TRUSTED_PROXY_CIDRS``. ASGI scopes without ``client`` (unix
+    ``MARKETHELM_TRUSTED_PROXY_CIDRS``. ASGI scopes without ``client`` (unix
     sockets, some reverse-proxy setups) stringify to ``unknown``. If that
     ValueError path skipped ahead to the forwarded chain, anyone could mint a
     fresh identity per request and bypass rate limits.
     """
-    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
+    monkeypatch.setenv("MARKETHELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8")
     request = _request_without_client("198.51.100.9")
     assert request.client is None
     assert client_ip(request) == "unknown"
@@ -413,8 +413,8 @@ def test_missing_client_shares_rate_limit_bucket(monkeypatch) -> None:
     limit-1 window and never 429. ``client_ip`` must stay stable so the
     middleware cannot be bypassed by omitting the ASGI client address.
     """
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
     rules = (RateLimitRule("test", 1, 60),)
     now = 1_700_000_000

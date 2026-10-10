@@ -24,7 +24,7 @@ def _positive_int(value: str) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="market-helm backtest",
+        prog="markethelm backtest",
         description="Evaluate saved projections against exact exchange sessions.",
     )
     parser.add_argument(

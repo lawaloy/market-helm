@@ -35,7 +35,7 @@ def _write_legacy_set(data_dir, day="2026-09-18", close=150.0):
 
 
 def test_backfill_imports_all_legacy_stores(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     _write_legacy_set(tmp_path)
 
     report = backfill_legacy_market_data(tmp_path)
@@ -67,7 +67,7 @@ def test_backfill_imports_all_legacy_stores(tmp_path, monkeypatch):
 
 
 def test_backfill_is_idempotent_and_preserves_existing_dates(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     _write_legacy_set(tmp_path, close=150.0)
     first = backfill_legacy_market_data(tmp_path)
     assert first["errors"] == []
@@ -82,7 +82,7 @@ def test_backfill_is_idempotent_and_preserves_existing_dates(tmp_path, monkeypat
 
 
 def test_backfill_can_explicitly_replace_existing_dates(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     upsert_market_bars([{"symbol": "AAPL", "close": 10.0}], "2026-09-18", data_dir=tmp_path)
     _write_legacy_set(tmp_path, close=175.0)
 
@@ -93,7 +93,7 @@ def test_backfill_can_explicitly_replace_existing_dates(tmp_path, monkeypatch):
 
 
 def test_backfill_continues_after_malformed_sibling_file(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "daily_data_2026-09-18.csv").write_text(
         "symbol,close\nAAPL,150\n", encoding="utf-8"
     )
@@ -109,7 +109,7 @@ def test_backfill_continues_after_malformed_sibling_file(tmp_path, monkeypatch):
 
 
 def test_backfill_empty_directory_does_not_create_sidecar(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
 
     report = backfill_legacy_market_data(tmp_path)
 
@@ -118,7 +118,7 @@ def test_backfill_empty_directory_does_not_create_sidecar(tmp_path, monkeypatch)
 
 
 def test_backfill_reports_configured_database_target(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///unused.sqlite")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///unused.sqlite")
 
     report = backfill_legacy_market_data(tmp_path)
 
@@ -127,7 +127,7 @@ def test_backfill_reports_configured_database_target(tmp_path, monkeypatch):
 
 
 def test_backfill_recovers_projections_embedded_in_summary(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "summary_2026-09-18.json").write_text(
         json.dumps(
             {
@@ -153,7 +153,7 @@ def test_backfill_recovers_projections_embedded_in_summary(tmp_path, monkeypatch
 
 
 def test_backfill_uses_summary_fallback_after_malformed_projection_csv(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "projections_2026-09-18.csv").write_text("", encoding="utf-8")
     (tmp_path / "summary_2026-09-18.json").write_text(
         json.dumps({"projections": {"AAPL": {"symbol": "AAPL"}}}),
@@ -168,7 +168,7 @@ def test_backfill_uses_summary_fallback_after_malformed_projection_csv(tmp_path,
 
 
 def test_backfill_recovers_embedded_projections_when_summary_already_exists(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     upsert_daily_summary({"analysis": {"total_stocks": 1}}, "2026-09-18", data_dir=tmp_path)
     (tmp_path / "summary_2026-09-18.json").write_text(
         json.dumps({"projections": {"AAPL": {"symbol": "AAPL"}}}),
@@ -183,7 +183,7 @@ def test_backfill_recovers_embedded_projections_when_summary_already_exists(tmp_
 
 
 def test_replace_existing_uses_embedded_projections_without_csv(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     upsert_projections(
         [{"symbol": "AAPL", "target_mid": 100}],
         "2026-09-18",
@@ -202,7 +202,7 @@ def test_replace_existing_uses_embedded_projections_without_csv(tmp_path, monkey
 
 
 def test_replace_existing_prefers_valid_projection_csv_over_summary(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "projections_2026-09-18.csv").write_text(
         "symbol,target_mid\nAAPL,175\n", encoding="utf-8"
     )

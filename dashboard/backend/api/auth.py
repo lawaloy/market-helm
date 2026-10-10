@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import os
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from dashboard.backend.account_email import send_account_email
+from src.core.compat import get_env
 from src.storage.account_tokens import (
     RESET_PASSWORD,
     VERIFY_EMAIL,
@@ -86,7 +86,7 @@ class DeleteAccountRequest(BaseModel):
 
 
 def _verification_required() -> bool:
-    return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+    return (get_env("MARKETHELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
         "1",
         "true",
         "yes",
@@ -106,7 +106,7 @@ def _require_multi_user() -> None:
     if not database_enabled():
         raise HTTPException(
             status_code=501,
-            detail="Multi-user mode is disabled. Set MARKET_HELM_DATABASE_URL to enable.",
+            detail="Multi-user mode is disabled. Set MARKETHELM_DATABASE_URL to enable.",
         )
 
 

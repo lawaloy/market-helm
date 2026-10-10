@@ -125,7 +125,7 @@ def load_symbol_closes_from_market_bars(
     """
     Chronological closes for ``symbol`` from durable ``market_bars``.
 
-    Uses the hosted app database when ``MARKET_HELM_DATABASE_URL`` is set,
+    Uses the hosted app database when ``MARKETHELM_DATABASE_URL`` is set,
     otherwise the sidecar at ``DATA_DIR/market_bars.sqlite``. Returns an empty
     list on any soft failure so RSI evaluation can degrade gracefully.
     """

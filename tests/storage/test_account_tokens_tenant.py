@@ -24,7 +24,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "account-tokens-tenant.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return db_path
 

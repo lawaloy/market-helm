@@ -1,7 +1,7 @@
 """File-mode PUT must strip/lower webhook_format into ALERT_WEBHOOK_FORMAT.
 
 ``_persist_webhook_secret`` writes Settings ``defaults.webhook_format`` into
-``~/.market-helm/.env`` then ``_load_env`` reloads it for CLI ``from_alert``.
+``~/.markethelm/.env`` then ``_load_env`` reloads it for CLI ``from_alert``.
 Existing PUT tests persist uppercase ``DISCORD``; ``_normalize_config`` covers
 padded Discord in memory only. A regression that skipped strip/lower on persist
 would leave ``ALERT_WEBHOOK_FORMAT= Slack `` (or ``Slack``) in the operator
@@ -21,15 +21,15 @@ from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 @pytest.fixture
 def file_mode(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_FORMAT", raising=False)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
-    user_dir = tmp_path / "market-helm"
+    user_dir = tmp_path / "markethelm"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(user_dir / "alerts.json"))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(user_dir / "alerts.json"))
     return user_dir
 
 

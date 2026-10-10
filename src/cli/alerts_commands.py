@@ -1,4 +1,4 @@
-"""CLI: market-helm alerts list|test|init|run"""
+"""CLI: markethelm alerts list|test|init|run"""
 
 from __future__ import annotations
 
@@ -85,12 +85,12 @@ def cmd_list(config_path: Optional[Path] = None) -> int:
         if path.exists():
             logger.error(
                 "Corrupt or invalid alerts config at %s. Fix JSON or run: "
-                "market-helm alerts init --force",
+                "markethelm alerts init --force",
                 path,
             )
         else:
             logger.error(
-                "No alerts config at %s. Run: market-helm alerts init",
+                "No alerts config at %s. Run: markethelm alerts init",
                 path,
             )
         return 1
@@ -151,7 +151,7 @@ def cmd_init(force: bool = False) -> int:
 
     logger.info("Created %s", dest)
     logger.info("Edit the file, set enabled rules to true, and configure SMTP/webhook env vars.")
-    logger.info("Secrets (SMTP password, webhook URLs) belong in ~/.market-helm/.env — not in git.")
+    logger.info("Secrets (SMTP password, webhook URLs) belong in ~/.markethelm/.env — not in git.")
     return 0
 
 
@@ -268,7 +268,7 @@ def cmd_run(*, loop: bool = False, interval: Optional[int] = None) -> int:
 def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] = None) -> int:
     path = resolve_alerts_config_path(config_path)
     if not path.exists():
-        logger.error("No alerts config at %s. Run: market-helm alerts init", path)
+        logger.error("No alerts config at %s. Run: markethelm alerts init", path)
         return 1
 
     try:
@@ -293,21 +293,21 @@ def cmd_test(alert_id: str, dry_run: bool = False, config_path: Optional[Path] =
 
 def main(argv: Optional[List[str]] = None) -> None:
     parser = argparse.ArgumentParser(
-        prog="market-helm alerts",
+        prog="markethelm alerts",
         description="Manage MarketHelm alert rules (config + test notifications)",
     )
     parser.add_argument(
         "--config",
         type=Path,
         default=None,
-        help="Path to alerts.json (default: ~/.market-helm/alerts.json or repo config)",
+        help="Path to alerts.json (default: ~/.markethelm/alerts.json or repo config)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("list", help="List configured alert rules")
 
     init_parser = sub.add_parser(
-        "init", help="Create ~/.market-helm/alerts.json from the bundled example"
+        "init", help="Create ~/.markethelm/alerts.json from the bundled example"
     )
     init_parser.add_argument(
         "--force",

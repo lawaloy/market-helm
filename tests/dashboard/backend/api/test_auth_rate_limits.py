@@ -11,16 +11,16 @@ import pytest
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'auth-limits.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "1")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "1")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "1")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_GLOBAL", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_EXPENSIVE", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_LOGIN", "1")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_REGISTER", "1")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", "1")
     from src.storage.database import init_database
 
     init_database()

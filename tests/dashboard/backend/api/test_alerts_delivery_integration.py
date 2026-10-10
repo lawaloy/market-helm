@@ -26,10 +26,10 @@ class WebhookNotifier:
 @pytest.fixture
 def alerts_config_dir(tmp_path: Path, monkeypatch):
     """Isolated alerts config directory."""
-    config_dir = tmp_path / "market-helm"
+    config_dir = tmp_path / "markethelm"
     config_dir.mkdir()
     config_path = config_dir / "alerts.json"
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     return config_dir
 
 

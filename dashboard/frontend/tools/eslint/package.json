@@ -1,5 +1,5 @@
 {
-  "name": "market-helm-web-eslint",
+  "name": "markethelm-web-eslint",
   "version": "0.0.0",
   "private": true,
   "description": "ESLint tooling for dashboard/frontend. Separate package because typescript-eslint does not support TypeScript 7 yet.",

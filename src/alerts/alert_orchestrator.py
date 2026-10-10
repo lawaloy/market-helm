@@ -15,7 +15,7 @@ from src.storage.database import database_enabled, init_database
 def run_orchestrator_tick() -> Dict[str, Any]:
     """Load market data once and enqueue one evaluate_symbol job per watched symbol."""
     if not database_enabled():
-        raise RuntimeError("Orchestrator requires MARKET_HELM_DATABASE_URL")
+        raise RuntimeError("Orchestrator requires MARKETHELM_DATABASE_URL")
 
     init_database()
     symbols = list_enabled_symbols()

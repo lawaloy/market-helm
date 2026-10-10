@@ -222,7 +222,7 @@ def display_results(result: dict):
 
 
 def main():
-    """CLI entry point for MarketHelm (see also console script `market-helm`)."""
+    """CLI entry point for MarketHelm (see also console script `markethelm`)."""
     import argparse
 
     if len(sys.argv) > 1 and sys.argv[1] == "alerts":

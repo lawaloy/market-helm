@@ -14,7 +14,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_user(tmp_path, monkeypatch):
     db_path = tmp_path / "orch.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     user = create_user("orch@example.com", "password123")
     return user["id"]
@@ -35,8 +35,8 @@ def _watch(alert_id, symbol):
 
 class TestAlertOrchestrator:
     def test_requires_database(self, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-        with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL"):
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+        with pytest.raises(RuntimeError, match="MARKETHELM_DATABASE_URL"):
             run_orchestrator_tick()
 
     def test_no_watches_message(self, db_user):

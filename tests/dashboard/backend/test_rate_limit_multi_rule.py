@@ -23,8 +23,8 @@ def _api_request(path: str = "/api/auth/login", method: str = "POST") -> Request
 
 
 def _enable_memory_limits(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
 
 
@@ -76,7 +76,7 @@ def test_blocked_global_not_hidden_by_path_rule_at_exact_limit(monkeypatch) -> N
     ``count > limit`` (blocked). ``min(remaining)`` would pick the first
     remaining-0 decision — here the still-allowed login rule — and skip
     429 even though the global bucket is already exhausted. Operators can
-    set ``MARKET_HELM_RATE_LIMIT_GLOBAL`` tighter than a path rule.
+    set ``MARKETHELM_RATE_LIMIT_GLOBAL`` tighter than a path rule.
     """
     _enable_memory_limits(monkeypatch)
     rules = (

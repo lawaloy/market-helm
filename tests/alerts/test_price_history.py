@@ -40,7 +40,7 @@ def test_closes_from_candle_payload_sorts_by_timestamp():
 
 
 def test_load_symbol_closes_prefers_provider_over_market_bars(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 1.0}])
 
     client = MagicMock()
@@ -56,7 +56,7 @@ def test_load_symbol_closes_prefers_provider_over_market_bars(tmp_path, monkeypa
 
 
 def test_load_symbol_closes_empty_when_provider_and_market_bars_are_empty(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     client = MagicMock()
     client.get_candle_data.side_effect = RuntimeError("no key")
 
@@ -65,7 +65,7 @@ def test_load_symbol_closes_empty_when_provider_and_market_bars_are_empty(tmp_pa
 
 def test_rsi_rule_degrades_gracefully_without_any_history(tmp_path, monkeypatch, caplog):
     """No provider candles and no market_bars: no crash, no trigger, clear log."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     client = MagicMock()
     client.get_candle_data.side_effect = RuntimeError("no key")
 
@@ -80,7 +80,7 @@ def test_rsi_rule_degrades_gracefully_without_any_history(tmp_path, monkeypatch,
 
 def test_load_symbol_closes_ignores_leftover_daily_csv(tmp_path, monkeypatch):
     """Legacy daily_data CSVs are no longer a price-history source."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     for day, close in [("2026-09-01", 100.0), ("2026-09-02", 101.0)]:
         (tmp_path / f"daily_data_{day}.csv").write_text(
             f"symbol,close\nAAPL,{close}\n",
@@ -93,7 +93,7 @@ def test_load_symbol_closes_ignores_leftover_daily_csv(tmp_path, monkeypatch):
 
 
 def test_load_symbol_closes_from_market_bars_sidecar(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 100.0}])
     seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 101.5}])
     seed_daily_bars(tmp_path, "2026-09-03", [{"symbol": "AAPL", "close": 99.0}])
@@ -108,7 +108,7 @@ def test_load_symbol_closes_from_market_bars_sidecar(tmp_path, monkeypatch):
 
 def test_load_symbol_closes_uses_market_bars_when_csv_gone(tmp_path, monkeypatch):
     """Post-#635: no daily_data CSV is written; RSI must still see saved bars."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 100.0}])
     seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 101.0}])
     client = MagicMock()
@@ -121,7 +121,7 @@ def test_load_symbol_closes_uses_market_bars_when_csv_gone(tmp_path, monkeypatch
 
 def test_load_symbol_closes_from_hosted_market_bars(tmp_path, monkeypatch):
     db_path = tmp_path / "hosted.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 200.0}],
@@ -143,7 +143,7 @@ def test_load_symbol_closes_from_hosted_market_bars(tmp_path, monkeypatch):
 
 def test_load_symbol_closes_prefers_local_when_provider_is_partial(tmp_path, monkeypatch):
     """Short Finnhub series must not beat a longer durable market_bars history."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     local = [100.0 + i for i in range(12)]
     for i, close in enumerate(local):
         seed_daily_bars(
@@ -162,7 +162,7 @@ def test_load_symbol_closes_prefers_local_when_provider_is_partial(tmp_path, mon
 
 
 def test_load_symbol_closes_keeps_partial_provider_when_longer_than_local(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 1.0}])
     seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 2.0}])
     client = MagicMock()

@@ -16,7 +16,7 @@ from src.storage.session import (
 
 @pytest.fixture
 def auth_secret(monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
 
 
 def test_decode_rejects_oversized_token_before_hmac(auth_secret, monkeypatch):

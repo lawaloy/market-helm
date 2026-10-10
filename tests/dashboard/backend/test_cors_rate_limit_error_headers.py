@@ -17,16 +17,16 @@ DASHBOARD_ORIGIN = "http://localhost:3000"
 
 def _limited_client(tmp_path, monkeypatch, db_name: str) -> TestClient:
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / db_name).as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "1")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "1000")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_GLOBAL", "1")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_LOGIN", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_REGISTER", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_EXPENSIVE", "1000")
     from src.storage.database import init_database
 
     init_database()

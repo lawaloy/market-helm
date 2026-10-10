@@ -19,7 +19,7 @@ from tests.helpers.market_bars import (
 @pytest.fixture
 def temp_data_dir(monkeypatch):
     """Create temp data directory with sample files."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)

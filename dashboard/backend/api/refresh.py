@@ -138,11 +138,11 @@ class RefreshStatusResponse(BaseModel):
 
 
 def run_daily_tracker():
-    """Run the MarketHelm CLI (`market-helm`) in a separate process."""
+    """Run the MarketHelm CLI (`markethelm`) in a separate process."""
     global _refresh_process
     try:
         refresh_status["is_running"] = True
-        refresh_status["progress"] = "Starting market-helm..."
+        refresh_status["progress"] = "Starting markethelm..."
         refresh_status["last_status"] = "running"
         _refresh_cancel_event.clear()
 
@@ -154,7 +154,7 @@ def run_daily_tracker():
         else:
             command = [sys.executable, "-m", "src.cli.commands"]
 
-        # Run market-helm (default to top 10 for faster refresh; hard-capped).
+        # Run markethelm (default to top 10 for faster refresh; hard-capped).
         top_n = _resolve_refresh_top_n()
         if top_n:
             command.extend(["--top-n", str(top_n)])
@@ -281,7 +281,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
             )
 
         refresh_status["last_status"] = "running"
-        refresh_status["progress"] = "Starting market-helm..."
+        refresh_status["progress"] = "Starting markethelm..."
         refresh_status["is_running"] = True
 
         # Start refresh in background

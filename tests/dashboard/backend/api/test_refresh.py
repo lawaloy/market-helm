@@ -159,7 +159,7 @@ def test_trigger_refresh_marks_running_before_worker_thread_starts(monkeypatch) 
     assert response.status == "started"
     assert response.is_running is True
     assert refresh.refresh_status["last_status"] == "running"
-    assert refresh.refresh_status["progress"] == "Starting market-helm..."
+    assert refresh.refresh_status["progress"] == "Starting markethelm..."
     assert refresh.refresh_status["is_running"] is True
     assert len(created_threads) == 1
     assert created_threads[0].daemon is True
@@ -444,8 +444,8 @@ def test_cancel_refresh_rejects_when_idle() -> None:
 def test_refresh_mutations_require_auth_in_database_mode(tmp_path, monkeypatch) -> None:
     reset_refresh_state()
     db_path = tmp_path / "refresh-auth.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
 
     from dashboard.backend.main import app
     from src.storage.database import init_database

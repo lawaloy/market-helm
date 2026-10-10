@@ -1,4 +1,4 @@
-"""Tests for market-helm alerts CLI."""
+"""Tests for markethelm alerts CLI."""
 
 import json
 from pathlib import Path
@@ -160,7 +160,7 @@ def test_cmd_init_refuses_existing_config_without_force(
 ) -> None:
     example = tmp_path / "alerts.example.json"
     example.write_text('{"defaults": {}, "alerts": []}', encoding="utf-8")
-    user_dir = tmp_path / "home" / ".market-helm"
+    user_dir = tmp_path / "home" / ".markethelm"
     user_dir.mkdir(parents=True)
     existing = user_dir / "alerts.json"
     existing.write_text('{"defaults": {}, "alerts": [{"id": "keep-me"}]}', encoding="utf-8")
@@ -186,7 +186,7 @@ def test_cmd_init_force_overwrites_existing_config(monkeypatch, tmp_path: Path) 
         ),
         encoding="utf-8",
     )
-    user_dir = tmp_path / "home" / ".market-helm"
+    user_dir = tmp_path / "home" / ".markethelm"
     user_dir.mkdir(parents=True)
     existing = user_dir / "alerts.json"
     existing.write_text(
@@ -207,7 +207,7 @@ def test_cmd_init_missing_bundled_example_returns_error(
     monkeypatch, tmp_path: Path, caplog
 ) -> None:
     missing = tmp_path / "missing-alerts.example.json"
-    user_dir = tmp_path / "home" / ".market-helm"
+    user_dir = tmp_path / "home" / ".markethelm"
     monkeypatch.setattr("src.alerts.alert_paths.bundled_example_path", lambda: missing)
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)
 

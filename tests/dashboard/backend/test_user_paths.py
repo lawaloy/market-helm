@@ -11,9 +11,9 @@ def _fake_home(monkeypatch, tmp_path: Path) -> Path:
     return tmp_path
 
 
-def test_user_config_dir_no_migration_when_market_helm_exists(monkeypatch, tmp_path):
+def test_user_config_dir_no_migration_when_markethelm_exists(monkeypatch, tmp_path):
     home = _fake_home(monkeypatch, tmp_path)
-    dest = home / ".market-helm"
+    dest = home / ".markethelm"
     dest.mkdir()
     (dest / "x.txt").write_text("ok")
 
@@ -33,7 +33,7 @@ def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path):
     from dashboard.backend import user_paths
 
     d = user_paths.user_config_dir()
-    assert d == home / ".market-helm"
+    assert d == home / ".markethelm"
     assert d.exists()
     assert not md.exists()
     assert (d / "data" / "daily.csv").read_text() == "sym"
@@ -53,7 +53,8 @@ def test_user_config_dir_soft_fails_when_legacy_rename_raises(monkeypatch, tmp_p
     monkeypatch.setattr(Path, "rename", boom)
 
     d = user_paths.user_config_dir()
-    assert d == home / ".market-helm"
-    assert not d.exists()
+    # The legacy folder keeps being used so no data is stranded.
+    assert d == md
+    assert not (home / ".markethelm").exists()
     assert md.exists()
     assert (md / "keep.txt").read_text() == "legacy"

@@ -57,7 +57,7 @@ def run_user_check(user_id: str) -> Dict[str, Any]:
     from src.storage.user_alerts import load_user_alerts_config
 
     if not database_enabled():
-        raise RuntimeError("User-scoped alert checks require MARKET_HELM_DATABASE_URL")
+        raise RuntimeError("User-scoped alert checks require MARKETHELM_DATABASE_URL")
 
     exists, config = load_user_alerts_config(user_id)
     if not exists or not config:

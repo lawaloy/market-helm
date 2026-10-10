@@ -8,12 +8,12 @@ import pytest
 @pytest.mark.parametrize(
     ("argv", "include_profile", "use_screener", "top_n"),
     [
-        (["market-helm"], True, True, None),
-        (["market-helm", "--quote-only"], False, True, None),
-        (["market-helm", "--no-screener"], True, False, None),
-        (["market-helm", "--top-n", "25"], True, True, 25),
+        (["markethelm"], True, True, None),
+        (["markethelm", "--quote-only"], False, True, None),
+        (["markethelm", "--no-screener"], True, False, None),
+        (["markethelm", "--top-n", "25"], True, True, 25),
         (
-            ["market-helm", "--quote-only", "--no-screener", "--top-n", "10"],
+            ["markethelm", "--quote-only", "--no-screener", "--top-n", "10"],
             False,
             False,
             10,
@@ -38,7 +38,7 @@ def test_main_forwards_flags_to_workflow(argv, include_profile, use_screener, to
 
 
 def test_main_returns_failure_when_daily_workflow_fails(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["market-helm"])
+    monkeypatch.setattr("sys.argv", ["markethelm"])
     workflow = MagicMock()
     workflow.run.return_value = {"success": False, "error": "No data fetched"}
 
@@ -53,10 +53,10 @@ def test_main_returns_failure_when_daily_workflow_fails(monkeypatch):
 
 
 def test_main_dispatches_alerts_subcommand_without_daily_workflow(monkeypatch):
-    """`market-helm alerts ...` must hand off argv and skip the daily tracker."""
+    """`markethelm alerts ...` must hand off argv and skip the daily tracker."""
     monkeypatch.setattr(
         "sys.argv",
-        ["market-helm", "alerts", "run", "--loop", "--interval", "120"],
+        ["markethelm", "alerts", "run", "--loop", "--interval", "120"],
     )
 
     with patch("src.cli.alerts_commands.main") as alerts_main:
@@ -70,7 +70,7 @@ def test_main_dispatches_alerts_subcommand_without_daily_workflow(monkeypatch):
 
 
 def test_main_dispatches_backtest_subcommand_without_daily_workflow(monkeypatch):
-    monkeypatch.setattr("sys.argv", ["market-helm", "backtest", "--days", "30"])
+    monkeypatch.setattr("sys.argv", ["markethelm", "backtest", "--days", "30"])
 
     with patch("src.cli.backtest_commands.main", return_value=0) as backtest_main:
         with patch("src.cli.commands.StockTrackerWorkflow") as ctor:

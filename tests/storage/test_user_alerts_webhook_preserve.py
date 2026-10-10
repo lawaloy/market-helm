@@ -14,7 +14,7 @@ REPLACEMENT = "https://hooks.example/user/replacement-token"
 @pytest.fixture
 def db_user(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     user = create_user("webhook-preserve@example.com", "password123")
     return user["id"]

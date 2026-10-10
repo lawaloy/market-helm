@@ -14,12 +14,12 @@ from src.storage.database import get_connection
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'token-lifecycle.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
-    monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", "true")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_REQUIRE_EMAIL_VERIFICATION", "true")
     from src.storage.database import init_database
 
     init_database()

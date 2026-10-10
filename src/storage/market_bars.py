@@ -221,7 +221,7 @@ def market_bars_connection(data_dir: Optional[str | Path] = None) -> Iterator[An
         return
     if data_dir is None:
         raise RuntimeError(
-            "market bars sidecar requires data_dir when MARKET_HELM_DATABASE_URL is unset"
+            "market bars sidecar requires data_dir when MARKETHELM_DATABASE_URL is unset"
         )
     with _sidecar_connection(data_dir) as conn:
         yield conn

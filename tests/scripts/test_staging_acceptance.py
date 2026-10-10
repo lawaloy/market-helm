@@ -785,19 +785,19 @@ def test_tenant_cleanup_failure_is_recorded() -> None:
 
 
 def test_credentials_from_env_requires_both_tenants(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_A_EMAIL", "a@example.com")
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_A_PASSWORD", "pw-a")
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_B_EMAIL", "b@example.com")
-    monkeypatch.delenv("MARKET_HELM_STAGING_TENANT_B_PASSWORD", raising=False)
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_A_EMAIL", "a@example.com")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_A_PASSWORD", "pw-a")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_B_EMAIL", "b@example.com")
+    monkeypatch.delenv("MARKETHELM_STAGING_TENANT_B_PASSWORD", raising=False)
     with pytest.raises(AcceptanceError, match="TENANT"):
         _credentials_from_env()
 
 
 def test_credentials_from_env_reads_stripped_emails(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_A_EMAIL", " a@example.com ")
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_A_PASSWORD", "pw-a")
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_B_EMAIL", "b@example.com")
-    monkeypatch.setenv("MARKET_HELM_STAGING_TENANT_B_PASSWORD", "pw-b")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_A_EMAIL", " a@example.com ")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_A_PASSWORD", "pw-a")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_B_EMAIL", "b@example.com")
+    monkeypatch.setenv("MARKETHELM_STAGING_TENANT_B_PASSWORD", "pw-b")
     assert _credentials_from_env() == [
         ("a@example.com", "pw-a"),
         ("b@example.com", "pw-b"),

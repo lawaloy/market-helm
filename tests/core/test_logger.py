@@ -45,7 +45,7 @@ class TestCoreLogger(unittest.TestCase):
         self.assertEqual(logger1.name, logger2.name)
 
     def test_renames_legacy_stock_tracker_log_files(self):
-        """Legacy stock_tracker_*.log files are renamed to market_helm_*.log."""
+        """Legacy stock_tracker_*.log files are renamed to markethelm_*.log."""
         from datetime import datetime
 
         today = datetime.now().strftime("%Y-%m-%d")
@@ -59,20 +59,18 @@ class TestCoreLogger(unittest.TestCase):
 
         self.assertFalse(legacy.exists())
         self.assertFalse(legacy_err.exists())
-        self.assertTrue((log_dir / f"market_helm_{today}.log").exists())
-        self.assertTrue((log_dir / f"market_helm_errors_{today}.log").exists())
-        self.assertIn(
-            "old main", (log_dir / f"market_helm_{today}.log").read_text(encoding="utf-8")
-        )
+        self.assertTrue((log_dir / f"markethelm_{today}.log").exists())
+        self.assertTrue((log_dir / f"markethelm_errors_{today}.log").exists())
+        self.assertIn("old main", (log_dir / f"markethelm_{today}.log").read_text(encoding="utf-8"))
 
     def test_skips_legacy_rename_when_destination_already_exists(self):
-        """Existing market_helm_*.log must not be overwritten by legacy rename."""
+        """Existing markethelm_*.log must not be overwritten by legacy rename."""
         from datetime import datetime
 
         today = datetime.now().strftime("%Y-%m-%d")
         log_dir = Path(self.test_log_dir)
         legacy = log_dir / f"stock_tracker_{today}.log"
-        dest = log_dir / f"market_helm_{today}.log"
+        dest = log_dir / f"markethelm_{today}.log"
         legacy.write_text("legacy only\n", encoding="utf-8")
         dest.write_text("already migrated\n", encoding="utf-8")
 

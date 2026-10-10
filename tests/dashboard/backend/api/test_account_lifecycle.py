@@ -5,9 +5,9 @@ import pytest
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'auth.db').as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_PUBLIC_URL", "https://staging.example.com")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'auth.db').as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_PUBLIC_URL", "https://staging.example.com")
     from src.storage.database import init_database
 
     init_database()
@@ -20,7 +20,7 @@ def client(tmp_path, monkeypatch):
 
 def test_verification_is_single_use_and_unlocks_login(client, monkeypatch):
     sent = {}
-    monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", "true")
+    monkeypatch.setenv("MARKETHELM_REQUIRE_EMAIL_VERIFICATION", "true")
     monkeypatch.setattr(
         "dashboard.backend.api.auth.send_account_email",
         lambda **kwargs: sent.update(kwargs) is None or True,

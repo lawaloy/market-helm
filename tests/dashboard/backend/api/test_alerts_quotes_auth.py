@@ -10,8 +10,8 @@ import pytest
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "quotes-auth.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -125,7 +125,7 @@ class TestFileModeQuotesRemainOpen:
     """Self-host / file mode must keep anonymous quotes (no DATABASE_URL)."""
 
     def test_get_quotes_without_auth(self, client, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.resolve_symbol_prices",
             lambda symbols, fetch_missing=True: {"AAPL": 99.0},
@@ -135,7 +135,7 @@ class TestFileModeQuotesRemainOpen:
         assert r.json()["prices"]["AAPL"] == 99.0
 
     def test_post_quotes_without_auth(self, client, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.resolve_symbol_prices",
             lambda symbols, fetch_missing=True: {"AAPL": 99.0},
