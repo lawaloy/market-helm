@@ -65,7 +65,7 @@ jobs:
                 pr.head.repo?.full_name === `${owner}/${repo}` &&
                 pr.base.ref === 'main' &&
                 pr.head.ref === 'security/deps-maintenance' &&
-                ['app/github-actions', 'github-actions[bot]', 'market-helm[bot]', 'markethelm[bot]', 'app/market-helm', 'app/markethelm'].includes(authorLogin) &&
+                ['app/github-actions', 'github-actions[bot]', 'markethelm[bot]', 'app/markethelm'].includes(authorLogin) &&
                 labels.includes('dependencies') &&
                 labels.includes('security')
               );

@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 from urllib.parse import urljoin, urlparse
 
 from src.alerts.notifiers.email_delivery import _platform_from_address, build_email_backend
-from src.core.compat import get_env
 
 logger = logging.getLogger(__name__)
 
 
 def send_account_email(*, recipient: str, purpose: str, token: str) -> bool:
-    raw_url = (get_env("MARKETHELM_PUBLIC_URL") or "").strip()
+    raw_url = (os.environ.get("MARKETHELM_PUBLIC_URL") or "").strip()
     parsed = urlparse(raw_url)
     local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}
     if (

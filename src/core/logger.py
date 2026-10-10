@@ -9,28 +9,6 @@ from datetime import datetime
 from pathlib import Path
 
 
-def _rename_legacy_log_files(log_path: Path) -> None:
-    """Rename stock_tracker_*.log files left from older releases to markethelm_*.log."""
-    for old in sorted(log_path.glob("stock_tracker_*.log")):
-        if old.name.startswith("stock_tracker_errors_"):
-            continue
-        suffix = old.name.removeprefix("stock_tracker_")
-        new = log_path / f"markethelm_{suffix}"
-        if not new.exists():
-            try:
-                old.rename(new)
-            except OSError:
-                pass
-    for old in sorted(log_path.glob("stock_tracker_errors_*.log")):
-        suffix = old.name.removeprefix("stock_tracker_errors_")
-        new = log_path / f"markethelm_errors_{suffix}"
-        if not new.exists():
-            try:
-                old.rename(new)
-            except OSError:
-                pass
-
-
 def setup_logger(name: str = "markethelm", log_dir: str = "logs") -> logging.Logger:
     """
     Set up logger with console and file handlers.
@@ -68,8 +46,6 @@ def setup_logger(name: str = "markethelm", log_dir: str = "logs") -> logging.Log
         log_path.mkdir(exist_ok=True)
     except OSError:
         return logger
-
-    _rename_legacy_log_files(log_path)
 
     today = datetime.now().strftime("%Y-%m-%d")
     try:

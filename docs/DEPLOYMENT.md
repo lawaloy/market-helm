@@ -684,61 +684,6 @@ Store API keys in the platform secret manager; never bake them into images.
 
 </details>
 
-<a id="migrating-from-market-helm"></a>
-<details>
-<summary><b>Migrating from market-helm (rename to markethelm)</b></summary>
-
-The project was renamed from `market-helm` to `markethelm`. Existing installs keep working
-through deprecated aliases, but deployed resources need a one-time migration:
-
-| What                            | Old name                                 | New name                               |
-| ------------------------------- | ---------------------------------------- | -------------------------------------- |
-| Python package                  | `market-helm`                            | `markethelm`                           |
-| CLI                             | `market-helm`, `market-helm-web`         | `markethelm`, `markethelm-web`         |
-| Environment variable            | `MARKET_HELM_*`                          | `MARKETHELM_*`                         |
-| User config folder              | `~/.market-helm`                         | `~/.markethelm`                        |
-| Log files                       | `logs/market_helm_*.log`                 | `logs/markethelm_*.log`                |
-| Docker image / CronJob / secret | `market-helm`, `market-helm-secrets`     | `markethelm`, `markethelm-secrets`     |
-| Browser storage keys            | `market-helm-token`, `market-helm-theme` | `markethelm-token`, `markethelm-theme` |
-
-**Compatibility (deprecated, will be removed in a future release):**
-
-- `MARKET_HELM_*` variables are still read when the `MARKETHELM_*` name is unset or empty.
-  The new name always wins, and one deprecation warning is logged per old variable.
-  Docker Compose substitution variables (`MARKETHELM_PORT`, `MARKETHELM_ENV_FILE`, ...) also fall
-  back to the old names.
-- `market-helm` and `market-helm-web` remain installed as aliases of `markethelm` and
-  `markethelm-web`.
-- On first use `~/.market-helm` (or the older `~/.market-desk`) is renamed to `~/.markethelm`.
-  If the rename fails (for example the folder is in use) the old folder keeps being used and a
-  warning is logged, so no data is stranded. If both folders exist, `~/.markethelm` wins and the
-  old one is left untouched; merge by hand if you need files from it.
-- Old log files are left in place; new log files use the new prefix.
-- Browsers carry the saved session and theme over automatically (one-time key move).
-
-**Steps for existing deployments:**
-
-1. **Environment:** rename `MARKET_HELM_*` to `MARKETHELM_*` in `.env`, `.env.staging`, compose
-   files, CI secrets and systemd units (the old names keep working meanwhile).
-2. **Python install:** `pip uninstall market-helm && pip install markethelm` (a new PyPI project
-   name; see the release notes for when it is first published).
-3. **Docker:** rebuild and retag the image (`docker build -t markethelm:latest .`). The compose
-   project name defaults to the checkout folder name; if you keep the old folder name your
-   existing named volumes (`postgres-data`, `market-data`) are reused. If you rename the folder or
-   set a new `-p` project name, Compose creates new empty volumes: copy the data first, for example
-   `docker run --rm -v OLD_VOLUME:/from -v NEW_VOLUME:/to alpine cp -a /from/. /to/`.
-4. **Host paths:** if you bind-mount `/var/lib/market-helm/...`, move it
-   (`mv /var/lib/market-helm /var/lib/markethelm`) and update the mount.
-5. **Kubernetes:** the manifest is now `k8s/markethelm-cronjob.yaml` (CronJob `markethelm`, secret
-   `markethelm-secrets`). Create the new secret, apply the new manifest, then delete the old
-   CronJob and secret:
-   `kubectl delete cronjob market-helm && kubectl delete secret market-helm-secrets`.
-6. **Scripts and cron:** change `market-helm ...` commands to `markethelm ...`.
-
----
-
-</details>
-
 <a id="security"></a>
 <details>
 <summary><b>Security</b></summary>

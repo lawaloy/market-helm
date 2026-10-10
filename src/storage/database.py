@@ -13,7 +13,6 @@ from typing import Any, Iterator
 from urllib.parse import urlparse
 
 from src.alerts.alert_paths import user_config_dir
-from src.core.compat import get_env
 
 logger = logging.getLogger(__name__)
 
@@ -247,12 +246,12 @@ _MIGRATION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (
 
 
 def database_enabled() -> bool:
-    return bool((get_env("MARKETHELM_DATABASE_URL") or "").strip())
+    return bool((os.environ.get("MARKETHELM_DATABASE_URL") or "").strip())
 
 
 def database_backend() -> str:
     """Return the configured storage backend name."""
-    raw = (get_env("MARKETHELM_DATABASE_URL") or "").strip()
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     if not raw:
         raise RuntimeError("MARKETHELM_DATABASE_URL is not set")
     scheme = urlparse(raw).scheme.lower()
@@ -267,7 +266,7 @@ def database_backend() -> str:
 
 def resolve_database_path() -> Path:
     """Resolve SQLite file path from MARKETHELM_DATABASE_URL (sqlite:///...)."""
-    raw = (get_env("MARKETHELM_DATABASE_URL") or "").strip()
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     if not raw:
         raise RuntimeError("MARKETHELM_DATABASE_URL is not set")
     parsed = urlparse(raw)
@@ -354,7 +353,7 @@ def _connect_postgresql() -> _PostgresConnection:
             "PostgreSQL support requires Psycopg with a usable libpq implementation. "
             "Install libpq or psycopg[binary] on a supported platform."
         ) from exc
-    raw = (get_env("MARKETHELM_DATABASE_URL") or "").strip()
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     return _PostgresConnection(psycopg.connect(raw, row_factory=dict_row))
 
 

@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
-from src.core.compat import get_env, resolve_user_config_dir
 from src.utils.tickers import normalize_ticker
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -35,7 +34,7 @@ def _env_lock_for(path: Path) -> threading.Lock:
 
 def user_config_dir() -> Path:
     """Per-user config directory (same location as the dashboard uses)."""
-    return resolve_user_config_dir(Path.home())
+    return Path.home() / ".markethelm"
 
 
 def bundled_example_path() -> Path:
@@ -44,7 +43,7 @@ def bundled_example_path() -> Path:
 
 def user_alerts_config_path() -> Path:
     """Writable user alerts path (never the repo dev fallback)."""
-    env_path = get_env("MARKETHELM_ALERTS_CONFIG")
+    env_path = os.environ.get("MARKETHELM_ALERTS_CONFIG")
     if env_path:
         return Path(env_path)
     return user_config_dir() / "alerts.json"
@@ -54,7 +53,7 @@ def resolve_alerts_config_path(explicit: Optional[Path] = None) -> Path:
     """Path to alerts.json: env override, then user file, then repo dev file."""
     if explicit is not None:
         return Path(explicit)
-    env_path = get_env("MARKETHELM_ALERTS_CONFIG")
+    env_path = os.environ.get("MARKETHELM_ALERTS_CONFIG")
     if env_path:
         return Path(env_path)
     user_path = user_config_dir() / "alerts.json"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -15,7 +16,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from src.core.compat import get_env
 from src.storage.database import database_enabled
 from src.storage.rate_limits import RateLimitUsage, consume_rate_limit
 
@@ -45,7 +45,7 @@ class RateLimitDecision:
 
 
 def _bounded_env(name: str, default: int, *, maximum: int) -> int:
-    raw = (get_env(name) or "").strip()
+    raw = (os.environ.get(name) or "").strip()
     if not raw:
         return default
     try:
@@ -56,7 +56,7 @@ def _bounded_env(name: str, default: int, *, maximum: int) -> int:
 
 
 def rate_limiting_enabled() -> bool:
-    raw = (get_env("MARKETHELM_RATE_LIMIT_ENABLED") or "").strip().lower()
+    raw = (os.environ.get("MARKETHELM_RATE_LIMIT_ENABLED") or "").strip().lower()
     if raw in {"1", "true", "yes", "on"}:
         return True
     if raw in {"0", "false", "no", "off"}:
@@ -120,7 +120,7 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
 
 def _trusted_proxy_networks() -> Tuple[ipaddress._BaseNetwork, ...]:
     networks = []
-    for raw in (get_env("MARKETHELM_TRUSTED_PROXY_CIDRS") or "").split(","):
+    for raw in (os.environ.get("MARKETHELM_TRUSTED_PROXY_CIDRS") or "").split(","):
         value = raw.strip()
         if not value:
             continue

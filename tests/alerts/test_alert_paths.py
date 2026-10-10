@@ -32,55 +32,10 @@ def test_resolve_prefers_explicit_path(tmp_path: Path) -> None:
     assert resolve_alerts_config_path(custom) == custom
 
 
-def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path: Path) -> None:
+def test_user_config_dir_is_dot_markethelm_in_home(monkeypatch, tmp_path: Path) -> None:
     home = _fake_home(monkeypatch, tmp_path)
-    legacy = home / ".market-desk"
-    legacy.mkdir()
-    (legacy / "alerts.json").write_text('{"alerts": []}', encoding="utf-8")
 
-    resolved = user_config_dir()
-
-    assert resolved == home / ".markethelm"
-    assert resolved.exists()
-    assert not legacy.exists()
-    assert (resolved / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
-
-
-def test_user_config_dir_soft_fails_when_legacy_rename_raises(monkeypatch, tmp_path: Path) -> None:
-    """A busy/unwritable ~/.market-desk must not crash config resolution."""
-    home = _fake_home(monkeypatch, tmp_path)
-    legacy = home / ".market-desk"
-    legacy.mkdir()
-    (legacy / "alerts.json").write_text('{"alerts": []}', encoding="utf-8")
-
-    def boom(_self, _dest):
-        raise OSError("permission denied")
-
-    monkeypatch.setattr(Path, "rename", boom)
-
-    resolved = user_config_dir()
-
-    # The legacy folder keeps being used so no data is stranded.
-    assert resolved == legacy
-    assert not (home / ".markethelm").exists()
-    assert legacy.exists()
-    assert (legacy / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
-
-
-def test_user_config_dir_keeps_existing_markethelm(monkeypatch, tmp_path: Path) -> None:
-    home = _fake_home(monkeypatch, tmp_path)
-    dest = home / ".markethelm"
-    dest.mkdir()
-    (dest / "alerts.json").write_text('{"alerts": [{"id": "keep"}]}', encoding="utf-8")
-    legacy = home / ".market-desk"
-    legacy.mkdir()
-    (legacy / "alerts.json").write_text('{"alerts": [{"id": "stale"}]}', encoding="utf-8")
-
-    resolved = user_config_dir()
-
-    assert resolved == dest
-    assert legacy.exists()
-    assert (dest / "alerts.json").read_text(encoding="utf-8") == '{"alerts": [{"id": "keep"}]}'
+    assert user_config_dir() == home / ".markethelm"
 
 
 def test_resolve_alerts_config_path_precedence(monkeypatch, tmp_path: Path) -> None:

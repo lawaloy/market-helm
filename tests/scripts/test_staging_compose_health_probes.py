@@ -55,8 +55,8 @@ def test_compose_api_healthcheck_probes_ready_and_binds_loopback() -> None:
     compose = COMPOSE_STAGING.read_text(encoding="utf-8")
     api = _service_block(compose, "api")
 
-    assert '"127.0.0.1:${MARKETHELM_PORT:-${MARKET_HELM_PORT:-8000}}:8000"' in api or (
-        "127.0.0.1:${MARKETHELM_PORT:-${MARKET_HELM_PORT:-8000}}:8000" in api
+    assert '"127.0.0.1:${MARKETHELM_PORT:-8000}:8000"' in api or (
+        "127.0.0.1:${MARKETHELM_PORT:-8000}:8000" in api
     )
     assert re.search(r"0\.0\.0\.0:.*8000", api) is None
 

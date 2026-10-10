@@ -89,7 +89,7 @@ module.exports = async ({ github, context, core }) => {
       pr.head.repo?.full_name === `${owner}/${repo}` &&
       pr.base?.ref === 'main' &&
       pr.head?.ref === 'security/deps-maintenance' &&
-      ['app/github-actions', 'github-actions[bot]', 'market-helm[bot]', 'markethelm[bot]', 'app/market-helm', 'app/markethelm'].includes(
+      ['app/github-actions', 'github-actions[bot]', 'markethelm[bot]', 'app/markethelm'].includes(
         authorLogin,
       ) &&
       labels.includes('dependencies') &&
@@ -104,7 +104,7 @@ module.exports = async ({ github, context, core }) => {
       pr.head.repo?.full_name === `${owner}/${repo}` &&
       pr.base?.ref === 'main' &&
       /^chore\/post-release-sync-\d+\.\d+\.\d+$/.test(headRef) &&
-      ['market-helm[bot]', 'markethelm[bot]', 'app/market-helm', 'app/markethelm'].includes(authorLogin)
+      ['markethelm[bot]', 'app/markethelm'].includes(authorLogin)
     );
   };
 

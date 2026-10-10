@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { migrateLegacyStorageKey } from '../utils/legacyStorage';
 import type {
   MarketOverview,
   MoversResponse,
@@ -27,7 +26,6 @@ export const AUTH_TOKEN_KEY = 'markethelm-token';
 
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  migrateLegacyStorageKey(AUTH_TOKEN_KEY, 'market-helm-token');
   try {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   } catch {

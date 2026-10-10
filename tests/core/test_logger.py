@@ -44,59 +44,6 @@ class TestCoreLogger(unittest.TestCase):
         logger2 = setup_logger(name="test_logger", log_dir=self.test_log_dir)
         self.assertEqual(logger1.name, logger2.name)
 
-    def test_renames_legacy_stock_tracker_log_files(self):
-        """Legacy stock_tracker_*.log files are renamed to markethelm_*.log."""
-        from datetime import datetime
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        log_dir = Path(self.test_log_dir)
-        legacy = log_dir / f"stock_tracker_{today}.log"
-        legacy_err = log_dir / f"stock_tracker_errors_{today}.log"
-        legacy.write_text("old main\n", encoding="utf-8")
-        legacy_err.write_text("old err\n", encoding="utf-8")
-
-        setup_logger(log_dir=self.test_log_dir)
-
-        self.assertFalse(legacy.exists())
-        self.assertFalse(legacy_err.exists())
-        self.assertTrue((log_dir / f"markethelm_{today}.log").exists())
-        self.assertTrue((log_dir / f"markethelm_errors_{today}.log").exists())
-        self.assertIn("old main", (log_dir / f"markethelm_{today}.log").read_text(encoding="utf-8"))
-
-    def test_skips_legacy_rename_when_destination_already_exists(self):
-        """Existing markethelm_*.log must not be overwritten by legacy rename."""
-        from datetime import datetime
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        log_dir = Path(self.test_log_dir)
-        legacy = log_dir / f"stock_tracker_{today}.log"
-        dest = log_dir / f"markethelm_{today}.log"
-        legacy.write_text("legacy only\n", encoding="utf-8")
-        dest.write_text("already migrated\n", encoding="utf-8")
-
-        logger = setup_logger(log_dir=self.test_log_dir)
-
-        self.assertTrue(legacy.exists())
-        self.assertEqual(dest.read_text(encoding="utf-8"), "already migrated\n")
-        self.assertIsInstance(logger, logging.Logger)
-
-    def test_soft_fails_when_legacy_rename_raises_oserror(self):
-        """Boot must still return a usable logger if legacy rename races."""
-        from datetime import datetime
-        from unittest.mock import patch
-
-        today = datetime.now().strftime("%Y-%m-%d")
-        log_dir = Path(self.test_log_dir)
-        legacy = log_dir / f"stock_tracker_{today}.log"
-        legacy.write_text("legacy\n", encoding="utf-8")
-
-        with patch.object(Path, "rename", side_effect=OSError("busy")):
-            logger = setup_logger(name="logger_rename_soft_fail", log_dir=self.test_log_dir)
-
-        self.assertIsInstance(logger, logging.Logger)
-        self.assertGreaterEqual(len(logger.handlers), 3)
-        self.assertTrue(legacy.exists())
-
     def test_soft_fails_when_log_dir_mkdir_raises_oserror(self):
         """Unwritable log dir must not abort imports that call setup_logger."""
         from unittest.mock import patch

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import json
+import os
 import secrets
 import sys
 import time
@@ -22,8 +23,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit, urlunsplit
-
-from src.core.compat import get_env
 
 
 class AcceptanceError(RuntimeError):
@@ -395,7 +394,10 @@ def _credentials_from_env() -> list[tuple[str, str]]:
         ("MARKETHELM_STAGING_TENANT_A_EMAIL", "MARKETHELM_STAGING_TENANT_A_PASSWORD"),
         ("MARKETHELM_STAGING_TENANT_B_EMAIL", "MARKETHELM_STAGING_TENANT_B_PASSWORD"),
     )
-    credentials = [(get_env(email, "").strip(), get_env(password, "")) for email, password in names]
+    credentials = [
+        (os.environ.get(email, "").strip(), os.environ.get(password, ""))
+        for email, password in names
+    ]
     if any(not email or not password for email, password in credentials):
         raise AcceptanceError(
             "Tenant checks require MARKETHELM_STAGING_TENANT_{A,B}_{EMAIL,PASSWORD}."
@@ -442,7 +444,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
-        default=get_env("MARKETHELM_STAGING_URL", "http://127.0.0.1:8000"),
+        default=os.environ.get("MARKETHELM_STAGING_URL", "http://127.0.0.1:8000"),
         help="Staging API URL (or MARKETHELM_STAGING_URL). Non-loopback URLs require HTTPS.",
     )
     parser.add_argument(

@@ -7,10 +7,9 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import time
 from typing import Any, Dict
-
-from src.core.compat import get_env
 
 DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
 # Bound Bearer token size so decode cannot HMAC multi-MB attacker payloads.
@@ -22,7 +21,7 @@ class AuthError(ValueError):
 
 
 def _auth_secret() -> bytes:
-    secret = (get_env("MARKETHELM_AUTH_SECRET") or "").strip()
+    secret = (os.environ.get("MARKETHELM_AUTH_SECRET") or "").strip()
     if len(secret) < 16:
         raise AuthError(
             "MARKETHELM_AUTH_SECRET must be set (min 16 characters) when multi-user mode is "

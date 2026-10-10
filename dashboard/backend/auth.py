@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from typing import Optional
 
 from fastapi import Header, HTTPException
 
-from src.core.compat import get_env
 from src.storage.database import database_enabled
 from src.storage.session import AuthError, decode_access_token
 from src.storage.users import get_user_by_id
@@ -49,7 +49,7 @@ def bearer_session(authorization: Optional[str]) -> Optional[dict]:
 
 
 def _verification_required() -> bool:
-    return (get_env("MARKETHELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+    return (os.environ.get("MARKETHELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
         "1",
         "true",
         "yes",
