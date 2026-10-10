@@ -2,15 +2,23 @@
 
 ---
 
-## Common issues
+<a id="common-issues"></a>
+<details open>
+<summary><b>Common issues</b></summary>
 
-### API key required
+<a id="api-key-required"></a>
+<details>
+<summary><b>API key required</b></summary>
 
 - Ensure a `.env` file exists with `FINNHUB_API_KEY=your-key`.
-- Check the key is correct (40 characters).
+- Copy the key exactly from your Finnhub dashboard, with no spaces, quotes, or line breaks.
 - Restart your terminal after creating `.env`.
 
-### Rate limit exceeded (429)
+</details>
+
+<a id="rate-limit-exceeded-429"></a>
+<details>
+<summary><b>Rate limit exceeded (429)</b></summary>
 
 - The tool has built-in retry logic.
 - If it happens frequently:
@@ -18,21 +26,35 @@
   - Wait 5–10 minutes between runs.
   - Consider upgrading to a paid Finnhub tier.
 
-### No data fetched
+</details>
+
+<a id="no-data-fetched"></a>
+<details>
+<summary><b>No data fetched</b></summary>
 
 - Check your internet connection.
 - Verify the Finnhub API key is valid.
 - Check `logs/market_helm_errors_*.log` for details.
 - Check [Finnhub API status](https://finnhub.io/status).
 
-### Logs not showing
+</details>
+
+<a id="logs-not-showing"></a>
+<details>
+<summary><b>Logs not showing</b></summary>
 
 - Logs are in the `logs/` folder (created automatically).
 - Console shows INFO level; files show DEBUG level.
 
 ---
 
-## FAQ
+</details>
+
+</details>
+
+<a id="faq"></a>
+<details>
+<summary><b>FAQ</b></summary>
 
 **Is this free?**  
 Yes. Finnhub's free tier is sufficient for daily tracking.
@@ -45,13 +67,14 @@ Rerun the tracker. Each run is independent; data is saved with the date.
 
 **Can I backtest strategies?**  
 MarketHelm can validate its saved projections with `market-helm backtest`. It is
-not a general trading-strategy simulator, and it needs dated daily/projection CSV
-snapshots in the configured data directory.
+not a general trading-strategy simulator, and it needs saved quotes and projections in the configured data store (`market_bars.sqlite`).
 
 **Is my data private?**  
 Yes. Data stays on your machine. API keys never leave your environment.
 
 ---
+
+</details>
 
 ## Getting help
 

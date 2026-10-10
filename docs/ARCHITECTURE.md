@@ -3,7 +3,9 @@
 MarketHelm has a reusable Python core, two presentation layers (CLI and web), a
 React dashboard, and an optional hosted persistence/worker subsystem.
 
-## Repository layout
+<a id="repository-layout"></a>
+<details open>
+<summary><b>Repository layout</b></summary>
 
 ```text
 market-helm/
@@ -20,7 +22,7 @@ market-helm/
 |   |-- backend/                    # FastAPI routes, auth, rate limits, health
 |   `-- frontend/                   # React/TypeScript SPA
 |-- config/                         # Exchange, filter, and alert examples
-|-- data/                           # Shared CSV/JSON/Markdown market output
+|-- data/                           # Runtime data: SQLite sidecar, optional Markdown reports
 |-- tests/                          # Python unit/integration/security tests
 `-- scripts/                        # Build, release, worker, and validation helpers
 ```
@@ -29,29 +31,36 @@ Business logic belongs in `src/` so the CLI, FastAPI routes, and workers can reu
 it. The frontend communicates with FastAPI through `/api/*` routes. A production
 frontend build is emitted into `dashboard/backend/static/` and served by FastAPI.
 
-## Operating modes
+</details>
 
-### Local/self-hosted file mode
+<a id="operating-modes"></a>
+<details>
+<summary><b>Operating modes</b></summary>
+
+<a id="localself-hosted-file-mode"></a>
+<details>
+<summary><b>Local/self-hosted file mode</b></summary>
 
 This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 
-- Market runs write dated CSV/JSON/Markdown files under `DATA_DIR` and dual-write
-  daily quote rows into durable `market_bars` (app database when
-  `MARKET_HELM_DATABASE_URL` is set, otherwise `DATA_DIR/market_bars.sqlite`).
-  Dashboard/alert readers still use CSV in this slice; DB is the accumulation path.
+- Market runs write quotes, projections, and daily summaries to durable storage (`market_bars`, `projections`, `daily_summaries`) in `DATA_DIR/market_bars.sqlite`, or in the app database when `MARKET_HELM_DATABASE_URL` is set. Optional Markdown projection reports go under `DATA_DIR`. Dashboard and alert readers use the same durable store.
 - Alert preferences and history use the local MarketHelm configuration directory.
 - Alert API routes are intended for an operator-controlled deployment and do not
   require user accounts.
 - `market-helm alerts run --loop` evaluates rules on a schedule.
 
-### Hosted multi-user mode
+</details>
+
+<a id="hosted-multi-user-mode"></a>
+<details>
+<summary><b>Hosted multi-user mode</b></summary>
 
 Setting `MARKET_HELM_DATABASE_URL` enables SQLite or PostgreSQL persistence for
 accounts and tenant-owned alert state.
 
 - Bearer sessions protect tenant-specific API routes.
 - Alert configuration, watches, jobs, and delivery history are scoped per user.
-- Market data files remain shared platform inputs.
+- Market data remains a shared platform input, not tenant-owned.
 - The orchestrator creates jobs and workers claim/process them from the database.
 - Versioned migrations run at startup and fail closed on an unknown newer schema.
 - Rate limiting defaults on and health/readiness/worker/metrics endpoints support
@@ -76,7 +85,13 @@ docker compose -f docker-compose.postgres-test.yml down --volumes
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration and hosted verification.
 
-## Daily market workflow
+</details>
+
+</details>
+
+<a id="daily-market-workflow"></a>
+<details>
+<summary><b>Daily market workflow</b></summary>
 
 ```text
 index constituents
@@ -90,7 +105,7 @@ detailed quote/profile fetch for selected symbols
         v
 market analysis + heuristic five-session XNYS projections
         |
-        +--> dated CSV/JSON/Markdown files
+        +--> durable market_bars/projections store (+ optional Markdown)
         +--> exact-session backtest CLI + dashboard history/accuracy APIs
         `--> alert evaluation snapshot
 ```
@@ -98,7 +113,11 @@ market analysis + heuristic five-session XNYS projections
 The workflow is batch-oriented. "Fetch New" starts the same underlying tracker
 work in a background process; it is not a streaming quote service.
 
-## Alert workflow
+</details>
+
+<a id="alert-workflow"></a>
+<details>
+<summary><b>Alert workflow</b></summary>
 
 ```text
 market snapshot / selected quote
@@ -116,11 +135,9 @@ market snapshot / selected quote
 In hosted mode, database jobs add claim/lease semantics around evaluation so
 multiple workers can process user rules without sharing in-memory tenant state.
 
-Current conditions are price thresholds and screening matches. Current channels
-are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
+Current channels are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
 conditions are price thresholds, RSI thresholds, shallow AND/OR compounds of those
-leaves (plus screening match), with history loaded from provider candles, then
-durable `market_bars`. Patterns,
+leaves (plus screening match), with history loaded from provider candles, then durable `market_bars`. Patterns,
 nested compounds, SMS, push, and cloud queue-provider adapters
 are not implemented.
 
@@ -133,20 +150,27 @@ are not implemented.
 | `delivery_status.py`                        | Record per-channel outcomes                     |
 | `notifiers/`                                | Email/webhook delivery and retry classification |
 
-## Data ownership
+</details>
 
-| Data                     | Local mode                  | Hosted mode                         |
-| ------------------------ | --------------------------- | ----------------------------------- |
-| Market CSV/JSON/Markdown | `DATA_DIR`                  | Shared `DATA_DIR`                   |
-| Alert config and history | Local JSON/files            | Per-user database records           |
-| Accounts and sessions    | Not used                    | Database                            |
-| Worker jobs and outcomes | Local run state/history     | Database                            |
-| Provider credentials     | Environment or local `.env` | Platform secret manager/environment |
+<a id="data-ownership"></a>
+<details>
+<summary><b>Data ownership</b></summary>
 
-The database is not currently a market-data warehouse. Persistence for generated
-market history remains file based in both modes.
+| Data                                  | Local mode                    | Hosted mode                         |
+| ------------------------------------- | ----------------------------- | ----------------------------------- |
+| Market quotes, projections, summaries | `DATA_DIR/market_bars.sqlite` | Shared application database         |
+| Alert config and history              | Local JSON/files              | Per-user database records           |
+| Accounts and sessions                 | Not used                      | Database                            |
+| Worker jobs and outcomes              | Local run state/history       | Database                            |
+| Provider credentials                  | Environment or local `.env`   | Platform secret manager/environment |
 
-## External API limiting and retries
+Quotes, projections, and daily summaries are stored durably in `market_bars`, `projections`, and `daily_summaries` (application database when `MARKET_HELM_DATABASE_URL` is set, otherwise the `DATA_DIR` sidecar); only optional Markdown reports remain files.
+
+</details>
+
+<a id="external-api-limiting-and-retries"></a>
+<details>
+<summary><b>External API limiting and retries</b></summary>
 
 `src/services/api_client.py` owns Finnhub request limiting, connection reuse, retry,
 and `429 Retry-After` behavior. Screening uses a quote-only request; only selected
@@ -157,7 +181,11 @@ This limiter is separate from the dashboard's inbound API rate limiter in
 `dashboard/backend/rate_limit.py`. Hosted API limits are configurable by route
 class and use trusted-proxy configuration to determine the client address.
 
-## Web/API boundaries
+</details>
+
+<a id="webapi-boundaries"></a>
+<details>
+<summary><b>Web/API boundaries</b></summary>
 
 FastAPI groups routes by concern:
 
@@ -170,13 +198,19 @@ FastAPI groups routes by concern:
 File mode preserves the original operator workflow. Hosted mode changes ownership
 and authorization of tenant data; it does not change the shared market-data model.
 
-## Important limitations
+</details>
+
+<a id="important-limitations"></a>
+<details>
+<summary><b>Important limitations</b></summary>
 
 - Projections are heuristic and are not a validated trading model.
 - Quotes and dashboard data are batch/refresh based, not WebSocket streams.
 - Managed PostgreSQL, provider delivery, ingress, backups, and restore need staging
   verification even though adapters and tests exist.
 - There is no broker API, order model, or automated execution path.
+
+</details>
 
 ## Related documentation
 

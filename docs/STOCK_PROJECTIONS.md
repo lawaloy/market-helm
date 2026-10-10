@@ -1,18 +1,30 @@
 # Stock Projections Feature
 
-## Overview
+<a id="overview"></a>
+<details open>
+<summary><b>Overview</b></summary>
 
 The Stock Projection system analyzes current market data and generates heuristic five-session price projections with buy/sell/hold recommendations for all tracked stocks.
 
-## Features
+</details>
 
-### 1. **Price Projections**
+<a id="features"></a>
+<details>
+<summary><b>Features</b></summary>
+
+<a id="1-price-projections"></a>
+<details>
+<summary><b>1. Price Projections</b></summary>
 
 - **5-Day Price Targets**: Low, Mid, and High price targets
 - **Expected Change**: Percentage gain/loss projection
 - **Projection Date**: Target date for the projection
 
-### 2. **Recommendations**
+</details>
+
+<a id="2-recommendations"></a>
+<details>
+<summary><b>2. Recommendations</b></summary>
 
 - **STRONG BUY**: High momentum bullish stocks with strong confidence
 - **BUY**: Moderate bullish momentum
@@ -20,7 +32,11 @@ The Stock Projection system analyzes current market data and generates heuristic
 - **SELL**: Moderate bearish pressure
 - **STRONG SELL**: Strong bearish momentum, potential decline
 
-### 3. **Confidence Scoring**
+</details>
+
+<a id="3-confidence-scoring"></a>
+<details>
+<summary><b>3. Confidence Scoring</b></summary>
 
 - **0-100% Confidence Score**: Based on multiple factors:
   - Momentum strength
@@ -29,21 +45,37 @@ The Stock Projection system analyzes current market data and generates heuristic
   - Market capitalization
   - Price stability
 
-### 4. **Risk Assessment**
+</details>
+
+<a id="4-risk-assessment"></a>
+<details>
+<summary><b>4. Risk Assessment</b></summary>
 
 - **Low Risk**: Stable, low volatility stocks
 - **Medium Risk**: Moderate volatility
 - **High Risk**: High volatility, unpredictable
 
-### 5. **Trend Classification**
+</details>
+
+<a id="5-trend-classification"></a>
+<details>
+<summary><b>5. Trend Classification</b></summary>
 
 - **Bullish**: Upward momentum expected
 - **Bearish**: Downward pressure expected
 - **Neutral**: Sideways movement expected
 
-## How It Works
+</details>
 
-### Technical Analysis Components
+</details>
+
+<a id="how-it-works"></a>
+<details>
+<summary><b>How It Works</b></summary>
+
+<a id="technical-analysis-components"></a>
+<details>
+<summary><b>Technical Analysis Components</b></summary>
 
 1. **Momentum Score** (-100 to +100)
    - Calculated from recent price changes
@@ -66,7 +98,11 @@ The Stock Projection system analyzes current market data and generates heuristic
    - High volume = Higher confidence
    - Large market cap = Higher confidence
 
-### Recommendation Logic
+</details>
+
+<a id="recommendation-logic"></a>
+<details>
+<summary><b>Recommendation Logic</b></summary>
 
 ```text
 STRONG BUY:  Momentum > 40 AND Volatility < 60
@@ -76,9 +112,17 @@ SELL:        Momentum < -15
 STRONG SELL: Momentum < -40 AND Volatility < 60
 ```
 
-## Output Format
+</details>
 
-### Console Display
+</details>
+
+<a id="output-format"></a>
+<details>
+<summary><b>Output Format</b></summary>
+
+<a id="console-display"></a>
+<details>
+<summary><b>Console Display</b></summary>
 
 When you run the tracker, you'll see:
 
@@ -110,9 +154,15 @@ Top 5 SELL Warnings:
   ...
 ```
 
-### Saved storage
+</details>
 
-#### 1. **Daily summary** (`daily_summaries` in hosted DB or `DATA_DIR/market_bars.sqlite`)
+<a id="saved-storage"></a>
+<details>
+<summary><b>Saved storage</b></summary>
+
+<a id="1-daily-summary-daily_summaries-in-hosted-db-or-data_dirmarket_barssqlite"></a>
+<details>
+<summary><b>1. Daily summary (<code>daily_summaries</code> in hosted DB or <code>DATA_DIR/market_bars.sqlite</code>)</b></summary>
 
 Logical location: `summary:YYYY-MM-DD`. Payload includes complete projection data:
 
@@ -154,15 +204,29 @@ Logical location: `summary:YYYY-MM-DD`. Payload includes complete projection dat
 }
 ```
 
-#### 2. **Projections table** (`projections` in the same DB sidecar)
+</details>
+
+<a id="2-projections-table-projections-in-the-same-db-sidecar"></a>
+<details>
+<summary><b>2. Projections table (<code>projections</code> in the same DB sidecar)</b></summary>
 
 Logical location: `projections:YYYY-MM-DD`. No `projections_*.csv` / `summary_*.json` write path.
 
 Optional human report: `data/projections_YYYY-MM-DD.md`.
 
-## Usage
+</details>
 
-### Running the Tracker
+</details>
+
+</details>
+
+<a id="usage"></a>
+<details>
+<summary><b>Usage</b></summary>
+
+<a id="running-the-tracker"></a>
+<details>
+<summary><b>Running the Tracker</b></summary>
 
 The projection system is automatically integrated into the daily tracker:
 
@@ -174,7 +238,11 @@ python main.py
 market-helm
 ```
 
-### Programmatic Access
+</details>
+
+<a id="programmatic-access"></a>
+<details>
+<summary><b>Programmatic Access</b></summary>
 
 ```python
 from src.workflows.tracker import StockTrackerWorkflow
@@ -196,7 +264,11 @@ if result['success']:
         print(f"Confidence: {aapl_projection['confidence']}%")
 ```
 
-### Custom Analysis
+</details>
+
+<a id="custom-analysis"></a>
+<details>
+<summary><b>Custom Analysis</b></summary>
 
 ```python
 from src.analysis.projector import StockProjector
@@ -214,9 +286,17 @@ projections = projector.generate_projections(current_stocks)
 summary = projector.generate_projection_summary(projections)
 ```
 
-## Important Notes
+</details>
 
-### ⚠️ Disclaimer
+</details>
+
+<a id="important-notes"></a>
+<details>
+<summary><b>Important Notes</b></summary>
+
+<a id="-disclaimer"></a>
+<details>
+<summary><b>⚠️ Disclaimer</b></summary>
 
 **Stock projections are for informational purposes only and should not be considered financial advice.**
 
@@ -226,14 +306,22 @@ summary = projector.generate_projection_summary(projections)
 - Always do your own research and consult with financial advisors
 - Consider multiple sources before making investment decisions
 
-### Limitations
+</details>
+
+<a id="limitations"></a>
+<details>
+<summary><b>Limitations</b></summary>
 
 1. **Short-term focus**: 5-session projections only
 2. **Technical only**: No fundamental analysis (earnings, news, etc.)
 3. **Historical data**: Requires at least 1 day of data
 4. **No guarantees**: Market conditions can change rapidly
 
-### Best Practices
+</details>
+
+<a id="best-practices"></a>
+<details>
+<summary><b>Best Practices</b></summary>
 
 ✅ **Use as one input among many**
 ✅ **Compare with other analysis tools**
@@ -242,7 +330,13 @@ summary = projector.generate_projection_summary(projections)
 ✅ **Track accuracy over time**
 ✅ **Adjust for market conditions**
 
-## Projection accuracy (shipped)
+</details>
+
+</details>
+
+<a id="projection-accuracy-shipped"></a>
+<details>
+<summary><b>Projection accuracy (shipped)</b></summary>
 
 The projection files now record a five-session **XNYS** target, rather than adding
 five calendar days. Premarket and intraday runs anchor that horizon to the last
@@ -281,7 +375,11 @@ assess --data-dir data --days 365` to see the evidence shortfall. The gate requi
 two confidence cohorts of 30 or more samples. `capture` writes a report and input
 hash manifest only after all gates pass; see [USAGE.md](USAGE.md#projection-backtesting).
 
-## Future Enhancements
+</details>
+
+<a id="future-enhancements"></a>
+<details>
+<summary><b>Future Enhancements</b></summary>
 
 Potential improvements for future versions:
 
@@ -295,9 +393,15 @@ Potential improvements for future versions:
       opportunities (RSI + shallow price/RSI compounds already ship; see
       [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow))
 
-## Architecture
+</details>
 
-### Module Structure
+<a id="architecture"></a>
+<details>
+<summary><b>Architecture</b></summary>
+
+<a id="module-structure"></a>
+<details>
+<summary><b>Module Structure</b></summary>
 
 ```text
 src/analysis/projector.py
@@ -313,13 +417,23 @@ src/analysis/projector.py
 │   └── generate_projection_summary() # Aggregate statistics
 ```
 
-### Integration Points
+</details>
+
+<a id="integration-points"></a>
+<details>
+<summary><b>Integration Points</b></summary>
 
 - **Workflow**: `src/workflows/tracker.py` - Step 4: Generate projections
 - **CLI**: `src/cli/commands.py` - Display projection results
-- **Storage**: `src/storage/data_storage.py` - Save projections to CSV/JSON
+- **Storage**: `src/storage/data_storage.py` - Save projections and summaries to durable storage
 
-## Example Results
+</details>
+
+</details>
+
+<a id="example-results"></a>
+<details>
+<summary><b>Example Results</b></summary>
 
 Based on actual test with 197 stocks:
 
@@ -327,7 +441,9 @@ Based on actual test with 197 stocks:
 - **Average Confidence**: 73.2%
 - **Expected Market Move**: +0.13%
 
-### Top Performers (Test Data)
+<a id="top-performers-test-data"></a>
+<details>
+<summary><b>Top Performers (Test Data)</b></summary>
 
 **Top BUY Opportunities:**
 
@@ -341,17 +457,29 @@ Based on actual test with 197 stocks:
 2. PLTR: $167.86 → $165.53 (-1.4%, 90% confidence)
 3. INTU: $629.46 → $613.80 (-2.5%, 90% confidence)
 
-## Testing
+</details>
+
+</details>
+
+<a id="testing"></a>
+<details>
+<summary><b>Testing</b></summary>
 
 The projection system has been tested with real market data and produces consistent, reasonable projections based on technical analysis principles.
 
-### Test Results
+<a id="test-results"></a>
+<details>
+<summary><b>Test Results</b></summary>
 
 - ✅ Successfully generates projections for 90%+ of stocks
 - ✅ Confidence scores properly weighted
 - ✅ Recommendations align with momentum/trend
 - ✅ Price targets within reasonable ranges
 - ✅ Risk levels correctly assessed
+
+</details>
+
+</details>
 
 ## Support
 

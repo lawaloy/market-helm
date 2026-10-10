@@ -1,58 +1,43 @@
 # MarketHelm — tests
 
-## Overview
+<a id="overview"></a>
+<details open>
+<summary><b>Overview</b></summary>
 
 This directory contains unit tests for the MarketHelm project. The test layout mirrors the project structure so that each source module has a corresponding test package.
 
-## Test Structure
+</details>
+
+<a id="test-structure"></a>
+<details>
+<summary><b>Test Structure</b></summary>
 
 Tests are organized to mirror the source code layout:
 
 ```text
 tests/
-├── __init__.py
-├── conftest.py              # Pytest config: adds project root to sys.path
-├── README.md
-│
-├── analysis/                # mirrors src/analysis/
-│   ├── __init__.py
-│   ├── test_ai_summarizer.py
-│   ├── test_analyzer.py
-│   └── test_projector.py
-│
-├── core/                    # mirrors src/core/
-│   ├── __init__.py
-│   ├── test_config.py
-│   └── test_logger.py
-│
-├── services/                # mirrors src/services/
-│   ├── __init__.py
-│   └── test_api_client.py
-│
-├── storage/                 # mirrors src/storage/
-│   ├── __init__.py
-│   └── test_data_storage.py
-│
-├── workflows/               # mirrors src/workflows/
-│   ├── __init__.py
-│   └── test_tracker.py
-│
-├── alerts/                  # src/alerts/ notifiers + engine integration
-│   └── test_webhook_notifier.py
-│
-└── dashboard/               # mirrors dashboard/
-    ├── __init__.py
-    └── backend/
-        ├── __init__.py
-        ├── api/
-        │   ├── __init__.py
-        │   └── test_api.py
-        └── services/
-            ├── __init__.py
-            └── test_data_loader.py
+|-- __init__.py
+|-- conftest.py       # Pytest config: adds project root to sys.path
+|-- README.md
+|-- helpers/          # Shared test helpers
+|-- alerts/           # mirrors src/alerts/ (engine, rules, storage, workers, notifiers)
+|-- analysis/         # mirrors src/analysis/
+|-- cli/              # mirrors src/cli/
+|-- core/             # mirrors src/core/
+|-- dashboard/        # mirrors dashboard/ (backend API and services)
+|-- integration/      # PostgreSQL storage and provider-resilience tests
+|-- scripts/          # scripts/ helpers plus workflow and compose hygiene checks
+|-- services/         # mirrors src/services/
+|-- storage/          # mirrors src/storage/ (accounts, alerts, market bars, migrations)
+|-- utils/            # mirrors src/utils/
+`-- workflows/        # mirrors src/workflows/
 ```
 
-## Path Setup
+</details>
+
+<a id="path-setup"></a>
+<details>
+<summary><b>Path Setup</b></summary>
 
 `conftest.py` adds the project root to `sys.path`, so tests can use:
 
@@ -61,9 +46,15 @@ tests/
 
 No manual `sys.path.insert` is needed in individual test files.
 
-## Running Tests
+</details>
 
-### Run All Tests
+<a id="running-tests"></a>
+<details open>
+<summary><b>Running Tests</b></summary>
+
+<a id="run-all-tests"></a>
+<details open>
+<summary><b>Run All Tests</b></summary>
 
 ```bash
 # Database-free suite from the project root
@@ -77,7 +68,11 @@ MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethe
 python -m unittest discover tests/
 ```
 
-### Run Specific Package
+</details>
+
+<a id="run-specific-package"></a>
+<details>
+<summary><b>Run Specific Package</b></summary>
 
 ```bash
 python -m pytest tests/analysis/
@@ -85,27 +80,45 @@ python -m pytest tests/core/
 python -m pytest tests/dashboard/
 ```
 
-### Run Specific Test File
+</details>
+
+<a id="run-specific-test-file"></a>
+<details>
+<summary><b>Run Specific Test File</b></summary>
 
 ```bash
 python -m pytest tests/core/test_config.py -v
 ```
 
-### Run Specific Test Class or Method
+</details>
+
+<a id="run-specific-test-class-or-method"></a>
+<details>
+<summary><b>Run Specific Test Class or Method</b></summary>
 
 ```bash
 python -m pytest tests/core/test_config.py::TestCoreConfig
 python -m pytest tests/core/test_config.py::TestCoreConfig::test_default_indices
 ```
 
-### Run with Coverage
+</details>
+
+<a id="run-with-coverage"></a>
+<details>
+<summary><b>Run with Coverage</b></summary>
 
 ```bash
 pip install pytest-cov
 python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --cov=src --cov-report=html
 ```
 
-## Test Coverage
+</details>
+
+</details>
+
+<a id="test-coverage"></a>
+<details>
+<summary><b>Test Coverage</b></summary>
 
 | Module                                      | Tests                                             |
 | ------------------------------------------- | ------------------------------------------------- |
@@ -121,7 +134,11 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 | `dashboard/backend/api`                     | Market, summary, health, history (incl. accuracy) |
 | `dashboard/backend/services/data_loader.py` | Data loading, projection accuracy computation     |
 
-## Writing New Tests
+</details>
+
+<a id="writing-new-tests"></a>
+<details>
+<summary><b>Writing New Tests</b></summary>
 
 1. **Mirror the source structure**  
    Place tests in the matching package:
@@ -139,20 +156,26 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 5. **Clean up resources**  
    Use `setUp`/`tearDown` or pytest fixtures for temp dirs.
 
-## Dependencies
+</details>
+
+<a id="dependencies"></a>
+<details>
+<summary><b>Dependencies</b></summary>
 
 ```bash
 pip install pytest pytest-cov
 ```
 
-## Next Priority
+</details>
+
+<a id="next-priority"></a>
+<details>
+<summary><b>Next Priority</b></summary>
 
 **Missing or light tests (by module):**
 
-1. `src/services/data_fetcher.py` – Stock data fetching
-2. `src/services/stock_screener.py` – Screening logic
-3. `src/services/index_fetcher.py` – Index constituent fetching
-4. `src/alerts/alert_engine.py`, `alert_rules.py`, `alert_storage.py` – Beyond webhook notifier coverage
-5. Integration tests for full workflow (end-to-end with temp `data/`)
+1. Integration tests for full workflow (end-to-end with temp `data/`)
 
 **Roadmap:** [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md)
+
+</details>
