@@ -31,9 +31,7 @@ def test_expired_rate_limit_rows_are_removed(rate_limit_database) -> None:
     consume_rate_limit("new:key", now=120, window_seconds=60)
 
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT bucket_key FROM api_rate_limits ORDER BY bucket_key"
-        ).fetchall()
+        rows = conn.execute("SELECT bucket_key FROM api_rate_limits ORDER BY bucket_key").fetchall()
     assert [row["bucket_key"] for row in rows] == ["new:key"]
 
 

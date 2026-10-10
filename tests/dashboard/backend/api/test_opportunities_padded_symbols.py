@@ -22,14 +22,13 @@ def temp_data_dir(monkeypatch):
 
 @pytest.fixture
 def client(temp_data_dir):
-    from dashboard.backend.services.data_loader import DataLoader
     import dashboard.backend.api.projections
+    from dashboard.backend.services.data_loader import DataLoader
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
+
         from dashboard.backend.main import app
 
         yield TestClient(app)

@@ -69,6 +69,7 @@ def test_cors_preflight_does_not_consume_global_login_budget(tmp_path, monkeypat
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     client = TestClient(app)
@@ -83,9 +84,7 @@ def test_cors_preflight_does_not_consume_global_login_budget(tmp_path, monkeypat
 
     assert first_preflight.status_code == 200
     assert second_preflight.status_code == 200
-    assert first_preflight.headers.get("access-control-allow-origin") == (
-        "http://localhost:3000"
-    )
+    assert first_preflight.headers.get("access-control-allow-origin") == ("http://localhost:3000")
     assert "x-ratelimit-limit" not in first_preflight.headers
     assert "x-ratelimit-limit" not in second_preflight.headers
 

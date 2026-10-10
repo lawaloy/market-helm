@@ -42,6 +42,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -202,9 +203,7 @@ def test_hosted_run_fires_email_and_webhook_and_claims_cooldown(client) -> None:
                 "src.alerts.market_snapshot.load_market_snapshot",
                 return_value=snapshot,
             ) as load_snapshot:
-                with patch(
-                    "src.alerts.alert_worker.run_db_worker_cycle"
-                ) as mock_cycle:
+                with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
                     first = client.post("/api/alerts/run", headers=headers_a)
                     posts_after_first = len(mock_post.call_args_list)
                     second = client.post("/api/alerts/run", headers=headers_a)
@@ -265,9 +264,7 @@ def test_hosted_run_fires_email_and_webhook_and_claims_cooldown(client) -> None:
                 "src.alerts.market_snapshot.load_market_snapshot",
                 return_value=snapshot,
             ):
-                with patch(
-                    "src.alerts.alert_worker.run_db_worker_cycle"
-                ) as mock_cycle_again:
+                with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle_again:
                     third = client.post("/api/alerts/run", headers=headers_a)
 
     assert third.status_code == 200
@@ -351,9 +348,7 @@ def test_hosted_run_miss_does_not_notify_or_claim_cooldown(client) -> None:
                 "src.alerts.market_snapshot.load_market_snapshot",
                 return_value=snapshot,
             ):
-                with patch(
-                    "src.alerts.alert_worker.run_db_worker_cycle"
-                ) as mock_cycle:
+                with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
                     missed = client.post("/api/alerts/run", headers=headers_a)
 
     assert missed.status_code == 200

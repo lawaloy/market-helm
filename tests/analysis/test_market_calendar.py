@@ -28,9 +28,7 @@ def test_non_session_run_anchors_to_previous_session():
         (datetime(2026, 7, 6, 21, tzinfo=timezone.utc), date(2026, 7, 6), date(2026, 7, 13)),
     ],
 )
-def test_timestamp_horizon_anchors_to_last_completed_session(
-    timestamp, completed, target
-):
+def test_timestamp_horizon_anchors_to_last_completed_session(timestamp, completed, target):
     assert last_completed_session(timestamp) == completed
     assert trading_session_after_timestamp(timestamp, 5) == target
 

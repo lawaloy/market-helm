@@ -123,10 +123,7 @@ class TestAlertJobLockOwnership:
         claim_jobs([JOB_DELIVER], "owner")
 
         assert complete_job(job_id, worker_id="intruder") is False
-        assert (
-            fail_job(job_id, "spoofed", worker_id="intruder", retry_delay_seconds=0)
-            is False
-        )
+        assert fail_job(job_id, "spoofed", worker_id="intruder", retry_delay_seconds=0) is False
 
         with get_connection() as conn:
             row = conn.execute(

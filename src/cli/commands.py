@@ -4,13 +4,13 @@ MarketHelm CLI — command-line interface for the daily tracker workflow.
 
 from __future__ import annotations
 
-from datetime import datetime
 import math
 import sys
+from datetime import datetime
 from typing import Any
 
-from ..workflows.tracker import StockTrackerWorkflow
 from ..core.logger import setup_logger
+from ..workflows.tracker import StockTrackerWorkflow
 
 # Set up logger
 logger = setup_logger()
@@ -55,26 +55,26 @@ def _as_dict(value: Any) -> dict:
 def display_results(result: dict):
     """
     Display workflow results in CLI format.
-    
+
     Args:
         result: Workflow result dictionary
     """
     if not result.get("success"):
         logger.error(f"Workflow failed: {result.get('error', 'Unknown error')}")
         return
-    
+
     analysis = _as_dict(result.get("analysis", {}))
     index_comparison = _as_dict(result.get("index_comparison", {}))
     projections = _as_dict(result.get("projections", {}))
     projection_summary = _as_dict(result.get("projection_summary", {}))
     ai_summary = result.get("ai_summary")
     metadata = _as_dict(result.get("metadata", {}))
-    
+
     # Header
     logger.info("=" * 60)
     logger.info("Daily Market Summary")
     logger.info("=" * 60)
-    
+
     # Display AI summary if available
     if ai_summary:
         logger.info("\n[AI Market Summary]")
@@ -82,7 +82,7 @@ def display_results(result: dict):
         logger.info(ai_summary)
         logger.info("-" * 60)
         logger.info("")
-    
+
     # Summary statistics
     summary = analysis.get("summary")
     if isinstance(summary, dict):
@@ -91,11 +91,9 @@ def display_results(result: dict):
         logger.info(f"Gainers: {summary.get('gainers', 0)}")
         logger.info(f"Losers: {summary.get('losers', 0)}")
         logger.info(f"Unchanged: {summary.get('unchanged', 0)}")
-        logger.info(
-            f"Average Change: {_fmt_pct(summary.get('average_change_percent', 0))}"
-        )
+        logger.info(f"Average Change: {_fmt_pct(summary.get('average_change_percent', 0))}")
         logger.info("")
-    
+
     # Top gainers
     top_gainers = analysis.get("top_gainers")
     if isinstance(top_gainers, list) and top_gainers:
@@ -109,7 +107,7 @@ def display_results(result: dict):
                 f"{_fmt_money(stock.get('close'))}"
             )
         logger.info("")
-    
+
     # Top losers
     top_losers = analysis.get("top_losers")
     if isinstance(top_losers, list) and top_losers:
@@ -123,7 +121,7 @@ def display_results(result: dict):
                 f"{_fmt_money(stock.get('close'))}"
             )
         logger.info("")
-    
+
     # Index comparison
     if index_comparison:
         logger.info("Index Performance:")
@@ -132,21 +130,18 @@ def display_results(result: dict):
                 continue
             logger.info(f"  {index_name}:")
             logger.info(f"    Stocks: {stats.get('stock_count', 0)}")
+            logger.info(f"    Avg Change: {_fmt_pct(stats.get('average_change_percent'))}")
             logger.info(
-                f"    Avg Change: {_fmt_pct(stats.get('average_change_percent'))}"
-            )
-            logger.info(
-                f"    Gainers: {stats.get('gainers', 0)} | "
-                f"Losers: {stats.get('losers', 0)}"
+                f"    Gainers: {stats.get('gainers', 0)} | " f"Losers: {stats.get('losers', 0)}"
             )
         logger.info("")
-    
+
     # Projection summary
     if projection_summary:
         logger.info("=" * 60)
         logger.info("STOCK PROJECTIONS - Next 5 Days")
         logger.info("=" * 60)
-        
+
         # Overall projection stats
         logger.info(f"Total Projections: {projection_summary.get('total_projections', 0)}")
         logger.info(
@@ -158,63 +153,69 @@ def display_results(result: dict):
             f"{_fmt_pct(projection_summary.get('average_expected_change', 0), signed=True)}"
         )
         logger.info("")
-        
+
         # Recommendation breakdown
-        recommendations = projection_summary.get('recommendations', {})
+        recommendations = projection_summary.get("recommendations", {})
         if isinstance(recommendations, dict) and recommendations:
             logger.info("Recommendation Breakdown:")
             for rec, count in sorted(recommendations.items(), key=lambda x: x[1], reverse=True):
                 logger.info(f"  {rec}: {count}")
             logger.info("")
-        
+
         # Top opportunities
-        opportunities = _as_dict(projection_summary.get('top_opportunities', {}))
-        
-        strong_buys = opportunities.get('strong_buys')
+        opportunities = _as_dict(projection_summary.get("top_opportunities", {}))
+
+        strong_buys = opportunities.get("strong_buys")
         if isinstance(strong_buys, list) and strong_buys:
             logger.info("Top 5 BUY Opportunities:")
             for i, stock in enumerate(strong_buys[:5], 1):
                 if not isinstance(stock, dict):
                     continue
-                proj = projections.get(stock.get('symbol'))
+                proj = projections.get(stock.get("symbol"))
                 if isinstance(proj, dict):
+                    change_text = _fmt_pct(
+                        proj.get("expected_change_percent"), precision=1, signed=True
+                    )
                     logger.info(
                         f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
-                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"({change_text}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
                     )
                     logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
-        
-        strong_sells = opportunities.get('strong_sells')
+
+        strong_sells = opportunities.get("strong_sells")
         if isinstance(strong_sells, list) and strong_sells:
             logger.info("Top 5 SELL Warnings:")
             for i, stock in enumerate(strong_sells[:5], 1):
                 if not isinstance(stock, dict):
                     continue
-                proj = projections.get(stock.get('symbol'))
+                proj = projections.get(stock.get("symbol"))
                 if isinstance(proj, dict):
+                    change_text = _fmt_pct(
+                        proj.get("expected_change_percent"), precision=1, signed=True
+                    )
                     logger.info(
                         f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
-                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"({change_text}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
                     )
                     logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
-        
-        logger.info(f"Full projections available in summary file")
+
+        logger.info("Full projections available in summary file")
         logger.info("=" * 60)
         logger.info("")
-    
+
     # File paths
     file_paths = _as_dict(result.get("file_paths", {}))
     if file_paths.get("data"):
         logger.info(f"Data saved to: {file_paths['data']}")
     if file_paths.get("summary"):
         logger.info(f"Summary saved to: {file_paths['summary']}")
-    
+
     logger.info("=" * 60)
     logger.info("Daily tracking complete!")
     logger.info("=" * 60)
@@ -244,33 +245,39 @@ def main():
                 f"--top-n must be a positive integer, got {value!r}"
             ) from exc
         if number <= 0:
-            raise argparse.ArgumentTypeError(
-                f"--top-n must be a positive integer, got {number}"
-            )
+            raise argparse.ArgumentTypeError(f"--top-n must be a positive integer, got {number}")
         return number
 
-    parser = argparse.ArgumentParser(description='MarketHelm — daily market run (day-trading oriented)')
-    parser.add_argument('--top-n', type=_positive_top_n, default=None, 
-                       help='Limit to top N stocks by volume (e.g. --top-n 50 for day trading)')
-    parser.add_argument('--no-screener', action='store_true',
-                       help='Disable stock screener')
-    parser.add_argument('--quote-only', action='store_true',
-                       help='Fetch quotes only (skip company profile for faster refresh)')
-    
+    parser = argparse.ArgumentParser(
+        description="MarketHelm — daily market run (day-trading oriented)"
+    )
+    parser.add_argument(
+        "--top-n",
+        type=_positive_top_n,
+        default=None,
+        help="Limit to top N stocks by volume (e.g. --top-n 50 for day trading)",
+    )
+    parser.add_argument("--no-screener", action="store_true", help="Disable stock screener")
+    parser.add_argument(
+        "--quote-only",
+        action="store_true",
+        help="Fetch quotes only (skip company profile for faster refresh)",
+    )
+
     args = parser.parse_args()
-    
+
     logger.info("=" * 60)
     logger.info("MarketHelm - Daily Data Collection")
     if args.top_n:
         logger.info(f"Day Trading Mode: Top {args.top_n} stocks by volume")
     logger.info("=" * 60)
     logger.debug("Starting CLI interface")
-    
+
     try:
         # Create and run workflow
         workflow = StockTrackerWorkflow(include_profile=not args.quote_only)
         result = workflow.run(use_screener=not args.no_screener, top_n_stocks=args.top_n)
-        
+
         # Display results
         display_results(result)
 
@@ -279,7 +286,7 @@ def main():
 
         logger.debug("CLI completed successfully")
         return 0
-        
+
     except KeyboardInterrupt:
         logger.warning("Interrupted by user. Exiting.")
         sys.exit(1)

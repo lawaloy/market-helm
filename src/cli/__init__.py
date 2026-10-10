@@ -1,5 +1,5 @@
 """CLI interface for MarketHelm."""
 
-from .commands import main, display_results
+from .commands import display_results, main
 
 __all__ = ["main", "display_results"]

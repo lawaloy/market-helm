@@ -9,13 +9,16 @@ When this runs
 --------------
 * **Locally** — after you change ``setup.cfg`` ``version``, run ``sync`` and commit.
 * **CI** (``.github/workflows/python-app.yml``) — ``check`` on every PR so drift fails the build.
-* **Publish to PyPI** (``.github/workflows/publish.yml``) — ``check`` in the *test* job; ``sync`` in the
-  *build* job **after** the release tag is applied to ``setup.cfg`` on the runner (so the SPA build
-  matches the tag). Nothing is committed from CI; ``sync`` only fixes the checkout used for the wheel.
+* **Publish to PyPI** (``.github/workflows/publish.yml``) — ``check`` in the *test* job;
+  ``sync`` in the *build* job **after** the release tag is applied to ``setup.cfg`` on the
+  runner (so the SPA build matches the tag). Nothing is committed from CI; ``sync`` only
+  fixes the checkout used for the wheel.
 
-``check`` never modifies files. Only ``sync`` writes. Broken inputs (missing ``setup.cfg``, bad JSON,
-missing markers in ``main.py``) print a short message to stderr and exit **2** (not a Python traceback).
+``check`` never modifies files. Only ``sync`` writes. Broken inputs (missing ``setup.cfg``,
+bad JSON, missing markers in ``main.py``) print a short message to stderr and exit **2**
+(not a Python traceback).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -94,16 +97,15 @@ def check(root: Path) -> list[str]:
     if top != want:
         errors.append(f"{_repo_rel_posix(root, lock)} root version: {top!r} != {want!r}")
     if inner != want:
-        errors.append(
-            f'{_repo_rel_posix(root, lock)} packages[""] version: {inner!r} != {want!r}'
-        )
+        errors.append(f'{_repo_rel_posix(root, lock)} packages[""] version: {inner!r} != {want!r}')
 
     main_py = root / "dashboard" / "backend" / "main.py"
     fa, rj = read_main_py_versions(main_py)
     if fa is None or rj is None:
         errors.append(
             f"{_repo_rel_posix(root, main_py)}: could not read version markers "
-            '(expected FastAPI "MarketHelm API" block and root() JSON). Run sync after fixing the file.'
+            '(expected FastAPI "MarketHelm API" block and root() JSON). '
+            "Run sync after fixing the file."
         )
     else:
         if fa != want:

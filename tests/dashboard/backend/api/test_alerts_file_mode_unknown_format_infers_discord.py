@@ -60,9 +60,7 @@ def test_file_get_unknown_format_infers_discord_from_url(client, file_mode: Path
         "condition_type": "price_threshold",
         "timestamp": "2026-05-21T12:00:00",
     }
-    notifier = WebhookNotifier.from_alert(
-        {"id": "a1", "notifications": ["webhook"]}
-    )
+    notifier = WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]})
     assert notifier is not None
     assert notifier._url == DISCORD_URL
     assert notifier._payload_format == "teams"

@@ -96,6 +96,6 @@ def test_staging_recovery_requires_a_success_from_the_restarted_worker() -> None
 
     assert "previous_worker_id=" in workflow
     assert "--print-worker-id" in workflow
-    assert "--previous-worker-id \"$previous_worker_id\"" in workflow
+    assert '--previous-worker-id "$previous_worker_id"' in workflow
     assert "scripts/check_worker_health.py" in workflow
     assert "python -c" not in workflow

@@ -22,14 +22,13 @@ def temp_data_dir(monkeypatch):
 
 @pytest.fixture
 def client(temp_data_dir):
-    from dashboard.backend.services.data_loader import DataLoader
     import dashboard.backend.api.projections
+    from dashboard.backend.services.data_loader import DataLoader
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
+
         from dashboard.backend.main import app
 
         yield TestClient(app)
@@ -92,9 +91,7 @@ def _write_fixtures(temp_data_dir: Path) -> None:
     )
 
 
-def test_opportunities_include_recommendation_matching_filter_type(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_include_recommendation_matching_filter_type(client, temp_data_dir) -> None:
     """Table filters need recommendation; trend alone is Bullish/Bearish."""
     _write_fixtures(temp_data_dir)
 
@@ -111,9 +108,7 @@ def test_opportunities_include_recommendation_matching_filter_type(
     assert row["trend"] == "Bullish"
 
 
-def test_opportunities_sell_bucket_keeps_trend_independent(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_sell_bucket_keeps_trend_independent(client, temp_data_dir) -> None:
     _write_fixtures(temp_data_dir)
 
     r = client.get(

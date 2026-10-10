@@ -205,9 +205,7 @@ def test_has_refresh_credentials_checks_env_var_and_dotenv(tmp_path, monkeypatch
     assert refresh._has_refresh_credentials(tmp_path) is True
 
 
-def test_has_refresh_credentials_soft_fails_unreadable_dotenv(
-    tmp_path, monkeypatch
-) -> None:
+def test_has_refresh_credentials_soft_fails_unreadable_dotenv(tmp_path, monkeypatch) -> None:
     """An unreadable project .env must not 500 the Fetch New credential gate."""
     from pathlib import Path
 
@@ -226,9 +224,7 @@ def test_has_refresh_credentials_soft_fails_unreadable_dotenv(
     assert refresh._has_refresh_credentials(tmp_path) is False
 
 
-def test_has_refresh_credentials_rejects_empty_or_unrelated_dotenv(
-    tmp_path, monkeypatch
-) -> None:
+def test_has_refresh_credentials_rejects_empty_or_unrelated_dotenv(tmp_path, monkeypatch) -> None:
     """A present .env without a usable Finnhub key must not false-start refresh."""
     monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
 
@@ -244,9 +240,7 @@ def test_has_refresh_credentials_rejects_empty_or_unrelated_dotenv(
     (tmp_path / ".env").write_text('FINNHUB_API_KEY=""\n', encoding="utf-8")
     assert refresh._has_refresh_credentials(tmp_path) is False
 
-    (tmp_path / ".env").write_text(
-        "export FINNHUB_API_KEY='real-key'\n", encoding="utf-8"
-    )
+    (tmp_path / ".env").write_text("export FINNHUB_API_KEY='real-key'\n", encoding="utf-8")
     assert refresh._has_refresh_credentials(tmp_path) is True
 
     monkeypatch.setenv("FINNHUB_API_KEY", "   ")
@@ -266,7 +260,9 @@ def test_run_daily_tracker_timeout_terminates_without_alert_check(monkeypatch) -
     monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "5")
     monkeypatch.setattr("src.alerts.alert_worker.run_check_once", alert_check)
     monkeypatch.setattr(refresh.time, "time", lambda: clock["t"])
-    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 10))
+    monkeypatch.setattr(
+        refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 10)
+    )
 
     refresh.run_daily_tracker()
 
@@ -288,7 +284,9 @@ def test_run_daily_tracker_kills_child_when_wait_hangs_after_timeout(monkeypatch
     monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "1")
     monkeypatch.setattr("src.alerts.alert_worker.run_check_once", lambda: {"triggered": 0})
     monkeypatch.setattr(refresh.time, "time", lambda: clock["t"])
-    monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 5))
+    monkeypatch.setattr(
+        refresh.time, "sleep", lambda _seconds: clock.__setitem__("t", clock["t"] + 5)
+    )
 
     refresh.run_daily_tracker()
 
@@ -381,7 +379,7 @@ def test_run_daily_tracker_invalid_timeout_still_manages_running_child(monkeypat
             fake_process._running = False
         return original_poll()
 
-    fake_process.poll = poll_then_finish  # type: ignore[method-assign]
+    fake_process.poll = poll_then_finish
 
     monkeypatch.setattr(refresh.subprocess, "Popen", popen)
     monkeypatch.setenv("REFRESH_TOP_N", "0")

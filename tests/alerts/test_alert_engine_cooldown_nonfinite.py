@@ -28,12 +28,8 @@ def test_within_cooldown_treats_inf_as_no_cooldown() -> None:
     storage.get_last_triggered.return_value = datetime.now(timezone.utc)
     engine = AlertEngine([], storage=storage)
 
-    assert engine._within_cooldown(
-        {"id": "bad", "cooldown_minutes": float("inf")}
-    ) is False
-    assert engine._within_cooldown(
-        {"id": "bad-neg", "cooldown_minutes": float("-inf")}
-    ) is False
+    assert engine._within_cooldown({"id": "bad", "cooldown_minutes": float("inf")}) is False
+    assert engine._within_cooldown({"id": "bad-neg", "cooldown_minutes": float("-inf")}) is False
 
 
 def test_evaluate_continues_after_inf_cooldown_on_sibling() -> None:

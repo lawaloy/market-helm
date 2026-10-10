@@ -80,11 +80,14 @@ def test_missing_from_address_does_not_send(configured_backend, monkeypatch):
         "dashboard.backend.account_email._platform_from_address",
         lambda: None,
     )
-    assert send_account_email(
-        recipient="user@example.com",
-        purpose="verify_email",
-        token="verify-token",
-    ) is False
+    assert (
+        send_account_email(
+            recipient="user@example.com",
+            purpose="verify_email",
+            token="verify-token",
+        )
+        is False
+    )
     configured_backend.send.assert_not_called()
 
 
@@ -110,8 +113,11 @@ def test_missing_backend_does_not_send(monkeypatch):
         "dashboard.backend.account_email._platform_from_address",
         lambda: "alerts@markethelm.example",
     )
-    assert send_account_email(
-        recipient="user@example.com",
-        purpose="verify_email",
-        token="verify-token",
-    ) is False
+    assert (
+        send_account_email(
+            recipient="user@example.com",
+            purpose="verify_email",
+            token="verify-token",
+        )
+        is False
+    )

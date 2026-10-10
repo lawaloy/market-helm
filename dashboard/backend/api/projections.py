@@ -1,6 +1,7 @@
 """
 Projections API endpoints
 """
+
 import math
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -8,7 +9,11 @@ from typing import Any, Optional
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
-from dashboard.backend.models.projection import ProjectionsSummary, OpportunitiesResponse, Opportunity
+from dashboard.backend.models.projection import (
+    OpportunitiesResponse,
+    Opportunity,
+    ProjectionsSummary,
+)
 from dashboard.backend.services.data_loader import get_data_loader
 from src.utils.tickers import normalize_ticker
 
@@ -33,9 +38,7 @@ def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> 
     if column not in df.columns:
         return default
     series = pd.to_numeric(df[column], errors="coerce")
-    finite = series.map(
-        lambda value: isinstance(value, (int, float)) and math.isfinite(value)
-    )
+    finite = series.map(lambda value: isinstance(value, (int, float)) and math.isfinite(value))
     if not bool(finite.any()):
         return default
     return _finite_float(series[finite].mean()) or default
@@ -73,22 +76,22 @@ async def get_projections_summary():
     try:
         loader = get_data_loader()
         date = loader.get_latest_date()
-        
+
         if not date:
             raise HTTPException(status_code=404, detail="No data available")
-        
+
         # Load projections data
         df = loader.load_projections()
-        
+
         # Calculate target date (5 days from projection date)
         proj_date = datetime.strptime(date, "%Y-%m-%d")
         target_date = (proj_date + timedelta(days=5)).strftime("%Y-%m-%d")
-        
+
         # Calculate statistics
         total_projections = len(df)
         avg_confidence = _finite_column_mean(df, "confidence")
         avg_expected_change = _finite_column_mean(df, "expected_change_percent")
-        
+
         # Determine sentiment
         if avg_expected_change > 1.0:
             sentiment = "Bullish"
@@ -96,39 +99,39 @@ async def get_projections_summary():
             sentiment = "Bearish"
         else:
             sentiment = "Neutral"
-        
+
         # Count recommendations
         recommendations = {}
-        if 'recommendation' in df.columns:
-            rec_counts = df['recommendation'].value_counts().to_dict()
+        if "recommendation" in df.columns:
+            rec_counts = df["recommendation"].value_counts().to_dict()
             recommendations = {
                 "STRONG_BUY": rec_counts.get("STRONG BUY", 0),
                 "BUY": rec_counts.get("BUY", 0),
                 "HOLD": rec_counts.get("HOLD", 0),
                 "SELL": rec_counts.get("SELL", 0),
-                "STRONG_SELL": rec_counts.get("STRONG SELL", 0)
+                "STRONG_SELL": rec_counts.get("STRONG SELL", 0),
             }
-        
+
         # Count trends
         trends = {}
-        if 'trend' in df.columns:
-            trend_counts = df['trend'].value_counts().to_dict()
+        if "trend" in df.columns:
+            trend_counts = df["trend"].value_counts().to_dict()
             trends = {
                 "Bullish": trend_counts.get("Bullish", 0),
                 "Neutral": trend_counts.get("Neutral", 0),
-                "Bearish": trend_counts.get("Bearish", 0)
+                "Bearish": trend_counts.get("Bearish", 0),
             }
-        
+
         # Count risk levels
         risk_profile = {}
-        if 'risk_level' in df.columns:
-            risk_counts = df['risk_level'].value_counts().to_dict()
+        if "risk_level" in df.columns:
+            risk_counts = df["risk_level"].value_counts().to_dict()
             risk_profile = {
                 "Low": risk_counts.get("Low", 0),
                 "Medium": risk_counts.get("Medium", 0),
-                "High": risk_counts.get("High", 0)
+                "High": risk_counts.get("High", 0),
             }
-        
+
         return ProjectionsSummary(
             date=date,
             targetDate=target_date,
@@ -138,9 +141,9 @@ async def get_projections_summary():
             sentiment=sentiment,
             recommendations=recommendations,
             trends=trends,
-            riskProfile=risk_profile
+            riskProfile=risk_profile,
         )
-    
+
     except HTTPException:
         raise
     except ValueError:
@@ -152,20 +155,20 @@ async def get_projections_summary():
 @router.get("/opportunities", response_model=OpportunitiesResponse)
 async def get_opportunities(
     type: str = Query("STRONG_BUY", pattern="^(STRONG_BUY|BUY|HOLD|SELL|STRONG_SELL)$"),
-    limit: int = Query(10, ge=1, le=50)
+    limit: int = Query(10, ge=1, le=50),
 ):
     """Get top opportunities by recommendation type"""
     try:
         loader = get_data_loader()
         date = loader.get_latest_date()
-        
+
         if not date:
             raise HTTPException(status_code=404, detail="No data available")
-        
+
         # Load projections and daily data
         proj_df = loader.load_projections()
         daily_df = loader.load_daily_data()
-        
+
         # Missing ranking columns → empty list (not KeyError→500)
         if (
             proj_df is None
@@ -181,11 +184,11 @@ async def get_opportunities(
             "BUY": "BUY",
             "HOLD": "HOLD",
             "SELL": "SELL",
-            "STRONG_SELL": "STRONG SELL"
+            "STRONG_SELL": "STRONG SELL",
         }
-        
+
         # Filter by recommendation
-        filtered_df = proj_df[proj_df['recommendation'] == rec_map[type]]
+        filtered_df = proj_df[proj_df["recommendation"] == rec_map[type]]
 
         # An empty Series mapped below keeps a non-boolean dtype in pandas.
         # Using it as a DataFrame mask then removes every column, causing
@@ -202,7 +205,7 @@ async def get_opportunities(
             ranking_df["confidence"].map(lambda value: _finite_float(value) is not None)
         ]
         sorted_df = ranking_df.nlargest(limit, "confidence")
-        
+
         opportunities = []
         for _, row in sorted_df.iterrows():
             # Match padded / mixed-case CSV symbols the same way stock detail does.
@@ -212,14 +215,10 @@ async def get_opportunities(
 
             # Required projection numerics: skip the row instead of int(NaN)→500
             # or Pydantic serializing NaN/Inf as JSON null.
-            target_price = _finite_float(row.get('target_mid'))
-            expected_change = _finite_float(row.get('expected_change_percent'))
-            confidence_f = _finite_float(row.get('confidence'))
-            if (
-                target_price is None
-                or expected_change is None
-                or confidence_f is None
-            ):
+            target_price = _finite_float(row.get("target_mid"))
+            expected_change = _finite_float(row.get("expected_change_percent"))
+            confidence_f = _finite_float(row.get("confidence"))
+            if target_price is None or expected_change is None or confidence_f is None:
                 continue
 
             # Get current price from daily data (normalize like stock detail).
@@ -232,53 +231,49 @@ async def get_opportunities(
                 current_price = 0.0
                 volume = 0
             else:
-                stock_daily = daily_df[
-                    daily_df["symbol"].map(normalize_ticker) == symbol
-                ]
+                stock_daily = daily_df[daily_df["symbol"].map(normalize_ticker) == symbol]
                 if stock_daily.empty:
                     current_price = 0.0
                     volume = 0
                 else:
                     daily_row = stock_daily.iloc[0]
-                    current_price = _finite_float(daily_row.get('close')) or 0.0
-                    volume = _safe_volume(daily_row.get('volume', 0))
+                    current_price = _finite_float(daily_row.get("close")) or 0.0
+                    volume = _safe_volume(daily_row.get("volume", 0))
 
             momentum = (
-                _finite_float(row.get('momentum_score'))
-                if 'momentum_score' in row.index
-                else None
+                _finite_float(row.get("momentum_score")) if "momentum_score" in row.index else None
             )
             volatility = (
-                _finite_float(row.get('volatility_score'))
-                if 'volatility_score' in row.index
+                _finite_float(row.get("volatility_score"))
+                if "volatility_score" in row.index
                 else None
             )
 
-            opportunities.append(Opportunity(
-                symbol=symbol,
-                # Dirty CSV name/reason cells (NaN/None) fail Pydantic str → 500.
-                name=_safe_label(row.get('name'), symbol),
-                currentPrice=current_price,
-                targetPrice=target_price,
-                expectedChange=expected_change,
-                confidence=int(confidence_f),
-                risk=_safe_label(row.get("risk_level"), "Unknown"),
-                # Echo the filter bucket so the dashboard table can filter/badge
-                # by BUY/HOLD/SELL without conflating it with Bullish/Bearish trend.
-                recommendation=rec_map[type],
-                trend=_safe_label(row.get("trend"), "Neutral"),
-                reason=_safe_label(row.get('reason'), ''),
-                volume=volume,
-                momentum=momentum,
-                volatility=volatility,
-            ))
-        
+            opportunities.append(
+                Opportunity(
+                    symbol=symbol,
+                    # Dirty CSV name/reason cells (NaN/None) fail Pydantic str → 500.
+                    name=_safe_label(row.get("name"), symbol),
+                    currentPrice=current_price,
+                    targetPrice=target_price,
+                    expectedChange=expected_change,
+                    confidence=int(confidence_f),
+                    risk=_safe_label(row.get("risk_level"), "Unknown"),
+                    # Echo the filter bucket so the dashboard table can filter/badge
+                    # by BUY/HOLD/SELL without conflating it with Bullish/Bearish trend.
+                    recommendation=rec_map[type],
+                    trend=_safe_label(row.get("trend"), "Neutral"),
+                    reason=_safe_label(row.get("reason"), ""),
+                    volume=volume,
+                    momentum=momentum,
+                    volatility=volatility,
+                )
+            )
+
         return OpportunitiesResponse(
-            type=type,
-            count=len(opportunities),
-            opportunities=opportunities
+            type=type, count=len(opportunities), opportunities=opportunities
         )
-    
+
     except HTTPException:
         raise
     except ValueError:

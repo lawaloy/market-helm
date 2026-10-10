@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 from src.analysis.ai_summarizer import AISummarizer
 
 

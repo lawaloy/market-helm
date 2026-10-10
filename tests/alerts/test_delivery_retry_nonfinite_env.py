@@ -59,12 +59,8 @@ def test_resolve_delivery_retry_settings_rejects_nonfinite_floats(env: dict) -> 
     # Non-finite sides fall back to defaults; finite "1" / "8" stay parsed.
     base_raw = env["ALERT_DELIVERY_RETRY_BASE_SECONDS"]
     max_raw = env["ALERT_DELIVERY_RETRY_MAX_SECONDS"]
-    assert settings.base_seconds == (
-        1.0 if base_raw == "1" else DEFAULT_BASE_SECONDS
-    )
-    assert settings.max_seconds == (
-        8.0 if max_raw == "8" else DEFAULT_MAX_SECONDS
-    )
+    assert settings.base_seconds == (1.0 if base_raw == "1" else DEFAULT_BASE_SECONDS)
+    assert settings.max_seconds == (8.0 if max_raw == "8" else DEFAULT_MAX_SECONDS)
 
 
 @patch("src.alerts.notifiers.delivery_retry.time.sleep")

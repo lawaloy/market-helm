@@ -34,9 +34,7 @@ def test_stock_detail_falls_back_when_name_is_nan(client) -> None:
     )
     mock_loader.load_projections.return_value = pd.DataFrame()
 
-    with patch.object(
-        dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader):
         r = client.get("/api/stocks/AAPL")
 
     assert r.status_code == 200
@@ -73,9 +71,7 @@ def test_stock_detail_defaults_missing_projection_labels(client) -> None:
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader):
         r = client.get("/api/stocks/AAPL")
 
     assert r.status_code == 200

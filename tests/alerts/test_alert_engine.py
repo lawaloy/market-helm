@@ -112,9 +112,7 @@ def test_evaluate_does_not_count_log_success_when_webhook_fails():
     alert = _price_alert(notifications=["log", "webhook"], cooldown_minutes=60)
     engine = AlertEngine([alert], storage=storage)
 
-    with patch(
-        "src.alerts.alert_engine.WebhookNotifier.from_alert", return_value=webhook
-    ):
+    with patch("src.alerts.alert_engine.WebhookNotifier.from_alert", return_value=webhook):
         failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
         retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
 
@@ -133,9 +131,7 @@ def test_evaluate_does_not_count_log_success_when_email_fails():
     alert = _price_alert(notifications=["log", "email"], cooldown_minutes=60)
     engine = AlertEngine([alert], storage=storage)
 
-    with patch(
-        "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email
-    ):
+    with patch("src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email):
         failed_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
         retried_events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
 
@@ -222,7 +218,9 @@ def test_evaluate_dispatches_email_notifier_for_triggered_alert():
     }
     engine = AlertEngine([alert], storage=storage)
 
-    with patch("src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email) as from_alert:
+    with patch(
+        "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=email
+    ) as from_alert:
         events = engine.evaluate([{"symbol": "AAPL", "close": 149.5}])
 
     assert len(events) == 1
@@ -264,9 +262,7 @@ def test_evaluate_suppresses_duplicate_notifications_during_cooldown():
 def test_evaluate_respects_cooldown_for_timezone_aware_last_triggered():
     """Hosted job-queue markers are timezone-aware; manual rechecks must not TypeError."""
     storage = MagicMock()
-    storage.get_last_triggered.return_value = datetime.now(timezone.utc) - timedelta(
-        minutes=1
-    )
+    storage.get_last_triggered.return_value = datetime.now(timezone.utc) - timedelta(minutes=1)
     engine = AlertEngine([_price_alert()], storage=storage)
 
     with patch("src.alerts.alert_engine.LogNotifier") as log_notifier_cls:
@@ -291,9 +287,7 @@ def test_evaluate_respects_cooldown_for_naive_last_triggered():
 
 def test_evaluate_fires_again_after_aware_cooldown_expires():
     storage = MagicMock()
-    storage.get_last_triggered.return_value = datetime.now(timezone.utc) - timedelta(
-        minutes=10
-    )
+    storage.get_last_triggered.return_value = datetime.now(timezone.utc) - timedelta(minutes=10)
     notifier = MagicMock()
     engine = AlertEngine([_price_alert()], storage=storage)
 
@@ -315,9 +309,7 @@ def test_from_config_returns_none_for_corrupt_json(tmp_path):
     path = tmp_path / "alerts.json"
     path.write_text("{not-json", encoding="utf-8")
 
-    with patch(
-        "src.alerts.alert_engine.resolve_alerts_config_path", return_value=path
-    ):
+    with patch("src.alerts.alert_engine.resolve_alerts_config_path", return_value=path):
         assert AlertEngine.from_config(path) is None
 
 
@@ -592,6 +584,7 @@ def test_evaluate_skips_sentinel_watch_symbols():
 
     assert events == []
     storage.record_event.assert_not_called()
+
 
 def test_evaluate_skips_unsupported_condition_type_and_continues():
     """One bad condition type must not block later valid watches."""

@@ -69,9 +69,7 @@ def test_non_numeric_weight_falls_back_to_default():
         },
         api_client=MagicMock(),
     )
-    assert screener.filters["weights"]["volume"] == pytest.approx(
-        defaults["weights"]["volume"]
-    )
+    assert screener.filters["weights"]["volume"] == pytest.approx(defaults["weights"]["volume"])
     assert screener.calculate_score(_liquid_mover()) > 70
 
 

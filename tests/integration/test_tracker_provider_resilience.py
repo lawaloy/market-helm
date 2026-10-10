@@ -11,8 +11,8 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from types import SimpleNamespace
-from urllib.parse import parse_qs, urlparse
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlparse
 
 from requests.adapters import HTTPAdapter
 
@@ -38,7 +38,7 @@ class _FinnhubStub(ThreadingHTTPServer):
 class _FinnhubHandler(BaseHTTPRequestHandler):
     server: _FinnhubStub
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def _handle_get(self) -> None:
         parsed = urlparse(self.path)
         symbol = parse_qs(parsed.query).get("symbol", [""])[0]
         attempt = self.server.record(symbol)
@@ -79,6 +79,9 @@ class _FinnhubHandler(BaseHTTPRequestHandler):
         ).encode("utf-8")
         self._write(200, payload, "application/json")
 
+    # BaseHTTPRequestHandler dispatches GET requests to an attribute named ``do_GET``.
+    do_GET = _handle_get
+
     def _write(self, status: int, payload: bytes, content_type: str) -> None:
         try:
             self.send_response(status)
@@ -114,9 +117,7 @@ def _workflow(monkeypatch, tmp_path: Path, server: _FinnhubStub, symbols: list[s
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(tmp_path / "no-alerts.json"))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setattr(
-        "src.services.data_fetcher.get_indices_to_track", lambda: ["TEST"]
-    )
+    monkeypatch.setattr("src.services.data_fetcher.get_indices_to_track", lambda: ["TEST"])
     monkeypatch.setattr("src.workflows.tracker.get_indices_to_track", lambda: ["TEST"])
     monkeypatch.setattr(
         "src.services.data_fetcher.IndexFetcher.get_index_symbols",
@@ -142,9 +143,7 @@ def _workflow(monkeypatch, tmp_path: Path, server: _FinnhubStub, symbols: list[s
     return workflow
 
 
-def test_tracker_keeps_valid_symbols_and_writes_backtestable_snapshots(
-    monkeypatch, tmp_path
-):
+def test_tracker_keeps_valid_symbols_and_writes_backtestable_snapshots(monkeypatch, tmp_path):
     with _finnhub_stub() as server:
         workflow = _workflow(
             monkeypatch,
@@ -177,9 +176,7 @@ def test_tracker_keeps_valid_symbols_and_writes_backtestable_snapshots(
 
 def test_total_provider_failure_reaches_nonzero_cli_exit(monkeypatch, tmp_path):
     with _finnhub_stub() as server:
-        workflow = _workflow(
-            monkeypatch, tmp_path, server, ["MALFORMED", "DROPPED", "TIMEOUT"]
-        )
+        workflow = _workflow(monkeypatch, tmp_path, server, ["MALFORMED", "DROPPED", "TIMEOUT"])
         monkeypatch.setattr("sys.argv", ["market-helm", "--no-screener", "--quote-only"])
 
         with patch("src.cli.commands.StockTrackerWorkflow", return_value=workflow):

@@ -5,12 +5,17 @@ import pytest
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'sessions.db').as_posix()}")
+    monkeypatch.setenv(
+        "MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'sessions.db').as_posix()}"
+    )
     monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
+
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
+
     return TestClient(app)
 
 
@@ -56,7 +61,10 @@ def test_password_reset_revokes_all_existing_tokens(client, monkeypatch):
         json={"email": "reset-session@example.com", "password": "new-password-123"},
     )
     assert fresh.status_code == 200
-    assert client.get(
-        "/api/auth/me",
-        headers={"Authorization": f"Bearer {fresh.json()['access_token']}"},
-    ).status_code == 200
+    assert (
+        client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {fresh.json()['access_token']}"},
+        ).status_code
+        == 200
+    )

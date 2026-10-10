@@ -152,6 +152,16 @@ const AlertsSettings: React.FC = () => {
     };
   }, [loadConfig, refreshStatus]);
 
+  // Read price callbacks through refs so the effects below run only when their own inputs
+  // change, not whenever the hook hands back a new function identity (fetchPricesFor changes
+  // when quote availability changes).
+  const fetchPricesForRef = useRef(fetchPricesFor);
+  const mergePricesRef = useRef(mergePrices);
+  useEffect(() => {
+    fetchPricesForRef.current = fetchPricesFor;
+    mergePricesRef.current = mergePrices;
+  });
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -161,7 +171,7 @@ const AlertsSettings: React.FC = () => {
         if (cancelled) return;
         setSymbolOptions(options);
         if (Object.keys(prices).length > 0) {
-          mergePrices(prices, savedMeta);
+          mergePricesRef.current(prices, savedMeta);
         }
         if (options.length > 0) {
           const preferred = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META'];
@@ -185,13 +195,11 @@ const AlertsSettings: React.FC = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- load catalog once on mount
   }, []);
 
   useEffect(() => {
     if (!apiReady || !newSymbol.trim()) return;
-    void fetchPricesFor([newSymbol]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch when API is ready
+    void fetchPricesForRef.current([newSymbol]);
   }, [apiReady, newSymbol]);
 
   useEffect(() => {
@@ -202,9 +210,8 @@ const AlertsSettings: React.FC = () => {
       )
       .filter((symbol): symbol is string => Boolean(symbol));
     if (watchSymbols.length > 0) {
-      void fetchPricesFor(watchSymbols);
+      void fetchPricesForRef.current(watchSymbols);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable fetchPricesFor via refs
   }, [apiReady, userRules]);
 
   useEffect(() => {

@@ -5,9 +5,8 @@ Sets up logging with both console and file output, with different log levels.
 """
 
 import logging
-import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def _rename_legacy_log_files(log_path: Path) -> None:
@@ -35,11 +34,11 @@ def _rename_legacy_log_files(log_path: Path) -> None:
 def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Logger:
     """
     Set up logger with console and file handlers.
-    
+
     Args:
         name: Logger name
         log_dir: Directory to store log files
-    
+
     Returns:
         Configured logger instance
     """
@@ -52,12 +51,9 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
 
     # Create formatters
     detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
-    console_formatter = logging.Formatter(
-        '%(levelname)s - %(message)s'
-    )
+    console_formatter = logging.Formatter("%(levelname)s - %(message)s")
 
     # Console handler - INFO level and above
     console_handler = logging.StreamHandler()
@@ -75,11 +71,9 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
 
     _rename_legacy_log_files(log_path)
 
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now().strftime("%Y-%m-%d")
     try:
-        file_handler = logging.FileHandler(
-            log_path / f"market_helm_{today}.log", encoding='utf-8'
-        )
+        file_handler = logging.FileHandler(log_path / f"market_helm_{today}.log", encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(detailed_formatter)
         logger.addHandler(file_handler)
@@ -88,7 +82,7 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
 
     try:
         error_handler = logging.FileHandler(
-            log_path / f"market_helm_errors_{today}.log", encoding='utf-8'
+            log_path / f"market_helm_errors_{today}.log", encoding="utf-8"
         )
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(detailed_formatter)
@@ -97,4 +91,3 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
         pass
 
     return logger
-

@@ -2,24 +2,25 @@
 Core alert engine.
 """
 
+import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
-import json
+
+from src.utils.company_names import _clean_display_name
 
 from ..core.logger import setup_logger
 from .alert_paths import apply_alert_defaults, resolve_alerts_config_path
-from .alert_storage import AlertStorage
 from .alert_rules import (
     collect_rsi_symbols,
     evaluate_compound,
     evaluate_leaf_symbols,
 )
+from .alert_storage import AlertStorage
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
 from .price_history import closes_by_symbol
-from src.utils.company_names import _clean_display_name
 
 logger = setup_logger("alerts")
 
@@ -173,11 +174,7 @@ class AlertEngine:
         last_triggered = self.storage.get_last_triggered(alert["id"])
         if not last_triggered:
             return False
-        now = (
-            datetime.now(last_triggered.tzinfo)
-            if last_triggered.tzinfo
-            else datetime.utcnow()
-        )
+        now = datetime.now(last_triggered.tzinfo) if last_triggered.tzinfo else datetime.utcnow()
         try:
             window = timedelta(minutes=cooldown_minutes)
         except OverflowError:
@@ -194,9 +191,7 @@ class AlertEngine:
         raw_notifications = alert.get("notifications")
         # Non-lists (e.g. int/str) are not iterable channel names; strings also
         # make `"email" in notifications` true via substring membership.
-        notifier_names = (
-            raw_notifications if isinstance(raw_notifications, list) else ["log"]
-        )
+        notifier_names = raw_notifications if isinstance(raw_notifications, list) else ["log"]
         if not notifier_names:
             notifier_names = ["log"]
         instances: List[Any] = []
@@ -268,9 +263,7 @@ class AlertEngine:
                 )
             elif condition_type == "compound":
                 history = self._closes_for_evaluate(stocks)
-                triggered_symbols = evaluate_compound(
-                    condition, stocks, closes_by_symbol=history
-                )
+                triggered_symbols = evaluate_compound(condition, stocks, closes_by_symbol=history)
             else:
                 logger.warning(f"Unsupported alert condition: {condition_type}")
                 continue

@@ -42,6 +42,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -205,9 +206,7 @@ def test_hosted_run_posts_discord_not_env_slack(client) -> None:
                 "src.alerts.market_snapshot.load_market_snapshot",
                 return_value=snapshot,
             ):
-                with patch(
-                    "src.alerts.alert_worker.run_db_worker_cycle"
-                ) as mock_cycle:
+                with patch("src.alerts.alert_worker.run_db_worker_cycle") as mock_cycle:
                     ran = client.post("/api/alerts/run", headers=seeded["headers_a"])
 
     assert ran.status_code == 200

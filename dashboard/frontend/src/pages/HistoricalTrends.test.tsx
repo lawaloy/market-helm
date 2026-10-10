@@ -522,3 +522,43 @@ describe('HistoricalTrends fetch races', () => {
     ).toContain('correctly predicted');
   });
 });
+
+describe('HistoricalTrends summary fetch triggers', () => {
+  beforeEach(() => {
+    apiMocks.getSummary.mockResolvedValue(summaryPayload());
+    apiMocks.getAccuracy.mockResolvedValue(accuracyPayload());
+    apiMocks.getRunProjections.mockResolvedValue({
+      data: { date: '2026-08-04', totalProjections: 0, projections: [] },
+    });
+    apiMocks.getHistorical.mockResolvedValue({ data: { data: [] } });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('fetches once on mount, once per refreshKey change, and once per range change', async () => {
+    const { rerender } = render(<HistoricalTrends refreshKey={0} />);
+    await screen.findByLabelText('Time range:');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(apiMocks.getSummary).toHaveBeenCalledTimes(1);
+    expect(apiMocks.getSummary).toHaveBeenLastCalledWith(30);
+
+    rerender(<HistoricalTrends refreshKey={1} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(apiMocks.getSummary).toHaveBeenCalledTimes(2);
+    expect(apiMocks.getSummary).toHaveBeenLastCalledWith(30);
+
+    fireEvent.change(screen.getByLabelText('Time range:'), { target: { value: '90' } });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(apiMocks.getSummary).toHaveBeenCalledTimes(3);
+    expect(apiMocks.getSummary).toHaveBeenLastCalledWith(90);
+  });
+});

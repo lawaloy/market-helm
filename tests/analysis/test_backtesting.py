@@ -83,9 +83,7 @@ def test_data_dir_loader_reads_market_bars(tmp_path, monkeypatch):
     assert verified_report["summary"]["pendingCount"] == 1
 
 
-def test_data_dir_uses_verified_outcome_session_instead_of_filename(
-    tmp_path, monkeypatch
-):
+def test_data_dir_uses_verified_outcome_session_instead_of_filename(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     seed_daily_bars(
         tmp_path,
@@ -116,9 +114,7 @@ def test_data_dir_uses_verified_outcome_session_instead_of_filename(
     assert report["samples"][0]["actualProvenance"] == "verified_previous_close"
 
 
-def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(
-    tmp_path, monkeypatch
-):
+def test_data_dir_excludes_intraday_outcomes_with_provenance_columns(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     seed_daily_bars(
         tmp_path,
@@ -183,9 +179,7 @@ def test_empty_data_dir_still_validates_calendar(tmp_path):
 def test_sample_limit_returns_newest_rows_and_is_json_safe():
     projections = [
         _projection(symbol="AAPL"),
-        _projection(
-            run_date="2026-07-06", symbol="MSFT", confidence=float("nan")
-        ),
+        _projection(run_date="2026-07-06", symbol="MSFT", confidence=float("nan")),
     ]
     closes = [
         {"date": "2026-07-10", "symbol": "AAPL", "close": 108.0},

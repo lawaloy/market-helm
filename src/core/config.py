@@ -46,11 +46,7 @@ def get_indices_to_track() -> List[str]:
             # the fetch pipeline; require a list of non-empty strings.
             if not isinstance(indices, list):
                 continue
-            cleaned = [
-                name.strip()
-                for name in indices
-                if isinstance(name, str) and name.strip()
-            ]
+            cleaned = [name.strip() for name in indices if isinstance(name, str) and name.strip()]
             if cleaned:
                 return cleaned
         except Exception:

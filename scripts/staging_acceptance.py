@@ -235,9 +235,7 @@ class AcceptanceRunner:
         return "Prometheus counters are exposed"
 
     def _check_auth_boundary(self) -> str:
-        payload = self.client.json(
-            "GET", "/api/alerts/config", expected_status=401
-        )
+        payload = self.client.json("GET", "/api/alerts/config", expected_status=401)
         if not payload.get("detail"):
             raise AcceptanceError("anonymous alert config request did not return an auth error")
         return "anonymous tenant data access is rejected"
@@ -247,9 +245,7 @@ class AcceptanceRunner:
         if parsed_origin.path not in {"", "/"}:
             raise AcceptanceError("CORS origin must not contain a path")
         origin = normalize_base_url(expected_origin)
-        _, _, headers = self.client.request(
-            "GET", "/health/live", headers={"Origin": origin}
-        )
+        _, _, headers = self.client.request("GET", "/health/live", headers={"Origin": origin})
         lowered = {key.lower(): value for key, value in headers.items()}
         request_id = lowered.get("x-request-id", "")
         if not request_id or len(request_id) > 128:
@@ -306,19 +302,21 @@ class AcceptanceRunner:
             for index, token in enumerate(tokens):
                 config = {
                     "defaults": {},
-                    "alerts": [{
-                        "id": ids[index],
-                        "name": f"Staging tenant {index + 1}",
-                        "enabled": True,
-                        "cooldown_minutes": 60,
-                        "condition": {
-                            "type": "price_threshold",
-                            "symbol": symbols[index],
-                            "operator": "greater_than",
-                            "value": 999999,
-                        },
-                        "notifications": ["log"],
-                    }],
+                    "alerts": [
+                        {
+                            "id": ids[index],
+                            "name": f"Staging tenant {index + 1}",
+                            "enabled": True,
+                            "cooldown_minutes": 60,
+                            "condition": {
+                                "type": "price_threshold",
+                                "symbol": symbols[index],
+                                "operator": "greater_than",
+                                "value": 999999,
+                            },
+                            "notifications": ["log"],
+                        }
+                    ],
                 }
                 self.client.json("PUT", "/api/alerts/config", token=token, payload=config)
 
@@ -330,7 +328,9 @@ class AcceptanceRunner:
                     if isinstance(alert, dict)
                 }
                 if ids[index] not in saved_ids or ids[1 - index] in saved_ids:
-                    raise AcceptanceError(f"tenant {index + 1} alert config crossed account boundary")
+                    raise AcceptanceError(
+                        f"tenant {index + 1} alert config crossed account boundary"
+                    )
                 status = self.client.json("GET", "/api/alerts/status", token=token)
                 if status.get("active_watches") != 1:
                     raise AcceptanceError(f"tenant {index + 1} watch index is not isolated")
@@ -342,9 +342,7 @@ class AcceptanceRunner:
                 )
                 previews = dry_run.get("previews") or []
                 preview_notifiers = {
-                    preview.get("notifier")
-                    for preview in previews
-                    if isinstance(preview, dict)
+                    preview.get("notifier") for preview in previews if isinstance(preview, dict)
                 }
                 if (
                     dry_run.get("alert_id") != ids[index]
@@ -382,7 +380,9 @@ def _assert_empty_dedicated_config(response: dict[str, Any]) -> None:
     if not isinstance(config, dict) or not isinstance(channels, dict):
         raise AcceptanceError("tenant alert config response has an unexpected shape")
     defaults = config.get("defaults") or {}
-    populated_defaults = {key: value for key, value in defaults.items() if value not in (None, "", False)}
+    populated_defaults = {
+        key: value for key, value in defaults.items() if value not in (None, "", False)
+    }
     if config.get("alerts") or populated_defaults:
         raise AcceptanceError("tenant account is not empty; use dedicated staging accounts")
     if channels.get("webhook_url") or channels.get("email_recipients"):
@@ -394,7 +394,10 @@ def _credentials_from_env() -> list[tuple[str, str]]:
         ("MARKET_HELM_STAGING_TENANT_A_EMAIL", "MARKET_HELM_STAGING_TENANT_A_PASSWORD"),
         ("MARKET_HELM_STAGING_TENANT_B_EMAIL", "MARKET_HELM_STAGING_TENANT_B_PASSWORD"),
     )
-    credentials = [(os.environ.get(email, "").strip(), os.environ.get(password, "")) for email, password in names]
+    credentials = [
+        (os.environ.get(email, "").strip(), os.environ.get(password, ""))
+        for email, password in names
+    ]
     if any(not email or not password for email, password in credentials):
         raise AcceptanceError(
             "Tenant checks require MARKET_HELM_STAGING_TENANT_{A,B}_{EMAIL,PASSWORD}."
@@ -444,12 +447,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=os.environ.get("MARKET_HELM_STAGING_URL", "http://127.0.0.1:8000"),
         help="Staging API URL (or MARKET_HELM_STAGING_URL). Non-loopback URLs require HTTPS.",
     )
-    parser.add_argument("--timeout", type=float, default=10.0, help="Per-request timeout in seconds.")
-    parser.add_argument("--skip-worker", action="store_true", help="Skip the worker heartbeat check.")
+    parser.add_argument(
+        "--timeout", type=float, default=10.0, help="Per-request timeout in seconds."
+    )
+    parser.add_argument(
+        "--skip-worker", action="store_true", help="Skip the worker heartbeat check."
+    )
     parser.add_argument(
         "--tenant-check",
         action="store_true",
-        help="Run the guarded write-isolation check with dedicated accounts from environment variables.",
+        help="Run the guarded write-isolation check with dedicated accounts from environment "
+        "variables.",
     )
     parser.add_argument(
         "--bootstrap-loopback-tenants",
@@ -460,7 +468,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--ingress-origin",
         help="Validate request IDs, exact-origin CORS, and HSTS for HTTPS deployments.",
     )
-    parser.add_argument("--report", type=Path, help="Optional path for a credential-free JSON report.")
+    parser.add_argument(
+        "--report", type=Path, help="Optional path for a credential-free JSON report."
+    )
     return parser.parse_args(argv)
 
 

@@ -19,6 +19,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -98,9 +99,7 @@ class TestMultiUserAlertsAPI:
         assert saved.json()["exists"] is False
         assert saved.json()["config"]["alerts"] == []
 
-    def test_invalid_update_preserves_existing_config_and_watch_index(
-        self, client, multi_user_env
-    ):
+    def test_invalid_update_preserves_existing_config_and_watch_index(self, client, multi_user_env):
         from src.storage.alert_watches import (
             list_enabled_symbols,
             list_watches_for_symbol,
@@ -123,17 +122,13 @@ class TestMultiUserAlertsAPI:
                 }
             ],
         }
-        saved = client.put(
-            "/api/alerts/config", json=valid_payload, headers=headers
-        )
+        saved = client.put("/api/alerts/config", json=valid_payload, headers=headers)
         assert saved.status_code == 200
         assert list_enabled_symbols() == ["AAPL"]
 
         invalid_payload = json.loads(json.dumps(valid_payload))
         invalid_payload["alerts"][0]["condition"]["value"] = "not-a-number"
-        rejected = client.put(
-            "/api/alerts/config", json=invalid_payload, headers=headers
-        )
+        rejected = client.put("/api/alerts/config", json=invalid_payload, headers=headers)
 
         assert rejected.status_code == 400
         current = client.get("/api/alerts/config", headers=headers).json()
@@ -162,8 +157,12 @@ class TestMultiUserAlertsAPI:
             headers={"Authorization": f"Bearer {token_b}"},
         )
 
-        cfg_a = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token_a}"}).json()
-        cfg_b = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token_b}"}).json()
+        cfg_a = client.get(
+            "/api/alerts/config", headers={"Authorization": f"Bearer {token_a}"}
+        ).json()
+        cfg_b = client.get(
+            "/api/alerts/config", headers={"Authorization": f"Bearer {token_b}"}
+        ).json()
         assert cfg_a["config"]["defaults"]["email_to"] == "a@example.com"
         assert cfg_b["config"]["defaults"]["email_to"] == "b@example.com"
 
@@ -191,9 +190,7 @@ class TestMultiUserAlertsAPI:
         mock_check.assert_called_once()
         assert mock_check.call_args.args[0]
 
-    def test_run_only_evaluates_authenticated_users_watches(
-        self, client, multi_user_env
-    ):
+    def test_run_only_evaluates_authenticated_users_watches(self, client, multi_user_env):
         from src.storage.database import get_connection
 
         token_a = _register(client, "runner-a@example.com")
@@ -231,9 +228,7 @@ class TestMultiUserAlertsAPI:
                 [{"symbol": "AAPL", "close": 150.0}],
             ),
         ):
-            with patch(
-                "src.alerts.alert_engine.LogNotifier.send", return_value=True
-            ) as send:
+            with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send:
                 first = client.post("/api/alerts/run", headers=headers_a)
                 second = client.post("/api/alerts/run", headers=headers_a)
 
@@ -319,9 +314,7 @@ class TestMultiUserAlertsAPI:
         assert raw is not None
         assert raw["defaults"]["webhook_url"].endswith("/user/token")
 
-    def test_test_send_records_status_for_authenticated_user_only(
-        self, client, multi_user_env
-    ):
+    def test_test_send_records_status_for_authenticated_user_only(self, client, multi_user_env):
         token_a = _register(client, "status-a@example.com")
         token_b = _register(client, "status-b@example.com")
         headers_a = {"Authorization": f"Bearer {token_a}"}
@@ -383,9 +376,7 @@ class TestMultiUserAlertsAPI:
         self, client, multi_user_env, monkeypatch
     ):
         """Hosted mode must ignore global DISCORD_WEBHOOK_URL for channel readiness."""
-        monkeypatch.setenv(
-            "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token"
-        )
+        monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
         monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
 
         token = _register(client, "global-webhook@example.com")
@@ -443,9 +434,7 @@ class TestMultiUserAlertsAPI:
         assert put2.json()["channels"]["email_recipients"] is True
         assert put2.json()["config"]["defaults"]["email_to"] == "tenant@example.com"
 
-    def test_status_active_watches_and_last_triggered_are_user_scoped(
-        self, client, multi_user_env
-    ):
+    def test_status_active_watches_and_last_triggered_are_user_scoped(self, client, multi_user_env):
         from src.alerts.user_alert_storage import UserAlertStorage
         from src.storage.users import authenticate_user
 
@@ -506,9 +495,13 @@ class TestMultiUserAlertsAPI:
         }
 
         assert client.post("/api/alerts/init", headers=headers_a).status_code == 200
-        assert client.put("/api/alerts/config", json=payload_a, headers=headers_a).status_code == 200
+        assert (
+            client.put("/api/alerts/config", json=payload_a, headers=headers_a).status_code == 200
+        )
         assert client.post("/api/alerts/init", headers=headers_b).status_code == 200
-        assert client.put("/api/alerts/config", json=payload_b, headers=headers_b).status_code == 200
+        assert (
+            client.put("/api/alerts/config", json=payload_b, headers=headers_b).status_code == 200
+        )
 
         user_a = authenticate_user("watches-a@example.com", "password123")
         assert user_a is not None
@@ -526,9 +519,7 @@ class TestMultiUserAlertsAPI:
         assert status_b.json()["active_watches"] == 1
         assert status_b.json()["last_triggered_at"] is None
 
-    def test_init_conflict_and_test_requires_existing_config(
-        self, client, multi_user_env
-    ):
+    def test_init_conflict_and_test_requires_existing_config(self, client, multi_user_env):
         token = _register(client, "init-conflict@example.com")
         headers = {"Authorization": f"Bearer {token}"}
 

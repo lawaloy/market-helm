@@ -4,14 +4,15 @@ MarketHelm - Data Storage Module
 Handles durable market bars plus summary/projection file persistence.
 """
 
-import pandas as pd
-from ..utils.company_names import enrich_stock_data_with_names
-import os
-import json
 import math
+import os
 from datetime import date, datetime, timedelta
-from typing import Any, List, Dict, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+
+from ..utils.company_names import enrich_stock_data_with_names
 
 
 def _json_safe_value(value: Any) -> Any:
@@ -86,7 +87,7 @@ def _data_date_for_filename() -> datetime.date:
 
 class DataStorage:
     """Manages storage of stock market data (market_bars + projection/summary files)."""
-    
+
     def __init__(self, data_dir: Optional[str] = None):
         """
         Initialize data storage.
@@ -100,7 +101,7 @@ class DataStorage:
             data_dir = os.getenv("DATA_DIR") or "data"
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
-    
+
     def save_daily_data(self, data: List[Dict], date: datetime.date = None) -> str:
         """
         Persist daily stock quotes to durable ``market_bars`` storage.
@@ -153,9 +154,7 @@ class DataStorage:
             day = dates[0]
         else:
             day = (
-                trade_date.strftime("%Y-%m-%d")
-                if isinstance(trade_date, date)
-                else str(trade_date)
+                trade_date.strftime("%Y-%m-%d") if isinstance(trade_date, date) else str(trade_date)
             )
 
         try:
@@ -166,7 +165,7 @@ class DataStorage:
         if frame is None or frame.empty:
             return None
         return frame
-    
+
     def save_summary(self, summary_data: Dict, date: datetime.date = None) -> str:
         """
         Persist daily summary statistics to durable ``daily_summaries`` storage.
@@ -231,37 +230,39 @@ class DataStorage:
             print(f"Warning: Could not generate markdown report: {e}")
 
         return f"projections:{date.strftime('%Y-%m-%d')}"
-    
-    def _generate_projection_markdown(self, df: pd.DataFrame, output_path: Path, date: datetime.date):
+
+    def _generate_projection_markdown(
+        self, df: pd.DataFrame, output_path: Path, date: datetime.date
+    ):
         """Generate a formatted Markdown report from projections DataFrame."""
         from datetime import datetime
-        
+
         # Parse dates
-        projection_date = pd.to_datetime(df['projection_date'].iloc[0]).strftime('%B %d, %Y')
-        generated_date = datetime.now().strftime('%B %d, %Y at %I:%M %p')
-        
+        projection_date = pd.to_datetime(df["projection_date"].iloc[0]).strftime("%B %d, %Y")
+        generated_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+
         # Calculate statistics
         total_stocks = len(df)
-        avg_confidence = df['confidence'].mean()
-        avg_expected_change = df['expected_change_percent'].mean()
-        
+        avg_confidence = df["confidence"].mean()
+        avg_expected_change = df["expected_change_percent"].mean()
+
         # Get counts
-        rec_counts = df['recommendation'].value_counts().to_dict()
-        trend_counts = df['trend'].value_counts().to_dict()
-        risk_counts = df['risk_level'].value_counts().to_dict()
-        
+        rec_counts = df["recommendation"].value_counts().to_dict()
+        trend_counts = df["trend"].value_counts().to_dict()
+        risk_counts = df["risk_level"].value_counts().to_dict()
+
         # Filter by recommendation
-        strong_buys = df[df['recommendation'] == 'STRONG BUY'].nlargest(10, 'confidence')
-        buys = df[df['recommendation'] == 'BUY'].nlargest(10, 'confidence')
-        strong_sells = df[df['recommendation'] == 'STRONG SELL'].nlargest(10, 'confidence')
-        
+        strong_buys = df[df["recommendation"] == "STRONG BUY"].nlargest(10, "confidence")
+        buys = df[df["recommendation"] == "BUY"].nlargest(10, "confidence")
+        strong_sells = df[df["recommendation"] == "STRONG SELL"].nlargest(10, "confidence")
+
         # Top movers
-        top_gainers = df.nlargest(10, 'expected_change_percent')
-        top_decliners = df.nsmallest(10, 'expected_change_percent')
-        
+        top_gainers = df.nlargest(10, "expected_change_percent")
+        top_decliners = df.nsmallest(10, "expected_change_percent")
+
         # High confidence picks
-        high_confidence = df[df['confidence'] >= 85].nlargest(10, 'expected_change_percent')
-        
+        high_confidence = df[df["confidence"] >= 85].nlargest(10, "expected_change_percent")
+
         # Build markdown content
         md = []
         md.append("# Stock Market Projections Report")
@@ -292,7 +293,7 @@ class DataStorage:
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Executive Summary
         md.append("## Executive Summary")
         md.append("")
@@ -307,11 +308,7 @@ class DataStorage:
             avg_change = float(avg_expected_change)
             direction = f"{'+' if avg_change >= 0 else ''}{avg_change:.2f}%"
             sentiment = (
-                "Bullish"
-                if avg_change > 0.5
-                else "Bearish"
-                if avg_change < -0.5
-                else "Neutral"
+                "Bullish" if avg_change > 0.5 else "Bearish" if avg_change < -0.5 else "Neutral"
             )
         else:
             direction = "—"
@@ -321,50 +318,50 @@ class DataStorage:
         md.append(f"- **Expected Market Direction:** {direction}")
         md.append(f"- **Market Sentiment:** {sentiment}")
         md.append("")
-        
+
         # Recommendation distribution
         md.append("### Recommendation Distribution")
         md.append("")
         md.append("```text")
         total_recs = sum(rec_counts.values())
-        for rec in ['STRONG BUY', 'BUY', 'HOLD', 'SELL', 'STRONG SELL']:
+        for rec in ["STRONG BUY", "BUY", "HOLD", "SELL", "STRONG SELL"]:
             count = rec_counts.get(rec, 0)
             pct = (count / total_recs * 100) if total_recs > 0 else 0
-            bar = '█' * int(pct / 2)
+            bar = "█" * int(pct / 2)
             md.append(f"{rec:12} │ {bar} {count:3d} ({pct:5.1f}%)")
         md.append("```")
         md.append("")
-        
+
         # Trend breakdown
         md.append("### Market Sentiment Breakdown")
         md.append("")
         md.append("| Trend | Count | Percentage |")
         md.append("| ----- | ----- | ---------- |")
-        for trend in ['Bullish', 'Neutral', 'Bearish']:
+        for trend in ["Bullish", "Neutral", "Bearish"]:
             count = trend_counts.get(trend, 0)
             pct = (count / total_stocks * 100) if total_stocks > 0 else 0
             md.append(f"| {trend} | {count} | {pct:.1f}% |")
         md.append("")
-        
+
         # Risk profile
         md.append("### Risk Profile")
         md.append("")
         md.append("| Risk Level | Count | Percentage |")
         md.append("| ---------- | ----- | ---------- |")
-        for risk in ['Low', 'Medium', 'High']:
+        for risk in ["Low", "Medium", "High"]:
             count = risk_counts.get(risk, 0)
             pct = (count / total_stocks * 100) if total_stocks > 0 else 0
             md.append(f"| {risk} | {count} | {pct:.1f}% |")
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Strong Buys
         md.append("## STRONG BUY Opportunities")
         md.append("")
         md.append(f"{len(strong_buys)} stocks identified with STRONG BUY rating")
         md.append("")
-        
+
         if len(strong_buys) > 0:
             md.append("| Symbol | Current → Target | Change | Confidence | Reason |")
             md.append("| ------ | ---------------- | ------ | ---------- | ------ |")
@@ -372,20 +369,21 @@ class DataStorage:
                 reason_short = _md_reason(stock.get("reason"), 55)
                 md.append(
                     f"| **{stock['symbol']}** | "
-                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_money(stock.get('current_price'))} → "
+                    f"{_md_money(stock.get('target_mid'))} | "
                     f"{_md_pct(stock.get('expected_change_percent'))} | "
                     f"{stock['confidence']}% | {reason_short} |"
                 )
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Buy Opportunities
         md.append("## BUY Opportunities")
         md.append("")
         md.append(f"{len(buys)} stocks identified with BUY rating")
         md.append("")
-        
+
         if len(buys) > 0:
             md.append("| Symbol | Current | Target | Change | Confidence | Risk |")
             md.append("| ------ | ------- | ------ | ------ | ---------- | ---- |")
@@ -399,13 +397,13 @@ class DataStorage:
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Strong Sells
         md.append("## STRONG SELL Warnings")
         md.append("")
         md.append(f"{len(strong_sells)} stocks identified with STRONG SELL rating")
         md.append("")
-        
+
         if len(strong_sells) > 0:
             md.append("| Symbol | Current | Target | Change | Confidence | Risk | Reason |")
             md.append("| ------ | ------- | ------ | ------ | ---------- | ---- | ------ |")
@@ -420,7 +418,7 @@ class DataStorage:
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Top Gainers
         md.append("## Top Expected Price Gainers")
         md.append("")
@@ -436,7 +434,7 @@ class DataStorage:
                 f"{stock['confidence']}% | {stock['recommendation']} |"
             )
         md.append("")
-        
+
         # Top Decliners
         md.append("## Top Expected Price Decliners")
         md.append("")
@@ -454,27 +452,36 @@ class DataStorage:
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # High Confidence Picks
         md.append("## High Confidence Picks (85%+)")
         md.append("")
-        md.append(f"{len(high_confidence)} stocks with highest confidence and best upside potential")
+        md.append(
+            f"{len(high_confidence)} stocks with highest confidence and best upside potential"
+        )
         md.append("")
-        
+
         if len(high_confidence) > 0:
-            md.append("| Symbol | Current → Target | Expected Change | Confidence | Recommendation | Trend |")
-            md.append("| ------ | ---------------- | --------------- | ---------- | -------------- | ----- |")
+            md.append(
+                "| Symbol | Current → Target | Expected Change | Confidence | Recommendation | "
+                "Trend |"
+            )
+            md.append(
+                "| ------ | ---------------- | --------------- | ---------- | -------------- | "
+                "----- |"
+            )
             for _, stock in high_confidence.iterrows():
                 md.append(
                     f"| **{stock['symbol']}** | "
-                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_money(stock.get('current_price'))} → "
+                    f"{_md_money(stock.get('target_mid'))} | "
                     f"{_md_pct(stock.get('expected_change_percent'))} | "
                     f"{stock['confidence']}% | {stock['recommendation']} | {stock['trend']} |"
                 )
         md.append("")
         md.append("---")
         md.append("")
-        
+
         # Disclaimer
         md.append("## Disclaimer")
         md.append("")
@@ -485,20 +492,19 @@ class DataStorage:
         md.append("---")
         md.append("")
         md.append(f"*Generated on {generated_date} by MarketHelm*")
-        
+
         # Write to file with trailing newline
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(md) + '\n')
-    
-    def get_historical_data(self, start_date: date = None,
-                          end_date: date = None) -> pd.DataFrame:
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(md) + "\n")
+
+    def get_historical_data(self, start_date: date = None, end_date: date = None) -> pd.DataFrame:
         """
         Load historical data for a date range.
-        
+
         Args:
             start_date: Start date (defaults to 30 days ago)
             end_date: End date (defaults to today)
-        
+
         Returns:
             Combined DataFrame with historical data
         """
@@ -506,16 +512,16 @@ class DataStorage:
             end_date = datetime.now().date()
         if start_date is None:
             start_date = end_date - timedelta(days=30)
-        
+
         all_data = []
         current_date = start_date
-        
+
         while current_date <= end_date:
             df = self.load_daily_data(current_date)
             if df is not None and not df.empty:
                 all_data.append(df)
             current_date += timedelta(days=1)
-        
+
         if all_data:
             return pd.concat(all_data, ignore_index=True)
         return pd.DataFrame()

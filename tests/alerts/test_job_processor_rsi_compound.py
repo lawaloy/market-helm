@@ -72,13 +72,17 @@ def _evaluate_compound_tick(price, closes):
             delivered_events.append(payload["event"])
         return enqueue_job(job_type, payload, **kwargs)
 
-    with patch(
-        "src.alerts.job_processor.closes_by_symbol",
-        return_value={"AAPL": closes},
-    ) as closes_mock, patch(
-        "src.alerts.job_processor.enqueue_job",
-        side_effect=_capture,
-    ), patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+    with (
+        patch(
+            "src.alerts.job_processor.closes_by_symbol",
+            return_value={"AAPL": closes},
+        ) as closes_mock,
+        patch(
+            "src.alerts.job_processor.enqueue_job",
+            side_effect=_capture,
+        ),
+        patch("src.alerts.alert_engine.LogNotifier.send", return_value=True),
+    ):
         stats = process_job_queue("test-worker")
     return stats, delivered_events, closes_mock
 
@@ -111,10 +115,13 @@ def test_rsi_watch_is_indexed_and_evaluated(db_user):
     assert watches[0]["condition_type"] == "rsi_threshold"
 
     enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 80.0})
-    with patch(
-        "src.alerts.job_processor.closes_by_symbol",
-        return_value={"AAPL": _falling_closes()},
-    ), patch("src.alerts.alert_engine.LogNotifier.send", return_value=True):
+    with (
+        patch(
+            "src.alerts.job_processor.closes_by_symbol",
+            return_value={"AAPL": _falling_closes()},
+        ),
+        patch("src.alerts.alert_engine.LogNotifier.send", return_value=True),
+    ):
         stats = process_job_queue("test-worker")
 
     assert stats["evaluated"] == 1

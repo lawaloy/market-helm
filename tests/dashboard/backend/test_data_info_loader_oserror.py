@@ -15,12 +15,15 @@ def test_data_info_404_when_available_dates_raises_oserror():
     loader.needs_fetch_for_latest_trading_day.return_value = False
     loader.get_available_dates.side_effect = OSError("permission denied")
 
-    with patch(
-        "dashboard.backend.services.data_loader.get_data_loader",
-        return_value=loader,
-    ), patch(
-        "dashboard.backend.services.data_loader.get_most_recent_trading_day",
-        return_value="2026-01-16",
+    with (
+        patch(
+            "dashboard.backend.services.data_loader.get_data_loader",
+            return_value=loader,
+        ),
+        patch(
+            "dashboard.backend.services.data_loader.get_most_recent_trading_day",
+            return_value="2026-01-16",
+        ),
     ):
         client = TestClient(app)
         r = client.get("/api/data-info")

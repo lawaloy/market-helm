@@ -65,18 +65,10 @@ def test_resolve_refresh_top_n_clamps_extreme_values(monkeypatch) -> None:
 
 def test_resolve_refresh_timeout_clamps_extreme_values(monkeypatch) -> None:
     monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "999999999")
-    assert (
-        refresh._resolve_refresh_timeout_seconds()
-        == refresh.MAX_REFRESH_TIMEOUT_SECONDS
-    )
+    assert refresh._resolve_refresh_timeout_seconds() == refresh.MAX_REFRESH_TIMEOUT_SECONDS
 
-    monkeypatch.setenv(
-        "REFRESH_TIMEOUT_SECONDS", str(refresh.MAX_REFRESH_TIMEOUT_SECONDS)
-    )
-    assert (
-        refresh._resolve_refresh_timeout_seconds()
-        == refresh.MAX_REFRESH_TIMEOUT_SECONDS
-    )
+    monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", str(refresh.MAX_REFRESH_TIMEOUT_SECONDS))
+    assert refresh._resolve_refresh_timeout_seconds() == refresh.MAX_REFRESH_TIMEOUT_SECONDS
 
     monkeypatch.setenv("REFRESH_TIMEOUT_SECONDS", "120")
     assert refresh._resolve_refresh_timeout_seconds() == 120

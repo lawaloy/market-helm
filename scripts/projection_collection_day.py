@@ -5,18 +5,18 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from pathlib import Path
-import sys
 from typing import Optional, Sequence
 
 import pandas as pd
 
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+from src.analysis.market_calendar import DEFAULT_CALENDAR, get_market_calendar
 
-from src.analysis.market_calendar import DEFAULT_CALENDAR, get_market_calendar  # noqa: E402
+ROOT = _repo_path.ROOT
 
 
 def session_has_completed(

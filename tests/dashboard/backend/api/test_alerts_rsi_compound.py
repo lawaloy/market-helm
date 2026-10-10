@@ -108,9 +108,7 @@ def _compound_payload(*, op="and", leaves=None):
                 "condition": {
                     "type": "compound",
                     "op": op,
-                    "conditions": leaves
-                    if leaves is not None
-                    else [_price_leaf(), _rsi_leaf()],
+                    "conditions": leaves if leaves is not None else [_price_leaf(), _rsi_leaf()],
                 },
                 "notifications": ["log"],
             }
@@ -126,9 +124,7 @@ def test_file_put_rejects_invalid_rsi_period(client, file_mode: Path, period):
     assert not file_mode.exists()
 
 
-def test_file_put_persists_valid_rsi_and_rejects_later_poison(
-    client, file_mode: Path
-):
+def test_file_put_persists_valid_rsi_and_rejects_later_poison(client, file_mode: Path):
     ok = client.put("/api/alerts/config", json=_rsi_payload(period=14))
     assert ok.status_code == 200
     assert ok.json()["config"]["alerts"][0]["condition"]["period"] == 14
@@ -171,9 +167,7 @@ def test_hosted_put_rejects_invalid_rsi_period(client, multi_user_env):
     token = _register(client, "rsi-period@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.put(
-        "/api/alerts/config", json=_rsi_payload(period=51), headers=headers
-    )
+    response = client.put("/api/alerts/config", json=_rsi_payload(period=51), headers=headers)
     assert response.status_code == 400
     assert "invalid RSI period" in response.json()["detail"]
 
@@ -186,17 +180,13 @@ def test_hosted_put_persists_valid_rsi(client, multi_user_env):
     token = _register(client, "rsi-ok@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.put(
-        "/api/alerts/config", json=_rsi_payload(period=14), headers=headers
-    )
+    response = client.put("/api/alerts/config", json=_rsi_payload(period=14), headers=headers)
     assert response.status_code == 200
     assert response.json()["config"]["alerts"][0]["condition"]["type"] == "rsi_threshold"
     assert response.json()["config"]["alerts"][0]["condition"]["period"] == 14
 
 
-def test_hosted_put_rejects_oversized_compound_without_replacing(
-    client, multi_user_env
-):
+def test_hosted_put_rejects_oversized_compound_without_replacing(client, multi_user_env):
     token = _register(client, "compound-cap@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 

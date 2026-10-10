@@ -21,6 +21,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -101,9 +102,7 @@ def test_hosted_init_409s_on_corrupt_row_until_force_without_touching_sibling(
 
     sibling_cfg = client.get("/api/alerts/config", headers=headers_b)
     assert sibling_cfg.status_code == 200
-    assert [alert["id"] for alert in sibling_cfg.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling_cfg.json()["config"]["alerts"]] == ["sibling-msft"]
     assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
         (user_b, "sibling-msft")
     }
@@ -139,9 +138,7 @@ def test_hosted_put_replaces_corrupt_row_and_reindexes_watches_without_touching_
     assert got_a.status_code == 200
     assert [alert["id"] for alert in got_a.json()["config"]["alerts"]] == ["aapl_drop"]
     assert got_b.status_code == 200
-    assert [alert["id"] for alert in got_b.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in got_b.json()["config"]["alerts"]] == ["sibling-msft"]
 
     aapl = {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")}
     assert aapl == {(user_a, "aapl_drop")}
@@ -223,4 +220,3 @@ def test_hosted_test_poison_row_404s_without_building_notifiers_or_touching_sibl
     assert sibling_test.status_code == 200
     assert sibling_test.json()["alert_id"] == "sibling-msft"
     assert sibling_test.json()["status"] == "dry_run"
-

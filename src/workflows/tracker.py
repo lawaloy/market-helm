@@ -5,19 +5,21 @@ Orchestrates screening, fetch, analysis, and storage.
 Reusable across CLI, web, and API.
 """
 
+import math
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
+
+from ..alerts.alert_engine import AlertEngine
+from ..analysis.ai_summarizer import AISummarizer
+from ..analysis.analyzer import StockAnalyzer
+from ..analysis.projector import StockProjector
+from ..core.config import get_indices_to_track
+from ..core.logger import setup_logger
 from ..services.data_fetcher import StockDataFetcher
 from ..storage.data_storage import DataStorage
-from ..analysis.analyzer import StockAnalyzer
-from ..analysis.ai_summarizer import AISummarizer
-from ..analysis.projector import StockProjector
-from ..alerts.alert_engine import AlertEngine
-from ..core.logger import setup_logger
-from ..core.config import get_indices_to_track
 from ..utils.tickers import normalize_ticker
-from datetime import datetime
-from typing import Dict, List, Any, Optional
-import math
-import pandas as pd
 
 logger = setup_logger("workflow")
 
@@ -45,17 +47,17 @@ def _volume_sort_key(row: Any) -> float:
 class StockTrackerWorkflow:
     """
     Core workflow for stock tracking.
-    
+
     This class handles the business logic for:
     - Fetching stock data from indices
     - Analyzing market data
     - Generating projections and recommendations
     - Generating AI summaries
     - Saving results
-    
+
     It returns structured data that can be consumed by any interface (CLI, Web, API).
     """
-    
+
     def __init__(self, include_profile: bool = True):
         """Initialize workflow components."""
         self.fetcher = StockDataFetcher(include_profile=include_profile)
@@ -65,15 +67,15 @@ class StockTrackerWorkflow:
         self.projector = StockProjector()
         self.alert_engine = AlertEngine.from_config()
         logger.debug("Workflow components initialized")
-    
+
     def run(self, use_screener: bool = True, top_n_stocks: Optional[int] = None) -> Dict[str, Any]:
         """
         Execute the complete stock tracking workflow.
-        
+
         Args:
             use_screener: Whether to use stock screener for filtering
             top_n_stocks: If specified, limit to top N stocks by volume (for day trading)
-        
+
         Returns:
             Dictionary containing:
             - success: bool
@@ -88,50 +90,49 @@ class StockTrackerWorkflow:
         """
         try:
             logger.info("Starting stock tracking workflow")
-            
+
             # Step 1: Fetch data
             logger.info("Step 1: Fetching stock data")
             fetch_result = self._fetch_data(use_screener, top_n_stocks)
-            
+
             if not fetch_result["success"]:
                 return fetch_result
-            
+
             all_data = fetch_result["data"]
             all_index_data = fetch_result["index_data"]
-            
+
             # Step 2: Save data
             logger.info("Step 2: Saving data")
             save_result = self._save_data(all_data)
-            
+
             # Step 3: Analyze data
             logger.info("Step 3: Analyzing data")
             analysis_result = self._analyze_data(all_data, all_index_data)
-            
+
             # Step 4: Generate projections
             logger.info("Step 4: Generating projections")
             projection_result = self._generate_projections(all_data)
-            
+
             # Step 5: Generate AI summary
             logger.info("Step 5: Generating summary")
             ai_summary = self._generate_summary(
-                analysis_result["analysis"],
-                analysis_result["index_comparison"]
+                analysis_result["analysis"], analysis_result["index_comparison"]
             )
-            
+
             # Step 6: Save summary and projections
             summary_result = self._save_summary(
                 analysis_result["analysis"],
                 analysis_result["index_comparison"],
                 ai_summary,
                 projection_result["projections"],
-                projection_result["projection_summary"]
+                projection_result["projection_summary"],
             )
 
             # Step 7: Evaluate alerts (if configured)
             self._run_alerts(all_data)
-            
+
             logger.info("Workflow completed successfully")
-            
+
             return {
                 "success": True,
                 "data": all_data,
@@ -142,23 +143,20 @@ class StockTrackerWorkflow:
                 "ai_summary": ai_summary,
                 "file_paths": {
                     "data": save_result.get("file_path"),
-                    "summary": summary_result.get("file_path")
+                    "summary": summary_result.get("file_path"),
                 },
                 "metadata": {
                     "date": datetime.now().date(),
                     "total_stocks": len(all_data),
                     "screener_enabled": use_screener,
                     "ai_enabled": self.ai_summarizer.enabled,
-                    "projections_enabled": True
-                }
+                    "projections_enabled": True,
+                },
             }
-            
+
         except Exception as e:
             logger.error(f"Workflow failed: {str(e)}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def _run_alerts(self, data: List[Dict]) -> None:
         """Evaluate configured alerts against current data."""
@@ -170,7 +168,7 @@ class StockTrackerWorkflow:
                 logger.info(f"Alerts triggered: {len(events)}")
         except Exception as e:
             logger.warning(f"Alert evaluation failed: {e}")
-    
+
     def _fetch_data(self, use_screener: bool, top_n_stocks: Optional[int] = None) -> Dict[str, Any]:
         """Fetch stock data from configured indices."""
         try:
@@ -185,22 +183,25 @@ class StockTrackerWorkflow:
             if top_n_stocks:
                 logger.info(f"Day trading mode: Will select top {top_n_stocks} stocks by volume")
                 # Limit per-index to avoid over-fetching (e.g. 10 stocks, 2 indices → 5 per index)
-                max_symbols_per_index = max(1, (top_n_stocks + num_indices - 1) // num_indices) if not use_screener else None
+                max_symbols_per_index = (
+                    max(1, (top_n_stocks + num_indices - 1) // num_indices)
+                    if not use_screener
+                    else None
+                )
             else:
                 max_symbols_per_index = None
             all_index_data = self.fetcher.fetch_all_indices(
-                use_screener=use_screener,
-                max_symbols_per_index=max_symbols_per_index
+                use_screener=use_screener, max_symbols_per_index=max_symbols_per_index
             )
-            
+
             # Combine all data
             all_data = []
             for index_name, data in all_index_data.items():
                 all_data.extend(data)
                 logger.info(f"  {index_name}: {len(data)} stocks fetched")
-            
+
             logger.info(f"Total stocks fetched: {len(all_data)}")
-            
+
             # Day trading optimization: Select top N by volume
             if top_n_stocks and len(all_data) > top_n_stocks:
                 logger.info(f"Filtering to top {top_n_stocks} stocks by volume...")
@@ -243,27 +244,17 @@ class StockTrackerWorkflow:
                         all_data.append(fetched)
                         existing.add(symbol)
                         logger.info(f"Included watch symbol {symbol} in fetch")
-            
+
             if not all_data:
                 logger.warning("No data was fetched")
-                return {
-                    "success": False,
-                    "error": "No data fetched from any index"
-                }
-            
-            return {
-                "success": True,
-                "data": all_data,
-                "index_data": all_index_data
-            }
-            
+                return {"success": False, "error": "No data fetched from any index"}
+
+            return {"success": True, "data": all_data, "index_data": all_index_data}
+
         except Exception as e:
             logger.error(f"Data fetch failed: {str(e)}")
-            return {
-                "success": False,
-                "error": f"Data fetch failed: {str(e)}"
-            }
-    
+            return {"success": False, "error": f"Data fetch failed: {str(e)}"}
+
     def _save_data(self, data: List[Dict]) -> Dict[str, Any]:
         """Persist stock data to durable market_bars storage."""
         try:
@@ -277,17 +268,15 @@ class StockTrackerWorkflow:
         except Exception as e:
             logger.error(f"Save failed: {str(e)}")
             return {"success": False, "error": str(e)}
-    
+
     def _analyze_data(
-        self, 
-        all_data: List[Dict], 
-        index_data: Dict[str, List[Dict]]
+        self, all_data: List[Dict], index_data: Dict[str, List[Dict]]
     ) -> Dict[str, Any]:
         """Analyze stock data and generate index comparison."""
         try:
             # Run analysis
             analysis = self.analyzer.analyze_daily_data(all_data)
-            
+
             # Generate index comparison
             index_comparison = {}
             for index_name, data in index_data.items():
@@ -295,43 +284,29 @@ class StockTrackerWorkflow:
                     df = pd.DataFrame(data)
                     finite_changes = _finite_numeric_series(df["change_percent"])
                     finite_volumes = _finite_numeric_series(df["volume"])
-                    avg_change = (
-                        float(finite_changes.mean()) if not finite_changes.empty else 0.0
-                    )
-                    total_volume = (
-                        float(finite_volumes.sum()) if not finite_volumes.empty else 0.0
-                    )
+                    avg_change = float(finite_changes.mean()) if not finite_changes.empty else 0.0
+                    total_volume = float(finite_volumes.sum()) if not finite_volumes.empty else 0.0
                     if not math.isfinite(avg_change):
                         avg_change = 0.0
                     if not math.isfinite(total_volume):
                         total_volume = 0.0
                     index_comparison[index_name] = {
-                        'stock_count': len(df),
-                        'average_change_percent': round(avg_change, 2),
-                        'total_volume': int(total_volume),
-                        'gainers': int((finite_changes > 0).sum()),
-                        'losers': int((finite_changes < 0).sum()),
+                        "stock_count": len(df),
+                        "average_change_percent": round(avg_change, 2),
+                        "total_volume": int(total_volume),
+                        "gainers": int((finite_changes > 0).sum()),
+                        "losers": int((finite_changes < 0).sum()),
                     }
-            
+
             logger.debug("Data analysis completed")
-            
-            return {
-                "analysis": analysis,
-                "index_comparison": index_comparison
-            }
-            
+
+            return {"analysis": analysis, "index_comparison": index_comparison}
+
         except Exception as e:
             logger.error(f"Analysis failed: {str(e)}")
-            return {
-                "analysis": {},
-                "index_comparison": {}
-            }
-    
-    def _generate_summary(
-        self, 
-        analysis: Dict, 
-        index_comparison: Dict
-    ) -> Optional[str]:
+            return {"analysis": {}, "index_comparison": {}}
+
+    def _generate_summary(self, analysis: Dict, index_comparison: Dict) -> Optional[str]:
         """Generate AI or demo summary."""
         try:
             ai_summary = self.ai_summarizer.generate_summary(analysis, index_comparison)
@@ -344,65 +319,56 @@ class StockTrackerWorkflow:
         except Exception as e:
             logger.error(f"Summary generation failed: {str(e)}")
             return None
-    
+
     def _generate_projections(self, data: List[Dict]) -> Dict[str, Any]:
         """Generate stock projections and recommendations."""
         try:
             # Generate projections for all stocks
             projections = self.projector.generate_projections(data)
-            
+
             # Generate projection summary
             projection_summary = self.projector.generate_projection_summary(projections)
-            
+
             logger.info(f"Generated {len(projections)} projections")
-            
-            return {
-                "projections": projections,
-                "projection_summary": projection_summary
-            }
-            
+
+            return {"projections": projections, "projection_summary": projection_summary}
+
         except Exception as e:
             logger.error(f"Projection generation failed: {str(e)}")
-            return {
-                "projections": {},
-                "projection_summary": {}
-            }
-    
+            return {"projections": {}, "projection_summary": {}}
+
     def _save_summary(
-        self, 
-        analysis: Dict, 
+        self,
+        analysis: Dict,
         index_comparison: Dict,
         ai_summary: Optional[str],
         projections: Dict = None,
-        projection_summary: Dict = None
+        projection_summary: Dict = None,
     ) -> Dict[str, Any]:
         """Persist analysis summary and projections to durable DB storage."""
         try:
-            summary_data = {
-                "analysis": analysis,
-                "exchange_comparison": index_comparison
-            }
+            summary_data = {"analysis": analysis, "exchange_comparison": index_comparison}
             if ai_summary:
                 summary_data["ai_summary"] = ai_summary
-            
+
             if projections:
                 summary_data["projections"] = projections
-            
+
             if projection_summary:
                 summary_data["projection_summary"] = projection_summary
-            
+
             summary_path = self.storage.save_summary(summary_data)
-            
+
             projection_location = None
             if projections:
                 projection_location = self.storage.save_projections(projections)
                 if projection_location:
                     logger.info(f"Projections saved to: {projection_location}")
-            
+
             if summary_path:
                 logger.info(f"Summary saved to: {summary_path}")
                 return {
-                    "success": True, 
+                    "success": True,
                     "file_path": summary_path,
                     "projection_location": projection_location,
                 }
@@ -416,34 +382,43 @@ class StockTrackerWorkflow:
 if __name__ == "__main__":
     """
     Direct execution for programmatic/testing use.
-    
+
     This runs the workflow and returns structured data without CLI formatting.
     For CLI output, use: python main.py or python -m src.cli.commands
     """
     import json
-    
+
     print("Running MarketHelm workflow (programmatic mode)...")
     print("-" * 60)
-    
+
     workflow = StockTrackerWorkflow()
     result = workflow.run(use_screener=True)
-    
+
     if result.get("success"):
         print("\n✓ Workflow completed successfully!")
         print(f"✓ Data saved: {result.get('data_saved', {}).get('file_path')}")
         print(f"✓ Summary saved: {result.get('summary_saved', {}).get('file_path')}")
-        
+
         # Print structured result (JSON)
         print("\n" + "=" * 60)
         print("RESULT (JSON):")
         print("=" * 60)
-        print(json.dumps({
-            "success": result["success"],
-            "metadata": result["metadata"],
-            "summary": result.get("analysis", {}).get("summary", {}),
-            "ai_summary": result.get("ai_summary", "N/A")[:200] + "..." if result.get("ai_summary") else "N/A"
-        }, indent=2, default=str))
+        print(
+            json.dumps(
+                {
+                    "success": result["success"],
+                    "metadata": result["metadata"],
+                    "summary": result.get("analysis", {}).get("summary", {}),
+                    "ai_summary": (
+                        result.get("ai_summary", "N/A")[:200] + "..."
+                        if result.get("ai_summary")
+                        else "N/A"
+                    ),
+                },
+                indent=2,
+                default=str,
+            )
+        )
     else:
         print(f"\n✗ Workflow failed: {result.get('error')}")
         exit(1)
-

@@ -23,9 +23,7 @@ def multi_user_env(tmp_path, monkeypatch):
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/global")
-    monkeypatch.setenv(
-        "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token"
-    )
+    monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
     from src.storage.database import init_database
 
     init_database()
@@ -112,9 +110,7 @@ def test_hosted_get_config_strips_placeholder_rule_webhook_without_touching_sibl
                             _rule(
                                 alert_id="example-aapl",
                                 symbol="AAPL",
-                                webhook_url=(
-                                    "https://hooks.example.com/services/T00/B00/xxx"
-                                ),
+                                webhook_url=("https://hooks.example.com/services/T00/B00/xxx"),
                             )
                         ],
                     }
@@ -146,9 +142,7 @@ def test_hosted_get_config_strips_placeholder_rule_webhook_without_touching_sibl
     assert sibling_got.status_code == 200
     assert sibling_got.json()["channels"]["webhook_url"] is True
     assert sibling_got.json()["channels"]["email_recipients"] is False
-    assert [alert["id"] for alert in sibling_got.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling_got.json()["config"]["alerts"]] == ["sibling-msft"]
     assert "hooks.example.com" not in json.dumps(sibling_got.json())
     assert "T00/B00/xxx" not in json.dumps(sibling_got.json())
     assert "sibling-rule" not in json.dumps(sibling_got.json())

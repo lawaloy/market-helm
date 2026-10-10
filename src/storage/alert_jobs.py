@@ -83,8 +83,7 @@ def enqueue_jobs(job_type: str, payloads: List[Dict[str, Any]]) -> int:
         return 0
     now = _utc_now()
     rows = [
-        (job_type, json.dumps(payload), STATUS_PENDING, 5, now, now, now)
-        for payload in payloads
+        (job_type, json.dumps(payload), STATUS_PENDING, 5, now, now, now) for payload in payloads
     ]
     with get_connection() as conn:
         conn.executemany(

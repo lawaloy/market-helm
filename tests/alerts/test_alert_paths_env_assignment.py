@@ -18,9 +18,7 @@ def _prepare_env(tmp_path: Path, monkeypatch) -> Path:
     return env_file
 
 
-def test_update_user_env_vars_rejects_equals_in_key(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_update_user_env_vars_rejects_equals_in_key(tmp_path: Path, monkeypatch) -> None:
     env_file = _prepare_env(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="="):
@@ -29,9 +27,7 @@ def test_update_user_env_vars_rejects_equals_in_key(
     assert env_file.read_text(encoding="utf-8") == "SHARED_KEEP=1\n"
 
 
-def test_update_user_env_vars_rejects_nul_in_key(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_update_user_env_vars_rejects_nul_in_key(tmp_path: Path, monkeypatch) -> None:
     env_file = _prepare_env(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="NUL"):
@@ -40,9 +36,7 @@ def test_update_user_env_vars_rejects_nul_in_key(
     assert env_file.read_text(encoding="utf-8") == "SHARED_KEEP=1\n"
 
 
-def test_update_user_env_vars_rejects_nul_in_value(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_update_user_env_vars_rejects_nul_in_value(tmp_path: Path, monkeypatch) -> None:
     env_file = _prepare_env(tmp_path, monkeypatch)
 
     with pytest.raises(ValueError, match="NUL"):
@@ -51,16 +45,11 @@ def test_update_user_env_vars_rejects_nul_in_value(
     assert env_file.read_text(encoding="utf-8") == "SHARED_KEEP=1\n"
 
 
-def test_update_user_env_vars_allows_equals_in_value(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_update_user_env_vars_allows_equals_in_value(tmp_path: Path, monkeypatch) -> None:
     env_file = _prepare_env(tmp_path, monkeypatch)
 
-    update_user_env_vars(
-        {"CUSTOM_WEBHOOK_URL": "https://hooks.example/path?token=secret"}
-    )
+    update_user_env_vars({"CUSTOM_WEBHOOK_URL": "https://hooks.example/path?token=secret"})
 
     assert env_file.read_text(encoding="utf-8") == (
-        "SHARED_KEEP=1\n"
-        "CUSTOM_WEBHOOK_URL=https://hooks.example/path?token=secret\n"
+        "SHARED_KEEP=1\n" "CUSTOM_WEBHOOK_URL=https://hooks.example/path?token=secret\n"
     )

@@ -8,6 +8,7 @@ import pytest
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -67,9 +68,7 @@ def test_hosted_put_rejects_null_price_threshold(client, multi_user_env):
 
     assert response.status_code == 400
     assert "price threshold" in response.json()["detail"]
-    saved = client.get(
-        "/api/alerts/config", headers={"Authorization": f"Bearer {token}"}
-    )
+    saved = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token}"})
     assert saved.status_code == 200
     assert saved.json()["exists"] is False
 
@@ -101,8 +100,6 @@ def test_hosted_put_null_threshold_preserves_existing(client, multi_user_env):
     bad = client.put("/api/alerts/config", content=body, headers=headers)
     assert bad.status_code == 400
 
-    saved = client.get(
-        "/api/alerts/config", headers={"Authorization": f"Bearer {token}"}
-    )
+    saved = client.get("/api/alerts/config", headers={"Authorization": f"Bearer {token}"})
     assert saved.status_code == 200
     assert saved.json()["config"]["alerts"][0]["condition"]["value"] == 150

@@ -1,9 +1,9 @@
 """Tests for core logging module."""
 
-import unittest
 import logging
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 
 from src.core.logger import setup_logger
@@ -61,7 +61,9 @@ class TestCoreLogger(unittest.TestCase):
         self.assertFalse(legacy_err.exists())
         self.assertTrue((log_dir / f"market_helm_{today}.log").exists())
         self.assertTrue((log_dir / f"market_helm_errors_{today}.log").exists())
-        self.assertIn("old main", (log_dir / f"market_helm_{today}.log").read_text(encoding="utf-8"))
+        self.assertIn(
+            "old main", (log_dir / f"market_helm_{today}.log").read_text(encoding="utf-8")
+        )
 
     def test_skips_legacy_rename_when_destination_already_exists(self):
         """Existing market_helm_*.log must not be overwritten by legacy rename."""
@@ -102,9 +104,7 @@ class TestCoreLogger(unittest.TestCase):
         from unittest.mock import patch
 
         with patch.object(Path, "mkdir", side_effect=OSError("read-only")):
-            logger = setup_logger(
-                name="logger_mkdir_soft_fail", log_dir="/unwritable/logs"
-            )
+            logger = setup_logger(name="logger_mkdir_soft_fail", log_dir="/unwritable/logs")
 
         self.assertIsInstance(logger, logging.Logger)
         self.assertEqual(len(logger.handlers), 1)
@@ -119,14 +119,12 @@ class TestCoreLogger(unittest.TestCase):
             "src.core.logger.logging.FileHandler",
             side_effect=OSError("disk full"),
         ):
-            logger = setup_logger(
-                name="logger_filehandler_soft_fail", log_dir=self.test_log_dir
-            )
+            logger = setup_logger(name="logger_filehandler_soft_fail", log_dir=self.test_log_dir)
 
         self.assertIsInstance(logger, logging.Logger)
         self.assertEqual(len(logger.handlers), 1)
         self.assertIsInstance(logger.handlers[0], logging.StreamHandler)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

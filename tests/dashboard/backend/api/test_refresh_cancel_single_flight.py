@@ -67,9 +67,7 @@ def test_worker_finally_releases_single_flight_after_cancel(monkeypatch) -> None
         refresh._refresh_cancel_event.set()
         return fake_process
 
-    monkeypatch.setattr(
-        refresh.subprocess, "Popen", MagicMock(side_effect=popen_and_cancel)
-    )
+    monkeypatch.setattr(refresh.subprocess, "Popen", MagicMock(side_effect=popen_and_cancel))
     monkeypatch.setenv("REFRESH_TOP_N", "0")
     monkeypatch.setattr("src.alerts.alert_worker.run_check_once", alert_check)
     monkeypatch.setattr(refresh.time, "sleep", lambda _seconds: None)

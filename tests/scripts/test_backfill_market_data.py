@@ -6,7 +6,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "backfill_market_data.py"
 SPEC = importlib.util.spec_from_file_location("backfill_market_data", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None

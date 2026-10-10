@@ -1,57 +1,36 @@
 """
 FastAPI backend for the MarketHelm dashboard.
 """
-import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
-)
+# Logging, sys.path and .env must be set up before the imports below (see _bootstrap).
+try:
+    from dashboard.backend import _bootstrap
+except ImportError:  # run as a script from dashboard/backend: repo root not on sys.path yet
+    import _bootstrap
+
+import logging
+import os
+import threading
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-from typing import List, Optional
-import sys
-import os
-
-# Add repo root to path when running from source (development) so src/ is importable.
-_here = Path(__file__).resolve()
-for _p in _here.parents:
-    if (_p / "main.py").is_file() and (_p / "src").is_dir():
-        if str(_p) not in sys.path:
-            sys.path.insert(0, str(_p))
-        break
-
-# Load .env from cwd, then repo root (dev), then user config dir (pip install)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-    for _p in _here.parents:
-        if (_p / "main.py").is_file() and (_p / ".env").is_file():
-            load_dotenv(_p / ".env")
-            break
-    _user_env = Path.home() / ".market-helm" / ".env"
-    if _user_env.is_file():
-        load_dotenv(_user_env, override=True)
-except ImportError:
-    pass
-
-from contextlib import asynccontextmanager
-import threading
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
+from dashboard.backend.api import alerts, auth, history, market, projections, refresh, stocks
 from dashboard.backend.api.market import get_market_summary
 from dashboard.backend.auth import require_user_id
-from dashboard.backend.rate_limit import RateLimitMiddleware
 from dashboard.backend.observability import ObservabilityMiddleware, prometheus_metrics
+from dashboard.backend.rate_limit import RateLimitMiddleware
+
+# Source-checkout root found by _bootstrap (None for a pip install).
+REPO_ROOT = _bootstrap.REPO_ROOT
 
 
 def _coerce_startup_triggered(raw) -> int:
@@ -75,7 +54,9 @@ def _startup_alert_check() -> None:
         result = run_check_once()
         triggered = _coerce_startup_triggered(result.get("triggered", 0))
         if triggered:
-            logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
+            logging.getLogger(__name__).info(
+                "Startup alert check triggered %s watch(es)", triggered
+            )
     except Exception as exc:
         logging.getLogger(__name__).warning("Startup alert check failed: %s", exc)
 
@@ -131,8 +112,7 @@ def parse_cors_origins(
             continue
         if origin == "*":
             logging.getLogger(__name__).warning(
-                "Ignoring CORS origin %r — wildcard is incompatible with "
-                "allow_credentials=True",
+                "Ignoring CORS origin %r — wildcard is incompatible with " "allow_credentials=True",
                 origin,
             )
             continue
@@ -189,12 +169,17 @@ async def health_live():
 @app.get("/health/ready")
 async def health_ready():
     from src.storage.database import database_enabled
+
     if not database_enabled():
         return {"status": "ready", "database": "disabled"}
     from src.storage.health import database_health, latest_worker_heartbeat
+
     database = database_health()
-    payload = {"status": "ready" if database["ok"] else "not_ready",
-               "database": database, "worker": None}
+    payload = {
+        "status": "ready" if database["ok"] else "not_ready",
+        "database": database,
+        "worker": None,
+    }
     if database["ok"]:
         try:
             payload["worker"] = latest_worker_heartbeat()
@@ -208,10 +193,12 @@ async def health_ready():
 @app.get("/health/worker")
 async def health_worker():
     from src.storage.database import database_enabled
+
     if not database_enabled():
         return {"status": "disabled"}
     from src.alerts.alert_worker import resolve_interval_seconds
     from src.storage.health import worker_health
+
     health = worker_health(stale_after_seconds=resolve_interval_seconds() * 2 + 30)
     payload = {"status": "healthy" if health["ok"] else "unhealthy", **health}
     if not health["ok"]:
@@ -232,6 +219,7 @@ async def data_info(_user_id: Optional[str] = Depends(require_user_id)):
     readiness. File mode (``require_user_id`` → ``None``) stays open.
     """
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
+
     try:
         loader = get_data_loader()
         target_trading_day = get_most_recent_trading_day()
@@ -300,5 +288,6 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
+
     reload = os.getenv("UVICORN_RELOAD", "").lower() in {"1", "true", "yes"}
     uvicorn.run("dashboard.backend.main:app", host="0.0.0.0", port=8000, reload=reload)

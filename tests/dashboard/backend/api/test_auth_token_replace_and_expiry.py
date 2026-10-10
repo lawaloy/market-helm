@@ -24,6 +24,7 @@ def client(tmp_path, monkeypatch):
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -48,9 +49,7 @@ def _register(client, email="lifecycle@example.com"):
     return registered
 
 
-def test_resending_password_reset_invalidates_the_previous_reset_link(
-    client, capture_tokens
-):
+def test_resending_password_reset_invalidates_the_previous_reset_link(client, capture_tokens):
     _register(client)
     first = client.post(
         "/api/auth/password-reset/request",
@@ -71,10 +70,13 @@ def test_resending_password_reset_invalidates_the_previous_reset_link(
     )
     assert stale.status_code == 400
     assert stale.json()["detail"] == "This reset link is invalid or expired."
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "lifecycle@example.com", "password": "hijacked-password"},
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "lifecycle@example.com", "password": "hijacked-password"},
+        ).status_code
+        == 401
+    )
 
     live = client.post(
         "/api/auth/password-reset/confirm",
@@ -89,9 +91,7 @@ def test_resending_password_reset_invalidates_the_previous_reset_link(
     assert blocked.status_code == 403
 
 
-def test_resending_verification_invalidates_the_previous_verify_link(
-    client, capture_tokens
-):
+def test_resending_verification_invalidates_the_previous_verify_link(client, capture_tokens):
     _register(client, "resend-verify@example.com")
     resent = client.post(
         "/api/auth/verify-email/request",
@@ -102,24 +102,26 @@ def test_resending_verification_invalidates_the_previous_verify_link(
     assert len(tokens) == 2
     assert tokens[0] != tokens[1]
 
-    stale = client.post(
-        "/api/auth/verify-email/confirm", json={"token": tokens[0]}
-    )
+    stale = client.post("/api/auth/verify-email/confirm", json={"token": tokens[0]})
     assert stale.status_code == 400
     assert stale.json()["detail"] == "This verification link is invalid or expired."
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "resend-verify@example.com", "password": "password123"},
-    ).status_code == 403
-
-    live = client.post(
-        "/api/auth/verify-email/confirm", json={"token": tokens[1]}
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "resend-verify@example.com", "password": "password123"},
+        ).status_code
+        == 403
     )
+
+    live = client.post("/api/auth/verify-email/confirm", json={"token": tokens[1]})
     assert live.status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "resend-verify@example.com", "password": "password123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "resend-verify@example.com", "password": "password123"},
+        ).status_code
+        == 200
+    )
 
 
 def test_expired_reset_token_cannot_change_password(client, capture_tokens):
@@ -145,10 +147,13 @@ def test_expired_reset_token_cannot_change_password(client, capture_tokens):
     )
     assert expired.status_code == 400
     assert expired.json()["detail"] == "This reset link is invalid or expired."
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "expired-reset@example.com", "password": "hijacked-password"},
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "expired-reset@example.com", "password": "hijacked-password"},
+        ).status_code
+        == 401
+    )
     # Original password still authenticates (verification gate only).
     blocked = client.post(
         "/api/auth/login",
@@ -168,21 +173,25 @@ def test_password_reset_request_leaves_verify_token_usable(client, capture_token
     verify_token = capture_tokens["verify_email"][0]
     reset_token = capture_tokens["reset_password"][0]
 
-    confirmed = client.post(
-        "/api/auth/verify-email/confirm", json={"token": verify_token}
-    )
+    confirmed = client.post("/api/auth/verify-email/confirm", json={"token": verify_token})
     assert confirmed.status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "keep-verify@example.com", "password": "password123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "keep-verify@example.com", "password": "password123"},
+        ).status_code
+        == 200
+    )
     # The reset link must still be able to change the password afterward.
     changed = client.post(
         "/api/auth/password-reset/confirm",
         json={"token": reset_token, "password": "new-password-123"},
     )
     assert changed.status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "keep-verify@example.com", "password": "new-password-123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "keep-verify@example.com", "password": "new-password-123"},
+        ).status_code
+        == 200
+    )

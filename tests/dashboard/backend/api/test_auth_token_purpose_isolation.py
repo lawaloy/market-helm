@@ -16,6 +16,7 @@ def client(tmp_path, monkeypatch):
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -50,26 +51,28 @@ def test_verify_token_cannot_reset_password(client, issued_tokens):
     )
     assert crossed.status_code == 400
     assert crossed.json()["detail"] == "This reset link is invalid or expired."
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "purpose@example.com", "password": "hijacked-password"},
-    ).status_code == 401
-    # Original verify link must still unlock the account.
-    confirmed = client.post(
-        "/api/auth/verify-email/confirm", json={"token": sent["verify_email"]}
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "purpose@example.com", "password": "hijacked-password"},
+        ).status_code
+        == 401
     )
+    # Original verify link must still unlock the account.
+    confirmed = client.post("/api/auth/verify-email/confirm", json={"token": sent["verify_email"]})
     assert confirmed.status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "purpose@example.com", "password": "password123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "purpose@example.com", "password": "password123"},
+        ).status_code
+        == 200
+    )
 
 
 def test_reset_token_cannot_mark_email_verified(client, issued_tokens):
     sent, _token = issued_tokens
-    crossed = client.post(
-        "/api/auth/verify-email/confirm", json={"token": sent["reset_password"]}
-    )
+    crossed = client.post("/api/auth/verify-email/confirm", json={"token": sent["reset_password"]})
     assert crossed.status_code == 400
     assert crossed.json()["detail"] == "This verification link is invalid or expired."
     blocked = client.post(

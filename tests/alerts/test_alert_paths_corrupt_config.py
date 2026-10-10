@@ -11,9 +11,7 @@ from src.alerts.alert_paths import (
 )
 
 
-def test_load_alerts_config_returns_none_for_corrupt_json(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_load_alerts_config_returns_none_for_corrupt_json(tmp_path: Path, monkeypatch) -> None:
     cfg = tmp_path / "alerts.json"
     cfg.write_text("{not-json", encoding="utf-8")
     monkeypatch.setattr(
@@ -26,9 +24,7 @@ def test_load_alerts_config_returns_none_for_corrupt_json(
     assert data is None
 
 
-def test_load_alerts_config_returns_none_for_non_object_json(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_load_alerts_config_returns_none_for_non_object_json(tmp_path: Path, monkeypatch) -> None:
     cfg = tmp_path / "alerts.json"
     cfg.write_text(json.dumps(["not", "a", "dict"]), encoding="utf-8")
     monkeypatch.setattr(
@@ -80,9 +76,7 @@ def test_strip_webhook_secrets_skips_non_dict_alerts() -> None:
     assert cleaned["alerts"] == [{"id": "a1"}]
 
 
-def test_get_enabled_watch_symbols_ignores_non_dict_rows(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_get_enabled_watch_symbols_ignores_non_dict_rows(tmp_path: Path, monkeypatch) -> None:
     cfg = tmp_path / "alerts.json"
     cfg.write_text(
         json.dumps(

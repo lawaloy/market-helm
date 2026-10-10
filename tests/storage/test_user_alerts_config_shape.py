@@ -85,9 +85,7 @@ def test_save_tolerates_truthy_non_dict_defaults_on_merge(db_user, bad_defaults)
 
 
 @pytest.mark.parametrize("bad_alerts", [1, True, {"id": "x"}])
-def test_save_tolerates_truthy_non_list_existing_alerts_on_merge(
-    db_user, bad_alerts
-) -> None:
+def test_save_tolerates_truthy_non_list_existing_alerts_on_merge(db_user, bad_alerts) -> None:
     """Existing poison ``alerts`` must not TypeError during webhook secret merge."""
     with get_connection() as conn:
         conn.execute(

@@ -2,6 +2,7 @@
 Shared company name resolution (pytickersymbols).
 Used when saving data so names are stored at write time.
 """
+
 from __future__ import annotations
 
 import math
@@ -51,6 +52,7 @@ def resolve_company_name(symbol: str, fallback: str = "") -> str:
         return _name_cache[key]
     try:
         from pytickersymbols import PyTickerSymbols
+
         data = PyTickerSymbols()
         for index_name in ["S&P 500", "NASDAQ 100", "Dow Jones"]:
             try:

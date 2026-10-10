@@ -9,6 +9,7 @@ from urllib.parse import quote
 import psycopg
 import pytest
 
+from src.storage.account_tokens import RESET_PASSWORD, consume_token, issue_token
 from src.storage.alert_jobs import (
     JOB_EVALUATE_SYMBOL,
     STATUS_COMPLETED,
@@ -18,16 +19,15 @@ from src.storage.alert_jobs import (
 )
 from src.storage.alert_watches import get_watch
 from src.storage.database import LATEST_SCHEMA_VERSION, get_connection, init_database
+from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
+from src.storage.market_bars import list_market_bar_dates, upsert_market_bars
 from src.storage.projections_store import (
     list_projection_dates,
     load_daily_summary,
     upsert_daily_summary,
     upsert_projections,
 )
-from src.storage.market_bars import list_market_bar_dates, upsert_market_bars
 from src.storage.rate_limits import consume_rate_limit
-from src.storage.account_tokens import RESET_PASSWORD, consume_token, issue_token
-from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
 from src.storage.user_alerts import load_user_alerts_config, save_user_alerts_config
 from src.storage.users import (
     authenticate_user,
@@ -36,7 +36,6 @@ from src.storage.users import (
     delete_user_account,
     get_user_by_id,
 )
-
 
 pytestmark = pytest.mark.integration
 
@@ -49,21 +48,17 @@ def postgresql_database(monkeypatch):
 
     schema = f"markethelm_test_{uuid.uuid4().hex}"
     with psycopg.connect(base_url, autocommit=True) as admin:
-        admin.execute(
-            psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema))
-        )
+        admin.execute(psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema)))
 
     separator = "&" if "?" in base_url else "?"
-    test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}') }"
+    test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}')}"
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", test_url)
     try:
         yield
     finally:
         with psycopg.connect(base_url, autocommit=True) as admin:
             admin.execute(
-                psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(
-                    psycopg.sql.Identifier(schema)
-                )
+                psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(psycopg.sql.Identifier(schema))
             )
 
 
@@ -104,16 +99,10 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
     assert complete_job(job_id, worker_id="postgres-worker") is True
 
     with get_connection() as conn:
-        job = conn.execute(
-            "SELECT status FROM alert_jobs WHERE id = ?", (job_id,)
-        ).fetchone()
-        versions = conn.execute(
-            "SELECT version FROM schema_migrations ORDER BY version"
-        ).fetchall()
+        job = conn.execute("SELECT status FROM alert_jobs WHERE id = ?", (job_id,)).fetchone()
+        versions = conn.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == list(
-        range(1, LATEST_SCHEMA_VERSION + 1)
-    )
+    assert [row["version"] for row in versions] == list(range(1, LATEST_SCHEMA_VERSION + 1))
 
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 201.0, "name": "Apple"}],

@@ -9,12 +9,17 @@ from src.storage.user_alerts import save_user_alerts_config
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'account.db').as_posix()}")
+    monkeypatch.setenv(
+        "MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'account.db').as_posix()}"
+    )
     monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
+
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
+
     return TestClient(app)
 
 
@@ -42,12 +47,18 @@ def test_change_password_requires_current_password_and_revokes_sessions(client):
     )
     assert changed.status_code == 200
     assert client.get("/api/auth/me", headers=headers).status_code == 401
-    assert client.post(
-        "/api/auth/login", json={"email": "account@example.com", "password": "password123"}
-    ).status_code == 401
-    assert client.post(
-        "/api/auth/login", json={"email": "account@example.com", "password": "new-password-123"}
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login", json={"email": "account@example.com", "password": "password123"}
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/auth/login", json={"email": "account@example.com", "password": "new-password-123"}
+        ).status_code
+        == 200
+    )
 
 
 def test_change_password_rejects_reuse(client):
@@ -67,22 +78,35 @@ def test_delete_account_requires_confirmation_and_cascades_tenant_data(client):
     headers = {"Authorization": f"Bearer {registered['access_token']}"}
     config = {
         "defaults": {},
-        "alerts": [{"id": "delete-watch", "enabled": True,
-                    "condition": {"type": "price_threshold", "symbol": "AAPL",
-                                  "operator": "greater_than", "value": 1}}],
+        "alerts": [
+            {
+                "id": "delete-watch",
+                "enabled": True,
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "greater_than",
+                    "value": 1,
+                },
+            }
+        ],
     }
     save_user_alerts_config(user_id, config)
     sync_watches_from_config(user_id, config)
 
     rejected = client.request(
-        "DELETE", "/api/auth/account", headers=headers,
+        "DELETE",
+        "/api/auth/account",
+        headers=headers,
         json={"current_password": "password123", "confirmation": "delete"},
     )
     assert rejected.status_code == 400
     assert client.get("/api/auth/me", headers=headers).status_code == 200
 
     deleted = client.request(
-        "DELETE", "/api/auth/account", headers=headers,
+        "DELETE",
+        "/api/auth/account",
+        headers=headers,
         json={"current_password": "password123", "confirmation": "DELETE"},
     )
     assert deleted.status_code == 200
@@ -99,7 +123,8 @@ def test_delete_account_requires_confirmation_and_cascades_tenant_data(client):
 def test_delete_account_rejects_wrong_password(client):
     registered = _register(client)
     response = client.request(
-        "DELETE", "/api/auth/account",
+        "DELETE",
+        "/api/auth/account",
         headers={"Authorization": f"Bearer {registered['access_token']}"},
         json={"current_password": "wrong-password", "confirmation": "DELETE"},
     )

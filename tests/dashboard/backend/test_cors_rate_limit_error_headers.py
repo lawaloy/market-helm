@@ -12,7 +12,6 @@ the limiter that check_rate_limits already applies in unit tests.
 
 from fastapi.testclient import TestClient
 
-
 DASHBOARD_ORIGIN = "http://localhost:3000"
 
 
@@ -36,9 +35,7 @@ def _limited_client(tmp_path, monkeypatch, db_name: str) -> TestClient:
     return TestClient(app)
 
 
-def test_rate_limited_login_exposes_cors_headers_to_browser_origin(
-    tmp_path, monkeypatch
-) -> None:
+def test_rate_limited_login_exposes_cors_headers_to_browser_origin(tmp_path, monkeypatch) -> None:
     """A limit-1 429 must remain readable cross-origin by the Vite dashboard.
 
     #572 POSTs without Origin, so CORSMiddleware never attaches allow-origin
@@ -63,9 +60,7 @@ def test_rate_limited_login_exposes_cors_headers_to_browser_origin(
     assert blocked.headers.get("x-ratelimit-limit") == "1"
 
 
-def test_non_preflight_options_consumes_global_login_budget(
-    tmp_path, monkeypatch
-) -> None:
+def test_non_preflight_options_consumes_global_login_budget(tmp_path, monkeypatch) -> None:
     """OPTIONS without Access-Control-Request-Method must still spend the slot.
 
     CORSMiddleware only short-circuits true preflights. Skipping every OPTIONS

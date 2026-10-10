@@ -34,15 +34,11 @@ def test_try_claim_trigger_does_not_see_sibling_tenant_timestamp(db) -> None:
     user_a = create_user("claim-tenant-a@example.com", "password123")["id"]
     user_b = create_user("claim-tenant-b@example.com", "password123")["id"]
 
-    claimed_b, previous_b = try_claim_trigger(
-        user_b, "aapl-low", "2026-07-24T20:00:00+00:00"
-    )
+    claimed_b, previous_b = try_claim_trigger(user_b, "aapl-low", "2026-07-24T20:00:00+00:00")
     assert claimed_b is True
     assert previous_b is None
 
-    claimed_a, previous_a = try_claim_trigger(
-        user_a, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    claimed_a, previous_a = try_claim_trigger(user_a, "aapl-low", "2026-07-24T12:00:00+00:00")
 
     assert claimed_a is True
     assert previous_a is None

@@ -1,13 +1,18 @@
 """Tests for dashboard data loader service."""
 
-import tempfile
 import shutil
-import pandas as pd
+import tempfile
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from tests.helpers.market_bars import seed_daily_bars, seed_projections, seed_simple_bars, seed_summary
+from tests.helpers.market_bars import (
+    seed_daily_bars,
+    seed_projections,
+    seed_simple_bars,
+    seed_summary,
+)
 
 
 @pytest.fixture
@@ -23,6 +28,7 @@ def loader(temp_data_dir, monkeypatch):
     """Create DataLoader with temp directory (file-mode market_bars sidecar)."""
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     from dashboard.backend.services.data_loader import DataLoader
+
     return DataLoader(data_dir=temp_data_dir)
 
 
@@ -52,10 +58,14 @@ class TestDataLoader:
 
     def test_load_daily_data_returns_dataframe(self, loader, temp_data_dir):
         """load_daily_data returns correct DataFrame."""
-        seed_daily_bars(temp_data_dir, "2026-01-15", [
-            {"symbol": "AAPL", "close": 150.0, "change_percent": 1.0},
-            {"symbol": "GOOGL", "close": 2800.0, "change_percent": -0.5},
-        ])
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {"symbol": "AAPL", "close": 150.0, "change_percent": 1.0},
+                {"symbol": "GOOGL", "close": 2800.0, "change_percent": -0.5},
+            ],
+        )
 
         result = loader.load_daily_data()
         assert isinstance(result, pd.DataFrame)
@@ -170,9 +180,7 @@ class TestDataLoader:
         assert out["summary"]["evaluationCoveragePct"] == 0.0
         assert out["samples"] == []
 
-    def test_compute_projection_accuracy_counts_pending_and_invalid(
-        self, loader, temp_data_dir
-    ):
+    def test_compute_projection_accuracy_counts_pending_and_invalid(self, loader, temp_data_dir):
         """Unmatured and malformed projections remain visible in report coverage."""
         seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
         seed_projections(
@@ -201,10 +209,14 @@ class TestDataLoader:
         self, loader, temp_data_dir
     ):
         """Padded symbols match daily rows; None/NaN never become NONE/NAN samples."""
-        seed_daily_bars(temp_data_dir, "2026-01-12", [
-            {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
-            {"symbol": "  msft  ", "close": 200.0, "change_percent": 0.0},
-        ])
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-12",
+            [
+                {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
+                {"symbol": "  msft  ", "close": 200.0, "change_percent": 0.0},
+            ],
+        )
         # Invalid/blank symbols are rejected by the store; only AAPL/MSFT persist.
         seed_projections(
             temp_data_dir,
@@ -217,9 +229,13 @@ class TestDataLoader:
                 {"symbol": "MSFT", "target_mid": 210.0, "recommendation": "SELL"},
             ],
         )
-        seed_daily_bars(temp_data_dir, "2026-01-05", [
-            {"symbol": "AAPL", "close": 95.0, "change_percent": 0.0},
-        ])
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-05",
+            [
+                {"symbol": "AAPL", "close": 95.0, "change_percent": 0.0},
+            ],
+        )
 
         out = loader.compute_projection_accuracy(days=90)
 
@@ -240,14 +256,18 @@ class TestDataLoader:
         from datetime import date, timedelta
 
         recent = (date.today() - timedelta(days=1)).isoformat()
-        seed_daily_bars(temp_data_dir, recent, [
-            {
-                "symbol": " AAPL ",
-                "close": 155.0,
-                "change_percent": 0.5,
-                "volume": 1_000,
-            },
-        ])
+        seed_daily_bars(
+            temp_data_dir,
+            recent,
+            [
+                {
+                    "symbol": " AAPL ",
+                    "close": 155.0,
+                    "change_percent": 0.5,
+                    "volume": 1_000,
+                },
+            ],
+        )
         seed_projections(
             temp_data_dir,
             recent,
@@ -292,6 +312,7 @@ class TestDataLoader:
     def test_get_most_recent_trading_day_weekend_rolls_to_friday(self, monkeypatch):
         """Saturday/Sunday map to the prior Friday."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Sat:
@@ -333,6 +354,7 @@ class TestDataLoader:
     ):
         """Attach projection fields when present; skip missing/broken dates."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Now:
@@ -350,12 +372,20 @@ class TestDataLoader:
 
         monkeypatch.setattr(dl, "datetime", _Now)
 
-        seed_daily_bars(temp_data_dir, "2026-01-16", [
-            {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
-        ])
-        seed_daily_bars(temp_data_dir, "2026-01-15", [
-            {"symbol": "MSFT", "close": 200.0, "change_percent": 0.0},
-        ])
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-16",
+            [
+                {"symbol": "AAPL", "close": 100.0, "change_percent": 0.0},
+            ],
+        )
+        seed_daily_bars(
+            temp_data_dir,
+            "2026-01-15",
+            [
+                {"symbol": "MSFT", "close": 200.0, "change_percent": 0.0},
+            ],
+        )
         # Dates with no bars for AAPL are skipped (gap days)
         seed_projections(
             temp_data_dir,
@@ -380,6 +410,7 @@ class TestDataLoader:
     def test_needs_fetch_for_latest_trading_day(self, loader, temp_data_dir, monkeypatch):
         """True when latest trading day is missing; false when present."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Fri:

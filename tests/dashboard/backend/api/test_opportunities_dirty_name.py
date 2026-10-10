@@ -22,22 +22,19 @@ def temp_data_dir(monkeypatch):
 
 @pytest.fixture
 def client(temp_data_dir):
-    from dashboard.backend.services.data_loader import DataLoader
     import dashboard.backend.api.projections
+    from dashboard.backend.services.data_loader import DataLoader
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
+
         from dashboard.backend.main import app
 
         yield TestClient(app)
 
 
-def test_opportunities_falls_back_when_name_and_reason_are_nan(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_falls_back_when_name_and_reason_are_nan(client, temp_data_dir) -> None:
     """NaN name/reason previously failed Opportunity str validation → 500."""
     seed_simple_bars(temp_data_dir, "2026-01-15", close=150.0, volume=1_000)
     seed_projections(

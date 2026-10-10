@@ -16,11 +16,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
 
 from scripts.staging_acceptance import AcceptanceError, normalize_base_url
+
+ROOT = _repo_path.ROOT
 
 
 @dataclass(frozen=True)
@@ -82,11 +85,11 @@ def run_baseline(
             "Requests and concurrency must be positive; concurrency cannot exceed requests."
         )
     if timeout <= 0 or max_p95_ms <= 0 or not 0 <= max_error_rate <= 1:
-        raise AcceptanceError("Timeout/P95 must be positive and error rate must be between 0 and 1.")
-    if endpoint not in {"/health/live", "/health/ready", "/health/worker", "/metrics"}:
         raise AcceptanceError(
-            "Endpoint must be a read-only MarketHelm health or metrics endpoint."
+            "Timeout/P95 must be positive and error rate must be between 0 and 1."
         )
+    if endpoint not in {"/health/live", "/health/ready", "/health/worker", "/metrics"}:
+        raise AcceptanceError("Endpoint must be a read-only MarketHelm health or metrics endpoint.")
     safe_base = normalize_base_url(base_url)
     url = f"{safe_base}{endpoint}"
     started = time.perf_counter()

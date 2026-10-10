@@ -46,6 +46,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -226,9 +227,9 @@ def test_queued_evaluate_skips_paused_dual_channel_without_touching_sibling(
     assert _enabled_flag(user_a, "aapl_drop") == 0
     assert list_watches_for_symbol("AAPL") == []
     assert "AAPL" not in list_enabled_symbols()
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")
-    } == {(user_b, "sibling-msft")}
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
+        (user_b, "sibling-msft")
+    }
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send_log:
         # webhook_notifier and email_delivery both `import requests`; one patch

@@ -25,15 +25,14 @@ def client(tmp_path, monkeypatch):
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
 
 
 @pytest.mark.parametrize("flag", ["0", "false", "no", "off"])
-def test_unverified_session_allowed_for_verification_env_off_aliases(
-    client, monkeypatch, flag
-):
+def test_unverified_session_allowed_for_verification_env_off_aliases(client, monkeypatch, flag):
     monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", flag)
     monkeypatch.setattr(
         "dashboard.backend.api.auth.send_account_email",

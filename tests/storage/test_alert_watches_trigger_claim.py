@@ -22,9 +22,7 @@ def db_user(tmp_path, monkeypatch):
 
 
 def test_first_claim_succeeds_and_records_event_timestamp(db_user) -> None:
-    claimed, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    claimed, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     assert claimed is True
     assert previous is None
     assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T12:00:00+00:00"
@@ -33,9 +31,7 @@ def test_first_claim_succeeds_and_records_event_timestamp(db_user) -> None:
 def test_same_or_older_event_loses_claim(db_user) -> None:
     try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
 
-    same, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    same, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     older, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T11:00:00+00:00")
 
     assert same is False
@@ -57,9 +53,7 @@ def test_missing_event_timestamp_fails_closed_when_prior_delivery_exists(
 
 
 @pytest.mark.parametrize("bad_ts", ["", "   ", "not-a-timestamp", "zzzz"])
-def test_unparseable_event_timestamp_fails_closed_when_prior_exists(
-    db_user, bad_ts
-) -> None:
+def test_unparseable_event_timestamp_fails_closed_when_prior_exists(db_user, bad_ts) -> None:
     try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
 
     claimed, previous = try_claim_trigger(db_user, "aapl-low", bad_ts)
@@ -80,9 +74,7 @@ def test_corrupt_previous_timestamp_fails_closed(db_user) -> None:
             (db_user, "aapl-low", "zzzz"),
         )
 
-    claimed, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T13:00:00+00:00"
-    )
+    claimed, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T13:00:00+00:00")
 
     assert claimed is False
     assert previous == "zzzz"
@@ -95,9 +87,7 @@ def test_cooldown_blocks_newer_event_while_window_is_open(db_user) -> None:
     newer = now.isoformat()
     try_claim_trigger(db_user, "aapl-low", last)
 
-    blocked, previous = try_claim_trigger(
-        db_user, "aapl-low", newer, cooldown_minutes=60
-    )
+    blocked, previous = try_claim_trigger(db_user, "aapl-low", newer, cooldown_minutes=60)
 
     assert blocked is False
     assert previous == last
@@ -110,9 +100,7 @@ def test_newer_event_claims_after_cooldown_window(db_user) -> None:
     newer = now.isoformat()
     try_claim_trigger(db_user, "aapl-low", last)
 
-    allowed, previous = try_claim_trigger(
-        db_user, "aapl-low", newer, cooldown_minutes=60
-    )
+    allowed, previous = try_claim_trigger(db_user, "aapl-low", newer, cooldown_minutes=60)
 
     assert allowed is True
     assert previous == last
@@ -120,15 +108,11 @@ def test_newer_event_claims_after_cooldown_window(db_user) -> None:
 
 
 def test_restore_deletes_row_when_there_was_no_previous_trigger(db_user) -> None:
-    claimed, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    claimed, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     assert claimed is True
     assert previous is None
 
-    restore_trigger_claim(
-        db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00"
-    )
+    restore_trigger_claim(db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00")
 
     assert get_last_triggered(db_user, "aapl-low") is None
     retried, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:01+00:00")
@@ -153,12 +137,8 @@ def test_z_suffix_and_offset_instants_compare_equal_to_stored_utc(db_user) -> No
     try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
 
     z_same, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00Z")
-    offset_same, _ = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T13:00:00+01:00"
-    )
-    offset_newer, _ = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T14:00:00+01:00"
-    )
+    offset_same, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T13:00:00+01:00")
+    offset_newer, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T14:00:00+01:00")
 
     assert z_same is False
     assert offset_same is False
@@ -179,9 +159,7 @@ def test_naive_previous_timestamp_does_not_typeerror_against_aware_event(
             (db_user, "aapl-low", "2026-07-24T12:00:00"),
         )
 
-    same, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    same, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     newer, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T13:00:00+00:00")
 
     assert same is False
@@ -192,15 +170,11 @@ def test_naive_previous_timestamp_does_not_typeerror_against_aware_event(
 
 def test_restore_puts_previous_timestamp_back_for_retry(db_user) -> None:
     try_claim_trigger(db_user, "aapl-low", "2026-07-24T10:00:00+00:00")
-    claimed, previous = try_claim_trigger(
-        db_user, "aapl-low", "2026-07-24T12:00:00+00:00"
-    )
+    claimed, previous = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")
     assert claimed is True
     assert previous == "2026-07-24T10:00:00+00:00"
 
-    restore_trigger_claim(
-        db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00"
-    )
+    restore_trigger_claim(db_user, "aapl-low", previous, claimed_at="2026-07-24T12:00:00+00:00")
 
     assert get_last_triggered(db_user, "aapl-low") == "2026-07-24T10:00:00+00:00"
     retried, _ = try_claim_trigger(db_user, "aapl-low", "2026-07-24T12:00:00+00:00")

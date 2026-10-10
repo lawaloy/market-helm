@@ -38,9 +38,7 @@ def test_market_overview_skips_non_numeric_change_percent(client) -> None:
     mock_loader.get_latest_date.return_value = "2026-01-15"
     mock_loader.load_daily_data.return_value = _dirty_daily()
 
-    with patch.object(
-        dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_loader):
         r = client.get("/api/market/overview")
 
     assert r.status_code == 200
@@ -63,15 +61,9 @@ def test_market_movers_skips_non_numeric_change_percent(client) -> None:
     mock_loader = MagicMock()
     mock_loader.load_daily_data.return_value = _dirty_daily()
 
-    with patch.object(
-        dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
-    ):
-        gainers = client.get(
-            "/api/market/movers", params={"type": "gainers", "limit": 10}
-        )
-        losers = client.get(
-            "/api/market/movers", params={"type": "losers", "limit": 10}
-        )
+    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_loader):
+        gainers = client.get("/api/market/movers", params={"type": "gainers", "limit": 10})
+        losers = client.get("/api/market/movers", params={"type": "losers", "limit": 10})
 
     assert gainers.status_code == 200
     assert losers.status_code == 200

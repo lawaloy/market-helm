@@ -1,16 +1,18 @@
 """
 Refresh API endpoints — trigger the daily MarketHelm run to fetch new data.
 """
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from pydantic import BaseModel
+
+import logging
+import os
 import subprocess
 import sys
-import os
-from pathlib import Path
-from datetime import datetime
 import threading
 import time
-import logging
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 
 from dashboard.backend.auth import require_user_id
 
@@ -32,7 +34,7 @@ refresh_status = {
     "is_running": False,
     "last_refresh": None,
     "last_status": "idle",
-    "progress": "Idle."
+    "progress": "Idle.",
 }
 
 _refresh_process: subprocess.Popen | None = None
@@ -143,7 +145,7 @@ def run_daily_tracker():
         refresh_status["progress"] = "Starting market-helm..."
         refresh_status["last_status"] = "running"
         _refresh_cancel_event.clear()
-        
+
         # Repo checkout: run top-level main.py. Pip install: run same CLI as console_scripts.
         project_root = Path(__file__).parent.parent.parent.parent
         main_script = project_root / "main.py"
@@ -195,7 +197,7 @@ def run_daily_tracker():
 
             elapsed = int(time.time() - start_time)
 
-            refresh_status["progress"] = f"Refreshing..."
+            refresh_status["progress"] = "Refreshing..."
 
             if elapsed >= max_seconds:
                 refresh_status["last_status"] = "timeout"
@@ -265,19 +267,17 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
                 status="already_running",
                 message="Data refresh is already in progress. Please wait.",
                 last_refresh=refresh_status.get("last_refresh"),
-                is_running=True
+                is_running=True,
             )
 
         if not _has_refresh_credentials(project_root):
             refresh_status["last_status"] = "error"
-            refresh_status["progress"] = (
-                "Refresh failed. Please check your API key configuration."
-            )
+            refresh_status["progress"] = "Refresh failed. Please check your API key configuration."
             return RefreshResponse(
                 status="error",
                 message="Refresh failed. Please check your API key configuration.",
                 last_refresh=refresh_status.get("last_refresh"),
-                is_running=False
+                is_running=False,
             )
 
         refresh_status["last_status"] = "running"
@@ -292,7 +292,7 @@ async def trigger_refresh(background_tasks: BackgroundTasks):
         status="started",
         message="Latest data will load when ready.",
         last_refresh=refresh_status.get("last_refresh"),
-        is_running=True
+        is_running=True,
     )
 
 
@@ -314,7 +314,7 @@ async def get_refresh_status():
         is_running=refresh_status["is_running"],
         last_refresh=refresh_status.get("last_refresh"),
         last_status=refresh_status.get("last_status"),
-        progress=refresh_status.get("progress")
+        progress=refresh_status.get("progress"),
     )
 
 
@@ -346,5 +346,5 @@ async def cancel_refresh():
         is_running=refresh_status["is_running"],
         last_refresh=refresh_status.get("last_refresh"),
         last_status=refresh_status.get("last_status"),
-        progress=refresh_status.get("progress")
+        progress=refresh_status.get("progress"),
     )

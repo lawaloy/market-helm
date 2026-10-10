@@ -1,9 +1,9 @@
 """Projection date coercion and missing-projection soft-fails for DataLoader."""
 
-from datetime import date, timedelta
-from pathlib import Path
 import shutil
 import tempfile
+from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -30,12 +30,8 @@ class TestProjectionAccuracyInvalidDates:
         self, loader, temp_data_dir
     ):
         """The shared evaluator derives the exact session instead of trusting a dirty field."""
-        seed_daily_bars(
-            temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}]
-        )
-        seed_daily_bars(
-            temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
-        )
+        seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
+        seed_daily_bars(temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}])
         seed_projections(
             temp_data_dir,
             "2026-01-05",
@@ -61,12 +57,8 @@ class TestProjectionAccuracyInvalidDates:
 class TestProjectionAccuracyRecommendationSentinels:
     def test_nan_recommendation_becomes_unknown(self, loader, temp_data_dir):
         """NaN recommendation cells must not create a \"nan\" accuracy bucket."""
-        seed_daily_bars(
-            temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}]
-        )
-        seed_daily_bars(
-            temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}]
-        )
+        seed_daily_bars(temp_data_dir, "2026-01-05", [{"symbol": "AAPL", "close": 100.0}])
+        seed_daily_bars(temp_data_dir, "2026-01-12", [{"symbol": "AAPL", "close": 110.0}])
         seed_projections(
             temp_data_dir,
             "2026-01-05",
@@ -90,9 +82,7 @@ class TestProjectionAccuracyRecommendationSentinels:
 
 
 class TestHistoricalMissingProjections:
-    def test_load_historical_data_keeps_daily_when_projections_missing(
-        self, loader, temp_data_dir
-    ):
+    def test_load_historical_data_keeps_daily_when_projections_missing(self, loader, temp_data_dir):
         """Missing projections for a bar date must not hide valid daily history."""
         recent = (date.today() - timedelta(days=1)).isoformat()
         seed_simple_bars(

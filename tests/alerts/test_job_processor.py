@@ -99,12 +99,10 @@ class TestJobProcessor:
         assert stats["delivered"] == 2
         assert stats["failed"] == 0
         with get_connection() as conn:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT user_id, alert_id FROM alert_trigger_state
                 ORDER BY user_id, alert_id
-                """
-            ).fetchall()
+                """).fetchall()
         assert {(row["user_id"], row["alert_id"]) for row in rows} == {
             (db_user, "aapl-low"),
             (other_user, "other-aapl-low"),
@@ -145,7 +143,8 @@ class TestJobProcessor:
         assert stats["delivered"] == 1
         with get_connection() as conn:
             row = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
         assert row is not None
@@ -207,9 +206,7 @@ class TestJobProcessor:
         )
         claimed = claim_jobs([JOB_DELIVER], "crashed-after-delivery")
 
-        with patch(
-            "src.alerts.alert_engine.LogNotifier.send", return_value=True
-        ) as mock_send:
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as mock_send:
             assert _process_deliver(claimed[0]) is True
             with get_connection() as conn:
                 trigger_before = conn.execute(
@@ -267,7 +264,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -278,9 +276,7 @@ class TestJobProcessor:
         assert job["status"] == STATUS_FAILED
         assert "Delivery failed" in job["last_error"]
 
-    def test_queued_deliver_retries_when_user_channels_fail_despite_log(
-        self, db_user
-    ):
+    def test_queued_deliver_retries_when_user_channels_fail_despite_log(self, db_user):
         """Settings prepends log; a log hit must not complete a failed email/webhook send."""
         sync_watches_from_config(db_user, _watch_config())
         event = {
@@ -322,7 +318,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -389,7 +386,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -420,8 +418,8 @@ class TestJobProcessor:
         config["alerts"][0]["cooldown_minutes"] = 60
         sync_watches_from_config(db_user, config)
         naive_ts = (
-            datetime.now(timezone.utc) - timedelta(minutes=5)
-        ).replace(tzinfo=None).isoformat()
+            (datetime.now(timezone.utc) - timedelta(minutes=5)).replace(tzinfo=None).isoformat()
+        )
         record_trigger(db_user, "aapl-low", timestamp=naive_ts)
         enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
 
@@ -576,9 +574,7 @@ class TestJobProcessor:
         assert stats["delivered"] == 1
         assert stats["failed"] == 0
         with get_connection() as conn:
-            rows = conn.execute(
-                "SELECT user_id, alert_id FROM alert_trigger_state"
-            ).fetchall()
+            rows = conn.execute("SELECT user_id, alert_id FROM alert_trigger_state").fetchall()
         assert {(row["user_id"], row["alert_id"]) for row in rows} == {
             (db_user, "aapl-low"),
         }
@@ -611,11 +607,27 @@ class TestJobProcessor:
         assert poison["status"] == "completed"
 
     def test_process_job_queue_stops_after_max_batches(self, db_user, caplog):
-        sync_watches_from_config(db_user, _watch_config())
-        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+        """A queue that never drains must stop after max_batches and warn."""
+        safety_limit = 20
+        claim_calls = {"eval": 0}
 
-        forever_job = {
-            "id": "synthetic-eval",
-            "payload": {"symbol": "AAPL", "price": 150.0},
-        }
-        claim_calls = {"n": 0}
+        def endless_claim(job_types, worker_id, limit=50):
+            if JOB_EVALUATE_SYMBOL not in job_types:
+                return []
+            claim_calls["eval"] += 1
+            if claim_calls["eval"] > safety_limit:
+                raise AssertionError("process_job_queue did not stop at max_batches")
+            return [{"id": f"synthetic-{claim_calls['eval']}", "payload": {}}]
+
+        with (
+            patch("src.alerts.job_processor.claim_jobs", side_effect=endless_claim),
+            patch("src.alerts.job_processor._process_evaluate_symbol") as process_eval,
+            patch("src.alerts.job_processor.complete_job", return_value=True),
+            caplog.at_level("WARNING", logger="src.alerts.job_processor"),
+        ):
+            stats = process_job_queue(max_batches=3)
+
+        assert claim_calls["eval"] == 3
+        assert process_eval.call_count == 3
+        assert stats == {"evaluated": 3, "delivered": 0, "failed": 0}
+        assert "Stopped processing alert jobs after 3 batches" in caplog.text

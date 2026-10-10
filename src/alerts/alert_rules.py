@@ -16,9 +16,7 @@ MIN_RSI_PERIOD = 2
 MAX_RSI_PERIOD = 50
 MAX_COMPOUND_LEAVES = 5
 COMPOUND_OPS = frozenset({"and", "or"})
-LEAF_CONDITION_TYPES = frozenset(
-    {"price_threshold", "screening_match", "rsi_threshold"}
-)
+LEAF_CONDITION_TYPES = frozenset({"price_threshold", "screening_match", "rsi_threshold"})
 
 
 def _compare(value: float, operator: str, threshold: float) -> bool:
@@ -230,9 +228,7 @@ def evaluate_compound(
             return []
         if leaf.get("type") not in LEAF_CONDITION_TYPES:
             return []
-        leaf_results.append(
-            evaluate_leaf_symbols(leaf, stocks, closes_by_symbol=closes_by_symbol)
-        )
+        leaf_results.append(evaluate_leaf_symbols(leaf, stocks, closes_by_symbol=closes_by_symbol))
 
     if op == "and":
         if not all(leaf_results):

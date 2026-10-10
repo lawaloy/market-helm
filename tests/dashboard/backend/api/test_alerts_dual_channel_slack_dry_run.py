@@ -44,6 +44,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -178,9 +179,7 @@ def test_hosted_dry_run_previews_slack_without_sending(client) -> None:
 
     previews = body["previews"]
     assert isinstance(previews, list)
-    webhook_previews = [
-        item for item in previews if item.get("notifier") == "WebhookNotifier"
-    ]
+    webhook_previews = [item for item in previews if item.get("notifier") == "WebhookNotifier"]
     assert len(webhook_previews) == 1
     slack_body = webhook_previews[0]["payload"]
     assert "text" in slack_body
@@ -190,9 +189,7 @@ def test_hosted_dry_run_previews_slack_without_sending(client) -> None:
     assert "content" not in slack_body
     assert "alert_id" not in slack_body
 
-    email_previews = [
-        item for item in previews if item.get("notifier") == "EmailNotifier"
-    ]
+    email_previews = [item for item in previews if item.get("notifier") == "EmailNotifier"]
     assert len(email_previews) == 1
 
     assert pending_job_count([JOB_DELIVER]) == 0

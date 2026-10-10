@@ -48,9 +48,7 @@ def _custom_rule() -> dict:
     }
 
 
-def test_file_mode_init_force_resets_to_empty_not_bundled_example(
-    client, file_mode: Path
-) -> None:
+def test_file_mode_init_force_resets_to_empty_not_bundled_example(client, file_mode: Path) -> None:
     """Conflict must keep the custom rule; force must wipe it without sample ids."""
     saved = client.put(
         "/api/alerts/config",

@@ -30,25 +30,19 @@ def test_is_iso_date_accepts_strict_calendar_dates() -> None:
     assert _is_iso_date("not-a-date") is False
 
 
-def test_get_available_dates_returns_seeded_iso_dates(
-    loader: DataLoader, data_dir: Path
-) -> None:
+def test_get_available_dates_returns_seeded_iso_dates(loader: DataLoader, data_dir: Path) -> None:
     seed_simple_bars(data_dir, "2026-01-15")
     assert loader.get_available_dates() == ["2026-01-15"]
 
 
-def test_get_latest_date_returns_newest_seeded_date(
-    loader: DataLoader, data_dir: Path
-) -> None:
+def test_get_latest_date_returns_newest_seeded_date(loader: DataLoader, data_dir: Path) -> None:
     seed_simple_bars(data_dir, "2026-01-15")  # Thursday
     seed_simple_bars(data_dir, "2026-01-14")  # Wednesday
 
     assert loader.get_latest_date() == "2026-01-15"
 
 
-def test_load_daily_data_default_uses_newest_weekday(
-    loader: DataLoader, data_dir: Path
-) -> None:
+def test_load_daily_data_default_uses_newest_weekday(loader: DataLoader, data_dir: Path) -> None:
     seed_simple_bars(data_dir, "2026-01-14", symbol="OLDER", close=50.0)
     seed_simple_bars(data_dir, "2026-01-15", symbol="NEWER", close=100.0)
 
@@ -56,9 +50,7 @@ def test_load_daily_data_default_uses_newest_weekday(
     assert list(frame["symbol"]) == ["NEWER"]
 
 
-def test_empty_store_has_no_available_dates(
-    loader: DataLoader, data_dir: Path
-) -> None:
+def test_empty_store_has_no_available_dates(loader: DataLoader, data_dir: Path) -> None:
     assert loader.get_available_dates() == []
     assert loader.get_latest_date() is None
 

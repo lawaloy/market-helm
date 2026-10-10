@@ -2,7 +2,7 @@
 
 import time
 
-from src.storage.users import _hash_password, _verify_password, _SCRYPT_N, _SCRYPT_R, _SCRYPT_P
+from src.storage.users import _SCRYPT_N, _SCRYPT_P, _SCRYPT_R, _hash_password, _verify_password
 
 
 def test_verify_rejects_oversized_scrypt_n_quickly():

@@ -61,10 +61,7 @@ def test_concurrent_claim_jobs_mutually_excludes_pending_row(db):
 
 def test_concurrent_claim_jobs_partitions_multiple_pending_rows(db):
     """Racing workers partition distinct pending jobs without overlap."""
-    job_ids = {
-        enqueue_job(JOB_DELIVER, {"user_id": "u1", "alert_id": f"a{i}"})
-        for i in range(4)
-    }
+    job_ids = {enqueue_job(JOB_DELIVER, {"user_id": "u1", "alert_id": f"a{i}"}) for i in range(4)}
     barrier = threading.Barrier(2)
     results: list[set[int]] = []
     lock = threading.Lock()

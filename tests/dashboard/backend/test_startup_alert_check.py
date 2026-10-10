@@ -40,9 +40,7 @@ def test_startup_alert_check_soft_coerces_nonfinite_triggered(caplog):
             with caplog.at_level("INFO"):
                 backend_main._startup_alert_check()
 
-        assert not any(
-            "Startup alert check triggered" in r.message for r in caplog.records
-        )
+        assert not any("Startup alert check triggered" in r.message for r in caplog.records)
         caplog.clear()
 
 
@@ -58,13 +56,16 @@ def test_lifespan_continues_when_db_init_fails(caplog):
     """DB init failure must not prevent lifespan from yielding (app still boots)."""
     fake_thread = MagicMock()
 
-    with patch(
-        "src.storage.database.init_database",
-        side_effect=RuntimeError("cannot open db"),
-    ), patch(
-        "threading.Thread",
-        return_value=fake_thread,
-    ) as thread_ctor:
+    with (
+        patch(
+            "src.storage.database.init_database",
+            side_effect=RuntimeError("cannot open db"),
+        ),
+        patch(
+            "threading.Thread",
+            return_value=fake_thread,
+        ) as thread_ctor,
+    ):
         with caplog.at_level("WARNING"):
 
             async def _run():

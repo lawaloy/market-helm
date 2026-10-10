@@ -29,9 +29,7 @@ def test_engine_within_cooldown_overflow_treats_as_cooling() -> None:
     storage.get_last_triggered.return_value = datetime.now(timezone.utc)
     engine = AlertEngine([], storage=storage)
 
-    assert engine._within_cooldown(
-        {"id": "poison", "cooldown_minutes": 10**15}
-    ) is True
+    assert engine._within_cooldown({"id": "poison", "cooldown_minutes": 10**15}) is True
 
 
 def test_engine_evaluate_continues_after_huge_cooldown_sibling() -> None:

@@ -8,6 +8,7 @@ import pytest
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -61,9 +62,7 @@ def _payload(value):
         ("NaN", "threshold-nan@example.com"),
     ],
 )
-def test_hosted_put_rejects_nonfinite_price_threshold(
-    client, multi_user_env, raw_token, email
-):
+def test_hosted_put_rejects_nonfinite_price_threshold(client, multi_user_env, raw_token, email):
     token = _register(client, email)
     headers = {
         "Authorization": f"Bearer {token}",
@@ -91,9 +90,7 @@ def test_hosted_put_rejects_nonfinite_price_threshold(
     "bad_value",
     ["Infinity", "-Infinity", "NaN"],
 )
-def test_hosted_put_rejects_nonfinite_threshold_string_tokens(
-    client, multi_user_env, bad_value
-):
+def test_hosted_put_rejects_nonfinite_threshold_string_tokens(client, multi_user_env, bad_value):
     """String tokens that float() treats as Inf/NaN must also fail closed."""
     token = _register(client, f"threshold-str-{bad_value.lower()}@example.com")
     headers = {"Authorization": f"Bearer {token}"}
@@ -111,9 +108,7 @@ def test_hosted_put_rejects_nonfinite_threshold_string_tokens(
     assert saved.json()["exists"] is False
 
 
-def test_hosted_put_nonfinite_threshold_preserves_existing_config(
-    client, multi_user_env
-):
+def test_hosted_put_nonfinite_threshold_preserves_existing_config(client, multi_user_env):
     token = _register(client, "threshold-preserve@example.com")
     headers = {
         "Authorization": f"Bearer {token}",

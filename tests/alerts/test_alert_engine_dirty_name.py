@@ -28,8 +28,8 @@ def test_evaluate_returns_empty_when_stocks_is_not_a_list() -> None:
     storage.get_last_triggered.return_value = None
     engine = AlertEngine([_price_alert()], storage=storage)
 
-    assert engine.evaluate(None) == []  # type: ignore[arg-type]
-    assert engine.evaluate({"symbol": "AAPL", "close": 150.0}) == []  # type: ignore[arg-type]
+    assert engine.evaluate(None) == []
+    assert engine.evaluate({"symbol": "AAPL", "close": 150.0}) == []
 
 
 def test_evaluate_coerces_nan_alert_name_to_alert_id() -> None:

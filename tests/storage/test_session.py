@@ -78,9 +78,11 @@ class TestSession:
         from src.storage import session as session_mod
 
         def _sign(payload: dict) -> str:
-            body = base64.urlsafe_b64encode(
-                json.dumps(payload, separators=(",", ":")).encode()
-            ).decode().rstrip("=")
+            body = (
+                base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode())
+                .decode()
+                .rstrip("=")
+            )
             sig = hmac.new(
                 session_mod._auth_secret(),
                 body.encode("ascii"),

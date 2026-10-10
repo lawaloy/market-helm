@@ -34,9 +34,7 @@ def _price_config(alert_id: str, symbol: str) -> dict:
     }
 
 
-def test_backfill_skips_unparseable_json_and_keeps_sibling_watches(
-    tmp_path, monkeypatch
-) -> None:
+def test_backfill_skips_unparseable_json_and_keeps_sibling_watches(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "backfill-json.db"
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
@@ -74,9 +72,7 @@ def test_backfill_skips_unparseable_json_and_keeps_sibling_watches(
     assert list_enabled_symbols() == ["AAPL"]
 
 
-def test_stale_backfill_cannot_restore_watches_over_newer_save(
-    tmp_path, monkeypatch
-) -> None:
+def test_stale_backfill_cannot_restore_watches_over_newer_save(tmp_path, monkeypatch) -> None:
     """Worker/login init_database must not revive watches a concurrent save replaced.
 
     Backfill used to SELECT every config, drop the connection, then rewrite

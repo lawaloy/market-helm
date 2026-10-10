@@ -20,6 +20,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -36,13 +37,16 @@ def _register(client, email: str = "symbols@example.com") -> str:
 
 class TestHostedSymbolsRequireAuth:
     def test_get_symbols_requires_auth(self, client, multi_user_env):
-        with patch(
-            "dashboard.backend.api.alerts.build_symbol_catalog",
-            return_value=(["AAPL"], {"AAPL": "Apple"}),
-        ) as catalog, patch(
-            "dashboard.backend.api.alerts.prices_from_saved_daily_data",
-            return_value={},
-        ) as prices:
+        with (
+            patch(
+                "dashboard.backend.api.alerts.build_symbol_catalog",
+                return_value=(["AAPL"], {"AAPL": "Apple"}),
+            ) as catalog,
+            patch(
+                "dashboard.backend.api.alerts.prices_from_saved_daily_data",
+                return_value={},
+            ) as prices,
+        ):
             r = client.get("/api/alerts/symbols")
         assert r.status_code == 401
         assert r.json()["detail"] == "Authentication required."
@@ -52,15 +56,19 @@ class TestHostedSymbolsRequireAuth:
     def test_get_symbols_with_bearer_returns_catalog(self, client, multi_user_env):
         token = _register(client)
         headers = {"Authorization": f"Bearer {token}"}
-        with patch(
-            "dashboard.backend.api.alerts.build_symbol_catalog",
-            return_value=(["AAPL", "MSFT"], {"AAPL": "Apple"}),
-        ), patch(
-            "dashboard.backend.api.alerts.prices_from_saved_daily_data",
-            return_value={"AAPL": 180.0},
-        ), patch(
-            "dashboard.backend.api.alerts.get_data_loader",
-            side_effect=ValueError("no data"),
+        with (
+            patch(
+                "dashboard.backend.api.alerts.build_symbol_catalog",
+                return_value=(["AAPL", "MSFT"], {"AAPL": "Apple"}),
+            ),
+            patch(
+                "dashboard.backend.api.alerts.prices_from_saved_daily_data",
+                return_value={"AAPL": 180.0},
+            ),
+            patch(
+                "dashboard.backend.api.alerts.get_data_loader",
+                side_effect=ValueError("no data"),
+            ),
         ):
             r = client.get("/api/alerts/symbols", headers=headers)
         assert r.status_code == 200
@@ -73,15 +81,19 @@ class TestHostedSymbolsRequireAuth:
 class TestFileModeSymbolsRemainOpen:
     def test_get_symbols_without_auth(self, client, monkeypatch):
         monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-        with patch(
-            "dashboard.backend.api.alerts.build_symbol_catalog",
-            return_value=(["AAPL"], {"AAPL": "Apple"}),
-        ), patch(
-            "dashboard.backend.api.alerts.prices_from_saved_daily_data",
-            return_value={},
-        ), patch(
-            "dashboard.backend.api.alerts.get_data_loader",
-            side_effect=ValueError("no data"),
+        with (
+            patch(
+                "dashboard.backend.api.alerts.build_symbol_catalog",
+                return_value=(["AAPL"], {"AAPL": "Apple"}),
+            ),
+            patch(
+                "dashboard.backend.api.alerts.prices_from_saved_daily_data",
+                return_value={},
+            ),
+            patch(
+                "dashboard.backend.api.alerts.get_data_loader",
+                side_effect=ValueError("no data"),
+            ),
         ):
             r = client.get("/api/alerts/symbols")
         assert r.status_code == 200

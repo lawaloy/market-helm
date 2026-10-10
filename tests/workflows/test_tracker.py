@@ -1,9 +1,9 @@
 """Tests for MarketHelm tracker workflow."""
 
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -50,7 +50,13 @@ class TestStockTrackerWorkflow:
     @patch("src.workflows.tracker.DataStorage")
     @patch("src.workflows.tracker.AlertEngine")
     def test_workflow_run_success(
-        self, mock_alert, mock_storage_cls, mock_fetcher_cls, mock_indices, sample_stock_data, temp_data_dir
+        self,
+        mock_alert,
+        mock_storage_cls,
+        mock_fetcher_cls,
+        mock_indices,
+        sample_stock_data,
+        temp_data_dir,
     ):
         """Workflow completes successfully with mocked fetch and storage."""
         from src.workflows.tracker import StockTrackerWorkflow
@@ -114,7 +120,13 @@ class TestStockTrackerWorkflow:
     @patch("src.workflows.tracker.DataStorage")
     @patch("src.workflows.tracker.AlertEngine")
     def test_analyze_and_projections_soft_fail(
-        self, mock_alert, mock_storage_cls, mock_fetcher_cls, mock_indices, sample_stock_data, temp_data_dir
+        self,
+        mock_alert,
+        mock_storage_cls,
+        mock_fetcher_cls,
+        mock_indices,
+        sample_stock_data,
+        temp_data_dir,
     ):
         """Analyzer/projector exceptions yield empty dicts so the run can continue."""
         from src.workflows.tracker import StockTrackerWorkflow
@@ -135,9 +147,7 @@ class TestStockTrackerWorkflow:
         workflow.storage = mock_storage
         workflow.alert_engine = None
         workflow.ai_summarizer.enabled = False
-        workflow.analyzer.analyze_daily_data = MagicMock(
-            side_effect=RuntimeError("analyzer boom")
-        )
+        workflow.analyzer.analyze_daily_data = MagicMock(side_effect=RuntimeError("analyzer boom"))
         workflow.projector.generate_projections = MagicMock(
             side_effect=RuntimeError("projector boom")
         )
@@ -208,7 +218,9 @@ class TestStockTrackerWorkflow:
         assert any(str(s).strip().upper() == "AAPL" for s in symbols)
 
     @patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"])
-    @patch("src.alerts.alert_paths.get_enabled_watch_symbols", return_value=["TSLA", "AAPL", "TSLA"])
+    @patch(
+        "src.alerts.alert_paths.get_enabled_watch_symbols", return_value=["TSLA", "AAPL", "TSLA"]
+    )
     @patch("src.workflows.tracker.StockDataFetcher")
     @patch("src.workflows.tracker.DataStorage")
     @patch("src.workflows.tracker.AlertEngine")
@@ -300,10 +312,34 @@ class TestStockTrackerWorkflow:
         from src.workflows.tracker import StockTrackerWorkflow
 
         stocks = [
-            {"symbol": "LOW", "close": 10.0, "volume": 100, "change_percent": 0.1, "index_name": "S&P 500"},
-            {"symbol": "MID", "close": 20.0, "volume": 5_000, "change_percent": 0.2, "index_name": "S&P 500"},
-            {"symbol": "HIGH", "close": 30.0, "volume": 50_000, "change_percent": 0.3, "index_name": "NASDAQ-100"},
-            {"symbol": "TOP", "close": 40.0, "volume": 90_000, "change_percent": 0.4, "index_name": "NASDAQ-100"},
+            {
+                "symbol": "LOW",
+                "close": 10.0,
+                "volume": 100,
+                "change_percent": 0.1,
+                "index_name": "S&P 500",
+            },
+            {
+                "symbol": "MID",
+                "close": 20.0,
+                "volume": 5_000,
+                "change_percent": 0.2,
+                "index_name": "S&P 500",
+            },
+            {
+                "symbol": "HIGH",
+                "close": 30.0,
+                "volume": 50_000,
+                "change_percent": 0.3,
+                "index_name": "NASDAQ-100",
+            },
+            {
+                "symbol": "TOP",
+                "close": 40.0,
+                "volume": 90_000,
+                "change_percent": 0.4,
+                "index_name": "NASDAQ-100",
+            },
         ]
         mock_fetcher = MagicMock()
         mock_fetcher.fetch_all_indices.return_value = {

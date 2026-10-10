@@ -36,7 +36,7 @@ def test_decode_rejects_oversized_token_before_hmac(auth_secret, monkeypatch):
 
 def test_decode_rejects_non_string_token(auth_secret):
     with pytest.raises(AuthError, match="Invalid access token"):
-        decode_access_token(None)  # type: ignore[arg-type]
+        decode_access_token(None)
 
 
 def test_created_token_within_length_ceiling(auth_secret):
@@ -55,12 +55,16 @@ def test_decode_accepts_token_at_max_length_when_well_formed(auth_secret, monkey
     # Build a signed token, then pad the body segment with ignored JSON whitespace
     # is not possible after b64 — instead verify len == MAX is allowed for garbage
     # that fails later as invalid, proving the length check is inclusive.
-    body = base64.urlsafe_b64encode(
-        json.dumps(
-            {"sub": "pad-user", "exp": int(time.time()) + 60},
-            separators=(",", ":"),
-        ).encode()
-    ).decode().rstrip("=")
+    body = (
+        base64.urlsafe_b64encode(
+            json.dumps(
+                {"sub": "pad-user", "exp": int(time.time()) + 60},
+                separators=(",", ":"),
+            ).encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
     sig = hmac.new(
         session_mod._auth_secret(),
         body.encode("ascii"),

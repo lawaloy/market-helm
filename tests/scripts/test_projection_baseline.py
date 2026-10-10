@@ -6,7 +6,6 @@ import importlib.util
 import json
 from pathlib import Path
 
-
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "projection_baseline.py"
 SPEC = importlib.util.spec_from_file_location("projection_baseline", MODULE_PATH)
 assert SPEC is not None
@@ -125,26 +124,20 @@ def test_capture_refuses_unqualified_data_without_creating_output(
     assert not output.exists()
 
 
-def test_capture_hashes_the_same_private_snapshot_it_evaluates(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_capture_hashes_the_same_private_snapshot_it_evaluates(tmp_path: Path, monkeypatch) -> None:
     from tests.helpers.market_bars import seed_projections
 
     source = tmp_path / "source"
     source.mkdir()
     # Capture snapshots market_bars.sqlite (bars + projections + summaries).
-    seed_projections(
-        source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 100.0}]
-    )
+    seed_projections(source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 100.0}])
     input_path = source / "market_bars.sqlite"
     seen = {}
 
     def evaluate(snapshot_dir: Path, _days: int) -> dict:
         copied = snapshot_dir / input_path.name
         seen["content"] = copied.read_bytes()
-        seed_projections(
-            source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 999.0}]
-        )
+        seed_projections(source, "2026-07-07", [{"symbol": "AAPL", "target_mid": 999.0}])
         return _qualified_report()
 
     monkeypatch.setattr(projection_baseline, "observed_report", evaluate)
@@ -153,9 +146,11 @@ def test_capture_hashes_the_same_private_snapshot_it_evaluates(
     assert projection_baseline.capture(source, output, 365) == 0
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["inputs"][0]["path"] == "market_bars.sqlite"
-    assert manifest["inputs"][0]["sha256"] == projection_baseline.hashlib.sha256(
-        seen["content"]
-    ).hexdigest()
-    assert manifest["inputs"][0]["sha256"] != projection_baseline.hashlib.sha256(
-        input_path.read_bytes()
-    ).hexdigest()
+    assert (
+        manifest["inputs"][0]["sha256"]
+        == projection_baseline.hashlib.sha256(seen["content"]).hexdigest()
+    )
+    assert (
+        manifest["inputs"][0]["sha256"]
+        != projection_baseline.hashlib.sha256(input_path.read_bytes()).hexdigest()
+    )

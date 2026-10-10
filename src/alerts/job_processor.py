@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from src.alerts.alert_engine import AlertEngine
 from src.alerts.alert_rules import evaluate_compound, evaluate_leaf_symbols
@@ -21,9 +21,12 @@ from src.storage.alert_jobs import (
     new_worker_id,
 )
 from src.storage.alert_watches import get_last_triggered as get_raw_triggered
-from src.storage.alert_watches import get_watch
-from src.storage.alert_watches import list_watches_for_symbol
-from src.storage.alert_watches import restore_trigger_claim, try_claim_trigger
+from src.storage.alert_watches import (
+    get_watch,
+    list_watches_for_symbol,
+    restore_trigger_claim,
+    try_claim_trigger,
+)
 from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
 
@@ -135,15 +138,10 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
                 leaves = condition.get("conditions")
                 if isinstance(leaves, list):
                     for leaf in leaves:
-                        if (
-                            isinstance(leaf, dict)
-                            and leaf.get("type") == "rsi_threshold"
-                        ):
+                        if isinstance(leaf, dict) and leaf.get("type") == "rsi_threshold":
                             needed.append(symbol)
                 history = closes_by_symbol(needed or [], [stock])
-                matched_symbols = evaluate_compound(
-                    condition, [stock], closes_by_symbol=history
-                )
+                matched_symbols = evaluate_compound(condition, [stock], closes_by_symbol=history)
         except (TypeError, ValueError, AttributeError) as exc:
             logger.warning(
                 "Skipping invalid alert %s for user %s on %s: %s",
@@ -266,9 +264,7 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
             raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
         return True
     except Exception:
-        restore_trigger_claim(
-            user_id, alert_id, previous_trigger, claimed_at=claim_ts
-        )
+        restore_trigger_claim(user_id, alert_id, previous_trigger, claimed_at=claim_ts)
         raise
 
 

@@ -53,15 +53,14 @@ def alert_history_dir(tmp_path: Path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
 
 
 class TestAlertsDeliveryIntegration:
-    def test_status_returns_seeded_delivery_log(
-        self, client, alerts_config_dir, alert_history_dir
-    ):
+    def test_status_returns_seeded_delivery_log(self, client, alerts_config_dir, alert_history_dir):
         history_path = alert_history_dir / "alerts_history.json"
         history_path.write_text(
             json.dumps(
@@ -142,9 +141,7 @@ class TestAlertsDeliveryIntegration:
         assert history["delivery_log"][-1]["alert_id"] == "price_watch"
         assert history["delivery_log"][-1]["channel"] == "email"
 
-    def test_failed_test_send_records_failure(
-        self, client, alerts_config_dir, alert_history_dir
-    ):
+    def test_failed_test_send_records_failure(self, client, alerts_config_dir, alert_history_dir):
         client.put(
             "/api/alerts/config",
             json={

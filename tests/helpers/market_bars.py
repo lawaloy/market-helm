@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Union
+from typing import Any, Dict, Sequence, Union
 
 from src.storage.market_bars import upsert_market_bars
 
@@ -49,6 +49,4 @@ def seed_summary(
     """Persist one daily summary into market_bars under ``data_dir``."""
     from src.storage.projections_store import upsert_daily_summary
 
-    return upsert_daily_summary(
-        dict(summary_data), summary_date, data_dir=data_dir, source="test"
-    )
+    return upsert_daily_summary(dict(summary_data), summary_date, data_dir=data_dir, source="test")

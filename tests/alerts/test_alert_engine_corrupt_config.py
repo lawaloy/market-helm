@@ -27,7 +27,7 @@ def _price_alert(**overrides):
 def test_from_config_dict_returns_none_for_non_object_root() -> None:
     assert AlertEngine.from_config_dict(["not", "a", "dict"]) is None
     assert AlertEngine.from_config_dict("alerts") is None
-    assert AlertEngine.from_config_dict(None) is None  # type: ignore[arg-type]
+    assert AlertEngine.from_config_dict(None) is None
 
 
 def test_from_config_dict_skips_non_dict_alert_rows() -> None:
@@ -79,12 +79,15 @@ def test_evaluate_skips_non_dict_condition_without_aborting_siblings() -> None:
     engine = AlertEngine(
         [
             _price_alert(id="bad", condition="nope"),
-            _price_alert(id="good", condition={
-                "type": "price_threshold",
-                "symbol": "AAPL",
-                "operator": "greater_than",
-                "value": 100,
-            }),
+            _price_alert(
+                id="good",
+                condition={
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "greater_than",
+                    "value": 100,
+                },
+            ),
         ],
         storage=storage,
     )

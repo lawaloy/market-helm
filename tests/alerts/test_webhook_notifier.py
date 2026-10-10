@@ -153,7 +153,9 @@ def test_build_payload_odd_fields_use_safe_fallbacks() -> None:
     assert json_notifier.build_payload(event) is not event
 
 
-@patch.dict("os.environ", {"DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/x/y"}, clear=False)
+@patch.dict(
+    "os.environ", {"DISCORD_WEBHOOK_URL": "https://discord.com/api/webhooks/x/y"}, clear=False
+)
 def test_from_alert_falls_back_to_discord_env_url() -> None:
     n = WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]})
     assert n is not None

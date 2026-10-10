@@ -31,6 +31,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -159,16 +160,12 @@ def test_put_rotates_webhook_url_retargets_queued_deliver_without_touching_sibli
     saved_a = client.put(
         "/api/alerts/config",
         headers=headers_a,
-        json=_webhook_payload(
-            "aapl_drop", "AAPL", url_a_old, notifications=["webhook"]
-        ),
+        json=_webhook_payload("aapl_drop", "AAPL", url_a_old, notifications=["webhook"]),
     )
     saved_b = client.put(
         "/api/alerts/config",
         headers=headers_b,
-        json=_webhook_payload(
-            "sibling-msft", "MSFT", url_b, notifications=["webhook"]
-        ),
+        json=_webhook_payload("sibling-msft", "MSFT", url_b, notifications=["webhook"]),
     )
     assert saved_a.status_code == 200
     assert saved_b.status_code == 200
@@ -181,9 +178,7 @@ def test_put_rotates_webhook_url_retargets_queued_deliver_without_touching_sibli
     rotated = client.put(
         "/api/alerts/config",
         headers=headers_a,
-        json=_webhook_payload(
-            "aapl_drop", "AAPL", url_a_new, notifications=["webhook"]
-        ),
+        json=_webhook_payload("aapl_drop", "AAPL", url_a_new, notifications=["webhook"]),
     )
     assert rotated.status_code == 200
     assert get_watch(user_a, "aapl_drop")["defaults"]["webhook_url"] == url_a_new

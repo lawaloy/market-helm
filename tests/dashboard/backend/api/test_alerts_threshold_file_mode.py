@@ -79,9 +79,7 @@ def test_file_put_rejects_omitted_price_threshold(client, file_mode: Path) -> No
     assert not file_mode.exists()
 
 
-def test_file_put_null_threshold_preserves_existing_config(
-    client, file_mode: Path
-) -> None:
+def test_file_put_null_threshold_preserves_existing_config(client, file_mode: Path) -> None:
     ok = client.put("/api/alerts/config", json=_payload(value=150))
     assert ok.status_code == 200
     before = json.loads(file_mode.read_text(encoding="utf-8"))

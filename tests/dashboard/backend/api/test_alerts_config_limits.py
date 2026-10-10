@@ -8,6 +8,7 @@ from src.storage.alert_watches import MAX_ALERTS_PER_CONFIG
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)

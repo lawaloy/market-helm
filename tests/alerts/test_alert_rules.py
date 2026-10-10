@@ -50,12 +50,10 @@ def test_price_threshold_matches_zero_close_against_nonzero_threshold():
 
 def test_price_threshold_boundary_and_operator():
     stock = {"close": "25.5"}
-    assert evaluate_price_threshold(
-        {"operator": "greater_or_equal", "value": "25.5"}, stock
-    ) is True
-    assert evaluate_price_threshold(
-        {"operator": "greater_than", "value": 25.5}, stock
-    ) is False
+    assert (
+        evaluate_price_threshold({"operator": "greater_or_equal", "value": "25.5"}, stock) is True
+    )
+    assert evaluate_price_threshold({"operator": "greater_than", "value": 25.5}, stock) is False
 
 
 def test_screening_match_passes_with_no_filters():
@@ -65,33 +63,44 @@ def test_screening_match_passes_with_no_filters():
 
 def test_screening_match_volume_and_change_filters():
     stock = {"volume": 1_000_000, "change_percent": -2.5, "close": 50.0}
-    assert evaluate_screening_match(
-        {"filters": {"volume_threshold": 500_000, "min_daily_change_pct": 2.0}},
-        stock,
-    ) is True
-    assert evaluate_screening_match(
-        {"filters": {"volume_threshold": 2_000_000}}, stock
-    ) is False
-    assert evaluate_screening_match(
-        {"filters": {"min_daily_change_pct": 3.0}}, stock
-    ) is False
+    assert (
+        evaluate_screening_match(
+            {"filters": {"volume_threshold": 500_000, "min_daily_change_pct": 2.0}},
+            stock,
+        )
+        is True
+    )
+    assert evaluate_screening_match({"filters": {"volume_threshold": 2_000_000}}, stock) is False
+    assert evaluate_screening_match({"filters": {"min_daily_change_pct": 3.0}}, stock) is False
 
 
 def test_screening_match_price_band_and_missing_fields():
-    assert evaluate_screening_match(
-        {"filters": {"price_min": 40, "price_max": 60}},
-        {"close": 50},
-    ) is True
-    assert evaluate_screening_match(
-        {"filters": {"price_min": 40}},
-        {"close": 39.9},
-    ) is False
-    assert evaluate_screening_match(
-        {"filters": {"price_max": 60}},
-        {"close": 60.1},
-    ) is False
+    assert (
+        evaluate_screening_match(
+            {"filters": {"price_min": 40, "price_max": 60}},
+            {"close": 50},
+        )
+        is True
+    )
+    assert (
+        evaluate_screening_match(
+            {"filters": {"price_min": 40}},
+            {"close": 39.9},
+        )
+        is False
+    )
+    assert (
+        evaluate_screening_match(
+            {"filters": {"price_max": 60}},
+            {"close": 60.1},
+        )
+        is False
+    )
     # Missing fields coerce to 0 and fail min filters
-    assert evaluate_screening_match(
-        {"filters": {"volume_threshold": 1, "price_min": 1}},
-        {},
-    ) is False
+    assert (
+        evaluate_screening_match(
+            {"filters": {"volume_threshold": 1, "price_min": 1}},
+            {},
+        )
+        is False
+    )

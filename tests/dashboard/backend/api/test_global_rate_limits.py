@@ -29,6 +29,7 @@ def client(tmp_path, monkeypatch):
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)

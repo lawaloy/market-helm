@@ -7,14 +7,14 @@ import pytest
 
 from src.alerts.alert_paths import (
     apply_alert_defaults,
-    update_user_env_vars,
+    dedupe_alerts_config,
     init_user_alerts_config,
     load_alerts_config,
     polish_alerts_config,
     resolve_alerts_config_path,
     save_alerts_config,
-    dedupe_alerts_config,
     strip_webhook_secrets_from_config,
+    update_user_env_vars,
     user_config_dir,
 )
 
@@ -46,9 +46,7 @@ def test_user_config_dir_migrates_market_desk(monkeypatch, tmp_path: Path) -> No
     assert (resolved / "alerts.json").read_text(encoding="utf-8") == '{"alerts": []}'
 
 
-def test_user_config_dir_soft_fails_when_legacy_rename_raises(
-    monkeypatch, tmp_path: Path
-) -> None:
+def test_user_config_dir_soft_fails_when_legacy_rename_raises(monkeypatch, tmp_path: Path) -> None:
     """A busy/unwritable ~/.market-desk must not crash config resolution."""
     home = _fake_home(monkeypatch, tmp_path)
     legacy = home / ".market-desk"
@@ -265,15 +263,30 @@ def test_dedupe_alerts_config_keeps_first_price_rule() -> None:
         "alerts": [
             {
                 "id": "aapl_drop",
-                "condition": {"type": "price_threshold", "symbol": "AAPL", "operator": "less_than", "value": 150},
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "less_than",
+                    "value": 150,
+                },
             },
             {
                 "id": "aapl_drop_copy",
-                "condition": {"type": "price_threshold", "symbol": "AAPL", "operator": "less_than", "value": 150},
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "less_than",
+                    "value": 150,
+                },
             },
             {
                 "id": "msft_high",
-                "condition": {"type": "price_threshold", "symbol": "MSFT", "operator": "greater_than", "value": 400},
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "MSFT",
+                    "operator": "greater_than",
+                    "value": 400,
+                },
             },
         ]
     }
@@ -384,9 +397,7 @@ def test_update_user_env_vars_replaces_webhook_values_without_dropping_other_set
     ]
 
 
-def test_update_user_env_vars_empty_value_deletes_key(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_update_user_env_vars_empty_value_deletes_key(tmp_path: Path, monkeypatch) -> None:
     user_dir = tmp_path / ".market-helm"
     env_file = user_dir / ".env"
     user_dir.mkdir()

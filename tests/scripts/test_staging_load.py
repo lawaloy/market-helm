@@ -69,9 +69,7 @@ def test_baseline_fails_thresholds() -> None:
         (1, 1, 1, -0.1, 1),
     ],
 )
-def test_baseline_rejects_invalid_limits(
-    requests, concurrency, timeout, error_rate, p95
-) -> None:
+def test_baseline_rejects_invalid_limits(requests, concurrency, timeout, error_rate, p95) -> None:
     with pytest.raises(AcceptanceError):
         run_baseline(
             "https://staging.example.com",

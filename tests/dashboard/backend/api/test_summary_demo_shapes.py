@@ -36,24 +36,21 @@ def summary_client(temp_data_dir):
     )
 
     loader = DataLoader(data_dir=temp_data_dir)
+    import dashboard.backend.api.history
     import dashboard.backend.api.market
     import dashboard.backend.api.projections
     import dashboard.backend.api.stocks
-    import dashboard.backend.api.history
 
-    with patch.object(
-        dashboard.backend.api.market, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=loader):
         with patch.object(
             dashboard.backend.api.projections, "get_data_loader", return_value=loader
         ):
-            with patch.object(
-                dashboard.backend.api.stocks, "get_data_loader", return_value=loader
-            ):
+            with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=loader):
                 with patch.object(
                     dashboard.backend.api.history, "get_data_loader", return_value=loader
                 ):
                     from fastapi.testclient import TestClient
+
                     from dashboard.backend.main import app
 
                     yield TestClient(app), temp_data_dir
@@ -82,9 +79,7 @@ def summary_client(temp_data_dir):
         ),
     ],
 )
-def test_generate_demo_summary_soft_fails_nested_shapes(
-    analysis, exchange_comparison
-) -> None:
+def test_generate_demo_summary_soft_fails_nested_shapes(analysis, exchange_comparison) -> None:
     """Truthy non-dict nests previously AttributeError/KeyError'd mid-template."""
     text = _generate_demo_summary(analysis, exchange_comparison)
     assert isinstance(text, str)

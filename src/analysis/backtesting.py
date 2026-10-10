@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-import math
 from pathlib import Path
 from statistics import median
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
+from ..utils.tickers import normalize_ticker
 from .market_calendar import (
     DEFAULT_CALENDAR,
     get_market_calendar,
     trading_session_after,
     trading_session_after_timestamp,
 )
-from ..utils.tickers import normalize_ticker
 
 _INVALID_LABELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
 
@@ -82,9 +82,7 @@ def _target_session(
         try:
             timestamp = datetime.fromisoformat(str(generated_at).replace("Z", "+00:00"))
             if timestamp.tzinfo is not None and timestamp.utcoffset() is not None:
-                return trading_session_after_timestamp(
-                    timestamp, horizon_sessions, calendar_name
-                )
+                return trading_session_after_timestamp(timestamp, horizon_sessions, calendar_name)
         except (TypeError, ValueError):
             pass
     return trading_session_after(run_date, horizon_sessions, calendar_name)
@@ -92,9 +90,7 @@ def _target_session(
 
 def _has_timestamped_generation(row: Mapping[str, Any]) -> bool:
     try:
-        timestamp = datetime.fromisoformat(
-            str(row.get("generated_at")).replace("Z", "+00:00")
-        )
+        timestamp = datetime.fromisoformat(str(row.get("generated_at")).replace("Z", "+00:00"))
     except (TypeError, ValueError):
         return False
     return timestamp.tzinfo is not None and timestamp.utcoffset() is not None
@@ -107,17 +103,13 @@ def _aggregate(samples: List[Dict[str, Any]]) -> Dict[str, Any]:
     calibrated = [sample for sample in directions if sample["confidence"] is not None]
     direction_accuracy = _mean(float(sample["directionCorrect"]) * 100 for sample in directions)
     mean_confidence = _mean(sample["confidence"] for sample in calibrated)
-    calibrated_accuracy = _mean(
-        float(sample["directionCorrect"]) * 100 for sample in calibrated
-    )
+    calibrated_accuracy = _mean(float(sample["directionCorrect"]) * 100 for sample in calibrated)
     return {
         "count": len(samples),
         "meanAbsErrorPct": _rounded(_mean(errors)),
         "medianAbsErrorPct": _rounded(median(errors) if errors else None),
         "directionalAccuracyPct": _rounded(direction_accuracy),
-        "bandCoveragePct": _rounded(
-            _mean(float(sample["bandHit"]) * 100 for sample in bands)
-        ),
+        "bandCoveragePct": _rounded(_mean(float(sample["bandHit"]) * 100 for sample in bands)),
         "meanConfidence": _rounded(mean_confidence),
         "calibrationGapPct": _rounded(
             mean_confidence - calibrated_accuracy
@@ -160,9 +152,7 @@ def evaluate_projections(
         )
         if verified_outcomes_only and not has_provenance:
             continue
-        close = _finite_positive(
-            row.get("outcome_close") if has_provenance else row.get("close")
-        )
+        close = _finite_positive(row.get("outcome_close") if has_provenance else row.get("close"))
         if has_provenance and not (
             _truthy(row.get("outcome_final")) and row.get("outcome_session")
         ):
@@ -188,9 +178,7 @@ def evaluate_projections(
         predicted = _finite_positive(row.get("target_mid"))
         try:
             run_date = datetime.strptime(str(row.get("run_date"))[:10], "%Y-%m-%d").date()
-            target_date = _target_session(
-                row, run_date, horizon_sessions, calendar_name
-            )
+            target_date = _target_session(row, run_date, horizon_sessions, calendar_name)
         except (TypeError, ValueError):
             invalid_count += 1
             continue
@@ -280,9 +268,7 @@ def evaluate_projections(
         },
     }
     samples.sort(key=lambda sample: sample["symbol"])
-    samples.sort(
-        key=lambda sample: (sample["runDate"], sample["targetDate"]), reverse=True
-    )
+    samples.sort(key=lambda sample: (sample["runDate"], sample["targetDate"]), reverse=True)
     visible_samples = samples if max_samples is None else samples[:max_samples]
     return {
         "summary": summary,
@@ -319,9 +305,7 @@ def backtest_data_dir(
     except Exception:
         projection_dates = []
 
-    dated_inputs = [(day, None) for day in bar_dates] or [
-        (day, None) for day in projection_dates
-    ]
+    dated_inputs = [(day, None) for day in bar_dates] or [(day, None) for day in projection_dates]
     if not dated_inputs:
         return evaluate_projections(
             [],
@@ -332,10 +316,7 @@ def backtest_data_dir(
             verified_outcomes_only=verified_outcomes_only,
         )
 
-    latest = max(
-        datetime.strptime(day, "%Y-%m-%d").date()
-        for day, _ in dated_inputs
-    )
+    latest = max(datetime.strptime(day, "%Y-%m-%d").date() for day, _ in dated_inputs)
     cutoff = latest - timedelta(days=days)
     projections: List[Dict[str, Any]] = []
     closes: List[Dict[str, Any]] = []

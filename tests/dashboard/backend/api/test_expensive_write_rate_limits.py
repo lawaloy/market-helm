@@ -32,6 +32,7 @@ def client(tmp_path, monkeypatch):
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -88,28 +89,28 @@ def test_password_change_rate_limit_blocks_a_second_change(client):
     assert int(blocked.headers["retry-after"]) >= 1
 
     # The second change never ran; the password stays the first new value.
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "expensive@example.com", "password": "third-password-123"},
-    ).status_code == 401
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "expensive@example.com", "password": "new-password-123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "expensive@example.com", "password": "third-password-123"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "expensive@example.com", "password": "new-password-123"},
+        ).status_code
+        == 200
+    )
 
 
-def test_expensive_write_bucket_is_shared_and_does_not_gate_get_quotes(
-    client, monkeypatch
-):
+def test_expensive_write_bucket_is_shared_and_does_not_gate_get_quotes(client, monkeypatch):
     headers = _spend_expensive_bucket(client)
     popen = MagicMock()
-    monkeypatch.setattr(
-        "dashboard.backend.api.refresh.subprocess.Popen", popen
-    )
+    monkeypatch.setattr("dashboard.backend.api.refresh.subprocess.Popen", popen)
     run_user_check = MagicMock()
-    monkeypatch.setattr(
-        "src.alerts.alert_worker.run_user_check", run_user_check
-    )
+    monkeypatch.setattr("src.alerts.alert_worker.run_user_check", run_user_check)
     resolve_prices = MagicMock(return_value={"AAPL": 180.0})
     monkeypatch.setattr(
         "dashboard.backend.api.alerts.resolve_symbol_prices",

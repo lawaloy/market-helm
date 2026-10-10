@@ -65,22 +65,34 @@ def test_delete_user_cascades_alert_tenant_tables(db) -> None:
         )
 
     with get_connection() as conn:
-        assert conn.execute(
-            "SELECT COUNT(*) AS n FROM user_alert_configs WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()["n"] == 1
-        assert conn.execute(
-            "SELECT COUNT(*) AS n FROM alert_watches WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()["n"] == 1
-        assert conn.execute(
-            "SELECT COUNT(*) AS n FROM alert_trigger_state WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()["n"] == 1
-        assert conn.execute(
-            "SELECT COUNT(*) AS n FROM alert_delivery_log WHERE user_id = ?",
-            (user_id,),
-        ).fetchone()["n"] == 1
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) AS n FROM user_alert_configs WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()["n"]
+            == 1
+        )
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) AS n FROM alert_watches WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()["n"]
+            == 1
+        )
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) AS n FROM alert_trigger_state WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()["n"]
+            == 1
+        )
+        assert (
+            conn.execute(
+                "SELECT COUNT(*) AS n FROM alert_delivery_log WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()["n"]
+            == 1
+        )
 
     with get_connection() as conn:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))

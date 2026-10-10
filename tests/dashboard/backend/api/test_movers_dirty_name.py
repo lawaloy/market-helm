@@ -33,15 +33,9 @@ def test_market_movers_falls_back_when_name_is_nan(client) -> None:
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
-    ):
-        gainers = client.get(
-            "/api/market/movers", params={"type": "gainers", "limit": 10}
-        )
-        losers = client.get(
-            "/api/market/movers", params={"type": "losers", "limit": 10}
-        )
+    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_loader):
+        gainers = client.get("/api/market/movers", params={"type": "gainers", "limit": 10})
+        losers = client.get("/api/market/movers", params={"type": "losers", "limit": 10})
 
     assert gainers.status_code == 200
     assert losers.status_code == 200

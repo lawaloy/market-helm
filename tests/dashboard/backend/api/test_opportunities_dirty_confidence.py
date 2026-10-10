@@ -23,14 +23,13 @@ def temp_data_dir(monkeypatch):
 
 @pytest.fixture
 def client(temp_data_dir):
-    from dashboard.backend.services.data_loader import DataLoader
     import dashboard.backend.api.projections
+    from dashboard.backend.services.data_loader import DataLoader
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
+
         from dashboard.backend.main import app
 
         yield TestClient(app)
@@ -83,9 +82,7 @@ def test_opportunities_soft_fails_string_confidence_column(client, temp_data_dir
     assert data["opportunities"][1]["confidence"] == 40
 
 
-def test_opportunities_skips_nonfinite_confidence_before_ranking(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_skips_nonfinite_confidence_before_ranking(client, temp_data_dir) -> None:
     """Inf/NaN confidence must not win nlargest slots or abort the endpoint."""
     _write_fixtures(temp_data_dir, [math.inf, float("nan"), 70.0, -math.inf])
 

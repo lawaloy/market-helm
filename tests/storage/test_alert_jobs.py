@@ -58,7 +58,9 @@ class TestAlertJobs:
             max_attempts=2,
         )
         claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
-        assert fail_job(job_id, "transient error", worker_id="worker-c", retry_delay_seconds=0) is True
+        assert (
+            fail_job(job_id, "transient error", worker_id="worker-c", retry_delay_seconds=0) is True
+        )
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status, attempts FROM alert_jobs WHERE id = ?",
@@ -68,7 +70,9 @@ class TestAlertJobs:
         assert row["attempts"] == 1
 
         claim_jobs([JOB_EVALUATE_SYMBOL], "worker-c")
-        assert fail_job(job_id, "permanent error", worker_id="worker-c", retry_delay_seconds=0) is True
+        assert (
+            fail_job(job_id, "permanent error", worker_id="worker-c", retry_delay_seconds=0) is True
+        )
         with get_connection() as conn:
             row = conn.execute(
                 "SELECT status FROM alert_jobs WHERE id = ?",

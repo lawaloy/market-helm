@@ -75,9 +75,34 @@ def tool_command(module: str, *args: str) -> List[str]:
     return [sys.executable, "-m", module, *args]
 
 
+E203_HINT = (
+    "hint: E203 means black wrote a space before ':' in a slice with complex bounds, e.g.\n"
+    "  ham[lower + offset : upper + offset]\n"
+    "flake8 rejects that spacing and black will not change it, so assign the bounds to\n"
+    "named variables instead (see CONTRIBUTING.md, 'Check Code Quality'):\n"
+    "  start = lower + offset\n"
+    "  stop = upper + offset\n"
+    "  ham[start:stop]"
+)
+
+
 def run_tool(label: str, command: Sequence[str]) -> int:
     print(f"==> {label}")
-    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    output = (result.stdout or "") + (result.stderr or "")
+    if output:
+        print(output, end="" if output.endswith("\n") else "\n")
+    if " E203 " in output:
+        print(E203_HINT)
+    return result.returncode
 
 
 def main(argv: Sequence[str] | None = None) -> int:

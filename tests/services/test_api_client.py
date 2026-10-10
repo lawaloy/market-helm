@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from src.services.api_client import RateLimiter, FinnhubClient, _quote_outcome_provenance
+from src.services.api_client import FinnhubClient, RateLimiter, _quote_outcome_provenance
 
 
 class TestRateLimiter(unittest.TestCase):
@@ -41,26 +41,30 @@ class TestFinnhubClient(unittest.TestCase):
 
     def test_client_requires_api_key(self):
         """Test that client raises error without API key."""
-        with patch.dict('os.environ', {}, clear=True):
+        with patch.dict("os.environ", {}, clear=True):
             with self.assertRaises(ValueError) as context:
                 FinnhubClient(api_key=None)
             self.assertIn("API key required", str(context.exception))
 
-    @patch('requests.Session')
+    @patch("requests.Session")
     def test_client_initialization(self, mock_session):
         """Test that client initializes with API key."""
         client = FinnhubClient(api_key=self.api_key)
         self.assertEqual(client.api_key, self.api_key)
         self.assertEqual(client.base_url, "https://finnhub.io/api/v1")
 
-    @patch('requests.Session')
+    @patch("requests.Session")
     def test_get_quote_structure(self, mock_session):
         """Test get_quote returns expected structure."""
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "c": 150.0, "h": 152.0, "l": 149.0, "o": 151.0,
-            "pc": 148.0, "t": 1234567890
+            "c": 150.0,
+            "h": 152.0,
+            "l": 149.0,
+            "o": 151.0,
+            "pc": 148.0,
+            "t": 1234567890,
         }
         mock_session_instance = Mock()
         mock_session_instance.get.return_value = mock_response
@@ -74,14 +78,12 @@ class TestFinnhubClient(unittest.TestCase):
         self.assertIn("c", quote)
         self.assertIn("pc", quote)
 
-    @patch('requests.Session')
+    @patch("requests.Session")
     def test_get_stock_data_for_screening(self, mock_session):
         """Test lightweight screening data fetch."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "c": 150.0, "pc": 148.0, "v": 50000000
-        }
+        mock_response.json.return_value = {"c": 150.0, "pc": 148.0, "v": 50000000}
         mock_session_instance = Mock()
         mock_session_instance.get.return_value = mock_response
         mock_session.return_value = mock_session_instance
@@ -205,14 +207,17 @@ class TestFinnhubClient(unittest.TestCase):
     def test_get_stock_data_records_previous_close_outcome(self):
         session = Mock()
         client = self._client_with_session(session)
-        with patch.object(
-            client,
-            "get_quote",
-            return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": 1783368000},
-        ), patch(
-            "src.services.api_client._quote_outcome_provenance",
-            return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
-        ) as provenance:
+        with (
+            patch.object(
+                client,
+                "get_quote",
+                return_value={"c": 100, "pc": 99, "o": 99, "h": 101, "l": 98, "t": 1783368000},
+            ),
+            patch(
+                "src.services.api_client._quote_outcome_provenance",
+                return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
+            ) as provenance,
+        ):
             data = client.get_stock_data("AAPL", include_profile=False)
 
         self.assertEqual(data["quote_timestamp"], "2026-07-06T20:00:00+00:00")
@@ -224,13 +229,16 @@ class TestFinnhubClient(unittest.TestCase):
 
     def test_get_stock_data_missing_previous_close_is_not_outcome(self):
         client = self._client_with_session(Mock())
-        with patch.object(
-            client,
-            "get_quote",
-            return_value={"c": 100, "o": 99, "h": 101, "l": 98, "t": 1783368000},
-        ), patch(
-            "src.services.api_client._quote_outcome_provenance",
-            return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
+        with (
+            patch.object(
+                client,
+                "get_quote",
+                return_value={"c": 100, "o": 99, "h": 101, "l": 98, "t": 1783368000},
+            ),
+            patch(
+                "src.services.api_client._quote_outcome_provenance",
+                return_value=("2026-07-06T20:00:00+00:00", "2026-07-06", True),
+            ),
         ):
             data = client.get_stock_data("AAPL", include_profile=False)
 
@@ -330,5 +338,5 @@ class TestFinnhubClient(unittest.TestCase):
         self.assertEqual(get_stock_data.call_count, 2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

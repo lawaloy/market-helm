@@ -171,9 +171,9 @@ def _format_symbols(raw: Any) -> str:
 
 def format_alert_email(event: Dict[str, Any]) -> tuple[str, str]:
     symbols = _format_symbols(event.get("symbols"))
-    alert_name = _sanitize_header_text(
-        event.get("alert_name", event.get("alert_id", "alert"))
-    ) or "alert"
+    alert_name = (
+        _sanitize_header_text(event.get("alert_name", event.get("alert_id", "alert"))) or "alert"
+    )
     subject = f"MarketHelm alert: {alert_name}"
     body = "\n".join(
         [
@@ -232,9 +232,7 @@ def _resolve_recipients(alert: Dict[str, Any]) -> List[str]:
     from src.storage.database import database_enabled
 
     allow_env_email = alert.get("_allow_env_email", not database_enabled()) is not False
-    env_recipients = (
-        parse_recipients(os.environ.get("ALERT_EMAIL_TO")) if allow_env_email else []
-    )
+    env_recipients = parse_recipients(os.environ.get("ALERT_EMAIL_TO")) if allow_env_email else []
     return parse_recipients(alert.get("email_to")) or env_recipients
 
 
@@ -248,8 +246,7 @@ class EmailDeliveryBackend(ABC):
         from_addr: str,
         to_addrs: List[str],
         event: Dict[str, Any],
-    ) -> bool:
-        ...
+    ) -> bool: ...
 
 
 class SmtpEmailBackend(EmailDeliveryBackend):
@@ -287,9 +284,7 @@ class SmtpEmailBackend(EmailDeliveryBackend):
         message.set_content(body)
         try:
             if self._use_ssl:
-                with smtplib.SMTP_SSL(
-                    self._host, self._port, timeout=self._timeout
-                ) as smtp:
+                with smtplib.SMTP_SSL(self._host, self._port, timeout=self._timeout) as smtp:
                     smtp.login(self._username, self._password)
                     smtp.send_message(message)
             else:
@@ -481,20 +476,16 @@ class MailgunEmailBackend(EmailDeliveryBackend):
 
 def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
     use_overrides = _allow_alert_smtp_overrides(alert)
-    host = (alert.get("smtp_host") if use_overrides else None) or os.environ.get(
-        "SMTP_HOST"
-    )
+    host = (alert.get("smtp_host") if use_overrides else None) or os.environ.get("SMTP_HOST")
     # Do not use `or` for port — 0 is falsy but must be rejected as invalid,
     # not silently replaced by the SMTP_PORT default.
     port_raw = alert.get("smtp_port") if use_overrides else None
     if port_raw is None or (isinstance(port_raw, str) and not str(port_raw).strip()):
         port_raw = os.environ.get("SMTP_PORT", "587")
-    username = (alert.get("smtp_user") if use_overrides else None) or os.environ.get(
-        "SMTP_USER"
+    username = (alert.get("smtp_user") if use_overrides else None) or os.environ.get("SMTP_USER")
+    password = (alert.get("smtp_password") if use_overrides else None) or os.environ.get(
+        "SMTP_PASSWORD"
     )
-    password = (
-        alert.get("smtp_password") if use_overrides else None
-    ) or os.environ.get("SMTP_PASSWORD")
 
     if not host or not str(host).strip():
         logger.warning(
@@ -534,9 +525,7 @@ def build_smtp_backend(alert: Dict[str, Any]) -> Optional[SmtpEmailBackend]:
 def build_sendgrid_backend() -> Optional[SendGridEmailBackend]:
     api_key = os.environ.get("SENDGRID_API_KEY")
     if not api_key or not str(api_key).strip():
-        logger.warning(
-            "SendGrid email requested but SENDGRID_API_KEY is missing."
-        )
+        logger.warning("SendGrid email requested but SENDGRID_API_KEY is missing.")
         return None
     return SendGridEmailBackend(api_key=str(api_key).strip())
 
@@ -545,14 +534,10 @@ def build_mailgun_backend() -> Optional[MailgunEmailBackend]:
     api_key = os.environ.get("MAILGUN_API_KEY")
     domain_raw = os.environ.get("MAILGUN_DOMAIN")
     if not api_key or not str(api_key).strip():
-        logger.warning(
-            "Mailgun email requested but MAILGUN_API_KEY is missing."
-        )
+        logger.warning("Mailgun email requested but MAILGUN_API_KEY is missing.")
         return None
     if not domain_raw or not str(domain_raw).strip():
-        logger.warning(
-            "Mailgun email requested but MAILGUN_DOMAIN is missing."
-        )
+        logger.warning("Mailgun email requested but MAILGUN_DOMAIN is missing.")
         return None
     domain = normalize_mailgun_domain(str(domain_raw))
     if domain is None:

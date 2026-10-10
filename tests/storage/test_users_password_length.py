@@ -51,7 +51,4 @@ def test_hash_accepts_password_at_max_length() -> None:
 
 def test_authenticate_rejects_oversized_password(db) -> None:
     create_user("auth-long@example.com", "password123")
-    assert (
-        authenticate_user("auth-long@example.com", "x" * (MAX_PASSWORD_LENGTH + 1))
-        is None
-    )
+    assert authenticate_user("auth-long@example.com", "x" * (MAX_PASSWORD_LENGTH + 1)) is None

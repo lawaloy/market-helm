@@ -29,9 +29,7 @@ def _normalize_email(email: str) -> str:
         raise UserError("A valid email address is required.")
     # Reject oversized input before strip so multi-MB payloads never hit the DB path.
     if len(email) > MAX_EMAIL_LENGTH:
-        raise UserError(
-            f"Email must be at most {MAX_EMAIL_LENGTH} characters."
-        )
+        raise UserError(f"Email must be at most {MAX_EMAIL_LENGTH} characters.")
     normalized = email.strip().lower()
     if not normalized or len(normalized) > MAX_EMAIL_LENGTH:
         raise UserError("A valid email address is required.")
@@ -49,9 +47,7 @@ def _hash_password(password: str) -> str:
     if len(password) < 8:
         raise UserError("Password must be at least 8 characters.")
     if len(password) > MAX_PASSWORD_LENGTH:
-        raise UserError(
-            f"Password must be at most {MAX_PASSWORD_LENGTH} characters."
-        )
+        raise UserError(f"Password must be at most {MAX_PASSWORD_LENGTH} characters.")
     salt = secrets.token_bytes(16)
     digest = hashlib.scrypt(
         password.encode("utf-8"),
@@ -112,8 +108,7 @@ def create_user(email: str, password: str) -> Dict[str, Any]:
                 raise UserError("An account with this email already exists.") from exc
             raise
 
-    return {"id": user_id, "email": normalized, "created_at": created_at,
-            "session_version": 1}
+    return {"id": user_id, "email": normalized, "created_at": created_at, "session_version": 1}
 
 
 def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
@@ -123,7 +118,8 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
         return None
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, password_hash, created_at, session_version FROM users WHERE email = ?",
+            "SELECT id, email, password_hash, created_at, session_version FROM users WHERE email = "
+            "?",
             (normalized,),
         ).fetchone()
     if not row or not _verify_password(password, row["password_hash"]):
@@ -139,14 +135,19 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE id = ?",
+            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE id "
+            "= ?",
             (user_id,),
         ).fetchone()
     if not row:
         return None
-    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"],
-            "email_verified": bool(row["email_verified_at"]),
-            "session_version": int(row["session_version"])}
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "created_at": row["created_at"],
+        "email_verified": bool(row["email_verified_at"]),
+        "session_version": int(row["session_version"]),
+    }
 
 
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
@@ -156,21 +157,27 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE email = ?",
+            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE "
+            "email = ?",
             (normalized,),
         ).fetchone()
     if not row:
         return None
-    return {"id": row["id"], "email": row["email"], "created_at": row["created_at"],
-            "email_verified": bool(row["email_verified_at"]),
-            "session_version": int(row["session_version"])}
+    return {
+        "id": row["id"],
+        "email": row["email"],
+        "created_at": row["created_at"],
+        "email_verified": bool(row["email_verified_at"]),
+        "session_version": int(row["session_version"]),
+    }
 
 
 def update_password(user_id: str, password: str) -> None:
     password_hash = _hash_password(password)
     with get_connection() as conn:
         conn.execute(
-            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = "
+            "?",
             (password_hash, user_id),
         )
 
@@ -180,22 +187,19 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
         raise UserError("New password must be different from the current password.")
     new_hash = _hash_password(new_password)
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT password_hash FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        row = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row or not _verify_password(current_password, row["password_hash"]):
             raise UserError("Current password is incorrect.")
         conn.execute(
-            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = "
+            "?",
             (new_hash, user_id),
         )
 
 
 def delete_user_account(user_id: str, current_password: str) -> None:
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT password_hash FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        row = conn.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row or not _verify_password(current_password, row["password_hash"]):
             raise UserError("Current password is incorrect.")
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))

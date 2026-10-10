@@ -96,9 +96,7 @@ def test_save_to_cache_soft_fails_when_write_raises(tmp_path: Path, monkeypatch)
     assert not (tmp_path / "SP_500_symbols.json").exists()
 
 
-def test_save_to_cache_preserves_existing_when_serialize_fails(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_save_to_cache_preserves_existing_when_serialize_fails(tmp_path: Path, monkeypatch) -> None:
     """A failed rewrite must leave the previous valid cache intact."""
     fetcher = IndexFetcher(cache_dir=tmp_path)
     fetcher._save_to_cache("S&P 500", ["AAPL", "MSFT"])

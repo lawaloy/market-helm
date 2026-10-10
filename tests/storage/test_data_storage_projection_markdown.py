@@ -1,7 +1,6 @@
 """Projection markdown must tolerate None/NaN reason and price cells."""
 
 from datetime import date
-from pathlib import Path
 
 import pandas as pd
 

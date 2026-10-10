@@ -6,7 +6,6 @@ import requests
 
 from src.alerts.notifiers.email_delivery import (
     MailgunEmailBackend,
-    SendGridEmailBackend,
     email_delivery_configured,
 )
 from src.alerts.notifiers.email_notifier import EmailNotifier
@@ -43,9 +42,7 @@ def test_sendgrid_delivery_success(mock_post: MagicMock) -> None:
     call_kwargs = mock_post.call_args.kwargs
     assert call_kwargs["headers"]["Authorization"] == "Bearer sg-test-key"
     assert call_kwargs["json"]["from"] == {"email": "alerts@markethelm.example"}
-    assert call_kwargs["json"]["personalizations"][0]["to"] == [
-        {"email": "user@example.com"}
-    ]
+    assert call_kwargs["json"]["personalizations"][0]["to"] == [{"email": "user@example.com"}]
 
 
 @patch("src.alerts.notifiers.email_delivery.requests.post")
@@ -109,9 +106,7 @@ def test_mailgun_delivery_success(mock_post: MagicMock) -> None:
     notifier = EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]})
     assert notifier is not None
 
-    assert notifier.send(
-        {"alert_id": "a1", "alert_name": "Test", "symbols": ["MSFT"]}
-    ) is True
+    assert notifier.send({"alert_id": "a1", "alert_name": "Test", "symbols": ["MSFT"]}) is True
 
     mock_post.assert_called_once()
     assert mock_post.call_args.args[0].endswith("/v3/mg.markethelm.example/messages")
@@ -320,7 +315,9 @@ def test_smtp_backend_requires_credentials() -> None:
     clear=True,
 )
 def test_mailgun_eu_api_base() -> None:
-    backend = MailgunEmailBackend("mg-test-key", "mg.markethelm.example", "https://api.eu.mailgun.net")
+    backend = MailgunEmailBackend(
+        "mg-test-key", "mg.markethelm.example", "https://api.eu.mailgun.net"
+    )
     assert backend._api_base == "https://api.eu.mailgun.net"
 
 

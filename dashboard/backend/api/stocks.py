@@ -1,13 +1,22 @@
 """
 Stocks API endpoints
 """
+
 import math
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query
-from dashboard.backend.models.stock import StockDetail, CurrentData, ProjectionData, TechnicalData, HistoricalData, HistoricalPoint
+
+from dashboard.backend.models.stock import (
+    CurrentData,
+    HistoricalData,
+    HistoricalPoint,
+    ProjectionData,
+    StockDetail,
+    TechnicalData,
+)
 from dashboard.backend.services.data_loader import get_data_loader
-from datetime import datetime, timedelta
 from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
@@ -49,10 +58,10 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
 
         loader = get_data_loader()
         date = loader.get_latest_date()
-        
+
         if not date:
             raise HTTPException(status_code=404, detail="No data available")
-        
+
         # Load daily data — match padded / mixed-case CSV symbols to the path key.
         daily_df = loader.load_daily_data()
         if (
@@ -66,7 +75,7 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
 
         if stock_daily.empty:
             raise HTTPException(status_code=404, detail="Stock not found.")
-        
+
         stock_row = stock_daily.iloc[0]
         for col in ("close", "change", "change_percent"):
             if col not in stock_row.index:
@@ -81,7 +90,11 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
         # Build current data
         volume_raw = stock_row.get("volume", 0)
         try:
-            volume = int(float(volume_raw)) if volume_raw is not None and math.isfinite(float(volume_raw)) else 0
+            volume = (
+                int(float(volume_raw))
+                if volume_raw is not None and math.isfinite(float(volume_raw))
+                else 0
+            )
         except (TypeError, ValueError):
             volume = 0
         market_cap = None
@@ -93,17 +106,17 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
             change=change,
             changePercent=change_percent,
             volume=volume,
-            marketCap=market_cap
+            marketCap=market_cap,
         )
-        
+
         # Try to load projection data
         projection_data = None
         technical_data = None
-        
+
         try:
             proj_df = loader.load_projections()
             stock_proj = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
-            
+
             if not stock_proj.empty:
                 proj_row = stock_proj.iloc[0]
 
@@ -127,9 +140,7 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
                         confidence=int(confidence_f),
                         # Legacy CSVs may omit label columns; keep the card
                         # instead of KeyError→bare except dropping projection.
-                        recommendation=_safe_label(
-                            proj_row.get("recommendation"), "HOLD"
-                        ),
+                        recommendation=_safe_label(proj_row.get("recommendation"), "HOLD"),
                         risk=_safe_label(proj_row.get("risk_level"), "Unknown"),
                         trend=_safe_label(proj_row.get("trend"), "Neutral"),
                     )
@@ -147,20 +158,20 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
                         ),
                         rsi=None,  # Not available in current data
                     )
-        
+
         except Exception:
             # No projection data available
             pass
-        
+
         return StockDetail(
             symbol=sym,
             # Dirty CSV name cells (NaN/None) fail Pydantic str → 500 the detail.
             name=_safe_label(stock_row.get("name"), sym),
             currentData=current_data,
             projection=projection_data,
-            technical=technical_data
+            technical=technical_data,
         )
-    
+
     except HTTPException:
         raise
     except Exception:
@@ -170,7 +181,7 @@ async def get_stock_detail(symbol: str = Path(..., description="Stock symbol")):
 @router.get("/{symbol}/historical", response_model=HistoricalData)
 async def get_stock_historical(
     symbol: str = Path(..., description="Stock symbol"),
-    days: int = Query(30, ge=1, le=365, description="Number of days of history")
+    days: int = Query(30, ge=1, le=365, description="Number of days of history"),
 ):
     """Get historical data for a specific stock"""
     try:
@@ -180,10 +191,10 @@ async def get_stock_historical(
 
         loader = get_data_loader()
         historical_records = loader.load_historical_data(sym, days)
-        
+
         if not historical_records:
             raise HTTPException(status_code=404, detail="No historical data found.")
-        
+
         historical_points = []
         for record in historical_records:
             close = _finite_float(record.get("close"))
@@ -192,24 +203,24 @@ async def get_stock_historical(
                 # Skip corrupt/partial days so one bad row cannot 500 the series.
                 continue
 
-            proj = record.get('projection')
+            proj = record.get("projection")
             # Convert to camelCase for frontend; omit nested projection when required
             # numerics are missing/non-finite (mirrors stock detail soft-fail).
             projection = None
             if proj:
-                target_price = _finite_float(proj.get('target_price'))
-                expected_change = _finite_float(proj.get('expected_change'))
-                confidence = _finite_float(proj.get('confidence'))
+                target_price = _finite_float(proj.get("target_price"))
+                expected_change = _finite_float(proj.get("expected_change"))
+                confidence = _finite_float(proj.get("confidence"))
                 if (
                     target_price is not None
                     and expected_change is not None
                     and confidence is not None
                 ):
                     projection = {
-                        'targetPrice': target_price,
-                        'confidence': confidence,
-                        'recommendation': proj.get('recommendation'),
-                        'expectedChange': expected_change,
+                        "targetPrice": target_price,
+                        "confidence": confidence,
+                        "recommendation": proj.get("recommendation"),
+                        "expectedChange": expected_change,
                     }
 
             volume_raw = record.get("volume", 0)
@@ -222,22 +233,21 @@ async def get_stock_historical(
             except (TypeError, ValueError):
                 volume = 0
 
-            historical_points.append(HistoricalPoint(
-                date=record['date'],
-                close=close,
-                change=change,
-                volume=volume,
-                projection=projection
-            ))
+            historical_points.append(
+                HistoricalPoint(
+                    date=record["date"],
+                    close=close,
+                    change=change,
+                    volume=volume,
+                    projection=projection,
+                )
+            )
 
         if not historical_points:
             raise HTTPException(status_code=404, detail="No historical data found.")
-        
-        return HistoricalData(
-            symbol=sym,
-            data=historical_points
-        )
-    
+
+        return HistoricalData(symbol=sym, data=historical_points)
+
     except HTTPException:
         raise
     except Exception:

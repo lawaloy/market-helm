@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 
 from src.storage.database import (
-    LATEST_SCHEMA_VERSION,
-    MigrationError,
-    POSTGRES_WRITE_MUTEX_KEY,
     _MIGRATIONS,
-    _PostgresConnection,
+    LATEST_SCHEMA_VERSION,
+    POSTGRES_WRITE_MUTEX_KEY,
+    MigrationError,
     _connect_postgresql,
     _migration_statements,
+    _PostgresConnection,
     apply_migrations,
     database_backend,
     database_enabled,
@@ -93,9 +93,7 @@ class TestResolveDatabasePath:
 class TestDatabaseBackend:
     @pytest.mark.parametrize("scheme", ["postgres", "postgresql"])
     def test_postgresql_aliases(self, monkeypatch, scheme):
-        monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL", f"{scheme}://db.example/markethelm"
-        )
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"{scheme}://db.example/markethelm")
         assert database_backend() == "postgresql"
 
     def test_sqlite_backend(self, monkeypatch):
@@ -153,9 +151,7 @@ class TestDatabaseBackend:
 
         raw = FakeConnection()
         _PostgresConnection(raw).execute("BEGIN IMMEDIATE")
-        assert raw.sql == (
-            f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"
-        )
+        assert raw.sql == (f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})")
         assert "SELECT 1" not in raw.sql
 
     def test_postgresql_plain_begin_is_not_write_mutex(self):
@@ -176,9 +172,7 @@ class TestDatabaseBackend:
 
     def test_connect_postgresql_requires_psycopg(self, monkeypatch):
         """Hosted boot without psycopg must fail closed with an actionable error."""
-        monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL", "postgresql://db.example/markethelm"
-        )
+        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "postgresql://db.example/markethelm")
         import builtins
 
         real_import = builtins.__import__
@@ -216,18 +210,14 @@ class TestDatabaseMigrations:
             f"sqlite:///{database_path.as_posix()}",
         )
 
-    def test_fresh_database_records_current_schema_version(
-        self, monkeypatch, tmp_path
-    ):
+    def test_fresh_database_records_current_schema_version(self, monkeypatch, tmp_path):
         self.configure_database(monkeypatch, tmp_path)
 
         init_database()
 
         with get_connection() as conn:
-            migration = conn.execute(
-                """SELECT version, name, applied_at FROM schema_migrations
-                   ORDER BY version DESC LIMIT 1"""
-            ).fetchone()
+            migration = conn.execute("""SELECT version, name, applied_at FROM schema_migrations
+                   ORDER BY version DESC LIMIT 1""").fetchone()
             tables = {
                 row["name"]
                 for row in conn.execute(
@@ -245,14 +235,12 @@ class TestDatabaseMigrations:
     ):
         self.configure_database(monkeypatch, tmp_path)
         with get_connection() as conn:
-            conn.execute(
-                """CREATE TABLE users (
+            conn.execute("""CREATE TABLE users (
                     id TEXT PRIMARY KEY,
                     email TEXT NOT NULL UNIQUE COLLATE NOCASE,
                     password_hash TEXT NOT NULL,
                     created_at TEXT NOT NULL
-                )"""
-            )
+                )""")
             conn.execute(
                 "INSERT INTO users VALUES (?, ?, ?, ?)",
                 ("user-1", "user@example.com", "hash", "2026-01-01T00:00:00Z"),
@@ -262,13 +250,9 @@ class TestDatabaseMigrations:
 
         with get_connection() as conn:
             user = conn.execute("SELECT * FROM users WHERE id = 'user-1'").fetchone()
-            versions = conn.execute(
-                "SELECT version FROM schema_migrations"
-            ).fetchall()
+            versions = conn.execute("SELECT version FROM schema_migrations").fetchall()
         assert user["email"] == "user@example.com"
-        assert [row["version"] for row in versions] == list(
-            range(1, LATEST_SCHEMA_VERSION + 1)
-        )
+        assert [row["version"] for row in versions] == list(range(1, LATEST_SCHEMA_VERSION + 1))
 
     def test_repeated_initialization_is_idempotent(self, monkeypatch, tmp_path):
         self.configure_database(monkeypatch, tmp_path)
@@ -283,13 +267,11 @@ class TestDatabaseMigrations:
     def test_unknown_future_schema_version_fails_closed(self, monkeypatch, tmp_path):
         self.configure_database(monkeypatch, tmp_path)
         with get_connection() as conn:
-            conn.execute(
-                """CREATE TABLE schema_migrations (
+            conn.execute("""CREATE TABLE schema_migrations (
                     version INTEGER PRIMARY KEY,
                     name TEXT NOT NULL,
                     applied_at TEXT NOT NULL
-                )"""
-            )
+                )""")
             conn.execute(
                 "INSERT INTO schema_migrations VALUES (?, ?, ?)",
                 (LATEST_SCHEMA_VERSION + 1, "future", "2026-01-01T00:00:00Z"),
@@ -321,6 +303,4 @@ class TestDatabaseMigrations:
         raw = FakeRaw()
         with pytest.raises(MigrationError, match="Failed to apply"):
             apply_migrations(_PostgresConnection(raw))
-        assert raw.statements == [
-            f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"
-        ]
+        assert raw.statements == [f"SELECT pg_advisory_xact_lock({POSTGRES_WRITE_MUTEX_KEY})"]

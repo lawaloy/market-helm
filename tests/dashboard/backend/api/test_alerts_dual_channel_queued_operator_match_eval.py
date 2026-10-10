@@ -46,6 +46,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client(multi_user_env):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -245,9 +246,9 @@ def test_queued_evaluate_delivers_flipped_dual_channel_operator_without_touching
     assert watches_a[0]["alert"]["condition"]["operator"] == "less_than"
     assert watches_a[0]["threshold"] == 150
     assert "AAPL" in list_enabled_symbols()
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")
-    } == {(user_b, "sibling-msft")}
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
+        (user_b, "sibling-msft")
+    }
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send_log:
         # webhook_notifier and email_delivery both `import requests`; one patch

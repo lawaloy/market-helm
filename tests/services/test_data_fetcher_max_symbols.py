@@ -28,9 +28,7 @@ def test_fetch_all_indices_skips_when_max_symbols_non_positive(
 
     for bad_limit in (0, -3):
         fetched.clear()
-        result = fetcher.fetch_all_indices(
-            use_screener=False, max_symbols_per_index=bad_limit
-        )
+        result = fetcher.fetch_all_indices(use_screener=False, max_symbols_per_index=bad_limit)
         assert fetched == []
         assert result == {}
 
@@ -54,8 +52,6 @@ def test_fetch_all_indices_skips_when_max_symbols_unparseable(
     monkeypatch.setenv("STOCK_FETCH_MAX_WORKERS", "1")
     monkeypatch.setattr("src.services.data_fetcher.time.sleep", lambda _seconds: None)
 
-    result = fetcher.fetch_all_indices(
-        use_screener=False, max_symbols_per_index=float("nan")
-    )
+    result = fetcher.fetch_all_indices(use_screener=False, max_symbols_per_index=float("nan"))
     assert fetched == []
     assert result == {}

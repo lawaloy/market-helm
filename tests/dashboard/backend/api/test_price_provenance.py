@@ -1,7 +1,7 @@
 """Saved quote provenance survives the API in file and hosted storage modes."""
 
-from unittest.mock import patch
 from datetime import datetime
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -15,15 +15,20 @@ def test_market_overview_exposes_quote_time_range(tmp_path, monkeypatch):
     upsert_market_bars(
         [
             {
-                "symbol": "AAPL", "close": 150, "change_percent": 1,
+                "symbol": "AAPL",
+                "close": 150,
+                "change_percent": 1,
                 "quote_timestamp": "2026-10-02T15:07:00+00:00",
             },
             {
-                "symbol": "MSFT", "close": 350, "change_percent": -1,
+                "symbol": "MSFT",
+                "close": 350,
+                "change_percent": -1,
                 "quote_timestamp": "2026-10-02T15:08:00+00:00",
             },
         ],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     with patch("dashboard.backend.api.market.get_data_loader", return_value=DataLoader(tmp_path)):
         response = TestClient(app).get("/api/market/overview")
@@ -36,15 +41,20 @@ def test_alert_catalog_and_quote_return_newest_provider_time(tmp_path, monkeypat
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 100, "quote_timestamp": "2026-10-02T15:07:00+00:00"}],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 101, "quote_timestamp": "2026-10-02T20:00:00+00:00"}],
-        "2026-10-03", data_dir=tmp_path,
+        "2026-10-03",
+        data_dir=tmp_path,
     )
     loader = DataLoader(tmp_path)
     with (
-        patch("dashboard.backend.api.alerts.build_symbol_catalog", return_value=(["AAPL"], {"AAPL": "Apple"})),
+        patch(
+            "dashboard.backend.api.alerts.build_symbol_catalog",
+            return_value=(["AAPL"], {"AAPL": "Apple"}),
+        ),
         patch("dashboard.backend.api.alerts.get_data_loader", return_value=loader),
         patch("dashboard.backend.services.data_loader.get_data_loader", return_value=loader),
     ):
@@ -56,7 +66,8 @@ def test_alert_catalog_and_quote_return_newest_provider_time(tmp_path, monkeypat
     for response in (catalog, quote):
         assert response.json()["prices"]["AAPL"] == 101
         assert response.json()["quote_meta"]["AAPL"] == {
-            "source": "saved", "as_of": "2026-10-02T20:00:00+00:00",
+            "source": "saved",
+            "as_of": "2026-10-02T20:00:00+00:00",
             "retrieved_at": None,
         }
 
@@ -69,14 +80,17 @@ def test_hosted_database_saved_quote_selection(tmp_path, monkeypatch):
     init_database()
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 150, "quote_timestamp": "2026-10-02T15:07:00+00:00"}],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 151, "quote_timestamp": "2026-10-02T20:00:00+00:00"}],
-        "2026-10-03", data_dir=tmp_path,
+        "2026-10-03",
+        data_dir=tmp_path,
     )
     assert latest_saved_quotes(data_dir=tmp_path)["AAPL"] == {
-        "price": 151.0, "as_of": "2026-10-02T20:00:00+00:00"
+        "price": 151.0,
+        "as_of": "2026-10-02T20:00:00+00:00",
     }
 
 

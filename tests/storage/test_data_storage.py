@@ -1,13 +1,14 @@
 """Tests for storage module."""
 
+import shutil
+import tempfile
 import unittest
 import unittest.mock
-import tempfile
-import shutil
-from pathlib import Path
-import pandas as pd
 from datetime import date, datetime
+from pathlib import Path
 from unittest.mock import patch
+
+import pandas as pd
 
 from src.storage.data_storage import DataStorage, _data_date_for_filename
 
@@ -37,9 +38,7 @@ class TestDataDateForFilename:
             "src.storage.data_storage._data_date_for_filename",
             return_value=date(2026, 7, 24),
         ):
-            path = storage.save_daily_data(
-                [{"symbol": "AAPL", "name": "Apple", "close": 150.0}]
-            )
+            path = storage.save_daily_data([{"symbol": "AAPL", "name": "Apple", "close": 150.0}])
         assert path == "market_bars:2026-07-24"
 
     def test_save_daily_data_empty_returns_none(self, tmp_path):
@@ -56,15 +55,10 @@ class TestDataStorage(unittest.TestCase):
         """Set up test fixtures."""
         self.test_data_dir = tempfile.mkdtemp()
         self.storage = DataStorage(data_dir=self.test_data_dir)
-        self.sample_df = pd.DataFrame({
-            'symbol': ['AAPL', 'GOOGL'],
-            'close': [150.0, 2800.0],
-            'volume': [50000000, 30000000]
-        })
-        self.sample_summary = {
-            'total_stocks': 2,
-            'date': str(date.today())
-        }
+        self.sample_df = pd.DataFrame(
+            {"symbol": ["AAPL", "GOOGL"], "close": [150.0, 2800.0], "volume": [50000000, 30000000]}
+        )
+        self.sample_summary = {"total_stocks": 2, "date": str(date.today())}
 
     def tearDown(self):
         """Clean up test fixtures."""
@@ -77,7 +71,7 @@ class TestDataStorage(unittest.TestCase):
 
     def test_save_daily_data(self):
         """Test saving daily data to market_bars."""
-        data_list = self.sample_df.to_dict('records')
+        data_list = self.sample_df.to_dict("records")
         location = self.storage.save_daily_data(data_list)
         self.assertTrue(str(location).startswith("market_bars:"))
         self.assertEqual(list(Path(self.test_data_dir).glob("daily_data_*.csv")), [])
@@ -95,12 +89,12 @@ class TestDataStorage(unittest.TestCase):
 
     def test_load_daily_data(self):
         """Test loading daily data from market_bars."""
-        data_list = self.sample_df.to_dict('records')
+        data_list = self.sample_df.to_dict("records")
         self.storage.save_daily_data(data_list)
         loaded_df = self.storage.load_daily_data()
         self.assertIsInstance(loaded_df, pd.DataFrame)
         self.assertEqual(len(loaded_df), 2)
-        self.assertIn('symbol', loaded_df.columns)
+        self.assertIn("symbol", loaded_df.columns)
 
     def test_load_summary(self):
         """Test loading summary from durable storage after save."""
@@ -110,7 +104,7 @@ class TestDataStorage(unittest.TestCase):
         self.assertEqual(list(Path(self.test_data_dir).glob("summary_*.json")), [])
         loaded_summary = load_daily_summary("2026-01-15", data_dir=self.test_data_dir)
         self.assertIsInstance(loaded_summary, dict)
-        self.assertEqual(loaded_summary['total_stocks'], 2)
+        self.assertEqual(loaded_summary["total_stocks"], 2)
 
     def test_save_projections_writes_db_and_markdown(self):
         """Projections land in DB (no CSV) and still emit optional markdown."""
@@ -214,5 +208,5 @@ class TestDataStorage(unittest.TestCase):
         self.assertIsNone(self.storage.load_daily_data())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 def _client(monkeypatch):
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)

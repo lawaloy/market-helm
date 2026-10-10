@@ -50,8 +50,6 @@ def test_record_notifier_delivery_soft_fails_storage_errors():
     storage = MagicMock()
     storage.record_delivery.side_effect = OSError("disk full")
 
-    record_notifier_delivery(
-        storage, alert_id="a1", notifier=EmailNotifier(), success=True
-    )
+    record_notifier_delivery(storage, alert_id="a1", notifier=EmailNotifier(), success=True)
 
     storage.record_delivery.assert_called_once()

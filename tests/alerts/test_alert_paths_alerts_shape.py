@@ -45,9 +45,7 @@ def test_strip_webhook_tolerates_truthy_non_list_alerts(bad_alerts) -> None:
     assert cleaned["alerts"] == []
 
 
-def test_get_enabled_watch_symbols_ignores_non_list_alerts(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_get_enabled_watch_symbols_ignores_non_list_alerts(tmp_path: Path, monkeypatch) -> None:
     cfg = tmp_path / "alerts.json"
     cfg.write_text('{"defaults": {}, "alerts": 1}', encoding="utf-8")
     monkeypatch.setattr(

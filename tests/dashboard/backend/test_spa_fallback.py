@@ -16,9 +16,7 @@ async def _not_found(request):
 
 
 def _make_app() -> Starlette:
-    return Starlette(
-        routes=[Route("/{full_path:path}", _not_found, methods=["GET", "POST"])]
-    )
+    return Starlette(routes=[Route("/{full_path:path}", _not_found, methods=["GET", "POST"])])
 
 
 def test_spa_fallback_serves_index_for_html_deep_link(tmp_path: Path) -> None:

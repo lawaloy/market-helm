@@ -55,9 +55,7 @@ def _watch_config():
         {"user_id": "u", "alert_id": "aapl-low", "event": None},
     ],
 )
-def test_poison_deliver_payload_completes_without_retry(
-    db_user, poison_payload
-) -> None:
+def test_poison_deliver_payload_completes_without_retry(db_user, poison_payload) -> None:
     """Missing keys / non-dict event must drain once (no fail→retry loop)."""
     sync_watches_from_config(db_user, _watch_config())
     poison_id = enqueue_job(JOB_DELIVER, poison_payload, max_attempts=5)

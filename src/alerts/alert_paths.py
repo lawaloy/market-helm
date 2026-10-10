@@ -73,9 +73,7 @@ def resolve_alerts_config_path(explicit: Optional[Path] = None) -> Path:
     return user_path
 
 
-_PLACEHOLDER_EMAILS = frozenset(
-    {"you@example.com", "alerts@example.com", "backup@example.com"}
-)
+_PLACEHOLDER_EMAILS = frozenset({"you@example.com", "alerts@example.com", "backup@example.com"})
 
 
 def _is_placeholder_webhook(url: str) -> bool:
@@ -248,7 +246,9 @@ def get_enabled_watch_symbols() -> List[str]:
     return sorted(symbols)
 
 
-def apply_alert_defaults(alert: Dict[str, Any], defaults: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+def apply_alert_defaults(
+    alert: Dict[str, Any], defaults: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
     """Merge config-level defaults into a rule for notification delivery."""
     if not defaults:
         return alert
@@ -337,9 +337,7 @@ def update_user_env_vars(updates: Dict[str, str]) -> None:
                 continue
             text = str(value)
             if not _is_safe_env_assignment(str(key), text):
-                raise ValueError(
-                    "Environment updates cannot contain CR/LF/NUL or '=' in keys."
-                )
+                raise ValueError("Environment updates cannot contain CR/LF/NUL or '=' in keys.")
             existing[str(key)] = text
             if str(key) not in order:
                 order.append(str(key))

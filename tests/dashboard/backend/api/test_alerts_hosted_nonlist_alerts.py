@@ -21,6 +21,7 @@ def multi_user_env(tmp_path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -61,12 +62,8 @@ def test_hosted_get_config_soft_fails_non_list_alerts_without_touching_sibling(
     client, multi_user_env, bad_alerts
 ) -> None:
     """Settings GET polishes stored JSON before normalize; ``alerts: 1`` 500ed."""
-    token_a, user_a = _register(
-        client, f"nonlist-a-{type(bad_alerts).__name__}@example.com"
-    )
-    token_b, _user_b = _register(
-        client, f"nonlist-b-{type(bad_alerts).__name__}@example.com"
-    )
+    token_a, user_a = _register(client, f"nonlist-a-{type(bad_alerts).__name__}@example.com")
+    token_b, _user_b = _register(client, f"nonlist-b-{type(bad_alerts).__name__}@example.com")
     headers_a = {"Authorization": f"Bearer {token_a}"}
     headers_b = {"Authorization": f"Bearer {token_b}"}
 
@@ -99,9 +96,7 @@ def test_hosted_get_config_soft_fails_non_list_alerts_without_touching_sibling(
     assert poisoned.json()["exists"] is True
     assert poisoned.json()["config"]["alerts"] == []
     assert sibling.status_code == 200
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]
 
 
 @pytest.mark.parametrize("bad_alerts", [1, True, {"id": "x"}])
@@ -109,12 +104,8 @@ def test_hosted_status_soft_fails_non_list_alerts_without_touching_sibling(
     client, multi_user_env, bad_alerts, monkeypatch
 ) -> None:
     """Status reads raw config_json and used to TypeError on ``alerts: 1``."""
-    token_a, user_a = _register(
-        client, f"status-a-{type(bad_alerts).__name__}@example.com"
-    )
-    token_b, _user_b = _register(
-        client, f"status-b-{type(bad_alerts).__name__}@example.com"
-    )
+    token_a, user_a = _register(client, f"status-a-{type(bad_alerts).__name__}@example.com")
+    token_b, _user_b = _register(client, f"status-b-{type(bad_alerts).__name__}@example.com")
     headers_a = {"Authorization": f"Bearer {token_a}"}
     headers_b = {"Authorization": f"Bearer {token_b}"}
 
