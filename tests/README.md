@@ -61,7 +61,7 @@ No manual `sys.path.insert` is needed in individual test files.
 python -m pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py
 
 # PostgreSQL integration against a disposable test database
-MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
+MARKETHELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
   python -m pytest tests/integration/test_postgresql_storage.py -v
 
 # Or using unittest

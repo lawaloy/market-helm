@@ -14,7 +14,7 @@ by both application processes.
 3. Validate with `docker compose -f docker-compose.staging.yml config`.
 4. Start with `docker compose -f docker-compose.staging.yml up -d --build`.
 5. Put a TLS reverse proxy in front of `127.0.0.1:8000` and add its IP/CIDR to
-   `MARKET_HELM_TRUSTED_PROXY_CIDRS`.
+   `MARKETHELM_TRUSTED_PROXY_CIDRS`.
 6. Verify `/health/live`, `/health/ready`, `/health/worker`, and `/metrics`, then test registration
    and the email-verification link against the public staging hostname.
 
@@ -45,10 +45,10 @@ Their alert configurations must be empty. Supply credentials through the process
 environment so passwords do not appear in shell history:
 
 ```bash
-export MARKET_HELM_STAGING_TENANT_A_EMAIL=acceptance-a@example.com
-export MARKET_HELM_STAGING_TENANT_A_PASSWORD='...'
-export MARKET_HELM_STAGING_TENANT_B_EMAIL=acceptance-b@example.com
-export MARKET_HELM_STAGING_TENANT_B_PASSWORD='...'
+export MARKETHELM_STAGING_TENANT_A_EMAIL=acceptance-a@example.com
+export MARKETHELM_STAGING_TENANT_A_PASSWORD='...'
+export MARKETHELM_STAGING_TENANT_B_EMAIL=acceptance-b@example.com
+export MARKETHELM_STAGING_TENANT_B_PASSWORD='...'
 python scripts/staging_acceptance.py \
   --base-url https://staging.example.com \
   --tenant-check \
@@ -232,7 +232,7 @@ file; use the selected platform's secret manager.
 - [ ] Create the staging DNS record pointing only to the intended ingress.
 - [ ] Install or enable a trusted, hostname-matching certificate with automatic
       renewal; enforce HTTP-to-HTTPS redirects and HSTS.
-- [ ] Set `MARKET_HELM_PUBLIC_URL`, `CORS_ORIGINS`, and the exact trusted-proxy
+- [ ] Set `MARKETHELM_PUBLIC_URL`, `CORS_ORIGINS`, and the exact trusted-proxy
       CIDRs for the deployed ingress.
 - [ ] Run `staging_acceptance.py --ingress-origin ...` against the public HTTPS URL
       and save its JSON report plus certificate/DNS evidence.
@@ -248,7 +248,7 @@ file; use the selected platform's secret manager.
 - [ ] Store a restricted provider key and configure `ALERT_EMAIL_PROVIDER` plus
       `ALERT_EMAIL_FROM`.
 - [ ] Receive and complete registration verification and password-reset links;
-      confirm both use `MARKET_HELM_PUBLIC_URL`.
+      confirm both use `MARKETHELM_PUBLIC_URL`.
 - [ ] Deliver a real alert while the dashboard is closed and record the provider
       message ID and inbox authentication results.
 - [ ] Trigger a controlled rejection and confirm retries/failure details appear in
@@ -288,21 +288,21 @@ Hosted mode requires a database URL and a stable signing secret. SQLite is usefu
 for development; PostgreSQL is recommended for a deployed service:
 
 ```bash
-export MARKET_HELM_DATABASE_URL=sqlite:////path/to/markethelm.db
-export MARKET_HELM_AUTH_SECRET=change-me-in-production-min-16-chars
+export MARKETHELM_DATABASE_URL=sqlite:////path/to/markethelm.db
+export MARKETHELM_AUTH_SECRET=change-me-in-production-min-16-chars
 
 # Hosted alternative:
-export MARKET_HELM_DATABASE_URL=postgresql://user:password@host:5432/markethelm
+export MARKETHELM_DATABASE_URL=postgresql://user:password@host:5432/markethelm
 ```
 
-When `MARKET_HELM_DATABASE_URL` is unset, the application remains in local file
+When `MARKETHELM_DATABASE_URL` is unset, the application remains in local file
 mode. Quotes, projections, and daily summaries live in the database when it is configured (otherwise in `DATA_DIR/market_bars.sqlite`); the database also stores accounts,
 sessions, per-user alert settings, jobs, and delivery outcomes.
 
 The account API under `/api/auth` includes registration, login/logout, current-user
 lookup, email-verification request/confirmation, password-reset
 request/confirmation, password change, and account deletion. Account email links
-require `MARKET_HELM_PUBLIC_URL` plus a configured platform email provider.
+require `MARKETHELM_PUBLIC_URL` plus a configured platform email provider.
 
 Schema migrations run automatically at startup and fail closed if the database has
 an unknown newer version. Before production, exercise the PostgreSQL integration
@@ -347,7 +347,7 @@ If you omit persistence, containers that restart **lose** history unless you res
 **Example (Linux):**
 
 ```bash
-export DATA_DIR=/var/lib/market-helm/data
+export DATA_DIR=/var/lib/markethelm/data
 ```
 
 Point your process manager (systemd, Docker, etc.) at that environment.
@@ -366,7 +366,7 @@ python3 scripts/backfill_market_data.py --data-dir "$DATA_DIR"
 Back up both the legacy files and the target database first. The command does not
 modify its source files and skips dates already present in the database, so it is
 safe to rerun after a partial operational attempt. Check the JSON report and its
-`target` field: a configured `MARKET_HELM_DATABASE_URL` takes precedence over the
+`target` field: a configured `MARKETHELM_DATABASE_URL` takes precedence over the
 sidecar path. Resolve every reported file error before removing old artifacts; the application no longer reads those CSV files at runtime. See [USAGE.md](USAGE.md#migrate-legacy-market-data-files)
 for `--replace-existing` upsert semantics.
 
@@ -380,41 +380,41 @@ for `--replace-existing` upsert semantics.
 <details>
 <summary><b>Environment variables (reference)</b></summary>
 
-| Variable                                 | Used by                         | Purpose                                                                                     |
-| ---------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
-| `DATA_DIR`                               | Tracker, dashboard backend      | Path to durable `market_bars.sqlite` / DB (`market_bars`, `projections`, `daily_summaries`) |
-| `FINNHUB_API_KEY`                        | Tracker CLI                     | Market data (required for live fetches)                                                     |
-| `CORS_ORIGINS`                           | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)                 |
-| `VITE_API_URL`                           | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                                      |
-| `MARKET_HELM_DATABASE_URL`               | API, worker                     | Enables hosted mode; SQLite for development or PostgreSQL for hosted use                    |
-| `MARKET_HELM_AUTH_SECRET`                | Dashboard backend               | Required hosted session-signing secret; minimum 16 characters                               |
-| `MARKET_HELM_PUBLIC_URL`                 | Dashboard backend               | Safe public base URL for email verification and password-reset links                        |
-| `MARKET_HELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend               | Require verified email before protected hosted operations                                   |
-| `MARKET_HELM_RATE_LIMIT_ENABLED`         | Dashboard backend               | Enables API rate limiting; defaults on when database mode is enabled                        |
-| `MARKET_HELM_RATE_LIMIT_GLOBAL`          | Dashboard backend               | Per-client API requests/minute (default `120`)                                              |
-| `MARKET_HELM_RATE_LIMIT_LOGIN`           | Dashboard backend               | Login attempts/client/minute (default `10`)                                                 |
-| `MARKET_HELM_RATE_LIMIT_REGISTER`        | Dashboard backend               | Registrations/client/hour (default `5`)                                                     |
-| `MARKET_HELM_RATE_LIMIT_AUTH_EMAIL`      | Dashboard backend               | Verification/reset email requests/client/hour (default `5`)                                 |
-| `MARKET_HELM_RATE_LIMIT_EXPENSIVE`       | Dashboard backend               | Expensive write requests/client/minute (default `10`)                                       |
-| `MARKET_HELM_TRUSTED_PROXY_CIDRS`        | Dashboard backend               | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For`                             |
-| `ALERT_WEBHOOK_URL`                      | Tracker (alerts)                | Default webhook when rules use `webhook` without per-rule `url`                             |
-| `ALERT_WEBHOOK_FORMAT`                   | Tracker (alerts)                | `json`, `slack`, or `discord` webhook body format                                           |
-| `DISCORD_WEBHOOK_URL`                    | Tracker (alerts)                | Default Discord incoming webhook URL when a rule has no `webhook_url`                       |
-| `MARKET_HELM_ALERTS_CONFIG`              | Tracker (alerts)                | Optional path to `alerts.json` (default `~/.market-helm/alerts.json`)                       |
-| `SMTP_HOST`                              | Tracker (alerts)                | SMTP server for `email` notifications                                                       |
-| `SMTP_PORT`                              | Tracker (alerts)                | SMTP port (default `587`)                                                                   |
-| `SMTP_USER`                              | Tracker (alerts)                | SMTP username                                                                               |
-| `SMTP_PASSWORD`                          | Tracker (alerts)                | SMTP password or app password                                                               |
-| `ALERT_EMAIL_TO`                         | Tracker (alerts)                | Default recipients for `email` notifications                                                |
-| `ALERT_EMAIL_FROM`                       | Tracker (alerts)                | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun          |
-| `ALERT_EMAIL_PROVIDER`                   | Tracker (alerts)                | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set             |
-| `SENDGRID_API_KEY`                       | Tracker (alerts)                | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid`                                       |
-| `MAILGUN_API_KEY`                        | Tracker (alerts)                | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun`                                         |
-| `ALERT_DELIVERY_MAX_ATTEMPTS`            | Tracker (alerts)                | Total send attempts per notification (default `3`)                                          |
-| `ALERT_DELIVERY_RETRY_BASE_SECONDS`      | Tracker (alerts)                | Initial backoff delay between retries (default `1`)                                         |
-| `ALERT_DELIVERY_RETRY_MAX_SECONDS`       | Tracker (alerts)                | Max backoff delay cap (default `8`)                                                         |
-| `MAILGUN_DOMAIN`                         | Tracker (alerts)                | Mailgun sending domain (e.g. `mg.yourdomain.com`)                                           |
-| `MAILGUN_API_BASE`                       | Tracker (alerts)                | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`)              |
+| Variable                                | Used by                         | Purpose                                                                                     |
+| --------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
+| `DATA_DIR`                              | Tracker, dashboard backend      | Path to durable `market_bars.sqlite` / DB (`market_bars`, `projections`, `daily_summaries`) |
+| `FINNHUB_API_KEY`                       | Tracker CLI                     | Market data (required for live fetches)                                                     |
+| `CORS_ORIGINS`                          | Dashboard backend               | Comma-separated origins allowed in browser (e.g. `https://app.example.com`)                 |
+| `VITE_API_URL`                          | Dashboard frontend (build time) | Public URL of the API (e.g. `https://api.example.com`)                                      |
+| `MARKETHELM_DATABASE_URL`               | API, worker                     | Enables hosted mode; SQLite for development or PostgreSQL for hosted use                    |
+| `MARKETHELM_AUTH_SECRET`                | Dashboard backend               | Required hosted session-signing secret; minimum 16 characters                               |
+| `MARKETHELM_PUBLIC_URL`                 | Dashboard backend               | Safe public base URL for email verification and password-reset links                        |
+| `MARKETHELM_REQUIRE_EMAIL_VERIFICATION` | Dashboard backend               | Require verified email before protected hosted operations                                   |
+| `MARKETHELM_RATE_LIMIT_ENABLED`         | Dashboard backend               | Enables API rate limiting; defaults on when database mode is enabled                        |
+| `MARKETHELM_RATE_LIMIT_GLOBAL`          | Dashboard backend               | Per-client API requests/minute (default `120`)                                              |
+| `MARKETHELM_RATE_LIMIT_LOGIN`           | Dashboard backend               | Login attempts/client/minute (default `10`)                                                 |
+| `MARKETHELM_RATE_LIMIT_REGISTER`        | Dashboard backend               | Registrations/client/hour (default `5`)                                                     |
+| `MARKETHELM_RATE_LIMIT_AUTH_EMAIL`      | Dashboard backend               | Verification/reset email requests/client/hour (default `5`)                                 |
+| `MARKETHELM_RATE_LIMIT_EXPENSIVE`       | Dashboard backend               | Expensive write requests/client/minute (default `10`)                                       |
+| `MARKETHELM_TRUSTED_PROXY_CIDRS`        | Dashboard backend               | Comma-separated proxy CIDRs allowed to supply `X-Forwarded-For`                             |
+| `ALERT_WEBHOOK_URL`                     | Tracker (alerts)                | Default webhook when rules use `webhook` without per-rule `url`                             |
+| `ALERT_WEBHOOK_FORMAT`                  | Tracker (alerts)                | `json`, `slack`, or `discord` webhook body format                                           |
+| `DISCORD_WEBHOOK_URL`                   | Tracker (alerts)                | Default Discord incoming webhook URL when a rule has no `webhook_url`                       |
+| `MARKETHELM_ALERTS_CONFIG`              | Tracker (alerts)                | Optional path to `alerts.json` (default `~/.markethelm/alerts.json`)                        |
+| `SMTP_HOST`                             | Tracker (alerts)                | SMTP server for `email` notifications                                                       |
+| `SMTP_PORT`                             | Tracker (alerts)                | SMTP port (default `587`)                                                                   |
+| `SMTP_USER`                             | Tracker (alerts)                | SMTP username                                                                               |
+| `SMTP_PASSWORD`                         | Tracker (alerts)                | SMTP password or app password                                                               |
+| `ALERT_EMAIL_TO`                        | Tracker (alerts)                | Default recipients for `email` notifications                                                |
+| `ALERT_EMAIL_FROM`                      | Tracker (alerts)                | Platform **From** address (`alerts@yourdomain.com`); required for SendGrid/Mailgun          |
+| `ALERT_EMAIL_PROVIDER`                  | Tracker (alerts)                | `smtp` (default), `sendgrid`, or `mailgun`; auto-detected when API keys are set             |
+| `SENDGRID_API_KEY`                      | Tracker (alerts)                | SendGrid API key when `ALERT_EMAIL_PROVIDER=sendgrid`                                       |
+| `MAILGUN_API_KEY`                       | Tracker (alerts)                | Mailgun API key when `ALERT_EMAIL_PROVIDER=mailgun`                                         |
+| `ALERT_DELIVERY_MAX_ATTEMPTS`           | Tracker (alerts)                | Total send attempts per notification (default `3`)                                          |
+| `ALERT_DELIVERY_RETRY_BASE_SECONDS`     | Tracker (alerts)                | Initial backoff delay between retries (default `1`)                                         |
+| `ALERT_DELIVERY_RETRY_MAX_SECONDS`      | Tracker (alerts)                | Max backoff delay cap (default `8`)                                                         |
+| `MAILGUN_DOMAIN`                        | Tracker (alerts)                | Mailgun sending domain (e.g. `mg.yourdomain.com`)                                           |
+| `MAILGUN_API_BASE`                      | Tracker (alerts)                | Optional; default `https://api.mailgun.net` (EU: `https://api.eu.mailgun.net`)              |
 
 **Dev vs product email:** SMTP env vars suit **self-host / operator** mail (e.g. personal Gmail). For production, use a transactional provider with a verified domain — see [Transactional alert email](#transactional-alert-email) below.
 
@@ -426,7 +426,7 @@ Never commit values; use your host’s secret manager or encrypted env.
 
 Hosted database mode enables rate limiting automatically. Counters are stored in
 SQLite or PostgreSQL so PostgreSQL deployments share limits across every API
-instance. File mode remains unlimited unless `MARKET_HELM_RATE_LIMIT_ENABLED=true`;
+instance. File mode remains unlimited unless `MARKETHELM_RATE_LIMIT_ENABLED=true`;
 in that mode counters are process-local and intended only for development.
 
 The API returns `429 Too Many Requests` with `Retry-After` and
@@ -434,7 +434,7 @@ The API returns `429 Too Many Requests` with `Retry-After` and
 hosted API requests fail closed with `503` instead of silently bypassing limits.
 
 Do not trust forwarded client headers by default. When a known load balancer or
-reverse proxy connects directly to MarketHelm, set `MARKET_HELM_TRUSTED_PROXY_CIDRS`
+reverse proxy connects directly to MarketHelm, set `MARKETHELM_TRUSTED_PROXY_CIDRS`
 to only that proxy network. The middleware walks `X-Forwarded-For` from right to
 left and selects the first untrusted hop, preventing a client-supplied prefix from
 bypassing per-client limits.
@@ -520,7 +520,7 @@ Generate SMTP credentials in the AWS SES console and verify your domain first.
 <summary><b>Test delivery</b></summary>
 
 ```bash
-market-helm alerts test <alert-id>
+markethelm alerts test <alert-id>
 ```
 
 Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider as production alerts.
@@ -552,10 +552,10 @@ Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider a
 Use this when moving from **local dev** to a **public host**. For day-to-day development, Gmail SMTP in `.env` is enough — skip this section until you deploy.
 
 1. **Host and ingress** — provision TLS, a persistent `DATA_DIR`, and an explicitly trusted reverse-proxy CIDR.
-2. **Database** — use managed PostgreSQL for hosted mode; set `MARKET_HELM_DATABASE_URL`, verify migrations, pooling, TLS, backups, and restore.
-3. **Deploy API and worker** — run `market-helm-web` plus a separate `market-helm alerts run --loop` process using the same database and secrets.
-4. **Auth** — set `MARKET_HELM_AUTH_SECRET`, `MARKET_HELM_PUBLIC_URL`, and email-verification policy; test registration, verification, reset, password change, logout, and deletion.
-5. **Daily tracker** — schedule `market-helm` and persist its shared market-data output.
+2. **Database** — use managed PostgreSQL for hosted mode; set `MARKETHELM_DATABASE_URL`, verify migrations, pooling, TLS, backups, and restore.
+3. **Deploy API and worker** — run `markethelm-web` plus a separate `markethelm alerts run --loop` process using the same database and secrets.
+4. **Auth** — set `MARKETHELM_AUTH_SECRET`, `MARKETHELM_PUBLIC_URL`, and email-verification policy; test registration, verification, reset, password change, logout, and deletion.
+5. **Daily tracker** — schedule `markethelm` and persist its shared market-data output.
 6. **Email** — verify a sender domain and configure SendGrid, Mailgun, or SES SMTP. Users only enter their recipient address in Helmtower.
 7. **Operations** — configure rate limits/proxies, collect `/metrics`, and monitor `/health/ready` plus `/health/worker`.
 8. **Secrets** — keep all credentials in the host secret manager; never commit `.env`.
@@ -594,18 +594,18 @@ This is **not legal or financial advice**; follow your broker’s terms and appl
 Build and run the daily tracker in a container:
 
 ```bash
-docker build -t market-helm:latest .
-docker run --rm -e FINNHUB_API_KEY=your-key market-helm:latest
-# Or: docker run --rm --env-file .env market-helm:latest
+docker build -t markethelm:latest .
+docker run --rm -e FINNHUB_API_KEY=your-key markethelm:latest
+# Or: docker run --rm --env-file .env markethelm:latest
 ```
 
 Mount persistent data:
 
 ```bash
 docker run --rm --env-file .env \
-  -v /var/lib/market-helm/data:/app/data \
-  -v /var/lib/market-helm/logs:/app/logs \
-  market-helm:latest
+  -v /var/lib/markethelm/data:/app/data \
+  -v /var/lib/markethelm/logs:/app/logs \
+  markethelm:latest
 ```
 
 <a id="docker-compose"></a>
@@ -614,7 +614,7 @@ docker run --rm --env-file .env \
 
 ```yaml
 services:
-  market-helm:
+  markethelm:
     build: .
     environment:
       - FINNHUB_API_KEY=${FINNHUB_API_KEY}
@@ -639,11 +639,11 @@ Use cron (Linux/Mac), Task Scheduler (Windows), or systemd to run once per day.
 **Cron example:**
 
 ```bash
-0 9 * * * docker run --rm -e FINNHUB_API_KEY=$(cat /path/to/key) market-helm:latest >> /var/log/market-helm.log 2>&1
+0 9 * * * docker run --rm -e FINNHUB_API_KEY=$(cat /path/to/key) markethelm:latest >> /var/log/markethelm.log 2>&1
 ```
 
 For alert evaluation on a schedule (independent of dashboard access), use
-`market-helm alerts run --loop`. Alert component boundaries and unsupported rule
+`markethelm alerts run --loop`. Alert component boundaries and unsupported rule
 types/channels are documented in [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflow).
 
 ---
@@ -654,10 +654,10 @@ types/channels are documented in [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflo
 <details>
 <summary><b>Kubernetes</b></summary>
 
-Use `k8s/market-helm-cronjob.yaml` as a CronJob. Create secrets first:
+Use `k8s/markethelm-cronjob.yaml` as a CronJob. Create secrets first:
 
 ```bash
-kubectl create secret generic market-helm-secrets \
+kubectl create secret generic markethelm-secrets \
   --from-literal=FINNHUB_API_KEY=your-key \
   --from-literal=OPENAI_API_KEY=your-key
 ```
@@ -679,6 +679,61 @@ Common patterns:
 - **Azure** — Container Instances + Logic Apps; secrets in Key Vault.
 
 Store API keys in the platform secret manager; never bake them into images.
+
+---
+
+</details>
+
+<a id="migrating-from-market-helm"></a>
+<details>
+<summary><b>Migrating from market-helm (rename to markethelm)</b></summary>
+
+The project was renamed from `market-helm` to `markethelm`. Existing installs keep working
+through deprecated aliases, but deployed resources need a one-time migration:
+
+| What                            | Old name                                 | New name                               |
+| ------------------------------- | ---------------------------------------- | -------------------------------------- |
+| Python package                  | `market-helm`                            | `markethelm`                           |
+| CLI                             | `market-helm`, `market-helm-web`         | `markethelm`, `markethelm-web`         |
+| Environment variable            | `MARKET_HELM_*`                          | `MARKETHELM_*`                         |
+| User config folder              | `~/.market-helm`                         | `~/.markethelm`                        |
+| Log files                       | `logs/market_helm_*.log`                 | `logs/markethelm_*.log`                |
+| Docker image / CronJob / secret | `market-helm`, `market-helm-secrets`     | `markethelm`, `markethelm-secrets`     |
+| Browser storage keys            | `market-helm-token`, `market-helm-theme` | `markethelm-token`, `markethelm-theme` |
+
+**Compatibility (deprecated, will be removed in a future release):**
+
+- `MARKET_HELM_*` variables are still read when the `MARKETHELM_*` name is unset or empty.
+  The new name always wins, and one deprecation warning is logged per old variable.
+  Docker Compose substitution variables (`MARKETHELM_PORT`, `MARKETHELM_ENV_FILE`, ...) also fall
+  back to the old names.
+- `market-helm` and `market-helm-web` remain installed as aliases of `markethelm` and
+  `markethelm-web`.
+- On first use `~/.market-helm` (or the older `~/.market-desk`) is renamed to `~/.markethelm`.
+  If the rename fails (for example the folder is in use) the old folder keeps being used and a
+  warning is logged, so no data is stranded. If both folders exist, `~/.markethelm` wins and the
+  old one is left untouched; merge by hand if you need files from it.
+- Old log files are left in place; new log files use the new prefix.
+- Browsers carry the saved session and theme over automatically (one-time key move).
+
+**Steps for existing deployments:**
+
+1. **Environment:** rename `MARKET_HELM_*` to `MARKETHELM_*` in `.env`, `.env.staging`, compose
+   files, CI secrets and systemd units (the old names keep working meanwhile).
+2. **Python install:** `pip uninstall market-helm && pip install markethelm` (a new PyPI project
+   name; see the release notes for when it is first published).
+3. **Docker:** rebuild and retag the image (`docker build -t markethelm:latest .`). The compose
+   project name defaults to the checkout folder name; if you keep the old folder name your
+   existing named volumes (`postgres-data`, `market-data`) are reused. If you rename the folder or
+   set a new `-p` project name, Compose creates new empty volumes: copy the data first, for example
+   `docker run --rm -v OLD_VOLUME:/from -v NEW_VOLUME:/to alpine cp -a /from/. /to/`.
+4. **Host paths:** if you bind-mount `/var/lib/market-helm/...`, move it
+   (`mv /var/lib/market-helm /var/lib/markethelm`) and update the mount.
+5. **Kubernetes:** the manifest is now `k8s/markethelm-cronjob.yaml` (CronJob `markethelm`, secret
+   `markethelm-secrets`). Create the new secret, apply the new manifest, then delete the old
+   CronJob and secret:
+   `kubectl delete cronjob market-helm && kubectl delete secret market-helm-secrets`.
+6. **Scripts and cron:** change `market-helm ...` commands to `markethelm ...`.
 
 ---
 

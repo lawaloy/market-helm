@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Renamed to `markethelm`** (repository `lawaloy/markethelm`): Python distribution,
+  console scripts (`markethelm`, `markethelm-web`), environment variables
+  (`MARKETHELM_*`), user config folder (`~/.markethelm`), log file prefix, Docker/Kubernetes
+  names, npm package names and docs. Deprecated aliases remain for one release line: the
+  `market-helm` / `market-helm-web` commands, `MARKET_HELM_*` variables (with a deprecation
+  warning), automatic migration of `~/.market-helm`, and a one-time move of the saved browser
+  session and theme. Deployed resources need the migration steps in
+  [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#migrating-from-market-helm). This is a
+  **breaking change for PyPI**: `market-helm` is no longer updated; install `markethelm`.
 - **Daily quotes leave CSV:** `save_daily_data` / dashboard loaders / backtests
   read and write only `market_bars` (hosted DB or `DATA_DIR/market_bars.sqlite`).
   `daily_data_*.csv` is no longer written or used as a fallback.

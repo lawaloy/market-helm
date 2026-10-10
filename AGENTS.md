@@ -26,7 +26,7 @@ See CI in `.github/workflows/python-app.yml` and `.github/workflows/pr-e2e.yml`.
 
 - **Lint**: `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`
 - **Tests**: `pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py` (database-free suite; no API key needed)
-- **PostgreSQL integration**: set `MARKET_HELM_POSTGRES_TEST_URL`, then run `pytest tests/integration/test_postgresql_storage.py -v`
+- **PostgreSQL integration**: set `MARKETHELM_POSTGRES_TEST_URL`, then run `pytest tests/integration/test_postgresql_storage.py -v`
 - **Frontend build**: `cd dashboard/frontend && npm run build` (outputs to `dashboard/backend/static/`)
 
 ### Opening pull requests
@@ -58,7 +58,7 @@ Fill in **What + Why** before the next push. Details: [CONTRIBUTING.md](CONTRIBU
 ### Gotchas
 
 - `flake8` and `pytest` are installed to `~/.local/bin` — make sure `PATH` includes it (`export PATH="$HOME/.local/bin:$PATH"`).
-- The `FINNHUB_API_KEY` env var is required only for live data fetching (CLI `market-helm` or dashboard "Fetch New" button). All tests mock the API and run without it.
+- The `FINNHUB_API_KEY` env var is required only for live data fetching (CLI `markethelm` or dashboard "Fetch New" button). All tests mock the API and run without it.
 - The `OPENAI_API_KEY` is fully optional; without it, AI summaries fall back to template-based demo text.
 - Dashboard API endpoints (e.g. `/api/market/overview`) return 404 `"No data available."` or 500 when no saved market data exists — this is expected on a fresh clone before the first fetch.
 - The frontend build outputs to `dashboard/backend/static/`; FastAPI serves this as a SPA mount if the directory exists.

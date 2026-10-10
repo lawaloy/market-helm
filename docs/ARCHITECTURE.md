@@ -8,7 +8,7 @@ React dashboard, and an optional hosted persistence/worker subsystem.
 <summary><b>Repository layout</b></summary>
 
 ```text
-market-helm/
+markethelm/
 |-- main.py                         # Source-checkout CLI entry point
 |-- src/
 |   |-- core/                       # Configuration and logging
@@ -17,7 +17,7 @@ market-helm/
 |   |-- storage/                    # Files, SQLite/PostgreSQL, sessions, migrations
 |   |-- workflows/                  # Reusable tracker orchestration
 |   |-- alerts/                     # Rules, workers, channels, delivery status
-|   `-- cli/                        # `market-helm` command presentation
+|   `-- cli/                        # `markethelm` command presentation
 |-- dashboard/
 |   |-- backend/                    # FastAPI routes, auth, rate limits, health
 |   `-- frontend/                   # React/TypeScript SPA
@@ -41,13 +41,13 @@ frontend build is emitted into `dashboard/backend/static/` and served by FastAPI
 <details>
 <summary><b>Local/self-hosted file mode</b></summary>
 
-This is the default when `MARKET_HELM_DATABASE_URL` is unset.
+This is the default when `MARKETHELM_DATABASE_URL` is unset.
 
-- Market runs write quotes, projections, and daily summaries to durable storage (`market_bars`, `projections`, `daily_summaries`) in `DATA_DIR/market_bars.sqlite`, or in the app database when `MARKET_HELM_DATABASE_URL` is set. Optional Markdown projection reports go under `DATA_DIR`. Dashboard and alert readers use the same durable store.
+- Market runs write quotes, projections, and daily summaries to durable storage (`market_bars`, `projections`, `daily_summaries`) in `DATA_DIR/market_bars.sqlite`, or in the app database when `MARKETHELM_DATABASE_URL` is set. Optional Markdown projection reports go under `DATA_DIR`. Dashboard and alert readers use the same durable store.
 - Alert preferences and history use the local MarketHelm configuration directory.
 - Alert API routes are intended for an operator-controlled deployment and do not
   require user accounts.
-- `market-helm alerts run --loop` evaluates rules on a schedule.
+- `markethelm alerts run --loop` evaluates rules on a schedule.
 
 </details>
 
@@ -55,7 +55,7 @@ This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 <details>
 <summary><b>Hosted multi-user mode</b></summary>
 
-Setting `MARKET_HELM_DATABASE_URL` enables SQLite or PostgreSQL persistence for
+Setting `MARKETHELM_DATABASE_URL` enables SQLite or PostgreSQL persistence for
 accounts and tenant-owned alert state.
 
 - Bearer sessions protect tenant-specific API routes.
@@ -70,7 +70,7 @@ The account router provides registration, login/logout, current-user lookup,
 verification request/confirmation, password-reset request/confirmation, password
 change, and account deletion. Password changes invalidate other sessions. Optional
 verification enforcement is controlled with
-`MARKET_HELM_REQUIRE_EMAIL_VERIFICATION`.
+`MARKETHELM_REQUIRE_EMAIL_VERIFICATION`.
 
 `init_database()` applies pending migrations in version order. Older untracked
 SQLite installations are adopted through the idempotent initial migration, while
@@ -164,7 +164,7 @@ are not implemented.
 | Worker jobs and outcomes              | Local run state/history       | Database                            |
 | Provider credentials                  | Environment or local `.env`   | Platform secret manager/environment |
 
-Quotes, projections, and daily summaries are stored durably in `market_bars`, `projections`, and `daily_summaries` (application database when `MARKET_HELM_DATABASE_URL` is set, otherwise the `DATA_DIR` sidecar); only optional Markdown reports remain files.
+Quotes, projections, and daily summaries are stored durably in `market_bars`, `projections`, and `daily_summaries` (application database when `MARKETHELM_DATABASE_URL` is set, otherwise the `DATA_DIR` sidecar); only optional Markdown reports remain files.
 
 </details>
 

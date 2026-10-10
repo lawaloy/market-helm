@@ -89,7 +89,7 @@ the optional OpenAI summarizer:
 1. Install the AI extra:
 
    ```bash
-   pip install 'market-helm[ai]'
+   pip install 'markethelm[ai]'
    ```
 
 2. Add the key to `.env` or the process environment:

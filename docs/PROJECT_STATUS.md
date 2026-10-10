@@ -68,7 +68,7 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 <details>
 <summary><b>Hosted alerts and accounts</b></summary>
 
-The hosted foundation is implemented. When `MARKET_HELM_DATABASE_URL` is set,
+The hosted foundation is implemented. When `MARKETHELM_DATABASE_URL` is set,
 alert routes require authentication and scope configuration, watches, jobs, and
 delivery history to the signed-in user. The account lifecycle includes:
 
@@ -83,7 +83,7 @@ per-channel outcomes. SMTP, SendGrid, and Mailgun are supported for platform ema
 generic, Slack, and Discord webhook formats are supported. Retry/backoff is
 configurable with `ALERT_DELIVERY_*` environment variables.
 
-Local mode remains intentionally supported. Without `MARKET_HELM_DATABASE_URL`,
+Local mode remains intentionally supported. Without `MARKETHELM_DATABASE_URL`,
 Helmtower and the alert CLI use the operator's `alerts.json` file and environment
 credentials. End users of a hosted deployment do not provide SMTP credentials.
 

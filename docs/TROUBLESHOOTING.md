@@ -34,7 +34,7 @@
 
 - Check your internet connection.
 - Verify the Finnhub API key is valid.
-- Check `logs/market_helm_errors_*.log` for details.
+- Check `logs/markethelm_errors_*.log` for details.
 - Check [Finnhub API status](https://finnhub.io/status).
 
 </details>
@@ -66,7 +66,7 @@ Yes. Edit `config/exchanges.json` to add symbols or change indices — see [CONF
 Rerun the tracker. Each run is independent; data is saved with the date.
 
 **Can I backtest strategies?**  
-MarketHelm can validate its saved projections with `market-helm backtest`. It is
+MarketHelm can validate its saved projections with `markethelm backtest`. It is
 not a general trading-strategy simulator, and it needs saved quotes and projections in the configured data store (`market_bars.sqlite`).
 
 **Is my data private?**  
@@ -78,6 +78,6 @@ Yes. Data stays on your machine. API keys never leave your environment.
 
 ## Getting help
 
-- Check `logs/market_helm_errors_*.log` for error details.
-- Open a [GitHub issue](https://github.com/lawaloy/market-helm/issues) with log excerpts.
+- Check `logs/markethelm_errors_*.log` for error details.
+- Open a [GitHub issue](https://github.com/lawaloy/markethelm/issues) with log excerpts.
 - Review [USAGE.md](USAGE.md) and [DEPLOYMENT.md](DEPLOYMENT.md) for setup questions.
