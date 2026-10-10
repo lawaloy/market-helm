@@ -211,7 +211,6 @@ export function AlertComposer({
       {currentPrice && (
         <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
           Reference price {currentPrice} · {quoteContext(currentQuoteMeta)}.
-          {currentQuoteMeta?.source !== 'saved' && ' Not guaranteed real-time.'}
         </p>
       )}
       {!currentPrice &&
