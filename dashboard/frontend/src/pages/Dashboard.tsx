@@ -116,9 +116,10 @@ const Dashboard: React.FC<DashboardProps> = ({ refreshKey = 0 }) => {
       console.error('Error fetching dashboard data:', err);
       setError(dashboardLoadErrorMessage(err));
     } finally {
-      if (generation !== loadGenerationRef.current) return;
-      setLoading(false);
-      if (!silent) isInitialMount.current = false;
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+        if (!silent) isInitialMount.current = false;
+      }
     }
   };
 

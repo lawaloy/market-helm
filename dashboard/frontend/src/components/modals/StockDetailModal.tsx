@@ -45,8 +45,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ symbol, isOpen, onC
         setError('Failed to load stock details');
         console.error(err);
       } finally {
-        if (cancelled) return;
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 

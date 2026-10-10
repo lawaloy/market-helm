@@ -161,14 +161,16 @@ export function useSymbolPrices() {
             }
           } finally {
             batch.forEach((symbol) => inflightRef.current.delete(symbol));
-            if (!mountedRef.current) return;
-            setAttemptedPrices((prev) => new Set([...prev, ...batch]));
-            setPricingPending((prev) => {
-              const next = new Set(prev);
-              batch.forEach((symbol) => next.delete(symbol));
-              return next;
-            });
           }
+          // Not in `finally`: the try/catch above already return when unmounted, so this only
+          // runs on paths where the old finally-block guard would also have continued.
+          if (!mountedRef.current) return;
+          setAttemptedPrices((prev) => new Set([...prev, ...batch]));
+          setPricingPending((prev) => {
+            const next = new Set(prev);
+            batch.forEach((symbol) => next.delete(symbol));
+            return next;
+          });
         }
       };
 
