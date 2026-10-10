@@ -129,7 +129,9 @@ market-helm
 market-helm-web
 ```
 
-## Projection validation
+<a id="projection-validation"></a>
+<details>
+<summary><b>Projection validation</b></summary>
 
 Evaluate saved projections against exact NYSE trading sessions:
 
@@ -150,7 +152,11 @@ gate:
 python3 scripts/projection_baseline.py assess --data-dir data --days 365
 ```
 
-## Runtime data
+</details>
+
+<a id="runtime-data"></a>
+<details>
+<summary><b>Runtime data</b></summary>
 
 | Output                                         | Description                              |
 | ---------------------------------------------- | ---------------------------------------- |
@@ -160,6 +166,8 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 
 Runtime data and credentials are not deployed from Git. Set `DATA_DIR` to an
 absolute persistent path when hosting the application.
+
+</details>
 
 ## Documentation
 

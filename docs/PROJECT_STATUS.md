@@ -7,7 +7,9 @@ covered by automated tests, and what remains unfinished. Deployment instructions
 live in [DEPLOYMENT.md](DEPLOYMENT.md); design documents describe longer-term ideas
 and should not be read as implementation claims.
 
-## Product direction
+<a id="product-direction"></a>
+<details open>
+<summary><b>Product direction</b></summary>
 
 MarketHelm is a stock-market monitoring product with a Python CLI and a React web
 dashboard. It screens and fetches market data, produces heuristic short-term
@@ -25,7 +27,11 @@ runtime is expected to be intraday or event-driven and separate from the
 once-per-session projection-evidence collector. MarketHelm does not provide
 investment, legal, or tax advice.
 
-## Status definitions
+</details>
+
+<a id="status-definitions"></a>
+<details>
+<summary><b>Status definitions</b></summary>
 
 | Label                                        | Meaning                                                                                                        |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -38,7 +44,11 @@ Automated coverage does not mean every production integration has been exercised
 For example, tests mock Finnhub and notification providers; managed PostgreSQL,
 real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
-## Current capability matrix
+</details>
+
+<a id="current-capability-matrix"></a>
+<details open>
+<summary><b>Current capability matrix</b></summary>
 
 | Area                          | Status                                       | What exists                                                                                                                                                                                       | Important remaining work                                                                                                                                    |
 | ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -52,7 +62,11 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 | Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                                                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                                                       |
 | Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls                                      |
 
-## Hosted alerts and accounts
+</details>
+
+<a id="hosted-alerts-and-accounts"></a>
+<details>
+<summary><b>Hosted alerts and accounts</b></summary>
 
 The hosted foundation is implemented. When `MARKET_HELM_DATABASE_URL` is set,
 alert routes require authentication and scope configuration, watches, jobs, and
@@ -76,7 +90,11 @@ credentials. End users of a hosted deployment do not provide SMTP credentials.
 See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries and
 [DEPLOYMENT.md](DEPLOYMENT.md) for hosted configuration.
 
-## Test posture and known verification gaps
+</details>
+
+<a id="test-posture-and-known-verification-gaps"></a>
+<details>
+<summary><b>Test posture and known verification gaps</b></summary>
 
 The repository has broad Python and frontend unit/integration coverage, including
 auth lifecycle, tenant isolation, storage migrations, worker orchestration,
@@ -98,7 +116,11 @@ The following should not be inferred from those tests:
 These are the highest-value testing gaps because they cross system boundaries that
 unit tests and container-only integration tests cannot fully reproduce.
 
-## Recommended next work
+</details>
+
+<a id="recommended-next-work"></a>
+<details>
+<summary><b>Recommended next work</b></summary>
 
 1. **Market data DB cutover:** daily bars, projections, and summaries now write to
    the app DB or `DATA_DIR/market_bars.sqlite`; dashboard and alert reads prefer
@@ -123,14 +145,20 @@ unit tests and container-only integration tests cannot fully reproduce.
 5. **Dashboard quality:** code-split routes, run accessibility/performance audits,
    and decide whether saved watchlists/views belong in the product.
 
-## Live prices roadmap
+</details>
+
+<a id="live-prices-roadmap"></a>
+<details>
+<summary><b>Live prices roadmap</b></summary>
 
 **Status: planned, not implemented.** Quotes and dashboard data are batch/refresh
 based today. "Fetch New" starts a background tracker run, and the UI labels prices
 as saved quotes ("Not live prices"). Live prices are a long-term product goal; this
 section records the intended order of work. It is a plan, not an implementation claim.
 
-### Principles
+<a id="principles"></a>
+<details>
+<summary><b>Principles</b></summary>
 
 - Keep batch projections and saved quotes as the reliable fallback. Live prices
   layer on top and must degrade to the saved-quote labels when the feed is down.
@@ -139,7 +167,11 @@ section records the intended order of work. It is a plan, not an implementation 
 - Hosted mode (shared database, per-user alerts) is the target. Local file mode
   stays supported for development but is not the customer path.
 
-### Proposed phases
+</details>
+
+<a id="proposed-phases"></a>
+<details>
+<summary><b>Proposed phases</b></summary>
 
 1. **Finish the market data database cutover** (see Recommended next work). Live
    quotes need a durable shared store first, and the temporary CSV fallback should be
@@ -164,14 +196,24 @@ section records the intended order of work. It is a plan, not an implementation 
    reconnect/backoff behavior, market-hours handling for XNYS sessions, metrics and
    health checks for feed lag, and staging verification against the real provider.
 
-### Not in scope for this roadmap
+</details>
+
+<a id="not-in-scope-for-this-roadmap"></a>
+<details>
+<summary><b>Not in scope for this roadmap</b></summary>
 
 - Automated trading and broker execution (see Explicitly deferred). It would depend
   on this work but needs its own risk, compliance, and audit design.
 - Changing projection or confidence scoring. Projections stay batch-based and
   evidence-led.
 
-## Explicitly deferred
+</details>
+
+</details>
+
+<a id="explicitly-deferred"></a>
+<details>
+<summary><b>Explicitly deferred</b></summary>
 
 | Item                               | Reason                                                                                   |
 | ---------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -181,12 +223,18 @@ section records the intended order of work. It is a plan, not an implementation 
 | International exchanges            | Current screening is centered on S&P 500 and NASDAQ-100                                  |
 | ML/fundamental/news projections    | Current projection engine is intentionally heuristic                                     |
 
-## Keeping this document current
+</details>
+
+<a id="keeping-this-document-current"></a>
+<details>
+<summary><b>Keeping this document current</b></summary>
 
 - Update the date and capability matrix after meaningful behavior changes.
 - Distinguish code completion from real-environment operational verification.
 - Link roadmap references here instead of maintaining conflicting status lists.
 - Keep release-specific history in [CHANGELOG.md](../CHANGELOG.md).
+
+</details>
 
 ## Related documentation
 

@@ -3,7 +3,9 @@
 MarketHelm has a reusable Python core, two presentation layers (CLI and web), a
 React dashboard, and an optional hosted persistence/worker subsystem.
 
-## Repository layout
+<a id="repository-layout"></a>
+<details open>
+<summary><b>Repository layout</b></summary>
 
 ```text
 market-helm/
@@ -29,9 +31,15 @@ Business logic belongs in `src/` so the CLI, FastAPI routes, and workers can reu
 it. The frontend communicates with FastAPI through `/api/*` routes. A production
 frontend build is emitted into `dashboard/backend/static/` and served by FastAPI.
 
-## Operating modes
+</details>
 
-### Local/self-hosted file mode
+<a id="operating-modes"></a>
+<details>
+<summary><b>Operating modes</b></summary>
+
+<a id="localself-hosted-file-mode"></a>
+<details>
+<summary><b>Local/self-hosted file mode</b></summary>
 
 This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 
@@ -44,7 +52,11 @@ This is the default when `MARKET_HELM_DATABASE_URL` is unset.
   require user accounts.
 - `market-helm alerts run --loop` evaluates rules on a schedule.
 
-### Hosted multi-user mode
+</details>
+
+<a id="hosted-multi-user-mode"></a>
+<details>
+<summary><b>Hosted multi-user mode</b></summary>
 
 Setting `MARKET_HELM_DATABASE_URL` enables SQLite or PostgreSQL persistence for
 accounts and tenant-owned alert state.
@@ -76,7 +88,13 @@ docker compose -f docker-compose.postgres-test.yml down --volumes
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for configuration and hosted verification.
 
-## Daily market workflow
+</details>
+
+</details>
+
+<a id="daily-market-workflow"></a>
+<details>
+<summary><b>Daily market workflow</b></summary>
 
 ```text
 index constituents
@@ -98,7 +116,11 @@ market analysis + heuristic five-session XNYS projections
 The workflow is batch-oriented. "Fetch New" starts the same underlying tracker
 work in a background process; it is not a streaming quote service.
 
-## Alert workflow
+</details>
+
+<a id="alert-workflow"></a>
+<details>
+<summary><b>Alert workflow</b></summary>
 
 ```text
 market snapshot / selected quote
@@ -132,7 +154,11 @@ are not implemented.
 | `delivery_status.py`                        | Record per-channel outcomes                     |
 | `notifiers/`                                | Email/webhook delivery and retry classification |
 
-## Data ownership
+</details>
+
+<a id="data-ownership"></a>
+<details>
+<summary><b>Data ownership</b></summary>
 
 | Data                     | Local mode                  | Hosted mode                         |
 | ------------------------ | --------------------------- | ----------------------------------- |
@@ -145,7 +171,11 @@ are not implemented.
 The database is not currently a market-data warehouse. Persistence for generated
 market history remains file based in both modes.
 
-## External API limiting and retries
+</details>
+
+<a id="external-api-limiting-and-retries"></a>
+<details>
+<summary><b>External API limiting and retries</b></summary>
 
 `src/services/api_client.py` owns Finnhub request limiting, connection reuse, retry,
 and `429 Retry-After` behavior. Screening uses a quote-only request; only selected
@@ -156,7 +186,11 @@ This limiter is separate from the dashboard's inbound API rate limiter in
 `dashboard/backend/rate_limit.py`. Hosted API limits are configurable by route
 class and use trusted-proxy configuration to determine the client address.
 
-## Web/API boundaries
+</details>
+
+<a id="webapi-boundaries"></a>
+<details>
+<summary><b>Web/API boundaries</b></summary>
 
 FastAPI groups routes by concern:
 
@@ -169,13 +203,19 @@ FastAPI groups routes by concern:
 File mode preserves the original operator workflow. Hosted mode changes ownership
 and authorization of tenant data; it does not change the shared market-data model.
 
-## Important limitations
+</details>
+
+<a id="important-limitations"></a>
+<details>
+<summary><b>Important limitations</b></summary>
 
 - Projections are heuristic and are not a validated trading model.
 - Quotes and dashboard data are batch/refresh based, not WebSocket streams.
 - Managed PostgreSQL, provider delivery, ingress, backups, and restore need staging
   verification even though adapters and tests exist.
 - There is no broker API, order model, or automated execution path.
+
+</details>
 
 ## Related documentation
 

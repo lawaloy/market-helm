@@ -2,7 +2,9 @@
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 
-## Getting Started
+<a id="getting-started"></a>
+<details open>
+<summary><b>Getting Started</b></summary>
 
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
@@ -28,7 +30,11 @@ Thank you for your interest in contributing! This document provides guidelines f
    pip install pytest pytest-cov  # For testing
    ```
 
-## Package version (single source of truth)
+</details>
+
+<a id="package-version-single-source-of-truth"></a>
+<details>
+<summary><b>Package version (single source of truth)</b></summary>
 
 The **canonical** release line for this repo is **`setup.cfg`** → **`[metadata]`** → **`version`** (e.g. `0.2.8`).
 
@@ -52,9 +58,15 @@ python scripts/version_sync.py check
 
 The **CI** job runs **`check`** on every PR (read-only; it does **not** auto-fix so the PR stays an honest diff). **Publish to PyPI** sets `setup.cfg` from the **release tag** on the runner, then runs **`sync`** in the build job before **`npm ci`** so the wheel and UI metadata match that tag (still not committed to `main` from CI). After a successful release publish, **Post-release sync to main** (separate workflow) may open a PR to align `main` with that tag.
 
-## Development Workflow
+</details>
 
-### 1. Create a Branch
+<a id="development-workflow"></a>
+<details>
+<summary><b>Development Workflow</b></summary>
+
+<a id="1-create-a-branch"></a>
+<details>
+<summary><b>1. Create a Branch</b></summary>
 
 ```bash
 git checkout -b feature/your-feature-name
@@ -62,14 +74,22 @@ git checkout -b feature/your-feature-name
 git checkout -b fix/your-bug-fix
 ```
 
-### 2. Make Your Changes
+</details>
+
+<a id="2-make-your-changes"></a>
+<details>
+<summary><b>2. Make Your Changes</b></summary>
 
 - Follow the existing code structure
 - Write clear, descriptive commit messages
 - Add tests for new functionality
 - Update documentation as needed
 
-### 3. Run Tests
+</details>
+
+<a id="3-run-tests"></a>
+<details>
+<summary><b>3. Run Tests</b></summary>
 
 ```bash
 # Run the database-free suite
@@ -86,7 +106,11 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 python -m pytest tests/core/test_config.py -v
 ```
 
-### 4. Check Code Quality
+</details>
+
+<a id="4-check-code-quality"></a>
+<details>
+<summary><b>4. Check Code Quality</b></summary>
 
 ```bash
 # Format code (optional, but recommended)
@@ -99,7 +123,11 @@ pip install flake8
 flake8 src/ tests/ --max-line-length=100
 ```
 
-### 5. Commit Your Changes
+</details>
+
+<a id="5-commit-your-changes"></a>
+<details>
+<summary><b>5. Commit Your Changes</b></summary>
 
 ```bash
 git add .
@@ -117,7 +145,11 @@ git commit -m "fix: resolve issue with Y"
 - `refactor:` - Code refactoring
 - `chore:` - Maintenance tasks
 
-### 6. Push and Create Pull Request
+</details>
+
+<a id="6-push-and-create-pull-request"></a>
+<details>
+<summary><b>6. Push and Create Pull Request</b></summary>
 
 ```bash
 git push origin feature/your-feature-name
@@ -154,7 +186,13 @@ Also include when relevant:
 - Reference to any related issues
 - Screenshots (if UI changes)
 
-## Code Structure
+</details>
+
+</details>
+
+<a id="code-structure"></a>
+<details>
+<summary><b>Code Structure</b></summary>
 
 ```text
 src/
@@ -169,16 +207,26 @@ src/
 **Key Principle**: Business logic in `workflows/` is reusable.
 CLI/Web/API layers consume workflows for their specific presentation needs.
 
-## Coding Standards
+</details>
 
-### Python Style
+<a id="coding-standards"></a>
+<details>
+<summary><b>Coding Standards</b></summary>
+
+<a id="python-style"></a>
+<details>
+<summary><b>Python Style</b></summary>
 
 - Follow PEP 8
 - Use type hints where appropriate
 - Maximum line length: 100 characters
 - Use descriptive variable names
 
-### Imports
+</details>
+
+<a id="imports"></a>
+<details>
+<summary><b>Imports</b></summary>
 
 ```python
 # Standard library
@@ -194,7 +242,11 @@ from ..core.logger import setup_logger
 from .api_client import FinnhubClient
 ```
 
-### Documentation
+</details>
+
+<a id="documentation"></a>
+<details>
+<summary><b>Documentation</b></summary>
 
 - Add docstrings to all functions and classes
 - Use Google-style docstrings:
@@ -217,7 +269,11 @@ def function_name(param1: str, param2: int) -> bool:
     pass
 ```
 
-### Testing
+</details>
+
+<a id="testing"></a>
+<details>
+<summary><b>Testing</b></summary>
 
 - Write tests for new features
 - Maintain or improve code coverage
@@ -236,11 +292,19 @@ def test_function_returns_expected_value_when_given_valid_input(self):
     self.assertEqual(result, expected_value)
 ```
 
-## Areas for Contribution
+</details>
+
+</details>
+
+<a id="areas-for-contribution"></a>
+<details>
+<summary><b>Areas for Contribution</b></summary>
 
 **Roadmap detail:** See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for current status, what shipped, what’s next, and deferred items. **Hosting:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-### Current Gaps & Opportunities
+<a id="current-gaps--opportunities"></a>
+<details>
+<summary><b>Current Gaps &amp; Opportunities</b></summary>
 
 - **Hosted readiness:** Container acceptance, persistence, recovery, backup/restore,
   bounded load, retention, and incident procedures are implemented. External gates
@@ -250,14 +314,24 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
 - **Screening:** Advanced technical filters (RSI/MACD, etc.) remain future work.
 
-### Completed Milestones
+</details>
+
+<a id="completed-milestones"></a>
+<details>
+<summary><b>Completed Milestones</b></summary>
 
 - ✅ **Web Dashboard (v0.3+)** — Market overview, projections, Historical Trends, **projection accuracy**, **Helmtower** (`/alerts`).
 - ✅ **Alerts** — `AlertEngine`, price/screening rules, cooldowns, **webhook** (JSON/Slack/Discord), **email** (SMTP + SendGrid/Mailgun), CLI, scheduled worker (`alerts run --loop`).
 
-### Priority Features (ranked by impact)
+</details>
 
-#### Priority #1: Alert & notification system
+<a id="priority-features-ranked-by-impact"></a>
+<details>
+<summary><b>Priority Features (ranked by impact)</b></summary>
+
+<a id="priority-1-alert--notification-system"></a>
+<details>
+<summary><b>Priority #1: Alert &amp; notification system</b></summary>
 
 **Status:** Local and hosted foundations are shipped; infrastructure validation and
 advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
@@ -281,7 +355,11 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 
 ---
 
-#### Priority #2: Historical trends & accuracy
+</details>
+
+<a id="priority-2-historical-trends--accuracy"></a>
+<details>
+<summary><b>Priority #2: Historical trends &amp; accuracy</b></summary>
 
 **Status:** Partially implemented.
 
@@ -299,7 +377,11 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 
 ---
 
-#### Priority #3: Web dashboard enhancements
+</details>
+
+<a id="priority-3-web-dashboard-enhancements"></a>
+<details>
+<summary><b>Priority #3: Web dashboard enhancements</b></summary>
 
 **Status:** Ongoing.
 
@@ -314,7 +396,13 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 
 ---
 
-### High Priority - Additional Features
+</details>
+
+</details>
+
+<a id="high-priority---additional-features"></a>
+<details>
+<summary><b>High Priority - Additional Features</b></summary>
 
 - [ ] **Support for additional stock exchanges** (international markets: LSE, TSE, HKEX)
 - [ ] **More screening filters** (technical indicators: RSI, MACD, Bollinger Bands, moving averages)
@@ -323,20 +411,34 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 - [ ] **Portfolio tracking** (track multiple portfolios, performance metrics)
 - [ ] **Backtesting engine** (test strategies against historical data)
 
-### Medium Priority - Improvements
+</details>
+
+<a id="medium-priority---improvements"></a>
+<details>
+<summary><b>Medium Priority - Improvements</b></summary>
 
 - [ ] Additional unit tests (especially for services/)
 - [ ] Integration tests for full workflow
 - [ ] Performance optimizations
 - [ ] CLI improvements (progress bars, colors, interactive mode)
 
-### Low Priority - Enhancements
+</details>
+
+<a id="low-priority---enhancements"></a>
+<details>
+<summary><b>Low Priority - Enhancements</b></summary>
 
 - [ ] Configuration validation with detailed error messages
 - [ ] Additional export formats (Excel, Parquet)
 - [ ] Enhanced error handling and recovery
 
-## Reporting Issues
+</details>
+
+</details>
+
+<a id="reporting-issues"></a>
+<details>
+<summary><b>Reporting Issues</b></summary>
 
 When reporting issues, please include:
 
@@ -349,6 +451,8 @@ When reporting issues, please include:
    - Python version
    - Relevant package versions
 6. **Logs**: Relevant log excerpts from `logs/` directory
+
+</details>
 
 ## Questions?
 

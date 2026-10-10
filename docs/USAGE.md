@@ -4,9 +4,13 @@ How to run the daily tracker after [install](../README.md#quick-start).
 
 ---
 
-## Entry points
+<a id="entry-points"></a>
+<details open>
+<summary><b>Entry points</b></summary>
 
-### Option 1: CLI (recommended for daily use)
+<a id="option-1-cli-recommended-for-daily-use"></a>
+<details open>
+<summary><b>Option 1: CLI (recommended for daily use)</b></summary>
 
 ```bash
 # Main entry point — formatted console output
@@ -26,7 +30,11 @@ This runs the CLI interface which:
 - Shows index performance
 - Prints AI summary (if enabled)
 
-### Option 2: Direct CLI module
+</details>
+
+<a id="option-2-direct-cli-module"></a>
+<details>
+<summary><b>Option 2: Direct CLI module</b></summary>
 
 ```bash
 python -m src.cli.commands
@@ -34,7 +42,11 @@ python -m src.cli.commands
 
 Same as Option 1, invoked as a module.
 
-### Projection backtesting
+</details>
+
+<a id="projection-backtesting"></a>
+<details>
+<summary><b>Projection backtesting</b></summary>
 
 Evaluate saved projection files against closing prices on the exact fifth NYSE
 trading session after each run:
@@ -111,7 +123,11 @@ Capture refuses to create an output directory when any qualification fails.
 It evaluates a private copy of the input CSVs and hashes that same copy, preventing
 a concurrent refresh from producing a report/manifest mismatch.
 
-### Option 3: Direct workflow (programmatic)
+</details>
+
+<a id="option-3-direct-workflow-programmatic"></a>
+<details>
+<summary><b>Option 3: Direct workflow (programmatic)</b></summary>
 
 ```bash
 python -m src.workflows.tracker
@@ -123,7 +139,11 @@ Runs the core workflow and returns structured JSON. Useful for:
 - CI/CD pipelines
 - Debugging without CLI formatting
 
-### Option 4: Programmatic import
+</details>
+
+<a id="option-4-programmatic-import"></a>
+<details>
+<summary><b>Option 4: Programmatic import</b></summary>
 
 ```python
 from src.workflows.tracker import StockTrackerWorkflow
@@ -141,7 +161,13 @@ Ideal for custom dashboards, scheduled tasks with custom notifications, or integ
 
 ---
 
-## Web dashboard
+</details>
+
+</details>
+
+<a id="web-dashboard"></a>
+<details>
+<summary><b>Web dashboard</b></summary>
 
 After install:
 
@@ -156,7 +182,11 @@ For React development (Vite on port 3000, hot reload), see
 
 ---
 
-## Local alerts
+</details>
+
+<a id="local-alerts"></a>
+<details>
+<summary><b>Local alerts</b></summary>
 
 Create the user alert configuration from the bundled example, inspect its rule
 IDs, and validate a rule without delivering a notification:
@@ -187,7 +217,11 @@ alerts require database mode and the separate worker described in
 
 ---
 
-## Output files
+</details>
+
+<a id="output-files"></a>
+<details>
+<summary><b>Output files</b></summary>
 
 Each run writes:
 
@@ -201,7 +235,11 @@ Set `DATA_DIR` to change the output location — see [DEPLOYMENT.md](DEPLOYMENT.
 
 ---
 
-## Migrate legacy market-data files
+</details>
+
+<a id="migrate-legacy-market-data-files"></a>
+<details>
+<summary><b>Migrate legacy market-data files</b></summary>
 
 Current releases store quotes, projections, and daily summaries in the configured
 application database or in `DATA_DIR/market_bars.sqlite`. If an existing install
@@ -228,7 +266,11 @@ from the legacy file remain.
 
 ---
 
-## Console output
+</details>
+
+<a id="console-output"></a>
+<details>
+<summary><b>Console output</b></summary>
 
 Example:
 
@@ -248,6 +290,8 @@ Index Performance:
 ```
 
 ---
+
+</details>
 
 ## Related
 

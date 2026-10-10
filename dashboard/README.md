@@ -5,7 +5,9 @@ For installing and running MarketHelm, start with the
 [main README](../README.md). For hosted configuration, persistence, and secrets,
 use the [deployment guide](../docs/DEPLOYMENT.md).
 
-## Web architecture
+<a id="web-architecture"></a>
+<details>
+<summary><b>Web architecture</b></summary>
 
 - `dashboard/frontend/` contains the React and TypeScript application.
 - `dashboard/backend/` contains the FastAPI application and API routes.
@@ -17,9 +19,15 @@ use the [deployment guide](../docs/DEPLOYMENT.md).
 The frontend is therefore part of the web application image; it is not normally
 deployed as an independent Vercel or Netlify application.
 
-## Development with hot reload
+</details>
 
-### Requirements
+<a id="development-with-hot-reload"></a>
+<details open>
+<summary><b>Development with hot reload</b></summary>
+
+<a id="requirements"></a>
+<details open>
+<summary><b>Requirements</b></summary>
 
 - Python 3.12 or newer
 - The Node.js version in [`.nvmrc`](../.nvmrc)
@@ -58,7 +66,13 @@ then run `npm run dev:3001` in `dashboard/frontend/` and open
 On Windows PowerShell, replace `python3` in this guide with
 `.\.venv\Scripts\python.exe`.
 
-## Build the integrated web application
+</details>
+
+</details>
+
+<a id="build-the-integrated-web-application"></a>
+<details>
+<summary><b>Build the integrated web application</b></summary>
 
 Build the React UI:
 
@@ -78,7 +92,11 @@ Open <http://localhost:8000>. Release automation performs the same frontend
 build before creating the Python package, and [`Dockerfile.web`](../Dockerfile.web)
 performs it in a Node build stage before constructing the Python runtime image.
 
-## Verification
+</details>
+
+<a id="verification"></a>
+<details>
+<summary><b>Verification</b></summary>
 
 Run frontend checks from `dashboard/frontend/`:
 
@@ -96,7 +114,11 @@ python3 -m pytest tests/dashboard/ -v
 The complete required checks and development workflow are documented in
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-## Configuration and behavior
+</details>
+
+<a id="configuration-and-behavior"></a>
+<details>
+<summary><b>Configuration and behavior</b></summary>
 
 - `DATA_DIR` selects the market-data directory. A source checkout defaults to
   the repository's `data/`; an installed wheel defaults to the user data directory.
@@ -109,3 +131,5 @@ The complete required checks and development workflow are documented in
 Feature availability and unfinished work are tracked only in
 [Project status](../docs/PROJECT_STATUS.md). API groups and service boundaries
 are documented in [Architecture](../docs/ARCHITECTURE.md#webapi-boundaries).
+
+</details>

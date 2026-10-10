@@ -1,10 +1,16 @@
 # MarketHelm — tests
 
-## Overview
+<a id="overview"></a>
+<details open>
+<summary><b>Overview</b></summary>
 
 This directory contains unit tests for the MarketHelm project. The test layout mirrors the project structure so that each source module has a corresponding test package.
 
-## Test Structure
+</details>
+
+<a id="test-structure"></a>
+<details>
+<summary><b>Test Structure</b></summary>
 
 Tests are organized to mirror the source code layout:
 
@@ -52,7 +58,11 @@ tests/
             └── test_data_loader.py
 ```
 
-## Path Setup
+</details>
+
+<a id="path-setup"></a>
+<details>
+<summary><b>Path Setup</b></summary>
 
 `conftest.py` adds the project root to `sys.path`, so tests can use:
 
@@ -61,9 +71,15 @@ tests/
 
 No manual `sys.path.insert` is needed in individual test files.
 
-## Running Tests
+</details>
 
-### Run All Tests
+<a id="running-tests"></a>
+<details open>
+<summary><b>Running Tests</b></summary>
+
+<a id="run-all-tests"></a>
+<details open>
+<summary><b>Run All Tests</b></summary>
 
 ```bash
 # Database-free suite from the project root
@@ -77,7 +93,11 @@ MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethe
 python -m unittest discover tests/
 ```
 
-### Run Specific Package
+</details>
+
+<a id="run-specific-package"></a>
+<details>
+<summary><b>Run Specific Package</b></summary>
 
 ```bash
 python -m pytest tests/analysis/
@@ -85,27 +105,45 @@ python -m pytest tests/core/
 python -m pytest tests/dashboard/
 ```
 
-### Run Specific Test File
+</details>
+
+<a id="run-specific-test-file"></a>
+<details>
+<summary><b>Run Specific Test File</b></summary>
 
 ```bash
 python -m pytest tests/core/test_config.py -v
 ```
 
-### Run Specific Test Class or Method
+</details>
+
+<a id="run-specific-test-class-or-method"></a>
+<details>
+<summary><b>Run Specific Test Class or Method</b></summary>
 
 ```bash
 python -m pytest tests/core/test_config.py::TestCoreConfig
 python -m pytest tests/core/test_config.py::TestCoreConfig::test_default_indices
 ```
 
-### Run with Coverage
+</details>
+
+<a id="run-with-coverage"></a>
+<details>
+<summary><b>Run with Coverage</b></summary>
 
 ```bash
 pip install pytest-cov
 python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --cov=src --cov-report=html
 ```
 
-## Test Coverage
+</details>
+
+</details>
+
+<a id="test-coverage"></a>
+<details>
+<summary><b>Test Coverage</b></summary>
 
 | Module                                      | Tests                                             |
 | ------------------------------------------- | ------------------------------------------------- |
@@ -121,7 +159,11 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 | `dashboard/backend/api`                     | Market, summary, health, history (incl. accuracy) |
 | `dashboard/backend/services/data_loader.py` | Data loading, projection accuracy computation     |
 
-## Writing New Tests
+</details>
+
+<a id="writing-new-tests"></a>
+<details>
+<summary><b>Writing New Tests</b></summary>
 
 1. **Mirror the source structure**  
    Place tests in the matching package:
@@ -139,13 +181,21 @@ python -m pytest tests/ --ignore=tests/integration/test_postgresql_storage.py --
 5. **Clean up resources**  
    Use `setUp`/`tearDown` or pytest fixtures for temp dirs.
 
-## Dependencies
+</details>
+
+<a id="dependencies"></a>
+<details>
+<summary><b>Dependencies</b></summary>
 
 ```bash
 pip install pytest pytest-cov
 ```
 
-## Next Priority
+</details>
+
+<a id="next-priority"></a>
+<details>
+<summary><b>Next Priority</b></summary>
 
 **Missing or light tests (by module):**
 
@@ -156,3 +206,5 @@ pip install pytest pytest-cov
 5. Integration tests for full workflow (end-to-end with temp `data/`)
 
 **Roadmap:** [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md)
+
+</details>

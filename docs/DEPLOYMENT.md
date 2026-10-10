@@ -1,6 +1,8 @@
 # Deployment & persistence
 
-## Hosted staging (API + worker + PostgreSQL)
+<a id="hosted-staging-api--worker--postgresql"></a>
+<details open>
+<summary><b>Hosted staging (API + worker + PostgreSQL)</b></summary>
 
 The staging stack in `docker-compose.staging.yml` builds the React application
 into the API image and runs the API, scheduled alert worker, and PostgreSQL as
@@ -20,7 +22,9 @@ by both application processes.
 the database is unavailable or migrations are incomplete and includes the latest
 worker heartbeat when one exists.
 
-### Staging acceptance harness
+<a id="staging-acceptance-harness"></a>
+<details>
+<summary><b>Staging acceptance harness</b></summary>
 
 After the stack is reachable, run the credential-free operational checks:
 
@@ -72,7 +76,11 @@ python scripts/staging_acceptance.py \
   --tenant-check --bootstrap-loopback-tenants
 ```
 
-### Operational readiness drills
+</details>
+
+<a id="operational-readiness-drills"></a>
+<details>
+<summary><b>Operational readiness drills</b></summary>
 
 The `Hosted staging readiness` workflow is the repeatable repository gate. It
 builds the real images, starts API + worker + PostgreSQL, runs operational/ingress/
@@ -96,7 +104,11 @@ database connection without mutating tenant data. Raise traffic gradually and se
 thresholds from the service's actual SLO; do not turn the tool into an unapproved
 stress test against a shared host.
 
-### Backup and restore runbook
+</details>
+
+<a id="backup-and-restore-runbook"></a>
+<details>
+<summary><b>Backup and restore runbook</b></summary>
 
 Back up **both** persistence layers as one recovery set:
 
@@ -126,7 +138,11 @@ Default retention unless a stricter policy applies:
 Test one restore monthly and after database/schema changes. Alert on a missed
 backup, failed checksum, expired encryption key, or failed restore drill.
 
-### Monitoring and incident runbook
+</details>
+
+<a id="monitoring-and-incident-runbook"></a>
+<details>
+<summary><b>Monitoring and incident runbook</b></summary>
 
 Scrape `/metrics` and probe `/health/live`, `/health/ready`, and `/health/worker`
 from outside the host. Preserve `X-Request-ID` in proxy and application logs.
@@ -149,16 +165,24 @@ Respond in this order:
    verified recovery set into new resources, validate it, then perform a deliberate
    cutover with a documented rollback target.
 
-### External staging sign-off
+</details>
+
+<a id="external-staging-sign-off"></a>
+<details>
+<summary><b>External staging sign-off</b></summary>
 
 Repository automation cannot prove controls owned by a hosting or email provider.
 Complete this operator-owned TODO in order after the staging-readiness PR merges.
 Never put provider credentials in an issue, PR, report, or committed environment
 file; use the selected platform's secret manager.
 
-#### External staging execution TODO
+<a id="external-staging-execution-todo"></a>
+<details>
+<summary><b>External staging execution TODO</b></summary>
 
-##### 1. Record decisions and ownership
+<a id="1-record-decisions-and-ownership"></a>
+<details>
+<summary><b>1. Record decisions and ownership</b></summary>
 
 - [ ] Choose the staging hostname and confirm who controls its DNS.
 - [ ] Choose the application host, managed PostgreSQL provider, region, and budget.
@@ -167,7 +191,11 @@ file; use the selected platform's secret manager.
 - [ ] Record the availability target, database RPO/RTO, backup retention, and
       person responsible for acknowledging staging incidents.
 
-##### 2. Add and provision the target deployment
+</details>
+
+<a id="2-add-and-provision-the-target-deployment"></a>
+<details>
+<summary><b>2. Add and provision the target deployment</b></summary>
 
 - [ ] Add provider-specific deployment configuration or infrastructure-as-code;
       the checked-in compose stack is the portable reference, not proof of a managed
@@ -177,7 +205,11 @@ file; use the selected platform's secret manager.
 - [ ] Deploy the same reviewed application image as separate API and worker
       services, then record the image digest and application version.
 
-##### 3. Sign off managed PostgreSQL
+</details>
+
+<a id="3-sign-off-managed-postgresql"></a>
+<details>
+<summary><b>3. Sign off managed PostgreSQL</b></summary>
 
 - [ ] Provision PostgreSQL 16 with encryption at rest, TLS required, restricted
       networking, least-privilege application credentials, and pooling/connection
@@ -191,7 +223,11 @@ file; use the selected platform's secret manager.
 - [ ] Perform a controlled provider failover, rerun acceptance, and save provider
       event IDs and recovery timings.
 
-##### 4. Sign off public DNS and TLS
+</details>
+
+<a id="4-sign-off-public-dns-and-tls"></a>
+<details>
+<summary><b>4. Sign off public DNS and TLS</b></summary>
 
 - [ ] Create the staging DNS record pointing only to the intended ingress.
 - [ ] Install or enable a trusted, hostname-matching certificate with automatic
@@ -201,7 +237,11 @@ file; use the selected platform's secret manager.
 - [ ] Run `staging_acceptance.py --ingress-origin ...` against the public HTTPS URL
       and save its JSON report plus certificate/DNS evidence.
 
-##### 5. Sign off transactional email
+</details>
+
+<a id="5-sign-off-transactional-email"></a>
+<details>
+<summary><b>5. Sign off transactional email</b></summary>
 
 - [ ] Authenticate the sender domain with provider-supplied SPF/DKIM records and
       publish a DMARC policy.
@@ -214,7 +254,11 @@ file; use the selected platform's secret manager.
 - [ ] Trigger a controlled rejection and confirm retries/failure details appear in
       MarketHelm delivery history without leaking credentials.
 
-##### 6. Sign off external monitoring and release evidence
+</details>
+
+<a id="6-sign-off-external-monitoring-and-release-evidence"></a>
+<details>
+<summary><b>6. Sign off external monitoring and release evidence</b></summary>
 
 - [ ] Probe `/health/live`, `/health/ready`, and `/health/worker` from outside the
       host and collect `/metrics` through an appropriately restricted path.
@@ -230,7 +274,15 @@ file; use the selected platform's secret manager.
 Until those artifacts exist for a specific environment, the code is staging-ready
 but that environment is not approved for production.
 
-### Hosted-mode configuration
+</details>
+
+</details>
+
+</details>
+
+<a id="hosted-mode-configuration"></a>
+<details>
+<summary><b>Hosted-mode configuration</b></summary>
 
 Hosted mode requires a database URL and a stable signing secret. SQLite is useful
 for development; PostgreSQL is recommended for a deployed service:
@@ -261,7 +313,13 @@ This project runs **locally** and can run **on a host** (VPS, PaaS, containers) 
 
 ---
 
-## What gets deployed vs what stays private
+</details>
+
+</details>
+
+<a id="what-gets-deployed-vs-what-stays-private"></a>
+<details>
+<summary><b>What gets deployed vs what stays private</b></summary>
 
 |                                                 | In git                    | On the server (never in git)                  |
 | ----------------------------------------------- | ------------------------- | --------------------------------------------- |
@@ -271,7 +329,11 @@ This project runs **locally** and can run **on a host** (VPS, PaaS, containers) 
 
 ---
 
-## Persistence: `DATA_DIR`
+</details>
+
+<a id="persistence-data_dir"></a>
+<details>
+<summary><b>Persistence: <code>DATA_DIR</code></b></summary>
 
 The tracker and dashboard **read and write** CSV/JSON under a directory that defaults to **`data/`** at the project root.
 
@@ -290,7 +352,9 @@ export DATA_DIR=/var/lib/market-helm/data
 
 Point your process manager (systemd, Docker, etc.) at that environment.
 
-### Legacy market-data backfill
+<a id="legacy-market-data-backfill"></a>
+<details>
+<summary><b>Legacy market-data backfill</b></summary>
 
 Installations upgraded from the CSV/JSON serving path can copy their dated
 snapshots into durable storage with:
@@ -304,12 +368,18 @@ modify its source files and skips dates already present in the database, so it i
 safe to rerun after a partial operational attempt. Check the JSON report and its
 `target` field: a configured `MARKET_HELM_DATABASE_URL` takes precedence over the
 sidecar path. Resolve every reported file error before removing old artifacts or
-the temporary CSV fallback. See [USAGE.md](USAGE.md#migrate-legacy-market-data)
+the temporary CSV fallback. See [USAGE.md](USAGE.md#migrate-legacy-market-data-files)
 for `--replace-existing` upsert semantics.
 
 ---
 
-## Environment variables (reference)
+</details>
+
+</details>
+
+<a id="environment-variables-reference"></a>
+<details>
+<summary><b>Environment variables (reference)</b></summary>
 
 | Variable                                 | Used by                         | Purpose                                                                                     |
 | ---------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -351,7 +421,9 @@ for `--replace-existing` upsert semantics.
 
 Never commit values; use your host’s secret manager or encrypted env.
 
-### API rate limiting
+<a id="api-rate-limiting"></a>
+<details>
+<summary><b>API rate limiting</b></summary>
 
 Hosted database mode enables rate limiting automatically. Counters are stored in
 SQLite or PostgreSQL so PostgreSQL deployments share limits across every API
@@ -370,11 +442,19 @@ bypassing per-client limits.
 
 ---
 
-## Transactional alert email
+</details>
+
+</details>
+
+<a id="transactional-alert-email"></a>
+<details>
+<summary><b>Transactional alert email</b></summary>
 
 Helmtower users only enter their **To** address. The platform operator configures **how** email is sent via environment variables (never in git).
 
-### Provider selection
+<a id="provider-selection"></a>
+<details>
+<summary><b>Provider selection</b></summary>
 
 Set `ALERT_EMAIL_PROVIDER` explicitly, or omit it and let MarketHelm auto-detect from API keys:
 
@@ -386,7 +466,11 @@ Set `ALERT_EMAIL_PROVIDER` explicitly, or omit it and let MarketHelm auto-detect
 
 Users still set `email_to` in Helmtower (or `ALERT_EMAIL_TO` as a default). Secrets stay in the host environment only.
 
-### SendGrid example
+</details>
+
+<a id="sendgrid-example"></a>
+<details>
+<summary><b>SendGrid example</b></summary>
 
 ```bash
 export ALERT_EMAIL_PROVIDER=sendgrid
@@ -396,7 +480,11 @@ export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
 
 Verify the sender domain in SendGrid (SPF/DKIM) before going live.
 
-### Mailgun example
+</details>
+
+<a id="mailgun-example"></a>
+<details>
+<summary><b>Mailgun example</b></summary>
 
 ```bash
 export ALERT_EMAIL_PROVIDER=mailgun
@@ -407,7 +495,11 @@ export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
 # export MAILGUN_API_BASE=https://api.eu.mailgun.net
 ```
 
-### AWS SES (SMTP relay)
+</details>
+
+<a id="aws-ses-smtp-relay"></a>
+<details>
+<summary><b>AWS SES (SMTP relay)</b></summary>
 
 SES works with the **SMTP** provider — no separate integration required:
 
@@ -422,7 +514,11 @@ export ALERT_EMAIL_FROM="MarketHelm Alerts <alerts@yourdomain.com>"
 
 Generate SMTP credentials in the AWS SES console and verify your domain first.
 
-### Test delivery
+</details>
+
+<a id="test-delivery"></a>
+<details>
+<summary><b>Test delivery</b></summary>
 
 ```bash
 market-helm alerts test <alert-id>
@@ -432,7 +528,13 @@ Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider a
 
 ---
 
-## Typical deployment layout
+</details>
+
+</details>
+
+<a id="typical-deployment-layout"></a>
+<details>
+<summary><b>Typical deployment layout</b></summary>
 
 1. **Backend** — Run FastAPI (`uvicorn` or `python main.py`) with `DATA_DIR` and `FINNHUB_API_KEY` set.
 2. **Frontend** — Build `dashboard/frontend` (`npm run build`) and serve `dist/` from a static host (or the same reverse proxy).
@@ -442,7 +544,11 @@ Or use **Send test** in Helmtower (`/alerts`). The test uses the same provider a
 
 ---
 
-## When you go live
+</details>
+
+<a id="when-you-go-live"></a>
+<details>
+<summary><b>When you go live</b></summary>
 
 Use this when moving from **local dev** to a **public host**. For day-to-day development, Gmail SMTP in `.env` is enough — skip this section until you deploy.
 
@@ -460,7 +566,11 @@ Roadmap context: [PROJECT_STATUS.md](PROJECT_STATUS.md).
 
 ---
 
-## Future: **automated trading** (not implemented)
+</details>
+
+<a id="future-automated-trading-not-implemented"></a>
+<details>
+<summary><b>Future: automated trading (not implemented)</b></summary>
 
 This repo today is **analysis + dashboard + alerts**. It does **not** place orders.
 The current product direction and capability matrix are in
@@ -476,7 +586,11 @@ This is **not legal or financial advice**; follow your broker’s terms and appl
 
 ---
 
-## Docker (CLI tracker)
+</details>
+
+<a id="docker-cli-tracker"></a>
+<details>
+<summary><b>Docker (CLI tracker)</b></summary>
 
 Build and run the daily tracker in a container:
 
@@ -495,7 +609,9 @@ docker run --rm --env-file .env \
   market-helm:latest
 ```
 
-### Docker Compose
+<a id="docker-compose"></a>
+<details>
+<summary><b>Docker Compose</b></summary>
 
 ```yaml
 services:
@@ -511,7 +627,13 @@ services:
 
 ---
 
-## Scheduled runs
+</details>
+
+</details>
+
+<a id="scheduled-runs"></a>
+<details>
+<summary><b>Scheduled runs</b></summary>
 
 Use cron (Linux/Mac), Task Scheduler (Windows), or systemd to run once per day.
 
@@ -527,7 +649,11 @@ types/channels are documented in [ARCHITECTURE.md](ARCHITECTURE.md#alert-workflo
 
 ---
 
-## Kubernetes
+</details>
+
+<a id="kubernetes"></a>
+<details>
+<summary><b>Kubernetes</b></summary>
 
 Use `k8s/market-helm-cronjob.yaml` as a CronJob. Create secrets first:
 
@@ -541,7 +667,11 @@ Mount a persistent volume for `DATA_DIR` so history survives pod restarts.
 
 ---
 
-## Cloud platforms
+</details>
+
+<a id="cloud-platforms"></a>
+<details>
+<summary><b>Cloud platforms</b></summary>
 
 Common patterns:
 
@@ -553,13 +683,19 @@ Store API keys in the platform secret manager; never bake them into images.
 
 ---
 
-## Security
+</details>
+
+<a id="security"></a>
+<details>
+<summary><b>Security</b></summary>
 
 - Never commit keys; `.env` is gitignored.
 - Use secret stores in production (AWS Secrets Manager, GCP Secret Manager, Azure Key Vault).
 - Rotate keys periodically; audit Finnhub usage at <https://finnhub.io/dashboard>.
 
 ---
+
+</details>
 
 ## Related
 

@@ -4,7 +4,9 @@ Edit JSON files under `config/` to control which stocks are screened and how the
 
 ---
 
-## Indices to track
+<a id="indices-to-track"></a>
+<details open>
+<summary><b>Indices to track</b></summary>
 
 Edit `config/exchanges.json`:
 
@@ -16,7 +18,11 @@ Edit `config/exchanges.json`:
 
 ---
 
-## Screening filters
+</details>
+
+<a id="screening-filters"></a>
+<details>
+<summary><b>Screening filters</b></summary>
 
 Edit `config/filters.json`:
 
@@ -43,15 +49,25 @@ Edit `config/filters.json`:
 
 ---
 
-## Performance tips
+</details>
 
-### Run faster
+<a id="performance-tips"></a>
+<details>
+<summary><b>Performance tips</b></summary>
+
+<a id="run-faster"></a>
+<details>
+<summary><b>Run faster</b></summary>
 
 - **Lower `top_n`** — currently optimized around 20.
 - **Track fewer indices** — remove one from `config/exchanges.json`.
 - **Upgrade API tier** — paid Finnhub plans allow more calls per minute.
 
-### Run cheaper
+</details>
+
+<a id="run-cheaper"></a>
+<details>
+<summary><b>Run cheaper</b></summary>
 
 - Stay on the free tier (60 calls/min).
 - Run once per day when using a scheduler.
@@ -59,7 +75,13 @@ Edit `config/filters.json`:
 
 ---
 
-## Optional AI summaries
+</details>
+
+</details>
+
+<a id="optional-ai-summaries"></a>
+<details>
+<summary><b>Optional AI summaries</b></summary>
 
 Without `OPENAI_API_KEY`, MarketHelm generates a template-based summary. To use
 the optional OpenAI summarizer:
@@ -86,7 +108,11 @@ or hosted environment.
 
 ---
 
-## Custom market-data providers
+</details>
+
+<a id="custom-market-data-providers"></a>
+<details>
+<summary><b>Custom market-data providers</b></summary>
 
 The Finnhub boundary lives in `src/services/api_client.py`. A replacement provider
 should preserve the existing client contract or be introduced behind an adapter so
@@ -94,6 +120,8 @@ screening and workflow code do not become provider-specific. It must also define
 authentication, quotas, retry behavior, response normalization, and tests.
 
 ---
+
+</details>
 
 ## Related
 
