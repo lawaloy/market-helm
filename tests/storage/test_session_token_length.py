@@ -36,7 +36,7 @@ def test_decode_rejects_oversized_token_before_hmac(auth_secret, monkeypatch):
 
 def test_decode_rejects_non_string_token(auth_secret):
     with pytest.raises(AuthError, match="Invalid access token"):
-        decode_access_token(None)  # type: ignore[arg-type]
+        decode_access_token(None)
 
 
 def test_created_token_within_length_ceiling(auth_secret):

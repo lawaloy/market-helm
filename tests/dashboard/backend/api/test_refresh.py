@@ -379,7 +379,7 @@ def test_run_daily_tracker_invalid_timeout_still_manages_running_child(monkeypat
             fake_process._running = False
         return original_poll()
 
-    fake_process.poll = poll_then_finish  # type: ignore[method-assign]
+    fake_process.poll = poll_then_finish
 
     monkeypatch.setattr(refresh.subprocess, "Popen", popen)
     monkeypatch.setenv("REFRESH_TOP_N", "0")
