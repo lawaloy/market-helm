@@ -440,8 +440,7 @@ def init_database() -> None:
 def _backfill_watches_from_configs() -> None:
     import json
 
-    from .alert_watches import InvalidAlertWatchConfig
-    from .alert_watches import sync_watches_from_config
+    from .alert_watches import InvalidAlertWatchConfig, sync_watches_from_config
 
     # Snapshot+rewrite must share the writer mutex. A committed SELECT followed
     # by a later sync can restore stale watches over a save that already wrote

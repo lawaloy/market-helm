@@ -10,9 +10,9 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
 from dashboard.backend.models.projection import (
-    ProjectionsSummary,
     OpportunitiesResponse,
     Opportunity,
+    ProjectionsSummary,
 )
 from dashboard.backend.services.data_loader import get_data_loader
 from src.utils.tickers import normalize_ticker

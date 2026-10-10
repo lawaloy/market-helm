@@ -9,15 +9,17 @@ import math
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
-from datetime import datetime, timedelta, timezone
 from collections import deque
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
 import requests
+from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from ..core.logger import setup_logger
+
 from ..analysis.market_calendar import get_market_calendar, previous_close_session_at
-from dotenv import load_dotenv
+from ..core.logger import setup_logger
 
 # Load environment variables
 load_dotenv()

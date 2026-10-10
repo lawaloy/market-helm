@@ -85,8 +85,8 @@ def test_fetch_all_indices_uses_default_filters_when_json_corrupt(
 ):
     """Corrupt filters.json must soft-fail to StockScreener defaults (None)."""
     import json
-    from pathlib import Path
     from io import StringIO
+    from pathlib import Path
 
     symbols = [f"S{i}" for i in range(25)]
     index_fetcher = MagicMock()

@@ -1,9 +1,9 @@
 """Tests for core logging module."""
 
-import unittest
 import logging
-import tempfile
 import shutil
+import tempfile
+import unittest
 from pathlib import Path
 
 from src.core.logger import setup_logger

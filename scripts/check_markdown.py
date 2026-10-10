@@ -8,10 +8,10 @@ Usage:
     python scripts/check_markdown.py --fix           # Auto-fix issues
 """
 
-import sys
-import subprocess
-from pathlib import Path
 import argparse
+import subprocess
+import sys
+from pathlib import Path
 
 try:
     from read_lints import read_lints

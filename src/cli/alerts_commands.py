@@ -10,8 +10,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..alerts.alert_engine import AlertEngine
-from ..alerts.alert_storage import AlertStorage
-from ..alerts.delivery_status import record_notifier_delivery
 from ..alerts.alert_paths import (
     apply_alert_defaults,
     init_user_alerts_config,
@@ -19,6 +17,8 @@ from ..alerts.alert_paths import (
     polish_alerts_config,
     resolve_alerts_config_path,
 )
+from ..alerts.alert_storage import AlertStorage
+from ..alerts.delivery_status import record_notifier_delivery
 from ..core.logger import setup_logger
 from ..storage.database import database_enabled
 

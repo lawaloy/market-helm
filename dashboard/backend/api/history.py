@@ -6,10 +6,10 @@ import logging
 import math
 from datetime import date as calendar_date
 from functools import lru_cache
-from fastapi import APIRouter, HTTPException, Path, Query
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel
 
 from dashboard.backend.services.data_loader import get_data_loader

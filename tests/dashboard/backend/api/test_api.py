@@ -1,11 +1,11 @@
 """Tests for dashboard backend API endpoints."""
 
-import tempfile
 import shutil
-import pandas as pd
+import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from tests.helpers.market_bars import (
@@ -110,10 +110,10 @@ def client(mock_data_loader):
     get_data_loader where it is used. Patches must be where the name is looked up
     (in the using module), not where it is defined.
     """
+    import dashboard.backend.api.history
     import dashboard.backend.api.market
     import dashboard.backend.api.projections
     import dashboard.backend.api.stocks
-    import dashboard.backend.api.history
 
     with patch.object(
         dashboard.backend.api.market, "get_data_loader", return_value=mock_data_loader
@@ -128,6 +128,7 @@ def client(mock_data_loader):
                     dashboard.backend.api.history, "get_data_loader", return_value=mock_data_loader
                 ):
                     from fastapi.testclient import TestClient
+
                     from dashboard.backend.main import app
 
                     yield TestClient(app)
@@ -226,6 +227,7 @@ class TestMarketAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -247,6 +249,7 @@ class TestMarketAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -265,6 +268,7 @@ class TestMarketAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -289,6 +293,7 @@ class TestMarketAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -456,6 +461,7 @@ class TestStocksAPI:
             dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -484,6 +490,7 @@ class TestStocksAPI:
             dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -770,6 +777,7 @@ class TestStocksAPIEdges:
             dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -839,6 +847,7 @@ class TestProjectionsSentimentBands:
             dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -962,6 +971,7 @@ class TestMarketAPIErrors:
             side_effect=ValueError("Data directory not found: /nonexistent"),
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1000,6 +1010,7 @@ class TestMarketAPIErrors:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1216,6 +1227,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1264,6 +1276,7 @@ class TestHistorySummaryAPI:
             return_value=mock_loader,
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1294,6 +1307,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1314,6 +1328,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1331,6 +1346,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1358,6 +1374,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1379,6 +1396,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1403,6 +1421,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1437,6 +1456,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)
@@ -1469,6 +1489,7 @@ class TestHistorySummaryAPI:
             dashboard.backend.api.projections, "get_data_loader", return_value=mock_loader
         ):
             from fastapi.testclient import TestClient
+
             from dashboard.backend.main import app
 
             client = TestClient(app)

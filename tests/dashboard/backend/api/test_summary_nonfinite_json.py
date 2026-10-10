@@ -43,6 +43,7 @@ def summary_client(monkeypatch):
                     dashboard.backend.api.history, "get_data_loader", return_value=loader
                 ):
                     from fastapi.testclient import TestClient
+
                     from dashboard.backend.main import app
 
                     try:

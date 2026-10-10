@@ -7,14 +7,14 @@ import pytest
 
 from src.alerts.alert_paths import (
     apply_alert_defaults,
-    update_user_env_vars,
+    dedupe_alerts_config,
     init_user_alerts_config,
     load_alerts_config,
     polish_alerts_config,
     resolve_alerts_config_path,
     save_alerts_config,
-    dedupe_alerts_config,
     strip_webhook_secrets_from_config,
+    update_user_env_vars,
     user_config_dir,
 )
 

@@ -6,13 +6,14 @@ Designed for trading automation - finds liquid, active stocks worth tracking.
 Uses official APIs (no scraping).
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 import math
 import time
-import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from ..core.logger import setup_logger
 from .api_client import FinnhubClient
 

@@ -5,11 +5,12 @@ Fetches all stocks from major market indices using Python packages.
 Uses pytickersymbols package for reliable, maintained index lists.
 """
 
-from typing import List, Dict, Optional, Any
-from pathlib import Path
 import json
 import time
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from ..core.logger import setup_logger
 from ..utils.tickers import normalize_ticker
 

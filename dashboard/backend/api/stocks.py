@@ -3,19 +3,20 @@ Stocks API endpoints
 """
 
 import math
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Path, Query
+
 from dashboard.backend.models.stock import (
-    StockDetail,
     CurrentData,
-    ProjectionData,
-    TechnicalData,
     HistoricalData,
     HistoricalPoint,
+    ProjectionData,
+    StockDetail,
+    TechnicalData,
 )
 from dashboard.backend.services.data_loader import get_data_loader
-from datetime import datetime, timedelta
 from src.utils.tickers import normalize_ticker
 
 router = APIRouter()

@@ -10,14 +10,15 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
+import os
+import sys
+from pathlib import Path
+from typing import List, Optional
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
-from typing import List, Optional
-import sys
-import os
 
 # Add repo root to path when running from source (development) so src/ is importable.
 _here = Path(__file__).resolve()
@@ -42,18 +43,18 @@ try:
 except ImportError:
     pass
 
-from contextlib import asynccontextmanager
 import threading
+from contextlib import asynccontextmanager
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from dashboard.backend.api import market, projections, stocks, refresh, history, alerts, auth
+from dashboard.backend.api import alerts, auth, history, market, projections, refresh, stocks
 from dashboard.backend.api.market import get_market_summary
 from dashboard.backend.auth import require_user_id
-from dashboard.backend.rate_limit import RateLimitMiddleware
 from dashboard.backend.observability import ObservabilityMiddleware, prometheus_metrics
+from dashboard.backend.rate_limit import RateLimitMiddleware
 
 
 def _coerce_startup_triggered(raw) -> int:

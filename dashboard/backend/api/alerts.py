@@ -10,14 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from dashboard.backend.api.history import build_symbol_catalog
 from dashboard.backend.auth import require_user_id
-from src.storage.database import database_enabled
-from src.storage.user_alerts import (
-    init_user_alerts_config,
-    load_user_alerts_config,
-    save_user_alerts_config,
-)
-
+from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.alert_paths import (
     alert_rows,
     init_minimal_user_alerts_config,
@@ -30,17 +25,20 @@ from src.alerts.alert_paths import (
     user_config_dir,
 )
 from src.alerts.notifiers.email_delivery import email_delivery_configured
-from src.cli.alerts_commands import _load_env, run_alert_test
-
-from dashboard.backend.api.history import build_symbol_catalog
-from dashboard.backend.services.data_loader import get_data_loader
 from src.alerts.symbol_prices import (
     prices_from_saved_daily_data,
     resolve_symbol_prices,
     saved_quote_details,
 )
-from src.utils.tickers import normalize_ticker
+from src.cli.alerts_commands import _load_env, run_alert_test
 from src.storage.alert_watches import InvalidAlertWatchConfig, validate_watches_config
+from src.storage.database import database_enabled
+from src.storage.user_alerts import (
+    init_user_alerts_config,
+    load_user_alerts_config,
+    save_user_alerts_config,
+)
+from src.utils.tickers import normalize_ticker
 
 router = APIRouter()
 

@@ -2,13 +2,13 @@
 Alert history storage.
 """
 
-from pathlib import Path
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
-from contextlib import contextmanager
 import json
 import threading
 import time
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 MAX_DELIVERY_LOG = 100
 

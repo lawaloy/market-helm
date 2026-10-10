@@ -8,6 +8,14 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from dashboard.backend.account_email import send_account_email
+from src.storage.account_tokens import (
+    RESET_PASSWORD,
+    VERIFY_EMAIL,
+    consume_token,
+    issue_token,
+    revoke_tokens,
+)
 from src.storage.database import database_enabled, init_database
 from src.storage.session import AuthError, create_access_token, ensure_auth_secret
 from src.storage.users import (
@@ -24,14 +32,6 @@ from src.storage.users import (
     revoke_user_sessions,
     update_password,
 )
-from src.storage.account_tokens import (
-    RESET_PASSWORD,
-    VERIFY_EMAIL,
-    consume_token,
-    issue_token,
-    revoke_tokens,
-)
-from dashboard.backend.account_email import send_account_email
 
 router = APIRouter()
 

@@ -1,9 +1,9 @@
 """Tests for core configuration module."""
 
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 
-from src.core.config import get_indices_to_track, _DEFAULT_INDICES
+from src.core.config import _DEFAULT_INDICES, get_indices_to_track
 
 
 class TestCoreConfig(unittest.TestCase):

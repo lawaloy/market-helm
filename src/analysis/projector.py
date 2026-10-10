@@ -8,10 +8,12 @@ This module analyzes historical stock data and generates:
 - Risk assessments
 """
 
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timezone
 import math
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple
+
 import pandas as pd
+
 from ..core.logger import setup_logger
 from ..utils.company_names import resolve_company_name
 from ..utils.tickers import normalize_ticker

@@ -8,7 +8,8 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
-from dashboard.backend.models.market import MarketOverview, MoversResponse, StockMover, IndexData
+
+from dashboard.backend.models.market import IndexData, MarketOverview, MoversResponse, StockMover
 from dashboard.backend.services.data_loader import get_data_loader
 
 router = APIRouter()

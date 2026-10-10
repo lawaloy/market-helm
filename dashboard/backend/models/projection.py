@@ -2,8 +2,9 @@
 Pydantic models for projection data
 """
 
-from pydantic import BaseModel
 from typing import Dict, Optional
+
+from pydantic import BaseModel
 
 
 class ProjectionsSummary(BaseModel):

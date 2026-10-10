@@ -7,7 +7,7 @@ from src.alerts.symbol_prices import (
     resolve_symbol_prices,
     saved_quote_details,
 )
-from src.storage.market_bars import upsert_market_bars, latest_saved_quotes
+from src.storage.market_bars import latest_saved_quotes, upsert_market_bars
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")

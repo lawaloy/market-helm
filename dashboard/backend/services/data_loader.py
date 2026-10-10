@@ -4,10 +4,11 @@ Data loading service for reading CSV and JSON files
 
 import os
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from datetime import datetime, timedelta
 
 from src.analysis.backtesting import backtest_data_dir
 from src.utils.tickers import normalize_ticker

@@ -2,24 +2,25 @@
 Core alert engine.
 """
 
+import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
-import json
+
+from src.utils.company_names import _clean_display_name
 
 from ..core.logger import setup_logger
 from .alert_paths import apply_alert_defaults, resolve_alerts_config_path
-from .alert_storage import AlertStorage
 from .alert_rules import (
     collect_rsi_symbols,
     evaluate_compound,
     evaluate_leaf_symbols,
 )
+from .alert_storage import AlertStorage
 from .delivery_status import record_notifier_delivery
 from .notifiers.email_notifier import EmailNotifier
 from .notifiers.webhook_notifier import WebhookNotifier
 from .price_history import closes_by_symbol
-from src.utils.company_names import _clean_display_name
 
 logger = setup_logger("alerts")
 

@@ -1,7 +1,7 @@
 """Tests for index symbol caching, routing, and fallback behavior."""
 
-from datetime import datetime, timedelta
 import json
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
 from src.services.index_fetcher import IndexFetcher

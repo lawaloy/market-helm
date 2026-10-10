@@ -117,7 +117,6 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     """Orchestrator tick + job queue processing for hosted multi-user mode."""
     from src.alerts.alert_orchestrator import run_orchestrator_tick
     from src.alerts.job_processor import process_job_queue
-
     from src.storage.database import init_database
 
     init_database()

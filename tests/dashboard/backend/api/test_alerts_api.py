@@ -23,6 +23,7 @@ def alerts_config_dir(tmp_path: Path, monkeypatch):
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -461,6 +462,7 @@ class TestAlertsConfigAPI:
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -842,6 +844,7 @@ class TestAlertsConfigAPI:
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)
@@ -1205,6 +1208,7 @@ class TestAlertsConfigAPI:
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     return TestClient(app)

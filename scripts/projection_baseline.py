@@ -4,14 +4,14 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-from difflib import unified_diff
 import hashlib
 import json
-from pathlib import Path
 import shutil
 import sys
 import tempfile
+from datetime import datetime, timezone
+from difflib import unified_diff
+from pathlib import Path
 from typing import Optional, Sequence
 
 ROOT = Path(__file__).resolve().parent.parent

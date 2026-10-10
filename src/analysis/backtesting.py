@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-import math
 from pathlib import Path
 from statistics import median
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
+from ..utils.tickers import normalize_ticker
 from .market_calendar import (
     DEFAULT_CALENDAR,
     get_market_calendar,
     trading_session_after,
     trading_session_after_timestamp,
 )
-from ..utils.tickers import normalize_ticker
 
 _INVALID_LABELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
 

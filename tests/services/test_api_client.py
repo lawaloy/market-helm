@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 import requests
 
-from src.services.api_client import RateLimiter, FinnhubClient, _quote_outcome_provenance
+from src.services.api_client import FinnhubClient, RateLimiter, _quote_outcome_provenance
 
 
 class TestRateLimiter(unittest.TestCase):

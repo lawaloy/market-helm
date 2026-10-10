@@ -25,7 +25,7 @@ def test_readiness_reports_database_schema(tmp_path, monkeypatch):
     monkeypatch.setenv(
         "MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'health.db').as_posix()}"
     )
-    from src.storage.database import init_database, LATEST_SCHEMA_VERSION
+    from src.storage.database import LATEST_SCHEMA_VERSION, init_database
 
     init_database()
     response = TestClient(app).get("/health/ready")

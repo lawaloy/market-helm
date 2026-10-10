@@ -7,7 +7,9 @@ Uses OpenAI API to generate natural language summaries of market data.
 import math
 import os
 from typing import Any, Dict, Optional
+
 from dotenv import load_dotenv
+
 from ..core.logger import setup_logger
 
 # Load environment variables

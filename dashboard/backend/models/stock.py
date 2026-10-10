@@ -2,8 +2,9 @@
 Pydantic models for stock data
 """
 
+from typing import Dict, List, Optional
+
 from pydantic import BaseModel
-from typing import Optional, List, Dict
 
 
 class CurrentData(BaseModel):

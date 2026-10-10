@@ -1,7 +1,7 @@
 """Saved quote provenance survives the API in file and hosted storage modes."""
 
-from unittest.mock import patch
 from datetime import datetime
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 

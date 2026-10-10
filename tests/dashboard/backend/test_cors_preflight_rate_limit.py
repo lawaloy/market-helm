@@ -69,6 +69,7 @@ def test_cors_preflight_does_not_consume_global_login_budget(tmp_path, monkeypat
 
     init_database()
     from fastapi.testclient import TestClient
+
     from dashboard.backend.main import app
 
     client = TestClient(app)

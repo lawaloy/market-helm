@@ -5,9 +5,10 @@ Analyzes stock market data and generates summaries.
 """
 
 import math
-import pandas as pd
-from typing import Any, Dict, List, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.utils.tickers import normalize_ticker
 

@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 
 from src.storage.database import (
-    LATEST_SCHEMA_VERSION,
-    MigrationError,
-    POSTGRES_WRITE_MUTEX_KEY,
     _MIGRATIONS,
-    _PostgresConnection,
+    LATEST_SCHEMA_VERSION,
+    POSTGRES_WRITE_MUTEX_KEY,
+    MigrationError,
     _connect_postgresql,
     _migration_statements,
+    _PostgresConnection,
     apply_migrations,
     database_backend,
     database_enabled,

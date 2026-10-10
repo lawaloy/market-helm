@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from src.storage.database import LATEST_SCHEMA_VERSION, get_connection, init_database
 from src.storage.data_storage import DataStorage
+from src.storage.database import LATEST_SCHEMA_VERSION, get_connection, init_database
 from src.storage.market_bars import (
     default_sidecar_path,
     list_market_bar_dates,

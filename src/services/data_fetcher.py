@@ -5,16 +5,16 @@ Fetches daily stock data using official APIs (Finnhub).
 Professional implementation with proper rate limiting and error handling.
 """
 
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
-import time
-import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from ..core.config import get_indices_to_track
+from ..core.logger import setup_logger
 from .api_client import FinnhubClient
 from .index_fetcher import IndexFetcher
-from ..core.logger import setup_logger
-from ..core.config import get_indices_to_track
 
 logger = setup_logger("data_fetcher")
 
@@ -134,9 +134,10 @@ class StockDataFetcher:
 
             # If using screener, screen first
             if use_screener and len(symbols) > 20:
-                from .stock_screener import StockScreener
                 import json
                 from pathlib import Path
+
+                from .stock_screener import StockScreener
 
                 # Load filter config
                 filter_config_path = Path(__file__).parent.parent / "config" / "filters.json"

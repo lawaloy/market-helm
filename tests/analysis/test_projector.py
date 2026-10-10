@@ -5,8 +5,9 @@ Tests the projection generation, recommendation logic, and confidence scoring.
 """
 
 import math
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 
 from src.analysis.projector import StockProjector
 

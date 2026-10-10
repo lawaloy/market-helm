@@ -2,8 +2,9 @@
 Pydantic models for market data
 """
 
-from pydantic import BaseModel
 from typing import Dict, Optional
+
+from pydantic import BaseModel
 
 
 class IndexData(BaseModel):

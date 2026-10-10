@@ -1,10 +1,10 @@
 """Tests for dashboard data loader service."""
 
-import tempfile
 import shutil
-import pandas as pd
+import tempfile
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from tests.helpers.market_bars import (
@@ -312,6 +312,7 @@ class TestDataLoader:
     def test_get_most_recent_trading_day_weekend_rolls_to_friday(self, monkeypatch):
         """Saturday/Sunday map to the prior Friday."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Sat:
@@ -353,6 +354,7 @@ class TestDataLoader:
     ):
         """Attach projection fields when present; skip missing/broken dates."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Now:
@@ -408,6 +410,7 @@ class TestDataLoader:
     def test_needs_fetch_for_latest_trading_day(self, loader, temp_data_dir, monkeypatch):
         """True when latest trading day is missing; false when present."""
         from datetime import date
+
         import dashboard.backend.services.data_loader as dl
 
         class _Fri:

@@ -6,8 +6,8 @@ Sets up logging with both console and file output, with different log levels.
 
 import logging
 import os
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 
 def _rename_legacy_log_files(log_path: Path) -> None:

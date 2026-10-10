@@ -21,9 +21,12 @@ from src.storage.alert_jobs import (
     new_worker_id,
 )
 from src.storage.alert_watches import get_last_triggered as get_raw_triggered
-from src.storage.alert_watches import get_watch
-from src.storage.alert_watches import list_watches_for_symbol
-from src.storage.alert_watches import restore_trigger_claim, try_claim_trigger
+from src.storage.alert_watches import (
+    get_watch,
+    list_watches_for_symbol,
+    restore_trigger_claim,
+    try_claim_trigger,
+)
 from src.storage.database import init_database
 from src.utils.tickers import normalize_ticker
 
