@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/assets/readme/markethelm-mark.png" alt="MarketHelm ship's helm and market chart logo" width="180">
   <h1>MarketHelm</h1>
-  <p><strong>Stock-market monitoring, projections, and alertsÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Âfrom CLI to web dashboard.</strong></p>
+  <p><strong>Stock-market monitoring, projections, and alerts—from CLI to web dashboard.</strong></p>
   <p>
     <a href="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml"><img src="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml/badge.svg?branch=main" alt="CI status"></a>
     <a href="https://pypi.org/project/market-helm/"><img src="https://img.shields.io/pypi/v/market-helm?logo=pypi&logoColor=white" alt="PyPI version"></a>
@@ -10,9 +10,9 @@
     <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="Pull requests welcome"></a>
   </p>
   <p>
-    <a href="#quick-start">Quick start</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="docs/README.md">Documentation</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
-    <a href="docs/PROJECT_STATUS.md">Project status</a> ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â·
+    <a href="#quick-start">Quick start</a> ·
+    <a href="docs/README.md">Documentation</a> ·
+    <a href="docs/PROJECT_STATUS.md">Project status</a> ·
     <a href="CONTRIBUTING.md">Contributing</a>
   </p>
 </div>
