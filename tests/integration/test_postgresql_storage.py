@@ -51,7 +51,7 @@ def postgresql_database(monkeypatch):
         admin.execute(psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema)))
 
     separator = "&" if "?" in base_url else "?"
-    test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}') }"
+    test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}')}"
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", test_url)
     try:
         yield
