@@ -107,9 +107,27 @@ def test_get_qualified_symbols_orders_by_score_and_respects_top_n(monkeypatch):
     )
 
     payloads = {
-        "LOW": {"symbol": "LOW", "volume": 2_000_000, "change_percent": 2.0, "close": 20.0, "market_cap": 2_000_000_000},
-        "MID": {"symbol": "MID", "volume": 5_000_000, "change_percent": 4.0, "close": 40.0, "market_cap": 10_000_000_000},
-        "HIGH": {"symbol": "HIGH", "volume": 20_000_000, "change_percent": 12.0, "close": 80.0, "market_cap": 200_000_000_000},
+        "LOW": {
+            "symbol": "LOW",
+            "volume": 2_000_000,
+            "change_percent": 2.0,
+            "close": 20.0,
+            "market_cap": 2_000_000_000,
+        },
+        "MID": {
+            "symbol": "MID",
+            "volume": 5_000_000,
+            "change_percent": 4.0,
+            "close": 40.0,
+            "market_cap": 10_000_000_000,
+        },
+        "HIGH": {
+            "symbol": "HIGH",
+            "volume": 20_000_000,
+            "change_percent": 12.0,
+            "close": 80.0,
+            "market_cap": 200_000_000_000,
+        },
         "FAIL": None,
     }
 

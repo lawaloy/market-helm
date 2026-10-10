@@ -6,7 +6,6 @@ from pathlib import Path
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "schedule.yml"
 
@@ -25,6 +24,7 @@ def test_projection_evidence_workflow_is_valid_yaml() -> None:
     assert isinstance(triggers, dict)
     assert "schedule" in triggers
     assert "workflow_dispatch" in triggers
+
 
 def test_projection_evidence_runs_weekdays_after_xnys_close() -> None:
     workflow = _workflow()
@@ -102,9 +102,7 @@ def test_assert_projection_date_script_reports_missing(tmp_path: Path) -> None:
     assert module.main(["--run-date", "2099-01-01", "--data-dir", str(tmp_path)]) == 1
 
 
-def test_assert_market_bar_date_script_succeeds_when_present(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_assert_market_bar_date_script_succeeds_when_present(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     from src.storage.market_bars import upsert_market_bars
 
@@ -117,9 +115,7 @@ def test_assert_market_bar_date_script_succeeds_when_present(
     assert module.main(["--trade-date", "2026-09-18", "--data-dir", str(tmp_path)]) == 0
 
 
-def test_assert_projection_date_script_succeeds_when_present(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_assert_projection_date_script_succeeds_when_present(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     from src.storage.projections_store import upsert_projections
 
@@ -196,16 +192,10 @@ def test_assert_projection_date_fails_when_present_outside_limit(
     )
     module = _load_script("assert_projection_date.py")
     assert (
-        module.main(
-            ["--run-date", "2026-09-18", "--data-dir", str(tmp_path), "--limit", "1"]
-        )
-        == 0
+        module.main(["--run-date", "2026-09-18", "--data-dir", str(tmp_path), "--limit", "1"]) == 0
     )
     assert (
-        module.main(
-            ["--run-date", "2026-09-17", "--data-dir", str(tmp_path), "--limit", "1"]
-        )
-        == 1
+        module.main(["--run-date", "2026-09-17", "--data-dir", str(tmp_path), "--limit", "1"]) == 1
     )
 
 

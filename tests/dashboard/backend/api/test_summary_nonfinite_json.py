@@ -38,9 +38,7 @@ def summary_client(monkeypatch):
         with patch.object(
             dashboard.backend.api.projections, "get_data_loader", return_value=loader
         ):
-            with patch.object(
-                dashboard.backend.api.stocks, "get_data_loader", return_value=loader
-            ):
+            with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=loader):
                 with patch.object(
                     dashboard.backend.api.history, "get_data_loader", return_value=loader
                 ):

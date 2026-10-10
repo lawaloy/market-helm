@@ -127,7 +127,5 @@ def test_hosted_get_config_soft_fails_nondict_defaults_without_touching_sibling(
     assert sibling.status_code == 200
     sibling_body = sibling.json()
     assert sibling_body["channels"]["email_recipients"] is True
-    assert [alert["id"] for alert in sibling_body["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling_body["config"]["alerts"]] == ["sibling-msft"]
     assert sibling_body["config"]["alerts"][0].get("email_to") == "ops-b@example.com"

@@ -43,10 +43,7 @@ def test_format_condition_rsi_and_compound_shapes() -> None:
         )
         == "compound and (2 conditions)"
     )
-    assert (
-        alerts_commands._format_condition({"type": "compound"})
-        == "compound and (0 conditions)"
-    )
+    assert alerts_commands._format_condition({"type": "compound"}) == "compound and (0 conditions)"
 
 
 def test_cmd_list_prints_rsi_and_compound_conditions(caplog, tmp_path: Path) -> None:

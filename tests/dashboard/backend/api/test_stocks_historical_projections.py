@@ -57,9 +57,7 @@ def test_stock_historical_omits_projection_when_target_is_nan(client) -> None:
         },
     ]
 
-    with patch.object(
-        dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader):
         response = client.get("/api/stocks/AAPL/historical", params={"days": 7})
 
     assert response.status_code == 200

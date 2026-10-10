@@ -72,15 +72,11 @@ def test_remaining_auth_routes_are_disabled_without_database(
         "@",
     ],
 )
-def test_password_reset_request_is_generic_for_unknown_and_junk_emails(
-    hosted_client, email
-):
+def test_password_reset_request_is_generic_for_unknown_and_junk_emails(hosted_client, email):
     known_shape = hosted_client.post(
         "/api/auth/password-reset/request", json={"email": "nobody@example.com"}
     )
-    response = hosted_client.post(
-        "/api/auth/password-reset/request", json={"email": email}
-    )
+    response = hosted_client.post("/api/auth/password-reset/request", json={"email": email})
     assert known_shape.status_code == response.status_code == 200
     assert known_shape.json() == response.json()
     assert "If the account exists" in response.json()["message"]
@@ -95,15 +91,11 @@ def test_password_reset_request_is_generic_for_unknown_and_junk_emails(
         "@",
     ],
 )
-def test_verify_email_request_is_generic_for_unknown_and_junk_emails(
-    hosted_client, email
-):
+def test_verify_email_request_is_generic_for_unknown_and_junk_emails(hosted_client, email):
     known_shape = hosted_client.post(
         "/api/auth/verify-email/request", json={"email": "nobody@example.com"}
     )
-    response = hosted_client.post(
-        "/api/auth/verify-email/request", json={"email": email}
-    )
+    response = hosted_client.post("/api/auth/verify-email/request", json={"email": email})
     assert known_shape.status_code == response.status_code == 200
     assert known_shape.json() == response.json()
     assert "If the account exists" in response.json()["message"]

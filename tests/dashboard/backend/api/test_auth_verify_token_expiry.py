@@ -95,15 +95,14 @@ def test_fresh_verify_request_recovers_after_expired_link(client, capture_tokens
     assert len(tokens) == 2
     assert tokens[0] != tokens[1]
 
-    assert client.post(
-        "/api/auth/verify-email/confirm", json={"token": stale}
-    ).status_code == 400
+    assert client.post("/api/auth/verify-email/confirm", json={"token": stale}).status_code == 400
 
-    live = client.post(
-        "/api/auth/verify-email/confirm", json={"token": tokens[1]}
-    )
+    live = client.post("/api/auth/verify-email/confirm", json={"token": tokens[1]})
     assert live.status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "recover-verify@example.com", "password": "password123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "recover-verify@example.com", "password": "password123"},
+        ).status_code
+        == 200
+    )

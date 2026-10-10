@@ -7,10 +7,12 @@ import pytest
 
 @pytest.fixture
 def fetch_workflow():
-    with patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"]), \
-         patch("src.workflows.tracker.StockDataFetcher"), \
-         patch("src.workflows.tracker.DataStorage"), \
-         patch("src.workflows.tracker.AlertEngine") as mock_alert:
+    with (
+        patch("src.workflows.tracker.get_indices_to_track", return_value=["S&P 500"]),
+        patch("src.workflows.tracker.StockDataFetcher"),
+        patch("src.workflows.tracker.DataStorage"),
+        patch("src.workflows.tracker.AlertEngine") as mock_alert,
+    ):
         mock_alert.from_config.return_value = None
         from src.workflows.tracker import StockTrackerWorkflow
 

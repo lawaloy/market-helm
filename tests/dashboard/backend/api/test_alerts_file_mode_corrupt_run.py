@@ -15,7 +15,6 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-
 POISON_BLOBS = (
     b'{"not": "recoverable"',
     b"[]",
@@ -71,9 +70,7 @@ def test_file_mode_run_idles_on_corrupt_or_non_object_root(
     assert file_mode.read_bytes() == blob
 
 
-def test_file_mode_test_404s_on_corrupt_without_building_notifiers(
-    client, file_mode: Path
-) -> None:
+def test_file_mode_test_404s_on_corrupt_without_building_notifiers(client, file_mode: Path) -> None:
     """Send-test must 404 as corrupt (not missing) and skip notifier setup."""
     file_mode.write_text("{not-json", encoding="utf-8")
 

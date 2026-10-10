@@ -55,9 +55,7 @@ def test_load_symbol_closes_prefers_provider_over_market_bars(tmp_path, monkeypa
     client.get_candle_data.assert_called_once()
 
 
-def test_load_symbol_closes_empty_when_provider_and_market_bars_are_empty(
-    tmp_path, monkeypatch
-):
+def test_load_symbol_closes_empty_when_provider_and_market_bars_are_empty(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     client = MagicMock()
     client.get_candle_data.side_effect = RuntimeError("no key")
@@ -163,9 +161,7 @@ def test_load_symbol_closes_prefers_local_when_provider_is_partial(tmp_path, mon
     assert closes == local
 
 
-def test_load_symbol_closes_keeps_partial_provider_when_longer_than_local(
-    tmp_path, monkeypatch
-):
+def test_load_symbol_closes_keeps_partial_provider_when_longer_than_local(tmp_path, monkeypatch):
     monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
     seed_daily_bars(tmp_path, "2026-09-01", [{"symbol": "AAPL", "close": 1.0}])
     seed_daily_bars(tmp_path, "2026-09-02", [{"symbol": "AAPL", "close": 2.0}])

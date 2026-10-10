@@ -26,14 +26,14 @@ def test_tracked_symbols_empty_catalog_fallback_skips_sentinels(client):
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.history, "get_data_loader", return_value=loader
-    ), patch.object(
-        dashboard.backend.api.history, "build_symbol_catalog", return_value=([], {})
-    ), patch.object(
-        dashboard.backend.api.history,
-        "load_index_symbol_names",
-        return_value={},
+    with (
+        patch.object(dashboard.backend.api.history, "get_data_loader", return_value=loader),
+        patch.object(dashboard.backend.api.history, "build_symbol_catalog", return_value=([], {})),
+        patch.object(
+            dashboard.backend.api.history,
+            "load_index_symbol_names",
+            return_value={},
+        ),
     ):
         r = client.get("/api/history/symbols")
 

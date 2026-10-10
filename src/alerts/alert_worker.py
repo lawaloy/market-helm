@@ -119,6 +119,7 @@ def run_db_worker_cycle(worker_id: Optional[str] = None) -> Dict[str, Any]:
     from src.alerts.job_processor import process_job_queue
 
     from src.storage.database import init_database
+
     init_database()
     wid = worker_id or _PROCESS_WORKER_ID
     from src.storage.health import record_worker_heartbeat

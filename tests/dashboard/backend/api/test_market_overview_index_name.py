@@ -29,9 +29,7 @@ def test_market_overview_skips_nan_and_none_index_names() -> None:
             "index_name": ["S&P 500", float("nan"), None],
         }
     )
-    with patch.object(
-        dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_loader):
         from fastapi.testclient import TestClient
         from dashboard.backend.main import app
 

@@ -114,9 +114,7 @@ def test_fetch_missing_watch_quotes_does_not_initialize_fetcher_when_all_symbols
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
-def test_fetch_missing_watch_quotes_soft_fails_when_fetcher_cannot_boot(
-    mock_fetcher_cls, caplog
-):
+def test_fetch_missing_watch_quotes_soft_fails_when_fetcher_cannot_boot(mock_fetcher_cls, caplog):
     mock_fetcher_cls.side_effect = RuntimeError("missing FINNHUB_API_KEY")
     stocks = [{"symbol": "AAPL", "close": 180.0}]
 
@@ -206,6 +204,7 @@ def test_fetch_missing_watch_quotes_skips_non_finite_live_prices(mock_fetcher_cl
         "BAD2",
         "MSFT",
     ]
+
 
 def test_stocks_from_daily_df_keeps_zero_close():
     """A halt / $0 close is finite; `if not close` would drop it before evaluate."""

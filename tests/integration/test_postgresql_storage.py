@@ -37,7 +37,6 @@ from src.storage.users import (
     get_user_by_id,
 )
 
-
 pytestmark = pytest.mark.integration
 
 
@@ -49,9 +48,7 @@ def postgresql_database(monkeypatch):
 
     schema = f"markethelm_test_{uuid.uuid4().hex}"
     with psycopg.connect(base_url, autocommit=True) as admin:
-        admin.execute(
-            psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema))
-        )
+        admin.execute(psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema)))
 
     separator = "&" if "?" in base_url else "?"
     test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}') }"
@@ -61,9 +58,7 @@ def postgresql_database(monkeypatch):
     finally:
         with psycopg.connect(base_url, autocommit=True) as admin:
             admin.execute(
-                psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(
-                    psycopg.sql.Identifier(schema)
-                )
+                psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(psycopg.sql.Identifier(schema))
             )
 
 
@@ -104,16 +99,10 @@ def test_postgresql_migrations_and_storage_workflow(postgresql_database):
     assert complete_job(job_id, worker_id="postgres-worker") is True
 
     with get_connection() as conn:
-        job = conn.execute(
-            "SELECT status FROM alert_jobs WHERE id = ?", (job_id,)
-        ).fetchone()
-        versions = conn.execute(
-            "SELECT version FROM schema_migrations ORDER BY version"
-        ).fetchall()
+        job = conn.execute("SELECT status FROM alert_jobs WHERE id = ?", (job_id,)).fetchone()
+        versions = conn.execute("SELECT version FROM schema_migrations ORDER BY version").fetchall()
     assert job["status"] == STATUS_COMPLETED
-    assert [row["version"] for row in versions] == list(
-        range(1, LATEST_SCHEMA_VERSION + 1)
-    )
+    assert [row["version"] for row in versions] == list(range(1, LATEST_SCHEMA_VERSION + 1))
 
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 201.0, "name": "Apple"}],

@@ -25,9 +25,7 @@ def test_loads_indices_from_stock_tracker_config_env(monkeypatch, tmp_path):
     assert get_indices_to_track() == ["Dow Jones", "NASDAQ-100"]
 
 
-def test_stock_tracker_config_env_overrides_bundled_exchanges_json(
-    monkeypatch, tmp_path
-):
+def test_stock_tracker_config_env_overrides_bundled_exchanges_json(monkeypatch, tmp_path):
     """Env path must win even when repo config/exchanges.json exists on disk."""
     custom = tmp_path / "custom_exchanges.json"
     custom.write_text(

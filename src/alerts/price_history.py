@@ -178,9 +178,7 @@ def load_symbol_closes_from_local(
     max_files: int = 120,
 ) -> List[float]:
     """Closes from durable ``market_bars`` (empty list when none are saved)."""
-    return load_symbol_closes_from_market_bars(
-        symbol, data_dir=data_dir, max_dates=max_files
-    )
+    return load_symbol_closes_from_market_bars(symbol, data_dir=data_dir, max_dates=max_files)
 
 
 def load_symbol_closes(
@@ -208,9 +206,7 @@ def load_symbol_closes(
             )
             return provider_closes if len(provider_closes) >= len(local_closes) else local_closes
 
-    local_closes = load_symbol_closes_from_local(
-        symbol, data_dir=data_dir, max_files=max_files
-    )
+    local_closes = load_symbol_closes_from_local(symbol, data_dir=data_dir, max_files=max_files)
     if not local_closes:
         logger.warning(
             "No close history for %s: provider candles and market_bars are both empty; "

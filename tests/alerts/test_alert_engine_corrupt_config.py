@@ -79,12 +79,15 @@ def test_evaluate_skips_non_dict_condition_without_aborting_siblings() -> None:
     engine = AlertEngine(
         [
             _price_alert(id="bad", condition="nope"),
-            _price_alert(id="good", condition={
-                "type": "price_threshold",
-                "symbol": "AAPL",
-                "operator": "greater_than",
-                "value": 100,
-            }),
+            _price_alert(
+                id="good",
+                condition={
+                    "type": "price_threshold",
+                    "symbol": "AAPL",
+                    "operator": "greater_than",
+                    "value": 100,
+                },
+            ),
         ],
         storage=storage,
     )

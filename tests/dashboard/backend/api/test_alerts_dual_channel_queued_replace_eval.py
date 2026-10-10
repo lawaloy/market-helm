@@ -235,9 +235,7 @@ def test_queued_evaluate_replaces_dual_channel_id_without_touching_sibling(
         ),
     )
     assert replaced.status_code == 200
-    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == [
-        "goog_drop"
-    ]
+    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == ["goog_drop"]
     assert replaced.json()["config"]["alerts"][0]["condition"]["symbol"] == "GOOG"
     assert not _watch_row_exists(user_a, "aapl_drop")
     assert get_watch(user_a, "aapl_drop") is None
@@ -252,12 +250,12 @@ def test_queued_evaluate_replaces_dual_channel_id_without_touching_sibling(
     assert _enabled_flag(user_a, "goog_drop") == 1
     assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")} == set()
     assert "AAPL" not in list_enabled_symbols()
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("GOOG")
-    } == {(user_a, "goog_drop")}
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")
-    } == {(user_b, "sibling-msft")}
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("GOOG")} == {
+        (user_a, "goog_drop")
+    }
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
+        (user_b, "sibling-msft")
+    }
     assert set(list_enabled_symbols()) == {"GOOG", "MSFT"}
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send_log:

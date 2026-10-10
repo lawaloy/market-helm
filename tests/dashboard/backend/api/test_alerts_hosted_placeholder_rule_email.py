@@ -129,7 +129,5 @@ def test_hosted_get_config_strips_placeholder_rule_email_without_touching_siblin
     assert sibling_got.status_code == 200
     assert sibling_got.json()["channels"]["email_recipients"] is True
     assert sibling_got.json()["config"]["alerts"][0]["email_to"] == "ops-b@example.org"
-    assert [alert["id"] for alert in sibling_got.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling_got.json()["config"]["alerts"]] == ["sibling-msft"]
     assert "you@example.com" not in json.dumps(sibling_got.json())

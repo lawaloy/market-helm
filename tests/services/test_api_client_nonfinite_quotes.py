@@ -39,9 +39,7 @@ def test_screening_falls_back_when_previous_close_nonfinite() -> None:
 
 
 def test_stock_data_skips_nan_close() -> None:
-    client = _client_with_quote(
-        {"c": float("nan"), "pc": 100.0, "v": 1, "o": 1, "h": 1, "l": 1}
-    )
+    client = _client_with_quote({"c": float("nan"), "pc": 100.0, "v": 1, "o": 1, "h": 1, "l": 1})
     assert client.get_stock_data("BAD", include_profile=False) is None
 
 

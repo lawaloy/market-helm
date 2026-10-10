@@ -177,9 +177,7 @@ def test_hosted_dry_run_previews_discord_without_sending(client) -> None:
 
     previews = body["previews"]
     assert isinstance(previews, list)
-    webhook_previews = [
-        item for item in previews if item.get("notifier") == "WebhookNotifier"
-    ]
+    webhook_previews = [item for item in previews if item.get("notifier") == "WebhookNotifier"]
     assert len(webhook_previews) == 1
     discord_body = webhook_previews[0]["payload"]
     assert "content" in discord_body
@@ -189,9 +187,7 @@ def test_hosted_dry_run_previews_discord_without_sending(client) -> None:
     assert "text" not in discord_body
     assert "blocks" not in discord_body
 
-    email_previews = [
-        item for item in previews if item.get("notifier") == "EmailNotifier"
-    ]
+    email_previews = [item for item in previews if item.get("notifier") == "EmailNotifier"]
     assert len(email_previews) == 1
 
     assert pending_job_count([JOB_DELIVER]) == 0

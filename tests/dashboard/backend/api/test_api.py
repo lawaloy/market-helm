@@ -98,6 +98,7 @@ def sample_summary(temp_data_dir):
 def mock_data_loader(temp_data_dir, sample_daily_data, sample_summary):
     """Create a real DataLoader with temp data."""
     from dashboard.backend.services.data_loader import DataLoader
+
     return DataLoader(data_dir=temp_data_dir)
 
 
@@ -113,12 +114,22 @@ def client(mock_data_loader):
     import dashboard.backend.api.projections
     import dashboard.backend.api.stocks
     import dashboard.backend.api.history
-    with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_data_loader):
-        with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=mock_data_loader):
-            with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_data_loader):
-                with patch.object(dashboard.backend.api.history, "get_data_loader", return_value=mock_data_loader):
+
+    with patch.object(
+        dashboard.backend.api.market, "get_data_loader", return_value=mock_data_loader
+    ):
+        with patch.object(
+            dashboard.backend.api.projections, "get_data_loader", return_value=mock_data_loader
+        ):
+            with patch.object(
+                dashboard.backend.api.stocks, "get_data_loader", return_value=mock_data_loader
+            ):
+                with patch.object(
+                    dashboard.backend.api.history, "get_data_loader", return_value=mock_data_loader
+                ):
                     from fastapi.testclient import TestClient
                     from dashboard.backend.main import app
+
                     yield TestClient(app)
 
 
@@ -767,9 +778,7 @@ class TestStocksAPIEdges:
         assert r.status_code == 404
         assert r.json()["detail"] == "No data available"
 
-    def test_stock_detail_survives_projection_load_failure(
-        self, client, mock_data_loader
-    ):
+    def test_stock_detail_survives_projection_load_failure(self, client, mock_data_loader):
         mock_data_loader.load_projections = MagicMock(
             side_effect=FileNotFoundError("projections missing")
         )
@@ -984,11 +993,15 @@ class TestMarketAPIErrors:
     def test_summary_404_when_no_data(self, temp_data_dir):
         """Summary returns 404 when no summary files exist."""
         import dashboard.backend.api.market
+
         mock_loader = MagicMock()
         mock_loader.load_summary.side_effect = ValueError("No summary files found")
-        with patch.object(dashboard.backend.api.market, "get_data_loader", return_value=mock_loader):
+        with patch.object(
+            dashboard.backend.api.market, "get_data_loader", return_value=mock_loader
+        ):
             from fastapi.testclient import TestClient
             from dashboard.backend.main import app
+
             client = TestClient(app)
             r = client.get("/api/summary")
 
@@ -997,9 +1010,7 @@ class TestMarketAPIErrors:
     def test_summary_404_when_missing(self, client, mock_data_loader, temp_data_dir):
         """Missing summary rows must 404 via ValueError mapping, not generic 500."""
         # sample_summary seeded a row; overwrite loader to simulate empty summaries.
-        mock_data_loader.load_summary = MagicMock(
-            side_effect=ValueError("No summary files found")
-        )
+        mock_data_loader.load_summary = MagicMock(side_effect=ValueError("No summary files found"))
 
         r = client.get("/api/summary")
         assert r.status_code == 404
@@ -1009,9 +1020,7 @@ class TestMarketAPIErrors:
 class TestHistorySummaryAPI:
     """Historical projections summary endpoint."""
 
-    def test_run_projections_returns_saved_rows_for_requested_date(
-        self, client, temp_data_dir
-    ):
+    def test_run_projections_returns_saved_rows_for_requested_date(self, client, temp_data_dir):
         seed_projections(
             temp_data_dir,
             "2026-01-15",
@@ -1060,9 +1069,7 @@ class TestHistorySummaryAPI:
         assert client.get("/api/history/runs/2026-01-14/projections").status_code == 404
         assert client.get("/api/history/runs/not-a-date/projections").status_code == 422
 
-    def test_history_summary_coerces_all_nan_means(
-        self, client, mock_data_loader, temp_data_dir
-    ):
+    def test_history_summary_coerces_all_nan_means(self, client, mock_data_loader, temp_data_dir):
         """All-NaN confidence/expected means must serialize as finite 0.0 + Neutral."""
         seed_projections(
             temp_data_dir,
@@ -1141,7 +1148,9 @@ class TestHistorySummaryAPI:
         assert "ZZZZ" in body["symbols"]
         assert body["names"]["ZZZZ"] == "Custom Co"
 
-    def test_summary_skips_bad_dates_and_sets_sentiment(self, client, mock_data_loader, temp_data_dir):
+    def test_summary_skips_bad_dates_and_sets_sentiment(
+        self, client, mock_data_loader, temp_data_dir
+    ):
         """Historical summary skips unloadable dates and classifies sentiment bands."""
         seed_projections(
             temp_data_dir,
@@ -1188,9 +1197,7 @@ class TestHistorySummaryAPI:
         assert "2026-01-14" not in sentiments
         assert "AAPL" in body["symbols"]
 
-    def test_market_movers_skips_non_finite_price_and_coerces_bad_volume(
-        self, temp_data_dir
-    ):
+    def test_market_movers_skips_non_finite_price_and_coerces_bad_volume(self, temp_data_dir):
         """One NaN price or volume must not 500 the movers card or emit null JSON."""
         import dashboard.backend.api.market
 
@@ -1223,9 +1230,7 @@ class TestHistorySummaryAPI:
         assert by_symbol["BADVOL"]["price"] == 50.0
         assert by_symbol["BADVOL"]["volume"] == 0
 
-    def test_opportunities_skips_non_finite_projection_and_coerces_daily(
-        self, temp_data_dir
-    ):
+    def test_opportunities_skips_non_finite_projection_and_coerces_daily(self, temp_data_dir):
         """NaN confidence/volume must not 500 opportunities or emit null targets."""
         import dashboard.backend.api.projections
 

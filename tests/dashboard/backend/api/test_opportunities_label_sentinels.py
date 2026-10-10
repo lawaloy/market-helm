@@ -26,9 +26,7 @@ def client(temp_data_dir):
     import dashboard.backend.api.projections
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
         from dashboard.backend.main import app
 
@@ -70,9 +68,7 @@ def _write_projection(temp_data_dir: Path, risk_level, trend) -> None:
         (float("nan"), float("nan")),
     ],
 )
-def test_opportunities_coerces_label_sentinels(
-    client, temp_data_dir, risk_level, trend
-) -> None:
+def test_opportunities_coerces_label_sentinels(client, temp_data_dir, risk_level, trend) -> None:
     _write_daily(temp_data_dir)
     _write_projection(temp_data_dir, risk_level=risk_level, trend=trend)
 

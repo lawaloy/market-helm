@@ -118,9 +118,7 @@ def _http_error(url: str, status: int, body: bytes) -> urllib.error.HTTPError:
 
 def test_api_client_accepts_http_error_when_status_is_expected() -> None:
     def opener(request, *, timeout):
-        raise _http_error(
-            request.full_url, 401, b'{"detail":"Authentication required."}'
-        )
+        raise _http_error(request.full_url, 401, b'{"detail":"Authentication required."}')
 
     client = ApiClient("https://staging.example.com", opener=opener)
     payload = client.json("GET", "/api/alerts/config", expected_status=401)
@@ -284,11 +282,13 @@ def test_ingress_check_requires_exact_cors_and_request_id() -> None:
             origin = kwargs["headers"]["Origin"]
             headers = {"X-Request-ID": "request-1"}
             if origin == "https://staging.example.com":
-                headers.update({
-                    "Access-Control-Allow-Origin": origin,
-                    "Access-Control-Allow-Credentials": "true",
-                    "Strict-Transport-Security": "max-age=31536000",
-                })
+                headers.update(
+                    {
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                        "Strict-Transport-Security": "max-age=31536000",
+                    }
+                )
             return 200, b'{"status":"healthy"}', headers
 
     runner = AcceptanceRunner(Client())
@@ -303,11 +303,15 @@ def test_ingress_check_fails_without_hsts_on_https() -> None:
             if path == "/metrics":
                 return super().request(method, path, **kwargs)
             origin = kwargs["headers"]["Origin"]
-            return 200, b"{}", {
-                "X-Request-ID": "request-1",
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Credentials": "true",
-            }
+            return (
+                200,
+                b"{}",
+                {
+                    "X-Request-ID": "request-1",
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                },
+            )
 
     runner = AcceptanceRunner(Client())
     runner.run_operational_checks(ingress_origin="https://staging.example.com")
@@ -355,10 +359,12 @@ class _IngressClient(_OperationalClient):
             if self.include_hsts:
                 headers["Strict-Transport-Security"] = "max-age=31536000"
         elif self.allow_untrusted and origin == "https://untrusted.invalid":
-            headers.update({
-                "Access-Control-Allow-Origin": origin,
-                "Access-Control-Allow-Credentials": "true",
-            })
+            headers.update(
+                {
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                }
+            )
             if self.include_hsts:
                 headers["Strict-Transport-Security"] = "max-age=31536000"
         return 200, b'{"status":"healthy"}', headers
@@ -380,9 +386,7 @@ def test_ingress_check_requires_valid_request_id(request_id: str) -> None:
 
 
 def test_ingress_check_skips_hsts_on_loopback_http() -> None:
-    runner = AcceptanceRunner(
-        _IngressClient(include_hsts=False, base_url="http://127.0.0.1:8012")
-    )
+    runner = AcceptanceRunner(_IngressClient(include_hsts=False, base_url="http://127.0.0.1:8012"))
     runner.run_operational_checks(ingress_origin="http://127.0.0.1:8012")
     assert runner.results[-1].name == "Ingress and CORS"
     assert runner.results[-1].status == "passed"
@@ -497,7 +501,9 @@ class _TenantClient:
         if (method, path) == ("POST", "/api/auth/login"):
             return {"access_token": self.tokens[payload["email"]]}
         if (method, path) == ("GET", "/api/auth/me"):
-            email = next(email for email, saved_token in self.tokens.items() if saved_token == token)
+            email = next(
+                email for email, saved_token in self.tokens.items() if saved_token == token
+            )
             return {"email": email}
         if (method, path) == ("GET", "/api/alerts/config"):
             return {
@@ -531,9 +537,7 @@ def test_tenant_check_proves_isolation_and_restores_empty_configs() -> None:
     client = _TenantClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "passed"
     assert client.configs == {
@@ -541,9 +545,7 @@ def test_tenant_check_proves_isolation_and_restores_empty_configs() -> None:
         "token-b": {"defaults": {}, "alerts": []},
     }
     written_ids = [
-        payload["alerts"][0]["id"]
-        for _, payload in client.put_payloads
-        if payload["alerts"]
+        payload["alerts"][0]["id"] for _, payload in client.put_payloads if payload["alerts"]
     ]
     assert len(written_ids) == 2
     assert written_ids[0] != written_ids[1]
@@ -558,9 +560,7 @@ def test_tenant_check_refuses_nonempty_account_without_overwriting_it() -> None:
     client = _TenantClient(nonempty=True)
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "dedicated staging accounts" in runner.results[-1].detail
@@ -572,9 +572,7 @@ def test_tenant_check_refuses_accounts_with_notification_secrets() -> None:
     client = _TenantClient(webhook_url=True)
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "notification secrets" in runner.results[-1].detail
@@ -587,9 +585,7 @@ def test_tenant_check_refuses_account_with_defaults_mailbox_without_overwriting_
     client = _TenantClient(defaults={"email_to": "ops@example.com"})
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "dedicated staging accounts" in runner.results[-1].detail
@@ -603,9 +599,7 @@ def test_tenant_check_refuses_accounts_with_email_recipient_secrets() -> None:
     client = _TenantClient(email_recipients=True)
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "notification secrets" in runner.results[-1].detail
@@ -628,9 +622,7 @@ def test_tenant_check_fails_when_configs_leak_across_accounts() -> None:
 
     client = LeakyClient()
     runner = AcceptanceRunner(client)
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     isolation = next(result for result in runner.results if result.name == "Tenant isolation")
     assert isolation.status == "failed"
@@ -642,9 +634,7 @@ def test_tenant_check_rejects_same_email_accounts() -> None:
     client.tokens = {"a@example.com": "token-a", "A@example.com": "token-b"}
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("A@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("A@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "different email" in runner.results[-1].detail
@@ -663,9 +653,7 @@ def test_tenant_check_refuses_login_without_access_token() -> None:
     client = NoTokenClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "no access token" in runner.results[-1].detail
@@ -685,9 +673,7 @@ def test_tenant_check_refuses_when_authenticated_identity_does_not_match() -> No
     client = MismatchClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "authenticated identity did not match" in runner.results[-1].detail
@@ -717,9 +703,7 @@ def test_tenant_check_refuses_unexpected_config_shape_without_overwriting(
     client = ShapelessClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     assert runner.results[-1].status == "failed"
     assert "unexpected shape" in runner.results[-1].detail
@@ -739,9 +723,7 @@ def test_tenant_check_fails_when_watch_index_is_not_isolated() -> None:
     client = SharedIndexClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     isolation = next(result for result in runner.results if result.name == "Tenant isolation")
     assert isolation.status == "failed"
@@ -776,9 +758,7 @@ def test_tenant_check_fails_when_log_only_dry_run_is_not_isolated(
     client = DryRunClient()
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     isolation = next(result for result in runner.results if result.name == "Tenant isolation")
     assert isolation.status == "failed"
@@ -793,9 +773,7 @@ def test_tenant_cleanup_failure_is_recorded() -> None:
     client = _TenantClient(fail_restore=True)
     runner = AcceptanceRunner(client)
 
-    runner.run_tenant_isolation(
-        [("a@example.com", "password-a"), ("b@example.com", "password-b")]
-    )
+    runner.run_tenant_isolation([("a@example.com", "password-a"), ("b@example.com", "password-b")])
 
     isolation = next(result for result in runner.results if result.name == "Tenant isolation")
     cleanups = [result for result in runner.results if result.name == "Tenant cleanup"]

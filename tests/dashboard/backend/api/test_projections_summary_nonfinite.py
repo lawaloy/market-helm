@@ -30,9 +30,7 @@ def test_projections_summary_ignores_inf_when_averaging_confidence_and_expected(
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         r = client.get("/api/projections/summary")
 
     assert r.status_code == 200
@@ -57,9 +55,7 @@ def test_projections_summary_all_inf_means_are_finite_neutral(client):
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         r = client.get("/api/projections/summary")
 
     assert r.status_code == 200

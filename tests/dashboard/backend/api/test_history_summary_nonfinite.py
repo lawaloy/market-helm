@@ -29,12 +29,13 @@ def test_history_summary_ignores_inf_when_averaging_confidence_and_expected(clie
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.history, "get_data_loader", return_value=loader
-    ), patch.object(
-        dashboard.backend.api.history,
-        "load_index_symbol_names",
-        return_value={},
+    with (
+        patch.object(dashboard.backend.api.history, "get_data_loader", return_value=loader),
+        patch.object(
+            dashboard.backend.api.history,
+            "load_index_symbol_names",
+            return_value={},
+        ),
     ):
         r = client.get("/api/history/summary", params={"days": 7})
 
@@ -58,12 +59,13 @@ def test_history_summary_all_inf_means_are_finite_neutral(client):
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.history, "get_data_loader", return_value=loader
-    ), patch.object(
-        dashboard.backend.api.history,
-        "load_index_symbol_names",
-        return_value={},
+    with (
+        patch.object(dashboard.backend.api.history, "get_data_loader", return_value=loader),
+        patch.object(
+            dashboard.backend.api.history,
+            "load_index_symbol_names",
+            return_value={},
+        ),
     ):
         r = client.get("/api/history/summary", params={"days": 7})
 

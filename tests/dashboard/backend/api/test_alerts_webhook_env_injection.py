@@ -47,9 +47,7 @@ def _price_alert_payload(*, webhook_url: str, webhook_format: str = "discord") -
     }
 
 
-def test_put_config_rejects_crlf_webhook_url(
-    client, alerts_config_dir, tmp_path, monkeypatch
-):
+def test_put_config_rejects_crlf_webhook_url(client, alerts_config_dir, tmp_path, monkeypatch):
     user_config_dir = tmp_path / "user-config"
     user_config_dir.mkdir()
     env_file = user_config_dir / ".env"
@@ -57,8 +55,7 @@ def test_put_config_rejects_crlf_webhook_url(
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
 
     poisoned = (
-        "https://discord.com/api/webhooks/secret/token\n"
-        "ALERT_EMAIL_TO=attacker@example.com"
+        "https://discord.com/api/webhooks/secret/token\n" "ALERT_EMAIL_TO=attacker@example.com"
     )
     response = client.put(
         "/api/alerts/config",
@@ -70,9 +67,7 @@ def test_put_config_rejects_crlf_webhook_url(
     assert not (alerts_config_dir / "alerts.json").exists()
 
 
-def test_put_config_rejects_crlf_webhook_format(
-    client, alerts_config_dir, tmp_path, monkeypatch
-):
+def test_put_config_rejects_crlf_webhook_format(client, alerts_config_dir, tmp_path, monkeypatch):
     user_config_dir = tmp_path / "user-config"
     user_config_dir.mkdir()
     env_file = user_config_dir / ".env"
@@ -91,9 +86,7 @@ def test_put_config_rejects_crlf_webhook_format(
     assert env_file.read_text(encoding="utf-8") == "SHARED_KEEP=1\n"
 
 
-def test_put_config_still_persists_safe_webhook(
-    client, alerts_config_dir, tmp_path, monkeypatch
-):
+def test_put_config_still_persists_safe_webhook(client, alerts_config_dir, tmp_path, monkeypatch):
     user_config_dir = tmp_path / "user-config"
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_config_dir)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)

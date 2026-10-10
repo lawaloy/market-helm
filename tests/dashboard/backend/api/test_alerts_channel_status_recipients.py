@@ -174,9 +174,7 @@ def test_hosted_rule_webhook_marks_channel_ready_without_touching_sibling(
     assert "hooks.example/global" not in json.dumps(got_b.json())
 
 
-def test_file_mode_env_mailbox_marks_recipients_ready(
-    client, tmp_path: Path, monkeypatch
-) -> None:
+def test_file_mode_env_mailbox_marks_recipients_ready(client, tmp_path: Path, monkeypatch) -> None:
     """File mode still treats process-wide ALERT_EMAIL_TO as this install's mailbox."""
     # Exercise the explicitly injected process environment without loading any
     # repository- or user-level dotenv files from the host running the test.
@@ -205,9 +203,7 @@ def test_file_mode_env_mailbox_marks_recipients_ready(
     assert empty.json()["channels"]["email_recipients"] is False
 
 
-def test_file_mode_env_webhook_marks_channel_ready(
-    client, tmp_path: Path, monkeypatch
-) -> None:
+def test_file_mode_env_webhook_marks_channel_ready(client, tmp_path: Path, monkeypatch) -> None:
     """File mode still treats DISCORD_WEBHOOK_URL as this install's webhook secret."""
     # Exercise the explicitly injected process environment without loading any
     # repository- or user-level dotenv files from the host running the test.
@@ -223,9 +219,7 @@ def test_file_mode_env_webhook_marks_channel_ready(
     config_dir = tmp_path / "market-helm"
     config_dir.mkdir()
     monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
-    monkeypatch.setenv(
-        "DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/local/token"
-    )
+    monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/local/token")
 
     response = client.get("/api/alerts/config")
     assert response.status_code == 200

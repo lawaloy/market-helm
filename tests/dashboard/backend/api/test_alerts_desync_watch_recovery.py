@@ -111,9 +111,7 @@ def test_force_init_after_save_then_poison_clears_stale_watches_without_touching
 
     sibling = client.get("/api/alerts/config", headers=headers_b)
     assert sibling.status_code == 200
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]
 
 
 def test_put_after_save_then_poison_replaces_stale_watches_without_touching_sibling(
@@ -146,9 +144,7 @@ def test_put_after_save_then_poison_replaces_stale_watches_without_touching_sibl
         json=_price_payload("goog_drop", "GOOG"),
     )
     assert replaced.status_code == 200
-    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == [
-        "goog_drop"
-    ]
+    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == ["goog_drop"]
     assert _watch_ids("AAPL") == set()
     assert _watch_ids("GOOG") == {(user_a, "goog_drop")}
     assert _watch_ids("MSFT") == {(user_b, "sibling-msft")}
@@ -156,6 +152,4 @@ def test_put_after_save_then_poison_replaces_stale_watches_without_touching_sibl
 
     sibling = client.get("/api/alerts/config", headers=headers_b)
     assert sibling.status_code == 200
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]

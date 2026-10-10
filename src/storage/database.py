@@ -147,9 +147,7 @@ _MIGRATIONS = (
     Migration(
         version=5,
         name="session_revocation",
-        statements=(
-            "ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1",
-        ),
+        statements=("ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1",),
     ),
     Migration(
         version=6,
@@ -262,8 +260,7 @@ def database_backend() -> str:
     if scheme in {"postgres", "postgresql"}:
         return "postgresql"
     raise ValueError(
-        f"Unsupported database URL scheme {scheme!r}. "
-        "Use sqlite:///... or postgresql://..."
+        f"Unsupported database URL scheme {scheme!r}. " "Use sqlite:///... or postgresql://..."
     )
 
 
@@ -340,9 +337,7 @@ def _connect_sqlite() -> sqlite3.Connection:
         # Unwritable / blocked parents must surface as a clear RuntimeError so
         # multi-user auth/alerts paths fail closed with an actionable message
         # instead of an opaque PermissionError from pathlib.
-        raise RuntimeError(
-            f"Cannot create database directory {path.parent}: {exc}"
-        ) from exc
+        raise RuntimeError(f"Cannot create database directory {path.parent}: {exc}") from exc
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")

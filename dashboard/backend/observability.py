@@ -32,19 +32,35 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             _requests[key] += 1
             _duration[(request.method, path)] += elapsed
         response.headers["X-Request-ID"] = request_id
-        logger.info("request method=%s path=%s status=%s duration_ms=%.1f request_id=%s",
-                    request.method, path, response.status_code, elapsed * 1000, request_id)
+        logger.info(
+            "request method=%s path=%s status=%s duration_ms=%.1f request_id=%s",
+            request.method,
+            path,
+            response.status_code,
+            elapsed * 1000,
+            request_id,
+        )
         return response
 
 
 def prometheus_metrics() -> str:
-    lines = ["# HELP markethelm_http_requests_total HTTP requests.",
-             "# TYPE markethelm_http_requests_total counter"]
+    lines = [
+        "# HELP markethelm_http_requests_total HTTP requests.",
+        "# TYPE markethelm_http_requests_total counter",
+    ]
     with _lock:
         for (method, path, status), value in sorted(_requests.items()):
-            lines.append(f'markethelm_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {value}')
-        lines.extend(["# HELP markethelm_http_request_duration_seconds_sum HTTP request duration.",
-                      "# TYPE markethelm_http_request_duration_seconds_sum counter"])
+            lines.append(
+                f'markethelm_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {value}'
+            )
+        lines.extend(
+            [
+                "# HELP markethelm_http_request_duration_seconds_sum HTTP request duration.",
+                "# TYPE markethelm_http_request_duration_seconds_sum counter",
+            ]
+        )
         for (method, path), value in sorted(_duration.items()):
-            lines.append(f'markethelm_http_request_duration_seconds_sum{{method="{method}",path="{path}"}} {value:.6f}')
+            lines.append(
+                f'markethelm_http_request_duration_seconds_sum{{method="{method}",path="{path}"}} {value:.6f}'
+            )
     return "\n".join(lines) + "\n"

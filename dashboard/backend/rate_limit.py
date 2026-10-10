@@ -166,9 +166,7 @@ class _MemoryCounters:
         reset_at = window_start + window_seconds
         with self._lock:
             self._counters = {
-                bucket: value
-                for bucket, value in self._counters.items()
-                if value[1] > now
+                bucket: value for bucket, value in self._counters.items() if value[1] > now
             }
             bucket = (key, window_start)
             count = self._counters.get(bucket, (0, reset_at))[0] + 1

@@ -46,12 +46,8 @@ def test_overlapping_evaluates_deliver_once_under_cooldown(db_user) -> None:
     Without a deliver-time cooldown re-check, both would notify.
     """
     sync_watches_from_config(db_user, _watch_config(cooldown_minutes=60))
-    enqueue_job(
-        JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"}
-    )
-    enqueue_job(
-        JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 149.0, "tick_id": "t2"}
-    )
+    enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"})
+    enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 149.0, "tick_id": "t2"})
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as mock_send:
         stats = process_job_queue("overlap-worker")
@@ -67,12 +63,8 @@ def test_overlapping_evaluates_deliver_once_under_cooldown(db_user) -> None:
 def test_overlapping_evaluates_still_multi_deliver_with_zero_cooldown(db_user) -> None:
     """cooldown_minutes=0 intentionally disables rate limiting."""
     sync_watches_from_config(db_user, _watch_config(cooldown_minutes=0))
-    enqueue_job(
-        JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"}
-    )
-    enqueue_job(
-        JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 149.0, "tick_id": "t2"}
-    )
+    enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0, "tick_id": "t1"})
+    enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 149.0, "tick_id": "t2"})
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as mock_send:
         stats = process_job_queue("overlap-worker-zero")

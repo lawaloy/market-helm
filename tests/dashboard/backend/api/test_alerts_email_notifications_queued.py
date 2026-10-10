@@ -173,16 +173,12 @@ def test_put_rotates_email_to_retargets_queued_deliver_without_touching_sibling(
     saved_a = client.put(
         "/api/alerts/config",
         headers=headers_a,
-        json=_email_payload(
-            "aapl_drop", "AAPL", addr_a_old, notifications=["email"]
-        ),
+        json=_email_payload("aapl_drop", "AAPL", addr_a_old, notifications=["email"]),
     )
     saved_b = client.put(
         "/api/alerts/config",
         headers=headers_b,
-        json=_email_payload(
-            "sibling-msft", "MSFT", addr_b, notifications=["email"]
-        ),
+        json=_email_payload("sibling-msft", "MSFT", addr_b, notifications=["email"]),
     )
     assert saved_a.status_code == 200
     assert saved_b.status_code == 200
@@ -195,9 +191,7 @@ def test_put_rotates_email_to_retargets_queued_deliver_without_touching_sibling(
     rotated = client.put(
         "/api/alerts/config",
         headers=headers_a,
-        json=_email_payload(
-            "aapl_drop", "AAPL", addr_a_new, notifications=["email"]
-        ),
+        json=_email_payload("aapl_drop", "AAPL", addr_a_new, notifications=["email"]),
     )
     assert rotated.status_code == 200
     assert get_watch(user_a, "aapl_drop")["defaults"]["email_to"] == addr_a_new

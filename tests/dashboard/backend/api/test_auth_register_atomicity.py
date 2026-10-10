@@ -44,9 +44,7 @@ def test_register_with_bad_auth_secret_leaves_no_user(
     assert row is None
 
 
-def test_register_succeeds_after_fixing_auth_secret(
-    client, tmp_path, monkeypatch
-) -> None:
+def test_register_succeeds_after_fixing_auth_secret(client, tmp_path, monkeypatch) -> None:
     """Retry must succeed once AUTH_SECRET is configured (no stuck orphan)."""
     db_path = tmp_path / "register-retry.db"
     monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")

@@ -22,9 +22,7 @@ from .projections_store import (
     upsert_projections,
 )
 
-_LEGACY_FILE = re.compile(
-    r"^(daily_data|projections|summary)_(\d{4}-\d{2}-\d{2})\.(csv|json)$"
-)
+_LEGACY_FILE = re.compile(r"^(daily_data|projections|summary)_(\d{4}-\d{2}-\d{2})\.(csv|json)$")
 _DATE_LIMIT = 100_000
 
 
@@ -105,9 +103,7 @@ def backfill_legacy_market_data(
     report: Dict[str, Any] = {
         "data_dir": str(root),
         "target": (
-            "configured_database"
-            if database_enabled()
-            else str(default_sidecar_path(root))
+            "configured_database" if database_enabled() else str(default_sidecar_path(root))
         ),
         "replace_existing": bool(replace_existing),
         "daily_data": _stats(len(files["daily_data"])),
@@ -121,9 +117,7 @@ def backfill_legacy_market_data(
         return report
 
     existing_bars = set(list_market_bar_dates(data_dir=root, limit=_DATE_LIMIT))
-    existing_projections = set(
-        list_projection_dates(data_dir=root, limit=_DATE_LIMIT)
-    )
+    existing_projections = set(list_projection_dates(data_dir=root, limit=_DATE_LIMIT))
     existing_summaries = set(list_summary_dates(data_dir=root, limit=_DATE_LIMIT))
     projection_csv_imported_dates: set[str] = set()
 
@@ -134,9 +128,7 @@ def backfill_legacy_market_data(
             continue
         try:
             rows = _csv_rows(path)
-            written = upsert_market_bars(
-                rows, day, data_dir=root, source="legacy_csv"
-            )
+            written = upsert_market_bars(rows, day, data_dir=root, source="legacy_csv")
             if written <= 0:
                 raise ValueError("file contains no valid market-bar rows")
             stats["imported_files"] += 1
@@ -153,9 +145,7 @@ def backfill_legacy_market_data(
             continue
         try:
             rows = _csv_rows(path)
-            written = upsert_projections(
-                rows, day, data_dir=root, source="legacy_csv"
-            )
+            written = upsert_projections(rows, day, data_dir=root, source="legacy_csv")
             if written <= 0:
                 raise ValueError("file contains no valid projection rows")
             stats["imported_files"] += 1
@@ -187,9 +177,7 @@ def backfill_legacy_market_data(
                         source="legacy_summary",
                     )
                     if written <= 0:
-                        raise ValueError(
-                            "embedded projections contain no valid rows"
-                        )
+                        raise ValueError("embedded projections contain no valid rows")
                     projection_stats = report["projections"]
                     projection_stats["rows_written"] += written
                     projection_stats["embedded_summary_fallbacks"] += 1

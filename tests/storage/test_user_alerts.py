@@ -84,16 +84,14 @@ class TestUserAlerts:
         }
         save_user_alerts_config(db_user, original)
         with get_connection() as conn:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE TRIGGER reject_blocked_watch
                 BEFORE INSERT ON alert_watches
                 WHEN NEW.alert_id = 'blocked'
                 BEGIN
                     SELECT RAISE(ABORT, 'blocked watch');
                 END
-                """
-            )
+                """)
 
         replacement = {
             "defaults": {},

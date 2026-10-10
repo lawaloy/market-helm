@@ -229,9 +229,9 @@ def test_queued_evaluate_skips_deleted_dual_channel_without_touching_sibling(
     assert get_watch(user_a, "aapl_drop") is None
     assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")} == set()
     assert "AAPL" not in list_enabled_symbols()
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")
-    } == {(user_b, "sibling-msft")}
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
+        (user_b, "sibling-msft")
+    }
     assert list_enabled_symbols() == ["MSFT"]
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send_log:

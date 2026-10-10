@@ -80,9 +80,7 @@ def test_hosted_put_rejects_blank_alert_id(client, multi_user_env, alert_id, ema
     token = _register(client, email)
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.put(
-        "/api/alerts/config", json=_payload(alert_id), headers=headers
-    )
+    response = client.put("/api/alerts/config", json=_payload(alert_id), headers=headers)
     assert response.status_code == 400
     assert "id" in response.json()["detail"].lower()
 

@@ -184,7 +184,10 @@ class TestAlertsConfigAPI:
     def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
-            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+            lambda: (
+                ["AAPL", "MSFT", "ZZZZ"],
+                {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"},
+            ),
         )
         r = client.get("/api/alerts/symbols")
         assert r.status_code == 200
@@ -423,9 +426,7 @@ class TestAlertsConfigAPI:
         assert "webhook_url" not in saved.get("defaults", {})
         assert "leaked/token" not in config_path.read_text(encoding="utf-8")
 
-    def test_get_config_seeds_webhook_format_from_env(
-        self, client, alerts_config_dir, monkeypatch
-    ):
+    def test_get_config_seeds_webhook_format_from_env(self, client, alerts_config_dir, monkeypatch):
         config_path = alerts_config_dir / "alerts.json"
         monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
         monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
@@ -447,9 +448,7 @@ class TestAlertsConfigAPI:
         assert r.status_code == 404
         assert "No market data available" in r.json()["detail"]
 
-    def test_run_maps_unexpected_failure_to_500(
-        self, client, alerts_config_dir, monkeypatch
-    ):
+    def test_run_maps_unexpected_failure_to_500(self, client, alerts_config_dir, monkeypatch):
         def boom():
             raise RuntimeError("worker crashed")
 
@@ -458,6 +457,7 @@ class TestAlertsConfigAPI:
         assert r.status_code == 500
         assert r.json()["detail"] == "Alert check failed."
 
+
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
@@ -622,7 +622,10 @@ class TestAlertsConfigAPI:
     def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
-            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+            lambda: (
+                ["AAPL", "MSFT", "ZZZZ"],
+                {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"},
+            ),
         )
         r = client.get("/api/alerts/symbols")
         assert r.status_code == 200
@@ -835,6 +838,7 @@ class TestAlertsConfigAPI:
         assert data["last_triggered_at"] is None
         assert data["latest_deliveries"] == []
 
+
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
@@ -999,7 +1003,10 @@ class TestAlertsConfigAPI:
     def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
-            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+            lambda: (
+                ["AAPL", "MSFT", "ZZZZ"],
+                {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"},
+            ),
         )
         r = client.get("/api/alerts/symbols")
         assert r.status_code == 200
@@ -1194,6 +1201,7 @@ class TestAlertsConfigAPI:
         assert data["last_data_date"] is None
         assert data["active_watches"] == 1
 
+
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
@@ -1358,7 +1366,10 @@ class TestAlertsConfigAPI:
     def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
-            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+            lambda: (
+                ["AAPL", "MSFT", "ZZZZ"],
+                {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"},
+            ),
         )
         r = client.get("/api/alerts/symbols")
         assert r.status_code == 200
@@ -1571,9 +1582,7 @@ class TestAlertsConfigAPI:
         assert data["last_triggered_at"] is None
         assert data["latest_deliveries"] == []
 
-    def test_get_symbols_soft_fails_tracked_when_projections_raise(
-        self, client, monkeypatch
-    ):
+    def test_get_symbols_soft_fails_tracked_when_projections_raise(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
             lambda: (["AAPL"], {"AAPL": "Apple Inc."}),
@@ -1754,7 +1763,10 @@ class TestAlertsConfigAPI:
     def test_get_symbols_includes_index_catalog(self, client, monkeypatch):
         monkeypatch.setattr(
             "dashboard.backend.api.alerts.build_symbol_catalog",
-            lambda: (["AAPL", "MSFT", "ZZZZ"], {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"}),
+            lambda: (
+                ["AAPL", "MSFT", "ZZZZ"],
+                {"AAPL": "Apple Inc.", "MSFT": "Microsoft", "ZZZZ": "ZZZZ"},
+            ),
         )
         r = client.get("/api/alerts/symbols")
         assert r.status_code == 200
@@ -1992,9 +2004,7 @@ class TestAlertsConfigAPI:
         assert "webhook_url" not in saved.get("defaults", {})
         assert "leaked/token" not in config_path.read_text(encoding="utf-8")
 
-    def test_get_config_seeds_webhook_format_from_env(
-        self, client, alerts_config_dir, monkeypatch
-    ):
+    def test_get_config_seeds_webhook_format_from_env(self, client, alerts_config_dir, monkeypatch):
         config_path = alerts_config_dir / "alerts.json"
         monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
         monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
@@ -2016,9 +2026,7 @@ class TestAlertsConfigAPI:
         assert r.status_code == 404
         assert "No market data available" in r.json()["detail"]
 
-    def test_run_maps_unexpected_failure_to_500(
-        self, client, alerts_config_dir, monkeypatch
-    ):
+    def test_run_maps_unexpected_failure_to_500(self, client, alerts_config_dir, monkeypatch):
         def boom():
             raise RuntimeError("worker crashed")
 
@@ -2037,9 +2045,7 @@ class TestAlertsConfigAPI:
         assert exc_info.value.status_code == 400
         assert "alerts" in str(exc_info.value.detail).lower()
 
-        normalized = _normalize_config(
-            {"defaults": {"webhook_format": " Discord "}, "alerts": []}
-        )
+        normalized = _normalize_config({"defaults": {"webhook_format": " Discord "}, "alerts": []})
         assert normalized["defaults"]["webhook_format"] == "discord"
         assert _normalize_config(None) == {"defaults": {}, "alerts": []}
 

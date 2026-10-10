@@ -14,13 +14,11 @@ import sys
 import tempfile
 from typing import Optional, Sequence
 
-
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.analysis.backtesting import backtest_data_dir  # noqa: E402
-
 
 BASELINE_DIR = ROOT / "baselines" / "projection-v1"
 DATA_DIR = BASELINE_DIR / "data"
@@ -113,9 +111,7 @@ def qualify_report(
     for name, check in checks.items():
         actual = check["actual"]
         if actual is None or actual < check["minimum"]:
-            failures.append(
-                f"{name} is {actual!r}; requires at least {check['minimum']}"
-            )
+            failures.append(f"{name} is {actual!r}; requires at least {check['minimum']}")
     if report.get("samplesTruncated"):
         failures.append("report samples are truncated")
     if int(summary.get("verifiedOutcomeCount", 0)) != sample_count:
@@ -131,9 +127,7 @@ def qualify_report(
 
 
 def observed_report(data_dir: Path, days: int) -> dict:
-    return backtest_data_dir(
-        data_dir, days=days, max_samples=None, verified_outcomes_only=True
-    )
+    return backtest_data_dir(data_dir, days=days, max_samples=None, verified_outcomes_only=True)
 
 
 def assess(data_dir: Path, days: int, **thresholds: object) -> int:

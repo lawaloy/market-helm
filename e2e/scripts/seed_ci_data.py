@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Write representative E2E data using the app's trading-day rule (prevents auto-fetch)."""
+
 from __future__ import annotations
 
 import json

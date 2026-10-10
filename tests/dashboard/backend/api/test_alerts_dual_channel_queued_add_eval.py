@@ -244,15 +244,15 @@ def test_queued_evaluate_delivers_added_dual_channel_watch_without_touching_sibl
     assert get_watch(user_a, "goog_drop")["defaults"]["webhook_url"] == url_a
     assert _enabled_flag(user_a, "aapl_drop") == 1
     assert _enabled_flag(user_a, "goog_drop") == 1
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")
-    } == {(user_a, "aapl_drop")}
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("GOOG")
-    } == {(user_a, "goog_drop")}
-    assert {
-        (w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")
-    } == {(user_b, "sibling-msft")}
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("AAPL")} == {
+        (user_a, "aapl_drop")
+    }
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("GOOG")} == {
+        (user_a, "goog_drop")
+    }
+    assert {(w["user_id"], w["alert_id"]) for w in list_watches_for_symbol("MSFT")} == {
+        (user_b, "sibling-msft")
+    }
     assert set(list_enabled_symbols()) == {"AAPL", "GOOG", "MSFT"}
 
     with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as send_log:

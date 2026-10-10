@@ -61,9 +61,7 @@ def _payload(cooldown_minutes):
         ("NaN", "cooldown-nan@example.com"),
     ],
 )
-def test_hosted_put_rejects_nonfinite_cooldown(
-    client, multi_user_env, raw_token, email
-):
+def test_hosted_put_rejects_nonfinite_cooldown(client, multi_user_env, raw_token, email):
     token = _register(client, email)
     headers = {
         "Authorization": f"Bearer {token}",

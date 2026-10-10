@@ -15,7 +15,8 @@ def test_prices_from_saved_daily_data(mock_get_loader, tmp_path):
     mock_get_loader.return_value.data_dir = tmp_path
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 180.5}, {"symbol": "GOOGL", "close": 170.25}],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     assert prices_from_saved_daily_data() == {"AAPL": 180.5, "GOOGL": 170.25}
 
@@ -82,21 +83,25 @@ def test_prices_from_saved_daily_data_skips_invalid_symbol_tokens(mock_get_loade
             {"symbol": "  ", "close": 3.0},
             {"symbol": " msft ", "close": 400.0},
         ],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5, "MSFT": 400.0}
 
 
 @patch("dashboard.backend.services.data_loader.get_data_loader")
-def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_get_loader, tmp_path):
+def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(
+    mock_get_loader, tmp_path
+):
     upsert_market_bars(
         [
             {"symbol": "AAPL", "close": 180.5},
             {"symbol": "", "close": 12.0},
             {"symbol": "BAD", "close": "n/a"},
         ],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5}
@@ -104,7 +109,8 @@ def test_prices_from_saved_daily_data_skips_invalid_rows_and_loader_errors(mock_
     next_dir = tmp_path / "next"
     upsert_market_bars(
         [{"symbol": "GOOG", "price": 140.0}],
-        "2026-10-02", data_dir=next_dir,
+        "2026-10-02",
+        data_dir=next_dir,
     )
     mock_get_loader.return_value.data_dir = next_dir
     assert prices_from_saved_daily_data() == {"GOOG": 140.0}
@@ -135,7 +141,8 @@ def test_prices_from_saved_daily_data_keeps_zero_close(mock_get_loader, tmp_path
             {"symbol": "AAPL", "close": 0},
             {"symbol": "MSFT", "close": 400.0},
         ],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 0.0, "MSFT": 400.0}
@@ -178,7 +185,8 @@ def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader, t
             {"symbol": "INF", "close": float("inf")},
             {"symbol": "NINF", "close": float("-inf")},
         ],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     mock_get_loader.return_value.data_dir = tmp_path
     assert prices_from_saved_daily_data() == {"AAPL": 180.5}
@@ -187,14 +195,17 @@ def test_prices_from_saved_daily_data_skips_non_finite_closes(mock_get_loader, t
 def test_latest_saved_quote_uses_provider_time_across_weekend_snapshots(tmp_path):
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 100, "quote_timestamp": "2026-10-02T15:07:00+00:00"}],
-        "2026-10-02", data_dir=tmp_path,
+        "2026-10-02",
+        data_dir=tmp_path,
     )
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 101, "quote_timestamp": "2026-10-02T20:00:00+00:00"}],
-        "2026-10-03", data_dir=tmp_path,
+        "2026-10-03",
+        data_dir=tmp_path,
     )
     assert latest_saved_quotes(data_dir=tmp_path)["AAPL"] == {
-        "price": 101.0, "as_of": "2026-10-02T20:00:00+00:00"
+        "price": 101.0,
+        "as_of": "2026-10-02T20:00:00+00:00",
     }
 
 
@@ -234,9 +245,7 @@ def test_resolve_symbol_prices_keeps_saved_when_live_fetcher_unavailable(
 
 @patch("src.services.data_fetcher.StockDataFetcher")
 @patch("src.alerts.symbol_prices.prices_from_saved_daily_data", return_value={})
-def test_resolve_symbol_prices_duplicates_do_not_starve_live_cap(
-    _mock_saved, mock_fetcher_cls
-):
+def test_resolve_symbol_prices_duplicates_do_not_starve_live_cap(_mock_saved, mock_fetcher_cls):
     """Padded duplicates must unique before the 15-symbol live-fetch budget.
 
     Settings quote pickers can pass the same ticker many times. If the cap

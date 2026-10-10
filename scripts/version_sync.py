@@ -16,6 +16,7 @@ When this runs
 ``check`` never modifies files. Only ``sync`` writes. Broken inputs (missing ``setup.cfg``, bad JSON,
 missing markers in ``main.py``) print a short message to stderr and exit **2** (not a Python traceback).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -94,9 +95,7 @@ def check(root: Path) -> list[str]:
     if top != want:
         errors.append(f"{_repo_rel_posix(root, lock)} root version: {top!r} != {want!r}")
     if inner != want:
-        errors.append(
-            f'{_repo_rel_posix(root, lock)} packages[""] version: {inner!r} != {want!r}'
-        )
+        errors.append(f'{_repo_rel_posix(root, lock)} packages[""] version: {inner!r} != {want!r}')
 
     main_py = root / "dashboard" / "backend" / "main.py"
     fa, rj = read_main_py_versions(main_py)

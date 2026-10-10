@@ -47,7 +47,12 @@ def build_smoke_config(
             "name": "Smoke Test (log)",
             "enabled": True,
             "notifications": ["log"],
-            "condition": {"type": "price_threshold", "symbol": "TEST", "operator": "less_than", "value": 1},
+            "condition": {
+                "type": "price_threshold",
+                "symbol": "TEST",
+                "operator": "less_than",
+                "value": 1,
+            },
         },
         {
             "id": "smoke_webhook_json",
@@ -56,7 +61,12 @@ def build_smoke_config(
             "notifications": ["webhook"],
             "webhook_url": webhook_url,
             "webhook_format": "json",
-            "condition": {"type": "price_threshold", "symbol": "TEST", "operator": "less_than", "value": 1},
+            "condition": {
+                "type": "price_threshold",
+                "symbol": "TEST",
+                "operator": "less_than",
+                "value": 1,
+            },
         },
         {
             "id": "smoke_webhook_slack",
@@ -65,7 +75,12 @@ def build_smoke_config(
             "notifications": ["webhook"],
             "webhook_url": webhook_url,
             "webhook_format": "slack",
-            "condition": {"type": "price_threshold", "symbol": "TEST", "operator": "less_than", "value": 1},
+            "condition": {
+                "type": "price_threshold",
+                "symbol": "TEST",
+                "operator": "less_than",
+                "value": 1,
+            },
         },
     ]
     if discord_webhook_url:
@@ -77,7 +92,12 @@ def build_smoke_config(
                 "notifications": ["webhook"],
                 "webhook_url": discord_webhook_url,
                 "webhook_format": "discord",
-                "condition": {"type": "price_threshold", "symbol": "TEST", "operator": "less_than", "value": 1},
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "TEST",
+                    "operator": "less_than",
+                    "value": 1,
+                },
             }
         )
     if include_email:
@@ -88,7 +108,12 @@ def build_smoke_config(
                 "enabled": True,
                 "notifications": ["email"],
                 "email_to": os.environ.get("ALERT_EMAIL_TO"),
-                "condition": {"type": "price_threshold", "symbol": "TEST", "operator": "less_than", "value": 1},
+                "condition": {
+                    "type": "price_threshold",
+                    "symbol": "TEST",
+                    "operator": "less_than",
+                    "value": 1,
+                },
             }
         )
     return {"alerts": alerts}
@@ -119,9 +144,13 @@ def main() -> int:
     if args.webhook_url == "https://httpbin.org/post" and not os.environ.get("ALERT_WEBHOOK_URL"):
         print("Webhook: using https://httpbin.org/post (HTTP 200 = success).")
         print("  For Slack, pass --webhook-url with your incoming webhook URL.\n")
-    if args.discord_webhook_url == "https://httpbin.org/post" and not os.environ.get("DISCORD_WEBHOOK_URL"):
+    if args.discord_webhook_url == "https://httpbin.org/post" and not os.environ.get(
+        "DISCORD_WEBHOOK_URL"
+    ):
         print("Discord: using https://httpbin.org/post (HTTP 200 = success).")
-        print("  For a real channel message, pass --discord-webhook-url or set DISCORD_WEBHOOK_URL.\n")
+        print(
+            "  For a real channel message, pass --discord-webhook-url or set DISCORD_WEBHOOK_URL.\n"
+        )
 
     include_email = not args.skip_email and smtp_configured()
     if not args.skip_email and not include_email:

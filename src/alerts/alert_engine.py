@@ -173,11 +173,7 @@ class AlertEngine:
         last_triggered = self.storage.get_last_triggered(alert["id"])
         if not last_triggered:
             return False
-        now = (
-            datetime.now(last_triggered.tzinfo)
-            if last_triggered.tzinfo
-            else datetime.utcnow()
-        )
+        now = datetime.now(last_triggered.tzinfo) if last_triggered.tzinfo else datetime.utcnow()
         try:
             window = timedelta(minutes=cooldown_minutes)
         except OverflowError:
@@ -194,9 +190,7 @@ class AlertEngine:
         raw_notifications = alert.get("notifications")
         # Non-lists (e.g. int/str) are not iterable channel names; strings also
         # make `"email" in notifications` true via substring membership.
-        notifier_names = (
-            raw_notifications if isinstance(raw_notifications, list) else ["log"]
-        )
+        notifier_names = raw_notifications if isinstance(raw_notifications, list) else ["log"]
         if not notifier_names:
             notifier_names = ["log"]
         instances: List[Any] = []
@@ -268,9 +262,7 @@ class AlertEngine:
                 )
             elif condition_type == "compound":
                 history = self._closes_for_evaluate(stocks)
-                triggered_symbols = evaluate_compound(
-                    condition, stocks, closes_by_symbol=history
-                )
+                triggered_symbols = evaluate_compound(condition, stocks, closes_by_symbol=history)
             else:
                 logger.warning(f"Unsupported alert condition: {condition_type}")
                 continue

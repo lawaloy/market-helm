@@ -120,9 +120,7 @@ def test_put_disable_drops_watch_from_index_without_touching_sibling(client) -> 
 
     sibling = client.get("/api/alerts/config", headers=headers_b)
     assert sibling.status_code == 200
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]
     assert sibling.json()["config"]["alerts"][0]["enabled"] is True
 
 
@@ -312,9 +310,7 @@ def test_put_same_id_symbol_swap_drops_old_symbol_without_touching_sibling(
         json=_price_payload("price_watch", "GOOG"),
     )
     assert swapped.status_code == 200
-    assert [alert["id"] for alert in swapped.json()["config"]["alerts"]] == [
-        "price_watch"
-    ]
+    assert [alert["id"] for alert in swapped.json()["config"]["alerts"]] == ["price_watch"]
     assert swapped.json()["config"]["alerts"][0]["condition"]["symbol"] == "GOOG"
 
     assert _watch_ids("AAPL") == set()
@@ -325,9 +321,7 @@ def test_put_same_id_symbol_swap_drops_old_symbol_without_touching_sibling(
 
     sibling = client.get("/api/alerts/config", headers=headers_b)
     assert sibling.status_code == 200
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]
 
 
 def test_put_retarget_skips_queued_old_symbol_and_delivers_new(client) -> None:

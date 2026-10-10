@@ -144,9 +144,7 @@ def test_send_returns_false_on_smtp_error(mock_smtp_cls: MagicMock) -> None:
 )
 def test_from_alert_returns_none_without_recipients() -> None:
     """SMTP can be configured but email still fails closed without recipients."""
-    assert (
-        EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
-    )
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
 
 
 @patch.dict(
@@ -160,9 +158,7 @@ def test_from_alert_returns_none_without_recipients() -> None:
 )
 def test_from_alert_returns_none_without_from_address() -> None:
     """SendGrid without ALERT_EMAIL_FROM must not build a notifier."""
-    assert (
-        EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
-    )
+    assert EmailNotifier.from_alert({"id": "a1", "notifications": ["email"]}) is None
 
 
 @patch.dict(

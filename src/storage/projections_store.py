@@ -173,7 +173,8 @@ def _row_from_projection(
         _finite_or_none(stock.get("volatility_score")),
         _optional_text(stock.get("risk_level")),
         _optional_text(stock.get("reason")),
-        _as_trade_date(stock.get("projection_date")) or _optional_text(stock.get("projection_date")),
+        _as_trade_date(stock.get("projection_date"))
+        or _optional_text(stock.get("projection_date")),
         horizon_n,
         _optional_text(stock.get("projection_calendar")),
         _optional_text(stock.get("generated_at")),
@@ -356,12 +357,8 @@ def load_daily_summary(
         payload = {
             "date": day,
             "analysis": _json_loads(row["analysis_json"], default={}),
-            "exchange_comparison": _json_loads(
-                row["exchange_comparison_json"], default={}
-            ),
-            "projection_summary": _json_loads(
-                row["projection_summary_json"], default={}
-            ),
+            "exchange_comparison": _json_loads(row["exchange_comparison_json"], default={}),
+            "projection_summary": _json_loads(row["projection_summary_json"], default={}),
         }
         if row["ai_summary"] is not None:
             payload["ai_summary"] = row["ai_summary"]
@@ -375,9 +372,7 @@ def load_daily_summary(
                 row["exchange_comparison_json"], default={}
             )
         if "projection_summary" not in payload and row["projection_summary_json"]:
-            payload["projection_summary"] = _json_loads(
-                row["projection_summary_json"], default={}
-            )
+            payload["projection_summary"] = _json_loads(row["projection_summary_json"], default={})
         if row["ai_summary"] is not None and "ai_summary" not in payload:
             payload["ai_summary"] = row["ai_summary"]
     return payload

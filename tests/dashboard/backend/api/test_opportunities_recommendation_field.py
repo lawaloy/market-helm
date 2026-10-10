@@ -26,9 +26,7 @@ def client(temp_data_dir):
     import dashboard.backend.api.projections
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
         from dashboard.backend.main import app
 
@@ -92,9 +90,7 @@ def _write_fixtures(temp_data_dir: Path) -> None:
     )
 
 
-def test_opportunities_include_recommendation_matching_filter_type(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_include_recommendation_matching_filter_type(client, temp_data_dir) -> None:
     """Table filters need recommendation; trend alone is Bullish/Bearish."""
     _write_fixtures(temp_data_dir)
 
@@ -111,9 +107,7 @@ def test_opportunities_include_recommendation_matching_filter_type(
     assert row["trend"] == "Bullish"
 
 
-def test_opportunities_sell_bucket_keeps_trend_independent(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_sell_bucket_keeps_trend_independent(client, temp_data_dir) -> None:
     _write_fixtures(temp_data_dir)
 
     r = client.get(

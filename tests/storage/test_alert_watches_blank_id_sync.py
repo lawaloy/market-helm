@@ -62,13 +62,9 @@ def test_sync_skips_blank_and_missing_ids_without_dropping_siblings(db_users) ->
 
     assert list_enabled_symbols() == ["AAPL", "GOOG"]
     goog = list_watches_for_symbol("GOOG")
-    assert [(w["user_id"], w["alert_id"]) for w in goog] == [
-        (mixed_user, "keep-goog")
-    ]
+    assert [(w["user_id"], w["alert_id"]) for w in goog] == [(mixed_user, "keep-goog")]
     aapl = list_watches_for_symbol("AAPL")
-    assert [(w["user_id"], w["alert_id"]) for w in aapl] == [
-        (sibling_user, "sibling-aapl")
-    ]
+    assert [(w["user_id"], w["alert_id"]) for w in aapl] == [(sibling_user, "sibling-aapl")]
     assert list_watches_for_symbol("MSFT") == []
     assert list_watches_for_symbol("NFLX") == []
 

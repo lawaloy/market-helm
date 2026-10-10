@@ -1,6 +1,7 @@
 """
 Historical trends API endpoints
 """
+
 import logging
 import math
 from datetime import date as calendar_date
@@ -36,9 +37,7 @@ def _finite_column_mean(df: pd.DataFrame, column: str, default: float = 0.0) -> 
     if column not in df.columns:
         return default
     series = pd.to_numeric(df[column], errors="coerce")
-    finite = series.map(
-        lambda value: isinstance(value, (int, float)) and math.isfinite(value)
-    )
+    finite = series.map(lambda value: isinstance(value, (int, float)) and math.isfinite(value))
     if not bool(finite.any()):
         return default
     return _safe_float(series[finite].mean(), default)
@@ -124,6 +123,7 @@ def build_symbol_catalog() -> tuple:
 
 class DailySummaryPoint(BaseModel):
     """Summary for a single day"""
+
     date: str
     totalProjections: int
     averageConfidence: float
@@ -138,6 +138,7 @@ class DailySummaryPoint(BaseModel):
 
 class HistoricalSummaryResponse(BaseModel):
     """Aggregated historical summary"""
+
     dates: List[str]
     data: List[DailySummaryPoint]
     firstDate: str
@@ -319,34 +320,36 @@ async def get_historical_summary(
                 else:
                     sentiment = "Neutral"
 
-                rec_counts = df['recommendation'].value_counts().to_dict() if 'recommendation' in df.columns else {}
+                rec_counts = (
+                    df["recommendation"].value_counts().to_dict()
+                    if "recommendation" in df.columns
+                    else {}
+                )
                 strong_buy = rec_counts.get("STRONG BUY", 0)
                 buy = rec_counts.get("BUY", 0)
                 hold = rec_counts.get("HOLD", 0)
                 sell = rec_counts.get("SELL", 0)
                 strong_sell = rec_counts.get("STRONG SELL", 0)
 
-                data_points.append(DailySummaryPoint(
-                    date=date,
-                    totalProjections=total,
-                    averageConfidence=round(avg_confidence, 1),
-                    expectedMarketMove=round(avg_expected, 2),
-                    sentiment=sentiment,
-                    strongBuy=strong_buy,
-                    buy=buy,
-                    hold=hold,
-                    sell=sell,
-                    strongSell=strong_sell,
-                ))
+                data_points.append(
+                    DailySummaryPoint(
+                        date=date,
+                        totalProjections=total,
+                        averageConfidence=round(avg_confidence, 1),
+                        expectedMarketMove=round(avg_expected, 2),
+                        sentiment=sentiment,
+                        strongBuy=strong_buy,
+                        buy=buy,
+                        hold=hold,
+                        sell=sell,
+                        strongSell=strong_sell,
+                    )
+                )
                 # Extract symbols and names from first successful load (latest data)
-                if not symbols_list and 'symbol' in df.columns:
+                if not symbols_list and "symbol" in df.columns:
                     # Normalize so None/NaN never leak as NONE/NAN list entries.
                     symbols_list = sorted(
-                        {
-                            key
-                            for key in (normalize_ticker(s) for s in df["symbol"].unique())
-                            if key
-                        }
+                        {key for key in (normalize_ticker(s) for s in df["symbol"].unique()) if key}
                     )
                     if "name" in df.columns:
                         symbol_names = {}
@@ -407,19 +410,21 @@ async def get_run_projections(
         symbol = normalize_ticker(row.get("symbol"))
         if not symbol:
             continue
-        projections.append(RunProjection(
-            symbol=symbol,
-            name=_display_text(row.get("name"), symbol),
-            recommendation=_display_text(row.get("recommendation"), "Unrated"),
-            confidence=_optional_finite(row.get("confidence")),
-            expectedChange=_optional_finite(row.get("expected_change_percent")),
-            currentPrice=_optional_finite(row.get("current_price")),
-            targetPrice=_optional_finite(row.get("target_mid")),
-            targetLow=_optional_finite(row.get("target_low")),
-            targetHigh=_optional_finite(row.get("target_high")),
-            risk=_display_text(row.get("risk_level"), "Unknown"),
-            reason=_display_text(row.get("reason")),
-        ))
+        projections.append(
+            RunProjection(
+                symbol=symbol,
+                name=_display_text(row.get("name"), symbol),
+                recommendation=_display_text(row.get("recommendation"), "Unrated"),
+                confidence=_optional_finite(row.get("confidence")),
+                expectedChange=_optional_finite(row.get("expected_change_percent")),
+                currentPrice=_optional_finite(row.get("current_price")),
+                targetPrice=_optional_finite(row.get("target_mid")),
+                targetLow=_optional_finite(row.get("target_low")),
+                targetHigh=_optional_finite(row.get("target_high")),
+                risk=_display_text(row.get("risk_level"), "Unknown"),
+                reason=_display_text(row.get("reason")),
+            )
+        )
 
     return RunProjectionsResponse(
         date=day,

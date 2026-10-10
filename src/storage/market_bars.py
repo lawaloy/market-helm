@@ -368,9 +368,7 @@ def latest_saved_quotes(
         quote_time = _optional_text(row["quote_timestamp"])
         try:
             quote_at = (
-                datetime.fromisoformat(quote_time.replace("Z", "+00:00"))
-                if quote_time
-                else None
+                datetime.fromisoformat(quote_time.replace("Z", "+00:00")) if quote_time else None
             )
             if quote_at is not None and quote_at.tzinfo is not None:
                 quote_at = quote_at.astimezone(timezone.utc)

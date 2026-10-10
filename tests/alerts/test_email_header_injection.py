@@ -29,12 +29,8 @@ def test_format_alert_email_strips_crlf_from_alert_name() -> None:
 
 
 def test_parse_recipients_drops_crlf_and_malformed_addresses() -> None:
-    assert parse_recipients("ok@example.com, evil\r\nBcc:x@example.com") == [
-        "ok@example.com"
-    ]
-    assert parse_recipients(["ok@example.com", "nope\nevil@example.com"]) == [
-        "ok@example.com"
-    ]
+    assert parse_recipients("ok@example.com, evil\r\nBcc:x@example.com") == ["ok@example.com"]
+    assert parse_recipients(["ok@example.com", "nope\nevil@example.com"]) == ["ok@example.com"]
     assert parse_recipients("not-an-email, also bad") == []
     assert parse_recipients("a@example.com") == ["a@example.com"]
 

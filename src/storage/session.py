@@ -50,8 +50,11 @@ def _b64url_decode(segment: str) -> bytes:
 def create_access_token(
     user_id: str, *, session_version: int = 1, ttl_seconds: int = DEFAULT_TTL_SECONDS
 ) -> str:
-    if isinstance(session_version, bool) or not isinstance(session_version, int) \
-            or session_version < 1:
+    if (
+        isinstance(session_version, bool)
+        or not isinstance(session_version, int)
+        or session_version < 1
+    ):
         raise AuthError("Invalid session version.")
     payload = {
         "sub": user_id,
@@ -92,8 +95,11 @@ def decode_access_token(token: str) -> Dict[str, Any]:
         if not isinstance(user_id, str) or not user_id.strip():
             raise AuthError("Invalid token subject.")
         session_version = payload.get("sv", 1)
-        if isinstance(session_version, bool) or not isinstance(session_version, int) \
-                or session_version < 1:
+        if (
+            isinstance(session_version, bool)
+            or not isinstance(session_version, int)
+            or session_version < 1
+        ):
             raise AuthError("Invalid session version.")
         return {"user_id": user_id.strip(), "session_version": session_version}
     except AuthError:

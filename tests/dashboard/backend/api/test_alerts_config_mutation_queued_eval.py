@@ -233,9 +233,7 @@ def test_put_new_alert_id_skips_queued_old_symbol_and_delivers_new(client) -> No
         json=_price_payload("goog_drop", "GOOG"),
     )
     assert replaced.status_code == 200
-    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == [
-        "goog_drop"
-    ]
+    assert [alert["id"] for alert in replaced.json()["config"]["alerts"]] == ["goog_drop"]
     assert not _watch_row_exists(user_a, "aapl_drop")
     assert get_watch(user_a, "aapl_drop") is None
     assert _watch_ids("AAPL") == set()

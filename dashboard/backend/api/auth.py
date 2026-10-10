@@ -25,7 +25,11 @@ from src.storage.users import (
     update_password,
 )
 from src.storage.account_tokens import (
-    RESET_PASSWORD, VERIFY_EMAIL, consume_token, issue_token, revoke_tokens,
+    RESET_PASSWORD,
+    VERIFY_EMAIL,
+    consume_token,
+    issue_token,
+    revoke_tokens,
 )
 from dashboard.backend.account_email import send_account_email
 
@@ -83,7 +87,10 @@ class DeleteAccountRequest(BaseModel):
 
 def _verification_required() -> bool:
     return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
-        "1", "true", "yes", "on"
+        "1",
+        "true",
+        "yes",
+        "on",
     }
 
 
@@ -137,9 +144,7 @@ async def login(body: LoginRequest) -> AuthResponse:
     if _verification_required() and not full_user.get("email_verified"):
         raise HTTPException(status_code=403, detail="Verify your email before signing in.")
     try:
-        token = create_access_token(
-            user["id"], session_version=full_user["session_version"]
-        )
+        token = create_access_token(user["id"], session_version=full_user["session_version"])
     except AuthError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return AuthResponse(access_token=token, user=full_user)

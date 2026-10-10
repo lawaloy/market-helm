@@ -32,9 +32,7 @@ def test_rolling_budget_sleeps_when_window_is_full() -> None:
     limiter.tokens = 10.0
     limiter.last_refill = clock.now
     oldest = clock.now - 10.0
-    limiter.call_times = deque(
-        [oldest] + [clock.now - 1.0] * (limiter.budget_max_calls - 1)
-    )
+    limiter.call_times = deque([oldest] + [clock.now - 1.0] * (limiter.budget_max_calls - 1))
 
     with patch("src.services.api_client.time.time", clock.time):
         with patch("src.services.api_client.time.sleep", clock.sleep):

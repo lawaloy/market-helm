@@ -157,6 +157,7 @@ def test_fetch_all_indices_continues_when_symbol_fetch_raises(
     assert symbols == ["GOOD", "OK"]
     assert all(row["index_name"] == "S&P 500" for row in result["S&P 500"])
 
+
 @patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
 @patch("src.services.data_fetcher.IndexFetcher")
 @patch("src.services.data_fetcher.ThreadPoolExecutor")
@@ -190,6 +191,7 @@ def test_fetch_all_indices_clamps_invalid_and_oversized_worker_env(
     fetcher.fetch_all_indices(use_screener=False)
     assert mock_executor_cls.call_args.kwargs["max_workers"] == 1
 
+
 @patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
 @patch("src.services.data_fetcher.IndexFetcher")
 def test_fetch_all_indices_respects_max_symbols_per_index(
@@ -214,6 +216,7 @@ def test_fetch_all_indices_respects_max_symbols_per_index(
 
     assert fetched == ["S0", "S1", "S2", "S3", "S4"]
     assert len(result["S&P 500"]) == 5
+
 
 @patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
 @patch("src.services.data_fetcher.IndexFetcher")
@@ -279,6 +282,7 @@ def test_fetch_all_indices_falls_back_when_screener_raises(
 
     assert fetched == ["S0", "S1", "S2", "S3", "S4"]
     assert [row["symbol"] for row in result["S&P 500"]] == fetched
+
 
 @patch("src.services.data_fetcher.get_indices_to_track", return_value=["S&P 500"])
 @patch("src.services.data_fetcher.IndexFetcher")

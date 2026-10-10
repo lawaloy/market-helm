@@ -40,10 +40,7 @@ def _format_condition(condition: Any) -> str:
         return "?"
     ctype = condition.get("type", "?")
     if ctype == "price_threshold":
-        return (
-            f"{condition.get('symbol')} {condition.get('operator')} "
-            f"{condition.get('value')}"
-        )
+        return f"{condition.get('symbol')} {condition.get('operator')} " f"{condition.get('value')}"
     if ctype == "rsi_threshold":
         period = condition.get("period", 14)
         return (
@@ -114,9 +111,7 @@ def cmd_list(config_path: Optional[Path] = None) -> int:
         # Mixed-type lists (hand-edited JSON) must not TypeError on join.
         if isinstance(raw_notifications, list):
             channels = [
-                ch.strip()
-                for ch in raw_notifications
-                if isinstance(ch, str) and ch.strip()
+                ch.strip() for ch in raw_notifications if isinstance(ch, str) and ch.strip()
             ]
         else:
             channels = ["log"]
@@ -177,9 +172,7 @@ def run_alert_test(
         path, raw = load_alerts_config(config_path)
         if raw is None:
             if path.exists():
-                raise FileNotFoundError(
-                    f"Corrupt or invalid alerts config at {path}"
-                )
+                raise FileNotFoundError(f"Corrupt or invalid alerts config at {path}")
             raise FileNotFoundError(f"No alerts config at {path}")
         polished = polish_alerts_config(raw, seed_env_email=seed_env_email)
 
@@ -250,11 +243,11 @@ def run_alert_test(
     return {
         "alert_id": alert_id,
         "dry_run": dry_run,
-        "notifiers": delivered if not dry_run else [
-            label
-            for item in previews
-            if (label := _notifier_label(item["notifier"]))
-        ],
+        "notifiers": (
+            delivered
+            if not dry_run
+            else [label for item in previews if (label := _notifier_label(item["notifier"]))]
+        ),
         "previews": previews if dry_run else None,
         "status": "dry_run" if dry_run else "sent",
     }
@@ -313,14 +306,18 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     sub.add_parser("list", help="List configured alert rules")
 
-    init_parser = sub.add_parser("init", help="Create ~/.market-helm/alerts.json from the bundled example")
+    init_parser = sub.add_parser(
+        "init", help="Create ~/.market-helm/alerts.json from the bundled example"
+    )
     init_parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite an existing user alerts file",
     )
 
-    test_parser = sub.add_parser("test", help="Send a test notification for one rule (no market check)")
+    test_parser = sub.add_parser(
+        "test", help="Send a test notification for one rule (no market check)"
+    )
     test_parser.add_argument("--id", required=True, help="Alert id from alerts.json")
     test_parser.add_argument(
         "--dry-run",

@@ -37,14 +37,10 @@ def _email_alert_config(*, email_to: str | None = None):
 
 def test_run_alert_test_does_not_seed_env_email_when_hosted(hosted_db) -> None:
     """Without a tenant email_to, polish must not invent one from ALERT_EMAIL_TO."""
-    with patch(
-        "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=None
-    ) as from_alert:
+    with patch("src.alerts.alert_engine.EmailNotifier.from_alert", return_value=None) as from_alert:
         # Engine falls back to LogNotifier when email cannot be built — that is fine.
         # The regression is seeding global ALERT_EMAIL_TO onto the effective alert.
-        result = alerts_commands.run_alert_test(
-            "a1", dry_run=True, config=_email_alert_config()
-        )
+        result = alerts_commands.run_alert_test("a1", dry_run=True, config=_email_alert_config())
 
     assert from_alert.call_count >= 1
     effective = from_alert.call_args[0][0]
@@ -84,9 +80,7 @@ def test_run_alert_test_still_seeds_env_email_in_file_mode(monkeypatch, tmp_path
     with patch(
         "src.alerts.alert_engine.EmailNotifier.from_alert", return_value=notifier
     ) as from_alert:
-        alerts_commands.run_alert_test(
-            "a1", dry_run=True, config=_email_alert_config()
-        )
+        alerts_commands.run_alert_test("a1", dry_run=True, config=_email_alert_config())
 
     effective = from_alert.call_args[0][0]
     assert effective.get("email_to") == "ops@example.com"

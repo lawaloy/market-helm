@@ -116,9 +116,7 @@ def test_fetch_missing_watch_quotes_duplicates_do_not_starve_live_cap(
 
 
 @patch("src.services.data_fetcher.StockDataFetcher")
-def test_fetch_missing_watch_quotes_at_budget_does_not_warn(
-    mock_fetcher_cls, caplog
-) -> None:
+def test_fetch_missing_watch_quotes_at_budget_does_not_warn(mock_fetcher_cls, caplog) -> None:
     fetcher = MagicMock()
     fetcher.fetch_symbol_data.side_effect = lambda symbol: {
         "symbol": symbol,

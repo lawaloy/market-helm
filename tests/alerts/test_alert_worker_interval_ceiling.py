@@ -6,10 +6,7 @@ from src.alerts import alert_worker
 
 
 def test_resolve_interval_seconds_clamps_extreme_explicit() -> None:
-    assert (
-        alert_worker.resolve_interval_seconds(10**18)
-        == alert_worker.MAX_INTERVAL_SECONDS
-    )
+    assert alert_worker.resolve_interval_seconds(10**18) == alert_worker.MAX_INTERVAL_SECONDS
     assert (
         alert_worker.resolve_interval_seconds(alert_worker.MAX_INTERVAL_SECONDS)
         == alert_worker.MAX_INTERVAL_SECONDS
@@ -21,9 +18,7 @@ def test_resolve_interval_seconds_clamps_extreme_env(monkeypatch) -> None:
     monkeypatch.setenv("ALERT_CHECK_INTERVAL_SECONDS", "1000000000000")
     assert alert_worker.resolve_interval_seconds() == alert_worker.MAX_INTERVAL_SECONDS
 
-    monkeypatch.setenv(
-        "ALERT_CHECK_INTERVAL_SECONDS", str(alert_worker.MAX_INTERVAL_SECONDS)
-    )
+    monkeypatch.setenv("ALERT_CHECK_INTERVAL_SECONDS", str(alert_worker.MAX_INTERVAL_SECONDS))
     assert alert_worker.resolve_interval_seconds() == alert_worker.MAX_INTERVAL_SECONDS
 
 

@@ -43,9 +43,7 @@ class TestUserAlertStorage:
     def test_get_last_triggered_parses_z_suffix(self, db_user):
         sync_watches_from_config(db_user, _config())
         storage = UserAlertStorage(db_user)
-        storage.record_event(
-            {"alert_id": "aapl-drop", "timestamp": "2026-07-24T12:00:00Z"}
-        )
+        storage.record_event({"alert_id": "aapl-drop", "timestamp": "2026-07-24T12:00:00Z"})
 
         got = storage.get_last_triggered("aapl-drop")
         assert got == datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc)
@@ -66,9 +64,7 @@ class TestUserAlertStorage:
         assert storage.get_last_triggered("aapl-drop") is None
         assert storage.latest_event_timestamp() is None
 
-    def test_get_last_triggered_returns_none_for_unparseable_db_timestamp(
-        self, db_user
-    ):
+    def test_get_last_triggered_returns_none_for_unparseable_db_timestamp(self, db_user):
         """Corrupt hosted trigger rows must fail closed (no cooldown parse)."""
         sync_watches_from_config(db_user, _config())
         with get_connection() as conn:

@@ -16,9 +16,7 @@ def test_allow_overrides_default_true_in_file_mode(monkeypatch) -> None:
 
 
 def test_allow_overrides_default_false_when_database_enabled(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db"
-    )
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db")
     assert _allow_alert_smtp_overrides({"id": "a1", "smtp_host": "evil.example"}) is False
     assert (
         _allow_alert_smtp_overrides(
@@ -29,15 +27,11 @@ def test_allow_overrides_default_false_when_database_enabled(monkeypatch) -> Non
 
 
 def test_platform_from_ignores_alert_email_from_in_hosted_mode(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db"
-    )
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db")
     monkeypatch.setenv("ALERT_EMAIL_FROM", "platform@markethelm.example")
 
     assert (
-        _platform_from_address(
-            {"id": "a1", "email_from": "spoof@attacker.example"}
-        )
+        _platform_from_address({"id": "a1", "email_from": "spoof@attacker.example"})
         == "platform@markethelm.example"
     )
 
@@ -47,15 +41,12 @@ def test_platform_from_honors_alert_email_from_in_file_mode(monkeypatch) -> None
     monkeypatch.delenv("ALERT_EMAIL_FROM", raising=False)
 
     assert (
-        _platform_from_address({"id": "a1", "email_from": "ops@example.com"})
-        == "ops@example.com"
+        _platform_from_address({"id": "a1", "email_from": "ops@example.com"}) == "ops@example.com"
     )
 
 
 def test_build_smtp_backend_ignores_tenant_host_in_hosted_mode(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db"
-    )
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db")
     monkeypatch.setenv("SMTP_HOST", "smtp.platform.example")
     monkeypatch.setenv("SMTP_PORT", "587")
     monkeypatch.setenv("SMTP_USER", "platform-user")
@@ -99,12 +90,8 @@ def test_build_smtp_backend_uses_alert_overrides_in_file_mode(monkeypatch) -> No
 
 
 @patch("src.alerts.notifiers.email_delivery.SmtpEmailBackend.send", return_value=True)
-def test_from_alert_uses_platform_smtp_not_tenant_host(
-    mock_send: MagicMock, monkeypatch
-) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db"
-    )
+def test_from_alert_uses_platform_smtp_not_tenant_host(mock_send: MagicMock, monkeypatch) -> None:
+    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-smtp-iso.db")
     monkeypatch.setenv("ALERT_EMAIL_PROVIDER", "smtp")
     monkeypatch.setenv("SMTP_HOST", "smtp.platform.example")
     monkeypatch.setenv("SMTP_USER", "platform-user")

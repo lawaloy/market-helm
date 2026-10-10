@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 MODULE_PATH = Path(__file__).resolve().parents[2] / "scripts" / "projection_collection_day.py"
 SPEC = importlib.util.spec_from_file_location("projection_collection_day", MODULE_PATH)
 assert SPEC is not None

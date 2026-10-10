@@ -11,7 +11,9 @@ def setup_function():
     company_names._name_cache.clear()
 
 
-@pytest.mark.parametrize("poison", [float("nan"), float("inf"), float("-inf"), "nan", "INF", None, ""])
+@pytest.mark.parametrize(
+    "poison", [float("nan"), float("inf"), float("-inf"), "nan", "INF", None, ""]
+)
 def test_resolve_skips_nonfinite_catalog_name_and_falls_back_to_symbol(poison):
     mock_data = MagicMock()
     mock_data.get_stocks_by_index.side_effect = lambda index: (
@@ -26,9 +28,7 @@ def test_resolve_skips_nonfinite_catalog_name_and_falls_back_to_symbol(poison):
 def test_resolve_caches_cleaned_catalog_name_not_raw_float():
     mock_data = MagicMock()
     mock_data.get_stocks_by_index.side_effect = lambda index: (
-        [{"symbol": "MSFT", "name": "  Microsoft Corporation  "}]
-        if index == "S&P 500"
-        else []
+        [{"symbol": "MSFT", "name": "  Microsoft Corporation  "}] if index == "S&P 500" else []
     )
     with patch("pytickersymbols.PyTickerSymbols", return_value=mock_data):
         assert company_names.resolve_company_name("MSFT") == "Microsoft Corporation"

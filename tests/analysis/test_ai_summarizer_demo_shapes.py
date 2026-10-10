@@ -11,7 +11,12 @@ def test_demo_summary_skips_non_dict_and_blank_symbol_movers() -> None:
             "losers": 2,
             "average_change_percent": 1.25,
         },
-        "top_gainers": [None, "AAPL", {"symbol": "  ", "change_percent": 9.0}, {"symbol": "GOOD", "change_percent": 4.5}],
+        "top_gainers": [
+            None,
+            "AAPL",
+            {"symbol": "  ", "change_percent": 9.0},
+            {"symbol": "GOOD", "change_percent": 4.5},
+        ],
         "top_losers": [{"change_percent": -3.0}, {"symbol": "DROP", "change_percent": -2.25}],
     }
 

@@ -18,7 +18,9 @@ def main() -> int:
     symbols, names = build_symbol_catalog()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(
-        json.dumps({"symbols": symbols, "names": names, "count": len(symbols)}, separators=(",", ":")),
+        json.dumps(
+            {"symbols": symbols, "names": names, "count": len(symbols)}, separators=(",", ":")
+        ),
         encoding="utf-8",
     )
     print(f"Wrote {len(symbols)} symbols to {OUT}")

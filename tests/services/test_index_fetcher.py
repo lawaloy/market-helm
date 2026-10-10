@@ -80,10 +80,11 @@ def test_get_sp500_symbols_normalizes_package_symbols_before_cache(tmp_path):
     fetcher = IndexFetcher(cache_dir=str(tmp_path))
     package = MagicMock()
     # Need >400 after normalize/dedupe for the sanity gate.
-    package.get_stocks_by_index.return_value = (
-        [{"symbol": f"s{i}"} for i in range(401)]
-        + [{"symbol": " S0 "}, {"symbol": None}, {"symbol": "NAN"}]
-    )
+    package.get_stocks_by_index.return_value = [{"symbol": f"s{i}"} for i in range(401)] + [
+        {"symbol": " S0 "},
+        {"symbol": None},
+        {"symbol": "NAN"},
+    ]
     fetcher.package_available = True
     fetcher.ticker_symbols = package
 

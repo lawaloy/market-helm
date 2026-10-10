@@ -1,6 +1,7 @@
 """
 Market API endpoints
 """
+
 import math
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -140,9 +141,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
         symbol = top_gainer.get("symbol")
         if symbol is not None and "change_percent" in top_gainer:
             change = _safe_float(top_gainer.get("change_percent"))
-            summary_parts.append(
-                f"{symbol} led gains with a {change:.2f}% increase."
-            )
+            summary_parts.append(f"{symbol} led gains with a {change:.2f}% increase.")
 
     if top_losers:
         top_loser = _as_dict(top_losers[0])
@@ -150,8 +149,7 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
         if symbol is not None and "change_percent" in top_loser:
             change = _safe_float(top_loser.get("change_percent"))
             summary_parts.append(
-                f"{symbol} declined {abs(change):.2f}%, "
-                "marking the largest drop."
+                f"{symbol} declined {abs(change):.2f}%, " "marking the largest drop."
             )
 
     items = [
@@ -179,10 +177,10 @@ async def get_market_overview():
     try:
         loader = get_data_loader()
         date = loader.get_latest_date()
-        
+
         if not date:
             raise HTTPException(status_code=404, detail="No data available")
-        
+
         # Load daily data
         df = loader.load_daily_data()
         if df is None or getattr(df, "empty", False) or "change_percent" not in df.columns:
@@ -198,8 +196,8 @@ async def get_market_overview():
             if "quote_timestamp" in df.columns
             else []
         )
-        complete_quote_times = (
-            len(quote_times) == len(df) and all(value is not None for value in quote_times)
+        complete_quote_times = len(quote_times) == len(df) and all(
+            value is not None for value in quote_times
         )
         total_stocks = len(df)
         gainers = int((change > 0).sum())
@@ -212,14 +210,14 @@ async def get_market_overview():
 
         # Calculate per-index statistics
         indices = {}
-        if 'index_name' in df.columns:
-            for index_name in df['index_name'].unique():
+        if "index_name" in df.columns:
+            for index_name in df["index_name"].unique():
                 key = _overview_index_key(index_name)
                 if key is None:
                     # Corrupt/missing index labels previously AttributeError'd on
                     # .replace and 500'd the whole overview payload.
                     continue
-                index_mask = df['index_name'] == index_name
+                index_mask = df["index_name"] == index_name
                 index_change = change[index_mask]
                 indices[key] = IndexData(
                     stocks=int(index_mask.sum()),
@@ -227,7 +225,7 @@ async def get_market_overview():
                     gainers=int((index_change > 0).sum()),
                     losers=int((index_change < 0).sum()),
                 )
-        
+
         return MarketOverview(
             date=date,
             quoteTimeStart=min(quote_times).isoformat() if complete_quote_times else None,
@@ -239,9 +237,9 @@ async def get_market_overview():
             averageChange=round(avg_change, 2),
             maxChange=round(max_change, 2),
             minChange=round(min_change, 2),
-            indices=indices
+            indices=indices,
         )
-    
+
     except HTTPException:
         raise
     except ValueError:
@@ -252,8 +250,7 @@ async def get_market_overview():
 
 @router.get("/movers", response_model=MoversResponse)
 async def get_top_movers(
-    type: str = Query("gainers", pattern="^(gainers|losers)$"),
-    limit: int = Query(10, ge=1, le=50)
+    type: str = Query("gainers", pattern="^(gainers|losers)$"), limit: int = Query(10, ge=1, le=50)
 ):
     """Get top gainers or losers"""
     try:
@@ -270,21 +267,17 @@ async def get_top_movers(
         # Filter by sign first so a large limit cannot mix gainers into losers
         # (or vice versa) when fewer matching movers exist than `limit`.
         if type == "gainers":
-            sorted_df = ranked[ranked["_change_percent"] > 0].nlargest(
-                limit, "_change_percent"
-            )
+            sorted_df = ranked[ranked["_change_percent"] > 0].nlargest(limit, "_change_percent")
         else:
-            sorted_df = ranked[ranked["_change_percent"] < 0].nsmallest(
-                limit, "_change_percent"
-            )
+            sorted_df = ranked[ranked["_change_percent"] < 0].nsmallest(limit, "_change_percent")
 
         movers = []
         for _, row in sorted_df.iterrows():
             # Skip non-finite price fields so one corrupt CSV row cannot null the payload
             # or abort the whole movers card via int(float('nan')).
-            price = _finite_float(row.get('close'))
-            change = _finite_float(row.get('change'))
-            change_percent = _finite_float(row.get('_change_percent'))
+            price = _finite_float(row.get("close"))
+            change = _finite_float(row.get("change"))
+            change_percent = _finite_float(row.get("_change_percent"))
             if price is None or change is None or change_percent is None:
                 continue
             symbol = row.get("symbol")
@@ -293,17 +286,23 @@ async def get_top_movers(
             symbol_text = str(symbol).strip()
             if not symbol_text:
                 continue
-            movers.append(StockMover(
-                symbol=symbol_text,
-                # Dirty CSV name cells (NaN/None) fail Pydantic str → 500 the card.
-                name=_safe_label(row.get('name'), symbol_text),
-                price=price,
-                change=change,
-                changePercent=change_percent,
-                volume=_safe_volume(row.get('volume', 0)),
-                quoteTimestamp=(timestamp.isoformat() if (timestamp := _quote_time(row.get('quote_timestamp'))) else None),
-            ))
-        
+            movers.append(
+                StockMover(
+                    symbol=symbol_text,
+                    # Dirty CSV name cells (NaN/None) fail Pydantic str → 500 the card.
+                    name=_safe_label(row.get("name"), symbol_text),
+                    price=price,
+                    change=change,
+                    changePercent=change_percent,
+                    volume=_safe_volume(row.get("volume", 0)),
+                    quoteTimestamp=(
+                        timestamp.isoformat()
+                        if (timestamp := _quote_time(row.get("quote_timestamp")))
+                        else None
+                    ),
+                )
+            )
+
         return MoversResponse(type=type, data=movers)
 
     except HTTPException:

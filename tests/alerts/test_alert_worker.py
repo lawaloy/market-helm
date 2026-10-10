@@ -362,12 +362,10 @@ def test_run_db_worker_cycle_evaluates_snapshot_and_delivers_per_user(db_users) 
     assert send.call_count == 2
 
     with get_connection() as conn:
-        rows = conn.execute(
-            """
+        rows = conn.execute("""
             SELECT user_id, alert_id FROM alert_trigger_state
             ORDER BY alert_id
-            """
-        ).fetchall()
+            """).fetchall()
 
     assert [(row["user_id"], row["alert_id"]) for row in rows] == [
         (user_a, "aapl-low-a"),

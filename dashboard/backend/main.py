@@ -1,6 +1,7 @@
 """
 FastAPI backend for the MarketHelm dashboard.
 """
+
 import logging
 
 logging.basicConfig(
@@ -29,6 +30,7 @@ for _p in _here.parents:
 # Load .env from cwd, then repo root (dev), then user config dir (pip install)
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
     for _p in _here.parents:
         if (_p / "main.py").is_file() and (_p / ".env").is_file():
@@ -75,7 +77,9 @@ def _startup_alert_check() -> None:
         result = run_check_once()
         triggered = _coerce_startup_triggered(result.get("triggered", 0))
         if triggered:
-            logging.getLogger(__name__).info("Startup alert check triggered %s watch(es)", triggered)
+            logging.getLogger(__name__).info(
+                "Startup alert check triggered %s watch(es)", triggered
+            )
     except Exception as exc:
         logging.getLogger(__name__).warning("Startup alert check failed: %s", exc)
 
@@ -131,8 +135,7 @@ def parse_cors_origins(
             continue
         if origin == "*":
             logging.getLogger(__name__).warning(
-                "Ignoring CORS origin %r — wildcard is incompatible with "
-                "allow_credentials=True",
+                "Ignoring CORS origin %r — wildcard is incompatible with " "allow_credentials=True",
                 origin,
             )
             continue
@@ -189,12 +192,17 @@ async def health_live():
 @app.get("/health/ready")
 async def health_ready():
     from src.storage.database import database_enabled
+
     if not database_enabled():
         return {"status": "ready", "database": "disabled"}
     from src.storage.health import database_health, latest_worker_heartbeat
+
     database = database_health()
-    payload = {"status": "ready" if database["ok"] else "not_ready",
-               "database": database, "worker": None}
+    payload = {
+        "status": "ready" if database["ok"] else "not_ready",
+        "database": database,
+        "worker": None,
+    }
     if database["ok"]:
         try:
             payload["worker"] = latest_worker_heartbeat()
@@ -208,10 +216,12 @@ async def health_ready():
 @app.get("/health/worker")
 async def health_worker():
     from src.storage.database import database_enabled
+
     if not database_enabled():
         return {"status": "disabled"}
     from src.alerts.alert_worker import resolve_interval_seconds
     from src.storage.health import worker_health
+
     health = worker_health(stale_after_seconds=resolve_interval_seconds() * 2 + 30)
     payload = {"status": "healthy" if health["ok"] else "unhealthy", **health}
     if not health["ok"]:
@@ -232,6 +242,7 @@ async def data_info(_user_id: Optional[str] = Depends(require_user_id)):
     readiness. File mode (``require_user_id`` → ``None``) stays open.
     """
     from dashboard.backend.services.data_loader import get_data_loader, get_most_recent_trading_day
+
     try:
         loader = get_data_loader()
         target_trading_day = get_most_recent_trading_day()
@@ -300,5 +311,6 @@ else:
 
 if __name__ == "__main__":
     import uvicorn
+
     reload = os.getenv("UVICORN_RELOAD", "").lower() in {"1", "true", "yes"}
     uvicorn.run("dashboard.backend.main:app", host="0.0.0.0", port=8000, reload=reload)

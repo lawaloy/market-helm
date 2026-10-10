@@ -54,11 +54,7 @@ def _fetch_missing_watch_quotes(
     if not watch_symbols:
         return stocks
 
-    present = {
-        key
-        for key in (normalize_ticker(stock.get("symbol")) for stock in stocks)
-        if key
-    }
+    present = {key for key in (normalize_ticker(stock.get("symbol")) for stock in stocks) if key}
     missing = [
         key
         for key in (normalize_ticker(symbol) for symbol in watch_symbols)

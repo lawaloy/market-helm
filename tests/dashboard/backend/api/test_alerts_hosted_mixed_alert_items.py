@@ -112,7 +112,5 @@ def test_hosted_get_config_skips_non_dict_alert_items_without_touching_sibling(
 
     assert sibling.status_code == 200
     assert sibling.json()["channels"]["email_recipients"] is False
-    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == [
-        "sibling-msft"
-    ]
+    assert [alert["id"] for alert in sibling.json()["config"]["alerts"]] == ["sibling-msft"]
     assert "ops-a@example.com" not in json.dumps(sibling.json())

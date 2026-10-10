@@ -99,12 +99,10 @@ class TestJobProcessor:
         assert stats["delivered"] == 2
         assert stats["failed"] == 0
         with get_connection() as conn:
-            rows = conn.execute(
-                """
+            rows = conn.execute("""
                 SELECT user_id, alert_id FROM alert_trigger_state
                 ORDER BY user_id, alert_id
-                """
-            ).fetchall()
+                """).fetchall()
         assert {(row["user_id"], row["alert_id"]) for row in rows} == {
             (db_user, "aapl-low"),
             (other_user, "other-aapl-low"),
@@ -207,9 +205,7 @@ class TestJobProcessor:
         )
         claimed = claim_jobs([JOB_DELIVER], "crashed-after-delivery")
 
-        with patch(
-            "src.alerts.alert_engine.LogNotifier.send", return_value=True
-        ) as mock_send:
+        with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as mock_send:
             assert _process_deliver(claimed[0]) is True
             with get_connection() as conn:
                 trigger_before = conn.execute(
@@ -278,9 +274,7 @@ class TestJobProcessor:
         assert job["status"] == STATUS_FAILED
         assert "Delivery failed" in job["last_error"]
 
-    def test_queued_deliver_retries_when_user_channels_fail_despite_log(
-        self, db_user
-    ):
+    def test_queued_deliver_retries_when_user_channels_fail_despite_log(self, db_user):
         """Settings prepends log; a log hit must not complete a failed email/webhook send."""
         sync_watches_from_config(db_user, _watch_config())
         event = {
@@ -420,8 +414,8 @@ class TestJobProcessor:
         config["alerts"][0]["cooldown_minutes"] = 60
         sync_watches_from_config(db_user, config)
         naive_ts = (
-            datetime.now(timezone.utc) - timedelta(minutes=5)
-        ).replace(tzinfo=None).isoformat()
+            (datetime.now(timezone.utc) - timedelta(minutes=5)).replace(tzinfo=None).isoformat()
+        )
         record_trigger(db_user, "aapl-low", timestamp=naive_ts)
         enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
 
@@ -576,9 +570,7 @@ class TestJobProcessor:
         assert stats["delivered"] == 1
         assert stats["failed"] == 0
         with get_connection() as conn:
-            rows = conn.execute(
-                "SELECT user_id, alert_id FROM alert_trigger_state"
-            ).fetchall()
+            rows = conn.execute("SELECT user_id, alert_id FROM alert_trigger_state").fetchall()
         assert {(row["user_id"], row["alert_id"]) for row in rows} == {
             (db_user, "aapl-low"),
         }

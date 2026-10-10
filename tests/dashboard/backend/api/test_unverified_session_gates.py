@@ -65,18 +65,19 @@ def test_unverified_registration_token_is_forbidden_until_confirm(client, monkey
     assert login.status_code == 403
     assert login.json()["detail"] == "Verify your email before signing in."
 
-    confirmed = client.post(
-        "/api/auth/verify-email/confirm", json={"token": sent["token"]}
-    )
+    confirmed = client.post("/api/auth/verify-email/confirm", json={"token": sent["token"]})
     assert confirmed.status_code == 200
 
     # Confirming email does not revoke the registration token.
     assert client.get("/api/auth/me", headers=headers).status_code == 200
     assert client.get("/api/alerts/config", headers=headers).status_code == 200
-    assert client.post(
-        "/api/auth/login",
-        json={"email": "gated@example.com", "password": "password123"},
-    ).status_code == 200
+    assert (
+        client.post(
+            "/api/auth/login",
+            json={"email": "gated@example.com", "password": "password123"},
+        ).status_code
+        == 200
+    )
 
 
 @pytest.fixture
@@ -149,8 +150,6 @@ def test_unverified_logout_does_not_revoke_the_registration_token(client, monkey
     assert logout.status_code == 403
     assert logout.json()["detail"] == "Email verification required."
 
-    confirmed = client.post(
-        "/api/auth/verify-email/confirm", json={"token": sent["token"]}
-    )
+    confirmed = client.post("/api/auth/verify-email/confirm", json={"token": sent["token"]})
     assert confirmed.status_code == 200
     assert client.get("/api/auth/me", headers=headers).status_code == 200

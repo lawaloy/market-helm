@@ -85,9 +85,7 @@ def test_load_market_snapshot_soft_fails_latest_date_runtime_error():
             return_value=[],
         ) as fetch_missing,
     ):
-        last_date, prices, stocks = load_market_snapshot(
-            ["MSFT"], fetch_missing_quotes=True
-        )
+        last_date, prices, stocks = load_market_snapshot(["MSFT"], fetch_missing_quotes=True)
 
     assert last_date is None
     assert prices == {}
@@ -99,9 +97,7 @@ def test_load_market_snapshot_skips_non_finite_prices_in_map():
     """Non-finite closes must not enter the snapshot price map for alert jobs."""
     loader = MagicMock()
     loader.get_latest_date.return_value = "2026-06-09"
-    loader.load_daily_data.return_value = pd.DataFrame(
-        [{"symbol": "AAPL", "close": 180.0}]
-    )
+    loader.load_daily_data.return_value = pd.DataFrame([{"symbol": "AAPL", "close": 180.0}])
 
     with (
         patch("src.alerts.market_snapshot._load_env"),
@@ -127,9 +123,7 @@ def test_load_market_snapshot_normalizes_padded_watch_symbols():
     """Watch list whitespace must strip so padded symbols match saved AAPL rows."""
     loader = MagicMock()
     loader.get_latest_date.return_value = "2026-06-09"
-    loader.load_daily_data.return_value = pd.DataFrame(
-        [{"symbol": "AAPL", "close": 180.0}]
-    )
+    loader.load_daily_data.return_value = pd.DataFrame([{"symbol": "AAPL", "close": 180.0}])
 
     with (
         patch("src.alerts.market_snapshot._load_env"),
@@ -150,6 +144,7 @@ def test_load_market_snapshot_normalizes_padded_watch_symbols():
         [{"symbol": "AAPL", "close": 180.0}],
         ["AAPL", "NVDA"],
     )
+
 
 def test_load_market_snapshot_skips_blank_symbols_and_non_numeric_closes():
     loader = MagicMock()

@@ -53,9 +53,7 @@ def test_resolve_company_names_skips_sentinels_and_strips_padding():
         "dashboard.backend.api.history.load_index_symbol_names",
         return_value={"AAPL": "Apple Inc.", "MSFT": "Microsoft"},
     ):
-        names = _resolve_company_names(
-            [" aapl ", None, float("nan"), "", "msft", "NONE"]
-        )
+        names = _resolve_company_names([" aapl ", None, float("nan"), "", "msft", "NONE"])
 
     assert names == {"AAPL": "Apple Inc.", "MSFT": "Microsoft"}
     assert "NONE" not in names

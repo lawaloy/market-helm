@@ -1,6 +1,7 @@
 """
 Data loading service for reading CSV and JSON files
 """
+
 import os
 import re
 from pathlib import Path
@@ -70,16 +71,16 @@ def get_most_recent_trading_day() -> str:
 
 class DataLoader:
     """Loads and caches stock market data from durable stores and JSON/CSV files."""
-    
+
     def __init__(self, data_dir: Optional[Path] = None):
         if data_dir is None:
             self.data_dir = _default_data_dir()
         else:
             self.data_dir = Path(data_dir).resolve()
-        
+
         if not self.data_dir.exists():
             raise ValueError(f"Data directory not found: {self.data_dir}")
-    
+
     def get_latest_date(self) -> Optional[str]:
         """Get the date of the most recent trading-day data (skips weekends when market is closed)."""
         dates = self.get_available_dates()
@@ -93,7 +94,7 @@ class DataLoader:
         target = get_most_recent_trading_day()
         dates = self.get_available_dates()
         return target not in dates
-    
+
     def load_daily_data(self, date: Optional[str] = None) -> pd.DataFrame:
         """Load daily stock data from durable ``market_bars`` storage."""
         from src.storage.market_bars import list_market_bar_dates, market_bars_frame
@@ -126,7 +127,7 @@ class DataLoader:
                 raise ValueError("No daily data found")
             raise ValueError(f"Daily data not found for date: {date}")
         return frame
-    
+
     def load_projections(self, date: Optional[str] = None) -> pd.DataFrame:
         """Load projections from durable ``projections`` storage."""
         from src.storage.projections_store import list_projection_dates, projections_frame
@@ -152,9 +153,7 @@ class DataLoader:
         except ValueError:
             raise
         except Exception as exc:
-            raise ValueError(
-                f"Projections unreadable for date: {date or 'latest'}"
-            ) from exc
+            raise ValueError(f"Projections unreadable for date: {date or 'latest'}") from exc
 
         if frame is None or frame.empty:
             if date is None:
@@ -194,7 +193,7 @@ class DataLoader:
                 raise ValueError("No summary files found")
             raise ValueError(f"Summary file unreadable for date: {date}")
         return data
-    
+
     def get_available_dates(self) -> List[str]:
         """Get list of all available quote dates from ``market_bars`` (newest first)."""
         from src.storage.market_bars import list_market_bar_dates
@@ -205,7 +204,7 @@ class DataLoader:
             raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
         except Exception as exc:
             raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
-    
+
     def load_historical_data(self, symbol: str, days: int = 30) -> List[Dict]:
         """Load historical data for a specific symbol"""
         sym = normalize_ticker(symbol)
@@ -214,45 +213,45 @@ class DataLoader:
 
         dates = self.get_available_dates()
         cutoff_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        
+
         historical_data = []
         for date in dates:
             if date < cutoff_date:
                 break
-            
+
             try:
                 # Load daily data — match padded / mixed-case CSV symbols.
                 daily_df = self.load_daily_data(date)
                 stock_data = daily_df[daily_df["symbol"].map(normalize_ticker) == sym]
-                
+
                 if stock_data.empty:
                     continue
-                
+
                 stock_record = stock_data.iloc[0].to_dict()
-                
+
                 # Try to load projections for this date
                 try:
                     proj_df = self.load_projections(date)
                     proj_data = proj_df[proj_df["symbol"].map(normalize_ticker) == sym]
-                    
+
                     if not proj_data.empty:
                         proj_record = proj_data.iloc[0].to_dict()
-                        stock_record['projection'] = {
-                            'target_price': proj_record.get('target_mid', None),
-                            'confidence': proj_record.get('confidence', None),
-                            'recommendation': proj_record.get('recommendation', None),
-                            'expected_change': proj_record.get('expected_change_percent', None)
+                        stock_record["projection"] = {
+                            "target_price": proj_record.get("target_mid", None),
+                            "confidence": proj_record.get("confidence", None),
+                            "recommendation": proj_record.get("recommendation", None),
+                            "expected_change": proj_record.get("expected_change_percent", None),
                         }
                 except Exception:
                     # No projection data for this date
                     pass
-                
-                stock_record['date'] = date
+
+                stock_record["date"] = date
                 historical_data.append(stock_record)
-            
+
             except Exception:
                 continue
-        
+
         return historical_data
 
     def compute_projection_accuracy(self, days: int = 90) -> Dict[str, Any]:

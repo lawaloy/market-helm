@@ -26,9 +26,7 @@ def client(temp_data_dir):
     import dashboard.backend.api.projections
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
         from dashboard.backend.main import app
 
@@ -53,9 +51,7 @@ def _write_projection(temp_data_dir: Path, **overrides) -> None:
     seed_projections(temp_data_dir, "2026-01-15", [row])
 
 
-def test_opportunities_defaults_when_daily_bars_missing(
-    client, temp_data_dir
-) -> None:
+def test_opportunities_defaults_when_daily_bars_missing(client, temp_data_dir) -> None:
     """Unmatched daily symbols must soft-default price/volume instead of 500ing."""
     # Bars exist for the trade date (so get_latest_date works) but not for AAPL.
     seed_daily_bars(

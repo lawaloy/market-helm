@@ -67,12 +67,15 @@ class TestHostedDataInfoRequiresAuth:
         fake_loader.get_latest_date.return_value = "2026-08-04"
         fake_loader.needs_fetch_for_latest_trading_day.return_value = False
         fake_loader.get_available_dates.return_value = ["2026-08-04"]
-        with patch(
-            "dashboard.backend.services.data_loader.get_data_loader",
-            return_value=fake_loader,
-        ), patch(
-            "dashboard.backend.services.data_loader.get_most_recent_trading_day",
-            return_value="2026-08-05",
+        with (
+            patch(
+                "dashboard.backend.services.data_loader.get_data_loader",
+                return_value=fake_loader,
+            ),
+            patch(
+                "dashboard.backend.services.data_loader.get_most_recent_trading_day",
+                return_value="2026-08-05",
+            ),
         ):
             r = client.get("/api/data-info", headers=headers)
         assert r.status_code == 200

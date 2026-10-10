@@ -38,12 +38,13 @@ def test_history_summary_skips_none_nan_blank_and_sentinel_symbols(client):
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.history, "get_data_loader", return_value=loader
-    ), patch.object(
-        dashboard.backend.api.history,
-        "load_index_symbol_names",
-        return_value={"AAPL": "Apple Inc.", "MSFT": "Microsoft"},
+    with (
+        patch.object(dashboard.backend.api.history, "get_data_loader", return_value=loader),
+        patch.object(
+            dashboard.backend.api.history,
+            "load_index_symbol_names",
+            return_value={"AAPL": "Apple Inc.", "MSFT": "Microsoft"},
+        ),
     ):
         r = client.get("/api/history/summary", params={"days": 7})
 

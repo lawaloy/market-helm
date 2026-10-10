@@ -1,6 +1,7 @@
 """
 Pydantic models for projection data
 """
+
 from pydantic import BaseModel
 from typing import Dict, Optional
 

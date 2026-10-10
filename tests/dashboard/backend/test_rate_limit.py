@@ -124,9 +124,7 @@ def test_forwarded_header_ignored_from_untrusted_peer(monkeypatch) -> None:
 
 
 def test_forwarded_chain_uses_first_untrusted_hop_from_right(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8,192.0.2.0/24"
-    )
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "10.0.0.0/8,192.0.2.0/24")
     request = _request("10.0.0.5", "198.51.100.9, 192.0.2.10")
     assert client_ip(request) == "198.51.100.9"
 
@@ -244,9 +242,7 @@ def test_poisoned_rate_limit_env_clamps_to_safe_bounds(monkeypatch) -> None:
 def test_expensive_write_rule_covers_account_mutations() -> None:
     rules = {rule.name: rule for rule in rate_limit.configured_rules()}
     expensive = rules["expensive-write"]
-    assert expensive.matches(
-        _api_request("/api/auth/password/change", method="POST")
-    )
+    assert expensive.matches(_api_request("/api/auth/password/change", method="POST"))
     assert expensive.matches(_api_request("/api/auth/account", method="DELETE"))
     assert expensive.matches(_api_request("/api/alerts/test", method="POST"))
     assert expensive.matches(_api_request("/api/refresh/cancel", method="POST"))
@@ -258,21 +254,11 @@ def test_expensive_write_rule_covers_account_mutations() -> None:
 def test_auth_email_rule_covers_request_endpoints_not_confirm() -> None:
     rules = {rule.name: rule for rule in rate_limit.configured_rules()}
     auth_email = rules["auth-email"]
-    assert auth_email.matches(
-        _api_request("/api/auth/password-reset/request", method="POST")
-    )
-    assert auth_email.matches(
-        _api_request("/api/auth/verify-email/request", method="POST")
-    )
-    assert not auth_email.matches(
-        _api_request("/api/auth/password-reset/confirm", method="POST")
-    )
-    assert not auth_email.matches(
-        _api_request("/api/auth/verify-email/confirm", method="POST")
-    )
-    assert not auth_email.matches(
-        _api_request("/api/auth/password-reset/request", method="GET")
-    )
+    assert auth_email.matches(_api_request("/api/auth/password-reset/request", method="POST"))
+    assert auth_email.matches(_api_request("/api/auth/verify-email/request", method="POST"))
+    assert not auth_email.matches(_api_request("/api/auth/password-reset/confirm", method="POST"))
+    assert not auth_email.matches(_api_request("/api/auth/verify-email/confirm", method="POST"))
+    assert not auth_email.matches(_api_request("/api/auth/password-reset/request", method="GET"))
 
 
 def test_invalid_proxy_value_is_not_logged(monkeypatch, caplog) -> None:
@@ -306,15 +292,11 @@ def test_rate_limit_buckets_are_isolated_by_client_ip(monkeypatch) -> None:
     rules = (RateLimitRule("test", 1, 60),)
     now = 1_700_000_000
 
-    first = check_rate_limits(
-        _api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules
-    )
+    first = check_rate_limits(_api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules)
     exhausted = check_rate_limits(
         _api_request("/api/test", peer="203.0.113.10"), now=now, rules=rules
     )
-    other = check_rate_limits(
-        _api_request("/api/test", peer="198.51.100.20"), now=now, rules=rules
-    )
+    other = check_rate_limits(_api_request("/api/test", peer="198.51.100.20"), now=now, rules=rules)
 
     assert first is not None and first.allowed is True
     assert exhausted is not None and exhausted.allowed is False
@@ -345,9 +327,7 @@ def test_forwarded_header_ignored_from_untrusted_ipv6_peer(monkeypatch) -> None:
 
 
 def test_ipv6_forwarded_chain_uses_first_untrusted_hop(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32,10.0.0.0/8"
-    )
+    monkeypatch.setenv("MARKET_HELM_TRUSTED_PROXY_CIDRS", "2001:db8::/32,10.0.0.0/8")
     request = _request("10.0.0.5", "198.51.100.9, 2001:db8::10")
     assert client_ip(request) == "198.51.100.9"
 
@@ -366,15 +346,11 @@ def test_rate_limit_buckets_are_isolated_by_ipv6_client_ip(monkeypatch) -> None:
     rules = (RateLimitRule("test", 1, 60),)
     now = 1_700_000_000
 
-    first = check_rate_limits(
-        _api_request("/api/test", peer="2001:db8::10"), now=now, rules=rules
-    )
+    first = check_rate_limits(_api_request("/api/test", peer="2001:db8::10"), now=now, rules=rules)
     exhausted = check_rate_limits(
         _api_request("/api/test", peer="2001:db8::10"), now=now, rules=rules
     )
-    other = check_rate_limits(
-        _api_request("/api/test", peer="2001:db8::20"), now=now, rules=rules
-    )
+    other = check_rate_limits(_api_request("/api/test", peer="2001:db8::20"), now=now, rules=rules)
 
     assert first is not None and first.allowed is True
     assert exhausted is not None and exhausted.allowed is False
@@ -406,9 +382,7 @@ def test_memory_rate_limit_window_resets_after_expiry(monkeypatch) -> None:
     assert blocked is not None and blocked.allowed is False
     assert blocked.reset_at == first.reset_at
 
-    still_blocked = check_rate_limits(
-        request, now=first.reset_at - 1, rules=rules
-    )
+    still_blocked = check_rate_limits(request, now=first.reset_at - 1, rules=rules)
     fresh = check_rate_limits(request, now=first.reset_at, rules=rules)
 
     assert still_blocked is not None and still_blocked.allowed is False

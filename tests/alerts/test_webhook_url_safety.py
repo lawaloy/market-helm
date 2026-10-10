@@ -72,27 +72,21 @@ def test_is_safe_webhook_url_rejects_unsafe(url: str) -> None:
 
 def test_from_alert_rejects_http_url() -> None:
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": "http://hooks.example.com/hook"}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": "http://hooks.example.com/hook"})
         is None
     )
 
 
 def test_from_alert_rejects_loopback_https() -> None:
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": "https://127.0.0.1/internal"}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": "https://127.0.0.1/internal"})
         is None
     )
 
 
 def test_from_alert_rejects_private_https() -> None:
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": "https://10.1.2.3/hooks/secret"}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": "https://10.1.2.3/hooks/secret"})
         is None
     )
 
@@ -117,18 +111,14 @@ def test_from_alert_rejects_unsafe_env_fallback(monkeypatch) -> None:
 
 def test_from_alert_rejects_decimal_loopback() -> None:
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": "https://2130706433/internal"}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": "https://2130706433/internal"})
         is None
     )
 
 
 def test_from_alert_rejects_hex_loopback() -> None:
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": "https://0x7f000001/internal"}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": "https://0x7f000001/internal"})
         is None
     )
 
@@ -143,9 +133,7 @@ def test_is_safe_webhook_url_rejects_lone_surrogate_hostname() -> None:
     url = "https://\ud800/hook"
     assert is_safe_webhook_url(url) is False
     assert (
-        WebhookNotifier.from_alert(
-            {"id": "a1", "webhook_url": url, "notifications": ["webhook"]}
-        )
+        WebhookNotifier.from_alert({"id": "a1", "webhook_url": url, "notifications": ["webhook"]})
         is None
     )
 

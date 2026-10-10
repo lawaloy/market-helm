@@ -44,9 +44,7 @@ def test_hosted_get_does_not_seed_env_webhook_format(client, multi_user_env, mon
     assert defaults.get("webhook_format") in (None, "")
 
 
-def test_hosted_get_keeps_explicit_tenant_webhook_format(
-    client, multi_user_env, monkeypatch
-):
+def test_hosted_get_keeps_explicit_tenant_webhook_format(client, multi_user_env, monkeypatch):
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
 
     token = _register(client, "tenant-format@example.com")
@@ -62,9 +60,7 @@ def test_hosted_get_keeps_explicit_tenant_webhook_format(
     assert response.json()["config"]["defaults"].get("webhook_format") == "discord"
 
 
-def test_file_mode_get_still_surfaces_env_webhook_format(
-    client, tmp_path, monkeypatch
-):
+def test_file_mode_get_still_surfaces_env_webhook_format(client, tmp_path, monkeypatch):
     # GET reloads ~/.market-helm/.env with override; a leftover Discord format
     # would beat process-wide ALERT_WEBHOOK_FORMAT=slack.
     user_dir = tmp_path / "user-config"

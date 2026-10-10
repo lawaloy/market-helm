@@ -90,15 +90,11 @@ def test_file_mode_put_rejects_blank_operator(client, file_mode, operator):
         ("NONE", "blank-sym-none@example.com"),
     ],
 )
-def test_hosted_put_rejects_blank_or_sentinel_symbol(
-    client, multi_user_env, symbol, email
-):
+def test_hosted_put_rejects_blank_or_sentinel_symbol(client, multi_user_env, symbol, email):
     token = _register(client, email)
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.put(
-        "/api/alerts/config", json=_payload(symbol=symbol), headers=headers
-    )
+    response = client.put("/api/alerts/config", json=_payload(symbol=symbol), headers=headers)
     assert response.status_code == 400
     assert "symbol" in response.json()["detail"].lower()
 
@@ -107,15 +103,11 @@ def test_hosted_put_rejects_blank_or_sentinel_symbol(
     assert saved.json()["config"]["alerts"] == []
 
 
-def test_hosted_put_rejects_blank_operator_and_preserves_config(
-    client, multi_user_env
-):
+def test_hosted_put_rejects_blank_operator_and_preserves_config(client, multi_user_env):
     token = _register(client, "blank-op-preserve@example.com")
     headers = {"Authorization": f"Bearer {token}"}
 
-    ok = client.put(
-        "/api/alerts/config", json=_payload(symbol="AAPL"), headers=headers
-    )
+    ok = client.put("/api/alerts/config", json=_payload(symbol="AAPL"), headers=headers)
     assert ok.status_code == 200
 
     bad = client.put(

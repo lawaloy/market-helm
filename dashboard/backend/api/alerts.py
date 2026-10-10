@@ -118,12 +118,14 @@ def _quote_meta(prices: Dict[str, float]) -> Dict[str, Dict[str, Optional[str]]]
     return {
         symbol: {
             "source": "saved" if symbol in saved and saved[symbol]["price"] == price else "lookup",
-            "as_of": str(saved[symbol]["as_of"])
-            if symbol in saved and saved[symbol]["price"] == price
-            else None,
-            "retrieved_at": None
-            if symbol in saved and saved[symbol]["price"] == price
-            else retrieved_at,
+            "as_of": (
+                str(saved[symbol]["as_of"])
+                if symbol in saved and saved[symbol]["price"] == price
+                else None
+            ),
+            "retrieved_at": (
+                None if symbol in saved and saved[symbol]["price"] == price else retrieved_at
+            ),
         }
         for symbol, price in prices.items()
     }
@@ -172,9 +174,7 @@ def _channel_status(
         webhook_ready = bool(has_webhook_secret)
     else:
         webhook_ready = bool(
-            has_webhook_secret
-            if has_webhook_secret is not None
-            else _has_webhook_secret(config)
+            has_webhook_secret if has_webhook_secret is not None else _has_webhook_secret(config)
         ) or bool(os.environ.get("ALERT_WEBHOOK_URL") or os.environ.get("DISCORD_WEBHOOK_URL"))
     return ChannelStatus(
         email_smtp=email_delivery_configured(),
@@ -364,9 +364,7 @@ async def put_alerts_config(
         _, saved = load_user_alerts_config(user_id)
         if saved is not None:
             status_source = saved
-    status_source = polish_alerts_config(
-        status_source, seed_env_email=not database_enabled()
-    )
+    status_source = polish_alerts_config(status_source, seed_env_email=not database_enabled())
     has_webhook_secret = _has_webhook_secret(status_source)
     public = _public_config(status_source)
     return AlertsConfigResponse(
@@ -442,11 +440,7 @@ async def get_alert_symbol_catalog(
         df = loader.load_projections()
         if not df.empty and "symbol" in df.columns:
             tracked = sorted(
-                {
-                    key
-                    for key in (normalize_ticker(s) for s in df["symbol"].unique())
-                    if key
-                }
+                {key for key in (normalize_ticker(s) for s in df["symbol"].unique()) if key}
             )
     except (ValueError, Exception):
         pass
@@ -471,9 +465,9 @@ async def get_symbol_quotes(
     Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
     """
     _load_env()
-    parsed = [
-        key for key in (normalize_ticker(symbol) for symbol in symbols.split(",")) if key
-    ][:15]
+    parsed = [key for key in (normalize_ticker(symbol) for symbol in symbols.split(",")) if key][
+        :15
+    ]
     if not parsed:
         return SymbolQuotesResponse(prices={})
     prices = await run_in_threadpool(resolve_symbol_prices, parsed, fetch_missing=True)
@@ -491,9 +485,7 @@ async def post_symbol_quotes(
     Finnhub quote budget. File mode (``require_user_id`` → ``None``) stays open.
     """
     _load_env()
-    symbols = [
-        key for key in (normalize_ticker(symbol) for symbol in body.symbols) if key
-    ][:15]
+    symbols = [key for key in (normalize_ticker(symbol) for symbol in body.symbols) if key][:15]
     if not symbols:
         return SymbolQuotesResponse(prices={})
     prices = await run_in_threadpool(resolve_symbol_prices, symbols, fetch_missing=True)
@@ -518,11 +510,7 @@ async def get_alerts_status(
         df = loader.load_projections()
         if not df.empty and "symbol" in df.columns:
             tracked = sorted(
-                {
-                    key
-                    for key in (normalize_ticker(s) for s in df["symbol"].unique())
-                    if key
-                }
+                {key for key in (normalize_ticker(s) for s in df["symbol"].unique()) if key}
             )
     except (ValueError, Exception):
         pass
@@ -534,18 +522,14 @@ async def get_alerts_status(
             if raw:
                 alerts = alert_rows(raw)
                 active_watches = sum(
-                    1
-                    for alert in alerts
-                    if isinstance(alert, dict) and alert.get("enabled")
+                    1 for alert in alerts if isinstance(alert, dict) and alert.get("enabled")
                 )
     elif path.exists():
         _, raw = load_alerts_config(path)
         if raw:
             alerts = polish_alerts_config(raw).get("alerts") or []
             active_watches = sum(
-                1
-                for alert in alerts
-                if isinstance(alert, dict) and alert.get("enabled")
+                1 for alert in alerts if isinstance(alert, dict) and alert.get("enabled")
             )
 
     try:

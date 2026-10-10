@@ -22,21 +22,27 @@ except ImportError:
 def find_markdown_files(directory="."):
     """Find all markdown files in the project."""
     project_root = Path(directory)
-    
+
     # Directories to exclude
     exclude_dirs = {
-        '.venv', 'venv', 'node_modules', '__pycache__',
-        '.git', '.pytest_cache', 'dist', 'build',
-        '*.egg-info'
+        ".venv",
+        "venv",
+        "node_modules",
+        "__pycache__",
+        ".git",
+        ".pytest_cache",
+        "dist",
+        "build",
+        "*.egg-info",
     }
-    
+
     md_files = []
     for md_file in project_root.rglob("*.md"):
         # Skip excluded directories
         if any(excluded in str(md_file) for excluded in exclude_dirs):
             continue
         md_files.append(md_file)
-    
+
     return sorted(md_files)
 
 
@@ -44,12 +50,12 @@ def check_markdown_with_markdownlint(files, fix=False):
     """Check markdown files using markdownlint-cli if available."""
     try:
         cmd = ["markdownlint"]
-        
+
         if fix:
             cmd.append("--fix")
-        
+
         cmd.extend([str(f) for f in files])
-        
+
         # On Windows, use shell=True to find .cmd files
         result = subprocess.run(
             cmd,
@@ -59,7 +65,7 @@ def check_markdown_with_markdownlint(files, fix=False):
             errors="replace",
             shell=True,
         )
-        
+
         if result.returncode == 0:
             print(f"All {len(files)} markdown files are clean!")
             return True
@@ -69,7 +75,7 @@ def check_markdown_with_markdownlint(files, fix=False):
             if result.stderr:
                 print(result.stderr)
             return False
-            
+
     except FileNotFoundError:
         print("markdownlint-cli not found. Install with:")
         print("   npm install -g markdownlint-cli")
@@ -84,7 +90,7 @@ def check_markdown_with_python(files):
         print("Please install markdownlint-cli:")
         print("   npm install -g markdownlint-cli")
         return False
-    
+
     try:
         errors_found = False
         for md_file in files:
@@ -93,12 +99,12 @@ def check_markdown_with_python(files):
                 errors_found = True
                 print(f"\n{md_file}:")
                 print(result)
-        
+
         if not errors_found:
             print(f"All {len(files)} markdown files are clean!")
             return True
         return False
-        
+
     except Exception as e:
         print(f"Error checking markdown: {e}")
         return False
@@ -111,27 +117,13 @@ def main():
     except Exception:
         pass
 
-    parser = argparse.ArgumentParser(
-        description="Check markdown files for linting errors"
-    )
-    parser.add_argument(
-        'files',
-        nargs='*',
-        help='Specific markdown files to check (default: all)'
-    )
-    parser.add_argument(
-        '--fix',
-        action='store_true',
-        help='Automatically fix fixable issues'
-    )
-    parser.add_argument(
-        '--dir',
-        default='.',
-        help='Directory to search for markdown files'
-    )
-    
+    parser = argparse.ArgumentParser(description="Check markdown files for linting errors")
+    parser.add_argument("files", nargs="*", help="Specific markdown files to check (default: all)")
+    parser.add_argument("--fix", action="store_true", help="Automatically fix fixable issues")
+    parser.add_argument("--dir", default=".", help="Directory to search for markdown files")
+
     args = parser.parse_args()
-    
+
     # Get files to check
     if args.files:
         md_files = [Path(f) for f in args.files]
@@ -139,17 +131,16 @@ def main():
         print(f"Searching for markdown files in {args.dir}...")
         md_files = find_markdown_files(args.dir)
         print(f"Found {len(md_files)} markdown files\n")
-    
+
     if not md_files:
         print("No markdown files found.")
         return 0
-    
+
     # Check the files
     success = check_markdown_with_markdownlint(md_files, fix=args.fix)
-    
+
     return 0 if success else 1
 
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -66,9 +66,7 @@ def test_evaluate_skips_non_price_threshold_without_blocking_siblings(db_user) -
     assert stats["failed"] == 0
     assert pending_job_count([JOB_DELIVER]) == 0
     with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT user_id, alert_id FROM alert_trigger_state"
-        ).fetchall()
+        rows = conn.execute("SELECT user_id, alert_id FROM alert_trigger_state").fetchall()
     assert {(row["user_id"], row["alert_id"]) for row in rows} == {
         (db_user, "aapl-low"),
     }

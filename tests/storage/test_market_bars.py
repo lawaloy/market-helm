@@ -25,17 +25,13 @@ def app_db(tmp_path, monkeypatch):
 def test_migration_seven_creates_projections_and_summaries(app_db):
     assert LATEST_SCHEMA_VERSION == 7
     with get_connection() as conn:
-        row = conn.execute(
-            "SELECT name FROM schema_migrations WHERE version = 7"
-        ).fetchone()
+        row = conn.execute("SELECT name FROM schema_migrations WHERE version = 7").fetchone()
         assert row["name"] == "projections_and_summaries"
         proj_cols = {
-            item["name"]
-            for item in conn.execute("PRAGMA table_info(projections)").fetchall()
+            item["name"] for item in conn.execute("PRAGMA table_info(projections)").fetchall()
         }
         summary_cols = {
-            item["name"]
-            for item in conn.execute("PRAGMA table_info(daily_summaries)").fetchall()
+            item["name"] for item in conn.execute("PRAGMA table_info(daily_summaries)").fetchall()
         }
     assert "run_date" in proj_cols
     assert "symbol" in proj_cols

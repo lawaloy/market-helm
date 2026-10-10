@@ -28,9 +28,7 @@ def test_stock_detail_404_when_daily_symbol_column_missing(client) -> None:
         }
     )
 
-    with patch.object(
-        dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader):
         r = client.get("/api/stocks/AAPL")
 
     assert r.status_code == 404
@@ -44,9 +42,7 @@ def test_stock_detail_404_when_daily_frame_empty(client) -> None:
     mock_loader.get_latest_date.return_value = "2026-01-15"
     mock_loader.load_daily_data.return_value = pd.DataFrame()
 
-    with patch.object(
-        dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader
-    ):
+    with patch.object(dashboard.backend.api.stocks, "get_data_loader", return_value=mock_loader):
         r = client.get("/api/stocks/AAPL")
 
     assert r.status_code == 404

@@ -22,8 +22,11 @@ def test_liveness_readiness_and_metrics_file_mode(monkeypatch):
 
 
 def test_readiness_reports_database_schema(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'health.db').as_posix()}")
+    monkeypatch.setenv(
+        "MARKET_HELM_DATABASE_URL", f"sqlite:///{(tmp_path / 'health.db').as_posix()}"
+    )
     from src.storage.database import init_database, LATEST_SCHEMA_VERSION
+
     init_database()
     response = TestClient(app).get("/health/ready")
     assert response.status_code == 200

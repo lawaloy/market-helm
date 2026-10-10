@@ -165,16 +165,12 @@ def test_failed_older_restore_does_not_redeliver_newer_event(db_user) -> None:
     assert claimed is True
     assert previous is None
 
-    with patch(
-        "src.alerts.alert_engine.LogNotifier.send", return_value=True
-    ) as mock_send:
+    with patch("src.alerts.alert_engine.LogNotifier.send", return_value=True) as mock_send:
         assert _process_deliver(newer_job) is True
         assert mock_send.call_count == 1
         assert get_last_triggered(db_user, "aapl-low") == newer_ts
 
-        restore_trigger_claim(
-            db_user, "aapl-low", previous, claimed_at=older_ts
-        )
+        restore_trigger_claim(db_user, "aapl-low", previous, claimed_at=older_ts)
         assert get_last_triggered(db_user, "aapl-low") == newer_ts
 
         # Crash-before-complete recovery of the newer event must still skip.

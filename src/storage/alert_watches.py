@@ -66,26 +66,18 @@ def _parseable_iso_timestamp(raw: Optional[str]) -> Optional[str]:
     return text
 
 
-def _coerce_threshold(
-    raw_value: Any, alert_id: str, *, label: str = "price threshold"
-) -> float:
+def _coerce_threshold(raw_value: Any, alert_id: str, *, label: str = "price threshold") -> float:
     # Missing/null thresholds previously persisted as SQL NULL watches that can
     # never evaluate usefully — reject at save so Infinity→JSON-null clients
     # and incomplete Settings payloads fail closed.
     if raw_value is None:
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid {label} value."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid {label} value.")
     try:
         threshold = float(raw_value)
     except (TypeError, ValueError) as exc:
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid {label} value."
-        ) from exc
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid {label} value.") from exc
     if not math.isfinite(threshold):
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid {label} value."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid {label} value.")
     return threshold
 
 
@@ -101,13 +93,9 @@ def _coerce_rsi_period(raw_value: Any, alert_id: str) -> int:
     try:
         period = int(raw_value)
     except (TypeError, ValueError) as exc:
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid RSI period."
-        ) from exc
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid RSI period.") from exc
     if period < MIN_RSI_PERIOD or period > MAX_RSI_PERIOD:
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid RSI period."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid RSI period.")
     return period
 
 
@@ -125,9 +113,7 @@ def _validate_compound_condition(condition: Dict[str, Any], alert_id: str) -> No
         )
     leaves = condition.get("conditions")
     if not isinstance(leaves, list) or not leaves:
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' compound rule must include conditions."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' compound rule must include conditions.")
     if len(leaves) > MAX_COMPOUND_LEAVES:
         raise InvalidAlertWatchConfig(
             f"Alert '{alert_id}' compound rule exceeds {MAX_COMPOUND_LEAVES} conditions."
@@ -148,28 +134,19 @@ def _validate_compound_condition(condition: Dict[str, Any], alert_id: str) -> No
             )
         if leaf_type == "price_threshold":
             if not normalize_ticker(leaf.get("symbol")):
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have a valid symbol."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have a valid symbol.")
             raw_operator = leaf.get("operator")
             if raw_operator is None or not str(raw_operator).strip():
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have an operator."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have an operator.")
             _coerce_threshold(leaf.get("value"), alert_id)
         elif leaf_type == "rsi_threshold":
             if not normalize_ticker(leaf.get("symbol")):
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have a valid symbol."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have a valid symbol.")
             raw_operator = leaf.get("operator")
             if raw_operator is None or not str(raw_operator).strip():
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have an operator."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have an operator.")
             _coerce_threshold(leaf.get("value"), alert_id, label="RSI threshold")
             _coerce_rsi_period(leaf.get("period"), alert_id)
-
 
 
 def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
@@ -182,21 +159,15 @@ def _coerce_cooldown(raw_value: Any, alert_id: str) -> int:
             f"Alert '{alert_id}' has an invalid cooldown_minutes value."
         ) from exc
     if not math.isfinite(as_float):
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid cooldown_minutes value.")
     if as_float < 0:
         # Negative cooldown is treated as "no cooldown" by evaluators; reject
         # at save so Settings cannot silently disable rate limiting.
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid cooldown_minutes value.")
     if as_float > MAX_COOLDOWN_MINUTES:
         # Huge finite values (e.g. 1e15) pass isfinite but OverflowError
         # timedelta at evaluate time — reject at save.
-        raise InvalidAlertWatchConfig(
-            f"Alert '{alert_id}' has an invalid cooldown_minutes value."
-        )
+        raise InvalidAlertWatchConfig(f"Alert '{alert_id}' has an invalid cooldown_minutes value.")
     try:
         return int(as_float)
     except (TypeError, ValueError, OverflowError) as exc:
@@ -236,33 +207,23 @@ def _rows_from_config(user_id: str, config: Dict[str, Any], updated_at: str) -> 
             # Strip whitespace / reject None-NaN sentinels so watch index keys match quotes.
             symbol = normalize_ticker(condition.get("symbol"))
             if not symbol:
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have a valid symbol."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have a valid symbol.")
             raw_operator = condition.get("operator")
             if raw_operator is None or not str(raw_operator).strip():
                 # Missing/blank operators never match at eval; reject at save so
                 # Settings cannot persist zombie enabled rules.
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have an operator."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have an operator.")
             operator = str(raw_operator).strip()
             threshold = _coerce_threshold(condition.get("value"), alert_id)
         elif condition_type == "rsi_threshold":
             symbol = normalize_ticker(condition.get("symbol"))
             if not symbol:
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have a valid symbol."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have a valid symbol.")
             raw_operator = condition.get("operator")
             if raw_operator is None or not str(raw_operator).strip():
-                raise InvalidAlertWatchConfig(
-                    f"Alert '{alert_id}' must have an operator."
-                )
+                raise InvalidAlertWatchConfig(f"Alert '{alert_id}' must have an operator.")
             operator = str(raw_operator).strip()
-            threshold = _coerce_threshold(
-                condition.get("value"), alert_id, label="RSI threshold"
-            )
+            threshold = _coerce_threshold(condition.get("value"), alert_id, label="RSI threshold")
             _coerce_rsi_period(condition.get("period"), alert_id)
         elif condition_type == "compound":
             _validate_compound_condition(condition, alert_id)
@@ -306,9 +267,7 @@ def ensure_alerts_within_limit(config: Dict[str, Any]) -> None:
     if not isinstance(alerts, list):
         raise InvalidAlertWatchConfig("Alerts config must include an 'alerts' array.")
     if len(alerts) > MAX_ALERTS_PER_CONFIG:
-        raise InvalidAlertWatchConfig(
-            f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts."
-        )
+        raise InvalidAlertWatchConfig(f"Config exceeds maximum of {MAX_ALERTS_PER_CONFIG} alerts.")
 
 
 def validate_watches_config(user_id: str, config: Dict[str, Any]) -> None:
@@ -354,18 +313,12 @@ def sync_watches_from_config(
 
 def list_enabled_symbols() -> List[str]:
     with get_connection() as conn:
-        rows = conn.execute(
-            """
+        rows = conn.execute("""
             SELECT DISTINCT symbol FROM alert_watches
             WHERE enabled = 1 AND symbol IS NOT NULL AND symbol != ''
             ORDER BY symbol
-            """
-        ).fetchall()
-    return [
-        key
-        for key in (normalize_ticker(row["symbol"]) for row in rows)
-        if key
-    ]
+            """).fetchall()
+    return [key for key in (normalize_ticker(row["symbol"]) for row in rows) if key]
 
 
 def list_watches_for_symbol(symbol: str) -> List[Dict[str, Any]]:

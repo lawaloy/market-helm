@@ -71,7 +71,4 @@ def test_dockerfile_web_copies_vite_outdir_into_fastapi_static() -> None:
         "./dashboard/backend/static",
         "dashboard/backend/static",
     }
-    assert (
-        '_STATIC_DIR = Path(__file__).resolve().parent / "static"'
-        in backend_main
-    )
+    assert '_STATIC_DIR = Path(__file__).resolve().parent / "static"' in backend_main

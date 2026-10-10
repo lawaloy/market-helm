@@ -135,15 +135,10 @@ def _process_evaluate_symbol(job: Dict[str, Any]) -> None:
                 leaves = condition.get("conditions")
                 if isinstance(leaves, list):
                     for leaf in leaves:
-                        if (
-                            isinstance(leaf, dict)
-                            and leaf.get("type") == "rsi_threshold"
-                        ):
+                        if isinstance(leaf, dict) and leaf.get("type") == "rsi_threshold":
                             needed.append(symbol)
                 history = closes_by_symbol(needed or [], [stock])
-                matched_symbols = evaluate_compound(
-                    condition, [stock], closes_by_symbol=history
-                )
+                matched_symbols = evaluate_compound(condition, [stock], closes_by_symbol=history)
         except (TypeError, ValueError, AttributeError) as exc:
             logger.warning(
                 "Skipping invalid alert %s for user %s on %s: %s",
@@ -266,9 +261,7 @@ def _process_deliver(job: Dict[str, Any]) -> bool:
             raise RuntimeError(f"Delivery failed for alert {alert_id!r}")
         return True
     except Exception:
-        restore_trigger_claim(
-            user_id, alert_id, previous_trigger, claimed_at=claim_ts
-        )
+        restore_trigger_claim(user_id, alert_id, previous_trigger, claimed_at=claim_ts)
         raise
 
 

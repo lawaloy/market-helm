@@ -98,9 +98,7 @@ class TestAlertOrchestrator:
         mock_snapshot.assert_called_once_with(["AAPL", "MSFT"], fetch_missing_quotes=True)
 
     @patch("src.alerts.alert_orchestrator.load_market_snapshot")
-    def test_no_priced_symbols_when_prices_do_not_match_watches(
-        self, mock_snapshot, db_user
-    ):
+    def test_no_priced_symbols_when_prices_do_not_match_watches(self, mock_snapshot, db_user):
         sync_watches_from_config(
             db_user,
             {

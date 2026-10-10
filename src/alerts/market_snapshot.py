@@ -40,9 +40,7 @@ def load_market_snapshot(
     # Strip/reject blank and sentinel tickers so " AAPL " matches saved AAPL
     # and float('nan') does not become a fake NAN watch fetch.
     symbols = list(
-        dict.fromkeys(
-            key for key in (normalize_ticker(s) for s in (watch_symbols or [])) if key
-        )
+        dict.fromkeys(key for key in (normalize_ticker(s) for s in (watch_symbols or [])) if key)
     )
     if fetch_missing_quotes and symbols:
         stocks = _fetch_missing_watch_quotes(stocks, symbols)

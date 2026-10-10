@@ -66,9 +66,7 @@ def _compound_alert(*, op="and", leaves=None):
         "condition": {
             "type": "compound",
             "op": op,
-            "conditions": leaves
-            if leaves is not None
-            else [_price_leaf(), _rsi_leaf()],
+            "conditions": leaves if leaves is not None else [_price_leaf(), _rsi_leaf()],
         },
         "notifications": ["log"],
     }
@@ -77,22 +75,16 @@ def _compound_alert(*, op="and", leaves=None):
 @pytest.mark.parametrize("period", [1, 51, "nope"])
 def test_validate_rejects_invalid_rsi_period(db_user, period):
     with pytest.raises(InvalidAlertWatchConfig, match="invalid RSI period"):
-        validate_watches_config(
-            db_user, {"defaults": {}, "alerts": [_rsi_alert(period=period)]}
-        )
+        validate_watches_config(db_user, {"defaults": {}, "alerts": [_rsi_alert(period=period)]})
 
 
 def test_validate_accepts_omitted_rsi_period_as_default(db_user):
-    validate_watches_config(
-        db_user, {"defaults": {}, "alerts": [_rsi_alert(period=None)]}
-    )
+    validate_watches_config(db_user, {"defaults": {}, "alerts": [_rsi_alert(period=None)]})
 
 
 def test_save_rejects_invalid_rsi_period_without_persisting(db_user):
     with pytest.raises(InvalidAlertWatchConfig, match="invalid RSI period"):
-        save_user_alerts_config(
-            db_user, {"defaults": {}, "alerts": [_rsi_alert(period=1)]}
-        )
+        save_user_alerts_config(db_user, {"defaults": {}, "alerts": [_rsi_alert(period=1)]})
 
     with get_connection() as conn:
         count = conn.execute(
@@ -145,9 +137,7 @@ def test_validate_rejects_invalid_compound_shapes(db_user, condition, match):
 
 
 def test_save_indexes_single_symbol_compound(db_user):
-    save_user_alerts_config(
-        db_user, {"defaults": {}, "alerts": [_compound_alert()]}
-    )
+    save_user_alerts_config(db_user, {"defaults": {}, "alerts": [_compound_alert()]})
     watches = list_watches_for_symbol("AAPL")
     assert len(watches) == 1
     assert watches[0]["condition_type"] == "compound"

@@ -90,6 +90,4 @@ def test_auth_email_bucket_is_shared_and_does_not_gate_confirm(client):
         json={"token": "x" * 20},
     )
     assert confirm.status_code == 400
-    assert confirm.json()["detail"] == (
-        "This verification link is invalid or expired."
-    )
+    assert confirm.json()["detail"] == ("This verification link is invalid or expired.")

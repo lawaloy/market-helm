@@ -13,9 +13,7 @@ from src.alerts.alert_storage import AlertStorage
     "bad_ts",
     [None, "", "   ", "not-a-timestamp", "2026-13-99T99:99:99Z", "yesterday"],
 )
-def test_record_event_falls_back_to_utc_now_for_unusable_timestamps(
-    tmp_path: Path, bad_ts
-) -> None:
+def test_record_event_falls_back_to_utc_now_for_unusable_timestamps(tmp_path: Path, bad_ts) -> None:
     storage = AlertStorage(tmp_path)
     before = datetime.now(timezone.utc)
     storage.record_event({"alert_id": "a1", "timestamp": bad_ts})
@@ -31,9 +29,7 @@ def test_record_event_falls_back_to_utc_now_for_unusable_timestamps(
 def test_record_event_preserves_valid_iso_timestamps(tmp_path: Path) -> None:
     storage = AlertStorage(tmp_path)
     storage.record_event({"alert_id": "a1", "timestamp": "2026-07-24T12:00:00Z"})
-    assert storage.get_last_triggered("a1") == datetime(
-        2026, 7, 24, 12, 0, tzinfo=timezone.utc
-    )
+    assert storage.get_last_triggered("a1") == datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc)
     assert storage.latest_event_timestamp() == "2026-07-24T12:00:00Z"
 
 

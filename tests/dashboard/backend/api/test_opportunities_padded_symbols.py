@@ -26,9 +26,7 @@ def client(temp_data_dir):
     import dashboard.backend.api.projections
 
     loader = DataLoader(data_dir=temp_data_dir)
-    with patch.object(
-        dashboard.backend.api.projections, "get_data_loader", return_value=loader
-    ):
+    with patch.object(dashboard.backend.api.projections, "get_data_loader", return_value=loader):
         from fastapi.testclient import TestClient
         from dashboard.backend.main import app
 

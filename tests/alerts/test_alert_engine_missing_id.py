@@ -60,12 +60,18 @@ def test_evaluate_skips_missing_id_and_still_fires_sibling() -> None:
         },
     }
     engine = AlertEngine(
-        [bad, _price_alert(id="good", condition={
-            "type": "price_threshold",
-            "symbol": "MSFT",
-            "operator": "greater_than",
-            "value": 100,
-        })],
+        [
+            bad,
+            _price_alert(
+                id="good",
+                condition={
+                    "type": "price_threshold",
+                    "symbol": "MSFT",
+                    "operator": "greater_than",
+                    "value": 100,
+                },
+            ),
+        ],
         storage=storage,
     )
 
