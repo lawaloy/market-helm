@@ -367,7 +367,7 @@ Back up both the legacy files and the target database first. The command does no
 modify its source files and skips dates already present in the database, so it is
 safe to rerun after a partial operational attempt. Check the JSON report and its
 `target` field: a configured `MARKET_HELM_DATABASE_URL` takes precedence over the
-sidecar path. Resolve every reported file error before removing old artifacts. See [USAGE.md](USAGE.md#migrate-legacy-market-data-files)
+sidecar path. Resolve every reported file error before removing old artifacts; the application no longer reads those CSV files at runtime. See [USAGE.md](USAGE.md#migrate-legacy-market-data-files)
 for `--replace-existing` upsert semantics.
 
 ---

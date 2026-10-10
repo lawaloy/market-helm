@@ -123,7 +123,7 @@ unit tests and container-only integration tests cannot fully reproduce.
 <summary><b>Recommended next work</b></summary>
 
 1. **Market data DB cutover:** daily bars, projections, and summaries now write to
-   the app DB or `DATA_DIR/market_bars.sqlite`; the dashboard, API, and backtests read only durable storage. Run and verify the legacy snapshot backfill in each environment, compare representative dates, then retire the old snapshot files. The only remaining legacy-CSV read is the last-resort RSI price-history fallback in `src/alerts/price_history.py`.
+   the app DB or `DATA_DIR/market_bars.sqlite`; the dashboard, API, and backtests read only durable storage. Run and verify the legacy snapshot backfill in each environment, compare representative dates, then retire the old snapshot files. Runtime reads no longer fall back to CSV; RSI price history uses provider candles, then `market_bars`.
 2. **Projection validation:** the weekday post-close workflow preserves a
    cumulative forward archive and its qualification report. Keep collecting exact
    target closes until `projection_baseline.py assess` passes and the workflow
@@ -169,7 +169,7 @@ section records the intended order of work. It is a plan, not an implementation 
 <details>
 <summary><b>Proposed phases</b></summary>
 
-1. **Finish the market data database cutover** (see Recommended next work). Live quotes need a durable shared store first, so the database must be the only data path before a live feed is added.
+1. **Finish the market data database cutover** (see Recommended next work). Live quotes need a durable shared store first, and the retired CSV path is already gone, so no second legacy data path remains.
 2. **Choose and validate a live-quote provider.** Confirm that the chosen plan
    allows the needed symbol count, update rate, and redistribution to end users.
    Open question: whether the current Finnhub plan is sufficient or another

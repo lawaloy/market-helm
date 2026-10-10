@@ -26,8 +26,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 4. **Install in development mode**:
 
    ```bash
-   pip install -e .
-   pip install pytest pytest-cov  # For testing
+   pip install -e .[dev]  # package plus pytest, coverage, black, isort
    ```
 
 </details>
@@ -113,15 +112,26 @@ python -m pytest tests/core/test_config.py -v
 <summary><b>4. Check Code Quality</b></summary>
 
 ```bash
-# Format code (optional, but recommended)
-pip install black isort
-black src/ tests/
-isort src/ tests/
+# Install black and isort (pinned in the dev extra)
+pip install -e .[dev]
 
-# Lint code (optional)
+# Format the Python files your branch changed (line length 100, isort profile black)
+python scripts/check_python_style.py --base origin/main --fix
+
+# Check without changing files, exactly as CI does
+python scripts/check_python_style.py --base origin/main
+
+# flake8 is part of the same check; to run it alone on specific files
 pip install flake8
-flake8 src/ tests/ --max-line-length=100
+flake8 path/to/changed_file.py
 ```
+
+CI runs `scripts/check_python_style.py` on the Python files changed in each pull
+request. **black**, **isort**, and **flake8** at 100 characters (configured in
+`pyproject.toml` and `.flake8`) must all pass for those files. Files you do not
+touch are not checked, so older findings elsewhere do not block your PR; if you
+edit a file that has legacy findings, fix them in the same PR. CI also runs
+flake8 with its error-only rules (`E9,F63,F7,F82`) on the whole repository.
 
 </details>
 
@@ -219,7 +229,7 @@ CLI/Web/API layers consume workflows for their specific presentation needs.
 
 - Follow PEP 8
 - Use type hints where appropriate
-- Maximum line length: 100 characters
+- Maximum line length: 100 characters (enforced by black and flake8 on changed files; see "Check Code Quality")
 - Use descriptive variable names
 
 </details>
