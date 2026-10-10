@@ -38,7 +38,7 @@ class _FinnhubStub(ThreadingHTTPServer):
 class _FinnhubHandler(BaseHTTPRequestHandler):
     server: _FinnhubStub
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def _handle_get(self) -> None:
         parsed = urlparse(self.path)
         symbol = parse_qs(parsed.query).get("symbol", [""])[0]
         attempt = self.server.record(symbol)
@@ -78,6 +78,9 @@ class _FinnhubHandler(BaseHTTPRequestHandler):
             }
         ).encode("utf-8")
         self._write(200, payload, "application/json")
+
+    # BaseHTTPRequestHandler dispatches GET requests to an attribute named ``do_GET``.
+    do_GET = _handle_get
 
     def _write(self, status: int, payload: bytes, content_type: str) -> None:
         try:
