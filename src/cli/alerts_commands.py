@@ -339,7 +339,8 @@ def main(argv: Optional[List[str]] = None) -> None:
         type=int,
         default=None,
         metavar="SECONDS",
-        help="Seconds between checks when --loop (min 60; default 300 or ALERT_CHECK_INTERVAL_SECONDS)",
+        help="Seconds between checks when --loop (min 60; default 300 or "
+        "ALERT_CHECK_INTERVAL_SECONDS)",
     )
 
     args = parser.parse_args(argv)

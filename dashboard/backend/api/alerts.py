@@ -397,7 +397,8 @@ async def post_alerts_init(
     except FileExistsError:
         raise HTTPException(
             status_code=409,
-            detail=f"{user_config_dir() / 'alerts.json'} already exists. Pass ?force=true to overwrite.",
+            detail=f"{user_config_dir() / 'alerts.json'} already exists. Pass ?force=true to "
+            "overwrite.",
         )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=str(exc))

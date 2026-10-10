@@ -40,7 +40,8 @@ class AISummarizer:
         if not self.enabled:
             logger.info("OpenAI API key not found. Using demo summary mode.")
             logger.info(
-                "To enable AI summaries: Set OPENAI_API_KEY environment variable or add to .env file"
+                "To enable AI summaries: Set OPENAI_API_KEY environment variable or add to .env "
+                "file"
             )
 
     def generate_demo_summary(self, analysis: Dict, exchange_comparison: Dict) -> str:
@@ -76,7 +77,8 @@ class AISummarizer:
             sentiment = "mixed"
 
         summary_parts.append(
-            f"Today's market showed {sentiment} sentiment with {gainers} gainers and {losers} losers, averaging {avg_change:.2f}% change overall."
+            f"Today's market showed {sentiment} sentiment with {gainers} gainers and {losers} "
+            f"losers, averaging {avg_change:.2f}% change overall."
         )
 
         # Highlight top movers (skip non-dict / blank symbols — same soft-fail
@@ -110,7 +112,8 @@ class AISummarizer:
             exchange_name, stats = best_exchange
             exchange_avg = _finite_float(stats.get("average_change_percent", 0))
             summary_parts.append(
-                f"The {exchange_name} exchange performed best with an average {exchange_avg:.2f}% gain."
+                f"The {exchange_name} exchange performed best with an average {exchange_avg:.2f}% "
+                "gain."
             )
 
         return " ".join(summary_parts)
@@ -144,8 +147,10 @@ class AISummarizer:
             # the bare except and return None when OPENAI_API_KEY is set.
             avg_change = _finite_float(summary_data.get("average_change_percent"))
             # Build prompt
-            prompt = f"""Write a brief, professional market summary (2-3 sentences) based on this stock market data:
-
+            prompt = (
+                "Write a brief, professional market summary (2-3 sentences) "
+                "based on this stock market data:\n"
+                f"""
 Date: {analysis.get('date', 'Today')}
 Total Stocks: {summary_data.get('total_stocks', 0)}
 Gainers: {summary_data.get('gainers', 0)}, Losers: {summary_data.get('losers', 0)}
@@ -153,6 +158,7 @@ Average Change: {avg_change:.2f}%
 
 Top Gainers:
 """
+            )
             for stock in top_gainers:
                 if not isinstance(stock, dict):
                     continue
@@ -191,7 +197,8 @@ Top Gainers:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a financial market analyst. Write clear, concise market summaries.",
+                        "content": "You are a financial market analyst. Write clear, concise "
+                        "market summaries.",
                     },
                     {"role": "user", "content": prompt},
                 ],

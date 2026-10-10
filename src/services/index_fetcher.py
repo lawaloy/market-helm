@@ -214,7 +214,7 @@ class IndexFetcher:
         return self._get_minimal_fallback("NASDAQ-100")
 
     def get_dow30_symbols(self) -> List[str]:
-        """Get all Dow Jones Industrial Average (30 stocks) symbols using pytickersymbols package."""
+        """Get all Dow Jones Industrial Average (30 stocks) symbols via pytickersymbols."""
         cached = self._load_from_cache("Dow Jones")
         if cached:
             return cached

@@ -83,7 +83,7 @@ class DataLoader:
             raise ValueError(f"Data directory not found: {self.data_dir}")
 
     def get_latest_date(self) -> Optional[str]:
-        """Get the date of the most recent trading-day data (skips weekends when market is closed)."""
+        """Get the date of the most recent trading-day data (skips weekends when closed)."""
         dates = self.get_available_dates()
         for d in dates:
             if _is_weekday(d):

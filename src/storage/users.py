@@ -118,7 +118,8 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
         return None
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, password_hash, created_at, session_version FROM users WHERE email = ?",
+            "SELECT id, email, password_hash, created_at, session_version FROM users WHERE email = "
+            "?",
             (normalized,),
         ).fetchone()
     if not row or not _verify_password(password, row["password_hash"]):
@@ -134,7 +135,8 @@ def authenticate_user(email: str, password: str) -> Optional[Dict[str, Any]]:
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE id = ?",
+            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE id "
+            "= ?",
             (user_id,),
         ).fetchone()
     if not row:
@@ -155,7 +157,8 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         return None
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE email = ?",
+            "SELECT id, email, created_at, email_verified_at, session_version FROM users WHERE "
+            "email = ?",
             (normalized,),
         ).fetchone()
     if not row:
@@ -173,7 +176,8 @@ def update_password(user_id: str, password: str) -> None:
     password_hash = _hash_password(password)
     with get_connection() as conn:
         conn.execute(
-            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = "
+            "?",
             (password_hash, user_id),
         )
 
@@ -187,7 +191,8 @@ def change_password(user_id: str, current_password: str, new_password: str) -> N
         if not row or not _verify_password(current_password, row["password_hash"]):
             raise UserError("Current password is incorrect.")
         conn.execute(
-            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
+            "UPDATE users SET password_hash = ?, session_version = session_version + 1 WHERE id = "
+            "?",
             (new_hash, user_id),
         )
 

@@ -24,7 +24,8 @@ def _auth_secret() -> bytes:
     secret = (os.environ.get("MARKET_HELM_AUTH_SECRET") or "").strip()
     if len(secret) < 16:
         raise AuthError(
-            "MARKET_HELM_AUTH_SECRET must be set (min 16 characters) when multi-user mode is enabled."
+            "MARKET_HELM_AUTH_SECRET must be set (min 16 characters) when multi-user mode is "
+            "enabled."
         )
     return secret.encode("utf-8")
 

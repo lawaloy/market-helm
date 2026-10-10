@@ -51,7 +51,8 @@ def prometheus_metrics() -> str:
     with _lock:
         for (method, path, status), value in sorted(_requests.items()):
             lines.append(
-                f'markethelm_http_requests_total{{method="{method}",path="{path}",status="{status}"}} {value}'
+                f'markethelm_http_requests_total{{method="{method}",path="{path}",'
+                f'status="{status}"}} {value}'
             )
         lines.extend(
             [
@@ -61,6 +62,7 @@ def prometheus_metrics() -> str:
         )
         for (method, path), value in sorted(_duration.items()):
             lines.append(
-                f'markethelm_http_request_duration_seconds_sum{{method="{method}",path="{path}"}} {value:.6f}'
+                f'markethelm_http_request_duration_seconds_sum{{method="{method}",path="{path}"}} '
+                f"{value:.6f}"
             )
     return "\n".join(lines) + "\n"

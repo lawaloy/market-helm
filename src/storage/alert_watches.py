@@ -428,7 +428,8 @@ def record_trigger(user_id: str, alert_id: str, timestamp: Optional[str] = None)
             """
             INSERT INTO alert_trigger_state (user_id, alert_id, last_triggered_at)
             VALUES (?, ?, ?)
-            ON CONFLICT(user_id, alert_id) DO UPDATE SET last_triggered_at = excluded.last_triggered_at
+            ON CONFLICT(user_id, alert_id) DO UPDATE SET
+                last_triggered_at = excluded.last_triggered_at
             """,
             (user_id, alert_id, ts),
         )
@@ -497,7 +498,8 @@ def try_claim_trigger(
             """
             INSERT INTO alert_trigger_state (user_id, alert_id, last_triggered_at)
             VALUES (?, ?, ?)
-            ON CONFLICT(user_id, alert_id) DO UPDATE SET last_triggered_at = excluded.last_triggered_at
+            ON CONFLICT(user_id, alert_id) DO UPDATE SET
+                last_triggered_at = excluded.last_triggered_at
             """,
             (user_id, alert_id, claim_ts),
         )
@@ -557,7 +559,8 @@ def record_delivery(
     with get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO alert_delivery_log (user_id, alert_id, channel, success, test, error, timestamp)
+            INSERT INTO alert_delivery_log
+                (user_id, alert_id, channel, success, test, error, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, alert_id, channel, 1 if success else 0, 1 if test else 0, error, ts),

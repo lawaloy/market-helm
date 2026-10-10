@@ -456,7 +456,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--tenant-check",
         action="store_true",
-        help="Run the guarded write-isolation check with dedicated accounts from environment variables.",
+        help="Run the guarded write-isolation check with dedicated accounts from environment "
+        "variables.",
     )
     parser.add_argument(
         "--bootstrap-loopback-tenants",

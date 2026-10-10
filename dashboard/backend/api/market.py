@@ -133,7 +133,8 @@ def _generate_demo_summary(analysis: Dict[str, Any], exchange_comparison: Dict[s
         sentiment = "mixed"
 
     summary_parts.append(
-        f"This saved market snapshot showed {sentiment} sentiment with {gainers} gainers and {losers} losers, "
+        f"This saved market snapshot showed {sentiment} sentiment with {gainers} gainers and "
+        f"{losers} losers, "
         f"averaging {avg_change:.2f}% change overall."
     )
 

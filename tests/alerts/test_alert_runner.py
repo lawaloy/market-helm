@@ -322,8 +322,10 @@ def test_get_enabled_watch_symbols(tmp_path, monkeypatch):
         """
         {
           "alerts": [
-            {"id": "a", "enabled": true, "condition": {"type": "price_threshold", "symbol": "aapl"}},
-            {"id": "b", "enabled": false, "condition": {"type": "price_threshold", "symbol": "MSFT"}},
+            {"id": "a", "enabled": true,
+             "condition": {"type": "price_threshold", "symbol": "aapl"}},
+            {"id": "b", "enabled": false,
+             "condition": {"type": "price_threshold", "symbol": "MSFT"}},
             {"id": "c", "enabled": true, "condition": {"type": "screening_match", "filters": {}}}
           ]
         }
@@ -341,7 +343,8 @@ def test_get_enabled_watch_symbols_strips_and_rejects_sentinels(tmp_path, monkey
         """
         {
           "alerts": [
-            {"id": "a", "enabled": true, "condition": {"type": "price_threshold", "symbol": " aapl "}},
+            {"id": "a", "enabled": true,
+             "condition": {"type": "price_threshold", "symbol": " aapl "}},
             {"id": "b", "enabled": true, "condition": {"type": "price_threshold", "symbol": "  "}},
             {"id": "c", "enabled": true, "condition": {"type": "price_threshold", "symbol": "nan"}},
             {"id": "d", "enabled": true, "condition": {"type": "price_threshold", "symbol": "msft"}}

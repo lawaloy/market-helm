@@ -202,7 +202,8 @@ class StockDataFetcher:
 
                     if completed % 25 == 0:
                         logger.info(
-                            f"  Progress: {completed}/{len(symbols)} symbols... ({failed_count} failed)"
+                            f"  Progress: {completed}/{len(symbols)} symbols... ({failed_count} "
+                            "failed)"
                         )
                         # Batch pause to stay under minute budget
                         time.sleep(5)

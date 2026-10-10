@@ -30,12 +30,14 @@ def record_worker_heartbeat(
     payload = json.dumps(details or {}, separators=(",", ":"), default=str)
     with get_connection() as conn:
         updated = conn.execute(
-            "UPDATE worker_heartbeats SET status = ?, last_seen_at = ?, details_json = ? WHERE worker_id = ?",
+            "UPDATE worker_heartbeats SET status = ?, last_seen_at = ?, details_json = ? WHERE "
+            "worker_id = ?",
             (status, now, payload, worker_id),
         )
         if updated.rowcount == 0:
             conn.execute(
-                "INSERT INTO worker_heartbeats (worker_id, status, last_seen_at, details_json) VALUES (?, ?, ?, ?)",
+                "INSERT INTO worker_heartbeats (worker_id, status, last_seen_at, details_json) "
+                "VALUES (?, ?, ?, ?)",
                 (worker_id, status, now, payload),
             )
 
@@ -43,7 +45,8 @@ def record_worker_heartbeat(
 def latest_worker_heartbeat() -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT worker_id, status, last_seen_at, details_json FROM worker_heartbeats ORDER BY last_seen_at DESC LIMIT 1"
+            "SELECT worker_id, status, last_seen_at, details_json FROM worker_heartbeats ORDER BY "
+            "last_seen_at DESC LIMIT 1"
         ).fetchone()
     if not row:
         return None

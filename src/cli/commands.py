@@ -173,10 +173,13 @@ def display_results(result: dict):
                     continue
                 proj = projections.get(stock.get("symbol"))
                 if isinstance(proj, dict):
+                    change_text = _fmt_pct(
+                        proj.get("expected_change_percent"), precision=1, signed=True
+                    )
                     logger.info(
                         f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
-                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"({change_text}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
                     )
                     logger.info(f"     Reason: {proj.get('reason', '')}")
@@ -190,10 +193,13 @@ def display_results(result: dict):
                     continue
                 proj = projections.get(stock.get("symbol"))
                 if isinstance(proj, dict):
+                    change_text = _fmt_pct(
+                        proj.get("expected_change_percent"), precision=1, signed=True
+                    )
                     logger.info(
                         f"  {i}. {proj.get('symbol', stock.get('symbol', '?'))} - Target: "
                         f"{_fmt_money(proj.get('target_mid'))} "
-                        f"({_fmt_pct(proj.get('expected_change_percent'), precision=1, signed=True)}) | "
+                        f"({change_text}) | "
                         f"Confidence: {proj.get('confidence', _MISSING)}%"
                     )
                     logger.info(f"     Reason: {proj.get('reason', '')}")

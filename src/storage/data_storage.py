@@ -369,7 +369,8 @@ class DataStorage:
                 reason_short = _md_reason(stock.get("reason"), 55)
                 md.append(
                     f"| **{stock['symbol']}** | "
-                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_money(stock.get('current_price'))} → "
+                    f"{_md_money(stock.get('target_mid'))} | "
                     f"{_md_pct(stock.get('expected_change_percent'))} | "
                     f"{stock['confidence']}% | {reason_short} |"
                 )
@@ -462,15 +463,18 @@ class DataStorage:
 
         if len(high_confidence) > 0:
             md.append(
-                "| Symbol | Current → Target | Expected Change | Confidence | Recommendation | Trend |"
+                "| Symbol | Current → Target | Expected Change | Confidence | Recommendation | "
+                "Trend |"
             )
             md.append(
-                "| ------ | ---------------- | --------------- | ---------- | -------------- | ----- |"
+                "| ------ | ---------------- | --------------- | ---------- | -------------- | "
+                "----- |"
             )
             for _, stock in high_confidence.iterrows():
                 md.append(
                     f"| **{stock['symbol']}** | "
-                    f"{_md_money(stock.get('current_price'))} → {_md_money(stock.get('target_mid'))} | "
+                    f"{_md_money(stock.get('current_price'))} → "
+                    f"{_md_money(stock.get('target_mid'))} | "
                     f"{_md_pct(stock.get('expected_change_percent'))} | "
                     f"{stock['confidence']}% | {stock['recommendation']} | {stock['trend']} |"
                 )

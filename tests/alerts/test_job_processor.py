@@ -143,7 +143,8 @@ class TestJobProcessor:
         assert stats["delivered"] == 1
         with get_connection() as conn:
             row = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
         assert row is not None
@@ -263,7 +264,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -316,7 +318,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -383,7 +386,8 @@ class TestJobProcessor:
         assert stats["failed"] == 1
         with get_connection() as conn:
             trigger = conn.execute(
-                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id = ?",
+                "SELECT last_triggered_at FROM alert_trigger_state WHERE user_id = ? AND alert_id "
+                "= ?",
                 (db_user, "aapl-low"),
             ).fetchone()
             job = conn.execute(
@@ -605,4 +609,3 @@ class TestJobProcessor:
     def test_process_job_queue_stops_after_max_batches(self, db_user, caplog):
         sync_watches_from_config(db_user, _watch_config())
         enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
-
