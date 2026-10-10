@@ -310,9 +310,9 @@ def test_function_returns_expected_value_when_given_valid_input(self):
   bounded load, retention, and incident procedures are implemented. External gates
   are managed infrastructure, real-provider delivery, and monitoring sign-off — see
   [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md).
-- **Historical / accuracy:** Multi-day trends and **projection accuracy** (API + Historical Trends UI) are in place; deeper **metrics by confidence**, **risk-adjusted** views, and **business-calendar** target dates are still open.
+- **Historical / accuracy:** Multi-day trends, exact XNYS-session **projection accuracy**, and confidence-band metrics (CLI, API, and Historical Trends UI) are in place; **risk-adjusted** and longer-horizon views are still open.
 - **Real-time:** Data is batch/daily; refresh is explicit (not streaming).
-- **Screening:** Advanced technical filters (RSI/MACD, etc.) remain future work.
+- **Screening:** The screener filters on volume, price, daily change, and market cap only. Technical indicators are not screening filters yet (RSI exists only as an alert rule); MACD, Bollinger Bands, and moving averages are not implemented.
 
 </details>
 
@@ -321,7 +321,8 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 <summary><b>Completed Milestones</b></summary>
 
 - ✅ **Web Dashboard (v0.3+)** — Market overview, projections, Historical Trends, **projection accuracy**, **Helmtower** (`/alerts`).
-- ✅ **Alerts** — `AlertEngine`, price/screening rules, cooldowns, **webhook** (JSON/Slack/Discord), **email** (SMTP + SendGrid/Mailgun), CLI, scheduled worker (`alerts run --loop`).
+- ✅ **Alerts** — `AlertEngine`, price/screening/RSI rules, shallow AND/OR compounds, cooldowns, **webhook** (JSON/Slack/Discord), **email** (SMTP + SendGrid/Mailgun), CLI, scheduled worker (`alerts run --loop`).
+- ✅ **Projection validation**: exact XNYS trading-session targets and `market-helm backtest`, shared by the CLI, API, and Historical Trends UI, with confidence-band cohorts.
 
 </details>
 
@@ -368,12 +369,12 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 - [x] Multi-day aggregation, summary API, charts (confidence, recommendations, expected move)
 - [x] Per-symbol historical chart with projection overlay
 - [x] **Projection accuracy** — `GET /api/history/accuracy`, UI on Historical Trends
+- [x] Accuracy by **confidence band** and exact XNYS-session target alignment
 
 **Still to build:**
 
-- [ ] Accuracy / trends **by confidence** band and richer performance metrics
+- [ ] **Risk-adjusted** and longer-horizon accuracy views
 - [ ] Recommendation change timeline, volume patterns (as needed)
-- [ ] Optional business-day target alignment for scoring
 
 ---
 
@@ -405,11 +406,11 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 <summary><b>High Priority - Additional Features</b></summary>
 
 - [ ] **Support for additional stock exchanges** (international markets: LSE, TSE, HKEX)
-- [ ] **More screening filters** (technical indicators: RSI, MACD, Bollinger Bands, moving averages)
+- [ ] **More screening filters** (technical indicators such as RSI, MACD, Bollinger Bands, and moving averages; RSI is currently available only as an alert rule)
 - [ ] **Enhanced AI summaries** (sentiment analysis, news integration, contextual recommendations)
 - [ ] **Sector analysis** (group stocks by sector, compare performance)
 - [ ] **Portfolio tracking** (track multiple portfolios, performance metrics)
-- [ ] **Backtesting engine** (test strategies against historical data)
+- [ ] **Strategy backtesting** (simulate trading strategies against historical data; `market-helm backtest` currently validates saved projections only)
 
 </details>
 
@@ -417,8 +418,8 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 <details>
 <summary><b>Medium Priority - Improvements</b></summary>
 
-- [ ] Additional unit tests (especially for services/)
-- [ ] Integration tests for full workflow
+- [ ] Additional unit tests where coverage is still thin
+- [ ] Broader end-to-end workflow tests (provider-resilience integration tests already exist)
 - [ ] Performance optimizations
 - [ ] CLI improvements (progress bars, colors, interactive mode)
 
@@ -429,7 +430,7 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 <summary><b>Low Priority - Enhancements</b></summary>
 
 - [ ] Configuration validation with detailed error messages
-- [ ] Additional export formats (Excel, Parquet)
+- [ ] Additional export formats (Excel, Parquet; the dashboard already exports CSV and PDF)
 - [ ] Enhanced error handling and recovery
 
 </details>
