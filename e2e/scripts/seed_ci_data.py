@@ -5,17 +5,18 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 from pathlib import Path
 
-# Repo root (e2e/scripts -> parents[2])
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Sibling helper (this script is run as ``python e2e/scripts/seed_ci_data.py``, so its
+# directory is on sys.path): puts the repo root on sys.path before the imports below.
+import _repo_root
 
-from dashboard.backend.services.data_loader import get_most_recent_trading_day  # noqa: E402
-from src.storage.market_bars import upsert_market_bars  # noqa: E402
-from src.storage.projections_store import upsert_daily_summary, upsert_projections  # noqa: E402
+from dashboard.backend.services.data_loader import get_most_recent_trading_day
+from src.storage.market_bars import upsert_market_bars
+from src.storage.projections_store import upsert_daily_summary, upsert_projections
+
+# Repo root (e2e/scripts -> parents[2])
+ROOT = _repo_root.ROOT
 
 
 def main() -> None:
