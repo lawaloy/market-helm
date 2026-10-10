@@ -1,3 +1,5 @@
+# NOTE: these commits must stay reachable in main (merge with a MERGE COMMIT, not squash or
+# rebase-merge); if the PR is ever squashed, replace the hashes below with the new commit.
 # One-time black + isort reformat (formatting only). Use: git config blame.ignoreRevsFile .git-blame-ignore-revs
 # style: apply black
 62f70e5f784788875749bcae1b6b90aa98810005
