@@ -607,5 +607,27 @@ class TestJobProcessor:
         assert poison["status"] == "completed"
 
     def test_process_job_queue_stops_after_max_batches(self, db_user, caplog):
-        sync_watches_from_config(db_user, _watch_config())
-        enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
+        """A queue that never drains must stop after max_batches and warn."""
+        safety_limit = 20
+        claim_calls = {"eval": 0}
+
+        def endless_claim(job_types, worker_id, limit=50):
+            if JOB_EVALUATE_SYMBOL not in job_types:
+                return []
+            claim_calls["eval"] += 1
+            if claim_calls["eval"] > safety_limit:
+                raise AssertionError("process_job_queue did not stop at max_batches")
+            return [{"id": f"synthetic-{claim_calls['eval']}", "payload": {}}]
+
+        with (
+            patch("src.alerts.job_processor.claim_jobs", side_effect=endless_claim),
+            patch("src.alerts.job_processor._process_evaluate_symbol") as process_eval,
+            patch("src.alerts.job_processor.complete_job", return_value=True),
+            caplog.at_level("WARNING", logger="src.alerts.job_processor"),
+        ):
+            stats = process_job_queue(max_batches=3)
+
+        assert claim_calls["eval"] == 3
+        assert process_eval.call_count == 3
+        assert stats == {"evaluated": 3, "delivered": 0, "failed": 0}
+        assert "Stopped processing alert jobs after 3 batches" in caplog.text
