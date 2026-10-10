@@ -56,14 +56,14 @@ def _bounded_env(name: str, default: int, *, maximum: int) -> int:
 
 
 def rate_limiting_enabled() -> bool:
-    raw = (os.environ.get("MARKET_HELM_RATE_LIMIT_ENABLED") or "").strip().lower()
+    raw = (os.environ.get("MARKETHELM_RATE_LIMIT_ENABLED") or "").strip().lower()
     if raw in {"1", "true", "yes", "on"}:
         return True
     if raw in {"0", "false", "no", "off"}:
         return False
     if raw:
         logger.warning(
-            "Invalid MARKET_HELM_RATE_LIMIT_ENABLED; using database-mode default",
+            "Invalid MARKETHELM_RATE_LIMIT_ENABLED; using database-mode default",
         )
     return database_enabled()
 
@@ -72,21 +72,21 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
     return (
         RateLimitRule(
             "auth-register",
-            _bounded_env("MARKET_HELM_RATE_LIMIT_REGISTER", 5, maximum=1000),
+            _bounded_env("MARKETHELM_RATE_LIMIT_REGISTER", 5, maximum=1000),
             3600,
             paths=("/api/auth/register",),
             methods=("POST",),
         ),
         RateLimitRule(
             "auth-login",
-            _bounded_env("MARKET_HELM_RATE_LIMIT_LOGIN", 10, maximum=10000),
+            _bounded_env("MARKETHELM_RATE_LIMIT_LOGIN", 10, maximum=10000),
             60,
             paths=("/api/auth/login",),
             methods=("POST",),
         ),
         RateLimitRule(
             "auth-email",
-            _bounded_env("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", 5, maximum=1000),
+            _bounded_env("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", 5, maximum=1000),
             3600,
             paths=(
                 "/api/auth/password-reset/request",
@@ -96,7 +96,7 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
         ),
         RateLimitRule(
             "expensive-write",
-            _bounded_env("MARKET_HELM_RATE_LIMIT_EXPENSIVE", 10, maximum=10000),
+            _bounded_env("MARKETHELM_RATE_LIMIT_EXPENSIVE", 10, maximum=10000),
             60,
             paths=(
                 "/api/refresh",
@@ -112,7 +112,7 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
         ),
         RateLimitRule(
             "api-global",
-            _bounded_env("MARKET_HELM_RATE_LIMIT_GLOBAL", 120, maximum=100000),
+            _bounded_env("MARKETHELM_RATE_LIMIT_GLOBAL", 120, maximum=100000),
             60,
         ),
     )
@@ -120,7 +120,7 @@ def configured_rules() -> Tuple[RateLimitRule, ...]:
 
 def _trusted_proxy_networks() -> Tuple[ipaddress._BaseNetwork, ...]:
     networks = []
-    for raw in (os.environ.get("MARKET_HELM_TRUSTED_PROXY_CIDRS") or "").split(","):
+    for raw in (os.environ.get("MARKETHELM_TRUSTED_PROXY_CIDRS") or "").split(","):
         value = raw.strip()
         if not value:
             continue

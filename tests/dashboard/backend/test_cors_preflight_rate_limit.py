@@ -31,8 +31,8 @@ def _api_request(path: str, method: str = "OPTIONS") -> Request:
 def test_options_consumes_global_bucket_when_limiter_runs(monkeypatch) -> None:
     """OPTIONS is an API method; skipping it in check_rate_limits would hide
     a middleware-order regression and allow an OPTIONS flood."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
     monkeypatch.setattr(rate_limit, "_memory_counters", rate_limit._MemoryCounters())
     rules = (RateLimitRule("api-global", 1, 60),)
     now = 1_700_000_000
@@ -55,16 +55,16 @@ def test_cors_preflight_does_not_consume_global_login_budget(tmp_path, monkeypat
     make the first real login 429 after a single CORS handshake.
     """
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'cors-preflight-limits.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "1")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "1000")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_GLOBAL", "1")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_LOGIN", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_REGISTER", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_EXPENSIVE", "1000")
     from src.storage.database import init_database
 
     init_database()

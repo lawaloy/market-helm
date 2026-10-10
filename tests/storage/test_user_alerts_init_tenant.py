@@ -32,7 +32,7 @@ GLOBAL_MAILBOX = "global-shared@example.com"
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "alerts-init-tenant.db"
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{db_path.as_posix()}",
     )
     monkeypatch.setenv("ALERT_EMAIL_TO", GLOBAL_MAILBOX)

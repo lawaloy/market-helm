@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import List, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXCLUDED_PARTS = {".venv", ".venv-audit", "build", "dist", "node_modules", "market_helm.egg-info"}
+EXCLUDED_PARTS = {".venv", ".venv-audit", "build", "dist", "node_modules", "markethelm.egg-info"}
 
 
 def filter_python_files(paths: Sequence[str]) -> List[str]:

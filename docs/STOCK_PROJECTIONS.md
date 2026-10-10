@@ -235,7 +235,7 @@ The projection system is automatically integrated into the daily tracker:
 python main.py
 
 # Or via console script
-market-helm
+markethelm
 ```
 
 </details>
@@ -347,7 +347,7 @@ error, direction accuracy, target-band coverage, and confidence calibration by
 confidence and recommendation cohort:
 
 ```bash
-market-helm backtest --data-dir data --days 365 --output data/backtest.json
+markethelm backtest --data-dir data --days 365 --output data/backtest.json
 ```
 
 The dashboard and **`GET /api/history/accuracy`** use the same evaluator and show

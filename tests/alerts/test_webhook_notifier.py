@@ -53,7 +53,7 @@ def test_from_alert_falls_back_to_env() -> None:
 
 
 def test_from_alert_ignores_env_webhook_in_database_mode(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-test.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm-test.db")
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
 
     assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None

@@ -14,7 +14,7 @@ from src.storage.users import (
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "email-validation.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return db_path
 

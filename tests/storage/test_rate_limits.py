@@ -12,7 +12,7 @@ from src.storage.rate_limits import consume_rate_limit
 @pytest.fixture()
 def rate_limit_database(tmp_path, monkeypatch) -> None:
     path = tmp_path / "rate-limits.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
     init_database()
 
 

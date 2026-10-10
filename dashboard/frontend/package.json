@@ -1,5 +1,5 @@
 {
-  "name": "market-helm-web",
+  "name": "markethelm-web",
   "version": "0.3.7",
   "private": true,
   "packageManager": "npm@10.9.8",

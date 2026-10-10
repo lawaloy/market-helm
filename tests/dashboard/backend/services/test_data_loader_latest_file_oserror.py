@@ -9,7 +9,7 @@ from dashboard.backend.services.data_loader import DataLoader
 
 @pytest.fixture
 def loader(tmp_path, monkeypatch) -> DataLoader:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     return DataLoader(data_dir=tmp_path)
 
 

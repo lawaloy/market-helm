@@ -6,8 +6,8 @@ import pytest
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "markethelm.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -24,7 +24,7 @@ def client():
 
 class TestAuthAPI:
     def test_register_disabled_without_database(self, client, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         r = client.post(
             "/api/auth/register",
             json={"email": "a@example.com", "password": "password123"},
@@ -46,7 +46,7 @@ class TestAuthAPI:
         self, client, monkeypatch, method, path, kwargs
     ):
         """Frontend probes /me (and login) for 501 to detect single-user mode."""
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         r = getattr(client, method)(path, **kwargs)
         assert r.status_code == 501
         assert "Multi-user mode is disabled" in r.json()["detail"]
@@ -156,11 +156,11 @@ class TestAuthAPI:
     ):
         """Register with DB on but bad AUTH_SECRET must 500 (not opaque crash)."""
         db_path = tmp_path / "auth-secret.db"
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
         if secret is None:
-            monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+            monkeypatch.delenv("MARKETHELM_AUTH_SECRET", raising=False)
         else:
-            monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", secret)
+            monkeypatch.setenv("MARKETHELM_AUTH_SECRET", secret)
         from src.storage.database import init_database
 
         init_database()
@@ -170,13 +170,13 @@ class TestAuthAPI:
             json={"email": "nosecret@example.com", "password": "password123"},
         )
         assert r.status_code == 500
-        assert "MARKET_HELM_AUTH_SECRET" in r.json()["detail"]
+        assert "MARKETHELM_AUTH_SECRET" in r.json()["detail"]
 
     def test_login_maps_missing_auth_secret_to_500(self, client, tmp_path, monkeypatch):
         """Login after user creation must map AuthError from missing secret to 500."""
         db_path = tmp_path / "auth-login-secret.db"
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-        monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+        monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
         from src.storage.database import init_database
 
         init_database()
@@ -187,10 +187,10 @@ class TestAuthAPI:
         )
         assert registered.status_code == 200
 
-        monkeypatch.delenv("MARKET_HELM_AUTH_SECRET", raising=False)
+        monkeypatch.delenv("MARKETHELM_AUTH_SECRET", raising=False)
         r = client.post(
             "/api/auth/login",
             json={"email": "login-secret@example.com", "password": "password123"},
         )
         assert r.status_code == 500
-        assert "MARKET_HELM_AUTH_SECRET" in r.json()["detail"]
+        assert "MARKETHELM_AUTH_SECRET" in r.json()["detail"]

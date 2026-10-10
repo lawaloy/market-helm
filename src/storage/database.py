@@ -246,14 +246,14 @@ _MIGRATION_TABLE = """CREATE TABLE IF NOT EXISTS schema_migrations (
 
 
 def database_enabled() -> bool:
-    return bool((os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip())
+    return bool((os.environ.get("MARKETHELM_DATABASE_URL") or "").strip())
 
 
 def database_backend() -> str:
     """Return the configured storage backend name."""
-    raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     if not raw:
-        raise RuntimeError("MARKET_HELM_DATABASE_URL is not set")
+        raise RuntimeError("MARKETHELM_DATABASE_URL is not set")
     scheme = urlparse(raw).scheme.lower()
     if scheme == "sqlite":
         return "sqlite"
@@ -265,10 +265,10 @@ def database_backend() -> str:
 
 
 def resolve_database_path() -> Path:
-    """Resolve SQLite file path from MARKET_HELM_DATABASE_URL (sqlite:///...)."""
-    raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
+    """Resolve SQLite file path from MARKETHELM_DATABASE_URL (sqlite:///...)."""
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     if not raw:
-        raise RuntimeError("MARKET_HELM_DATABASE_URL is not set")
+        raise RuntimeError("MARKETHELM_DATABASE_URL is not set")
     parsed = urlparse(raw)
     if parsed.scheme != "sqlite":
         raise ValueError(
@@ -353,7 +353,7 @@ def _connect_postgresql() -> _PostgresConnection:
             "PostgreSQL support requires Psycopg with a usable libpq implementation. "
             "Install libpq or psycopg[binary] on a supported platform."
         ) from exc
-    raw = (os.environ.get("MARKET_HELM_DATABASE_URL") or "").strip()
+    raw = (os.environ.get("MARKETHELM_DATABASE_URL") or "").strip()
     return _PostgresConnection(psycopg.connect(raw, row_factory=dict_row))
 
 

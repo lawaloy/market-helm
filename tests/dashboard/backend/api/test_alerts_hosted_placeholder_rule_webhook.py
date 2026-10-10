@@ -20,8 +20,8 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "hosted-placeholder-webhook.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/global")
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
     from src.storage.database import init_database

@@ -19,7 +19,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_users(tmp_path, monkeypatch):
     db_path = tmp_path / "cooldown-inf.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     good = create_user("cooldown-inf-good@example.com", "password123")["id"]
     bad = create_user("cooldown-inf-bad@example.com", "password123")["id"]

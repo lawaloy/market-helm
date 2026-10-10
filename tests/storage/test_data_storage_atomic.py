@@ -15,7 +15,7 @@ from src.storage.projections_store import load_daily_summary, load_projections
 
 @pytest.fixture
 def storage(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     return DataStorage(data_dir=str(tmp_path))
 
 

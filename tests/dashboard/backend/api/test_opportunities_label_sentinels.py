@@ -14,7 +14,7 @@ from tests.helpers.market_bars import seed_projections, seed_simple_bars
 
 @pytest.fixture
 def temp_data_dir(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     yield Path(tmp)
     shutil.rmtree(tmp, ignore_errors=True)

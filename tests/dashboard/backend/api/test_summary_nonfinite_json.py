@@ -12,7 +12,7 @@ from tests.helpers.market_bars import seed_simple_bars, seed_summary
 
 @pytest.fixture
 def summary_client(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     tmp = tempfile.mkdtemp()
     data_dir = Path(tmp)
     from dashboard.backend.services.data_loader import DataLoader

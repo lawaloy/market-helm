@@ -14,7 +14,7 @@ SPEC.loader.exec_module(backfill_market_data)
 
 
 def test_cli_reports_successful_import(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "daily_data_2026-09-18.csv").write_text(
         "symbol,close\nAAPL,150\n", encoding="utf-8"
     )
@@ -26,7 +26,7 @@ def test_cli_reports_successful_import(tmp_path, monkeypatch, capsys):
 
 
 def test_cli_returns_failure_when_a_file_is_malformed(tmp_path, monkeypatch, capsys):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     (tmp_path / "summary_2026-09-18.json").write_text("[]", encoding="utf-8")
 
     assert backfill_market_data.main(["--data-dir", str(tmp_path)]) == 1

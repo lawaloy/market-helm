@@ -1,4 +1,4 @@
-"""Resolve alert config locations for repo dev vs pip install (~/.market-helm)."""
+"""Resolve alert config locations for repo dev vs pip install (~/.markethelm)."""
 
 from __future__ import annotations
 
@@ -34,15 +34,7 @@ def _env_lock_for(path: Path) -> threading.Lock:
 
 def user_config_dir() -> Path:
     """Per-user config directory (same location as the dashboard uses)."""
-    home = Path.home()
-    legacy = home / ".market-desk"
-    dest = home / ".market-helm"
-    if not dest.exists() and legacy.exists():
-        try:
-            legacy.rename(dest)
-        except OSError:
-            pass
-    return dest
+    return Path.home() / ".markethelm"
 
 
 def bundled_example_path() -> Path:
@@ -51,7 +43,7 @@ def bundled_example_path() -> Path:
 
 def user_alerts_config_path() -> Path:
     """Writable user alerts path (never the repo dev fallback)."""
-    env_path = os.environ.get("MARKET_HELM_ALERTS_CONFIG")
+    env_path = os.environ.get("MARKETHELM_ALERTS_CONFIG")
     if env_path:
         return Path(env_path)
     return user_config_dir() / "alerts.json"
@@ -61,7 +53,7 @@ def resolve_alerts_config_path(explicit: Optional[Path] = None) -> Path:
     """Path to alerts.json: env override, then user file, then repo dev file."""
     if explicit is not None:
         return Path(explicit)
-    env_path = os.environ.get("MARKET_HELM_ALERTS_CONFIG")
+    env_path = os.environ.get("MARKETHELM_ALERTS_CONFIG")
     if env_path:
         return Path(env_path)
     user_path = user_config_dir() / "alerts.json"
@@ -307,7 +299,7 @@ def _replace_env_file_with_retry(source: Path, target: Path) -> None:
 
 
 def update_user_env_vars(updates: Dict[str, str]) -> None:
-    """Update ~/.market-helm/.env without logging or returning secret values.
+    """Update ~/.markethelm/.env without logging or returning secret values.
 
     Serialized per path and written via temp+replace so concurrent settings
     saves cannot drop keys or leave a truncated .env on crash mid-write.

@@ -13,7 +13,7 @@ from src.storage.health import latest_worker_heartbeat, record_worker_heartbeat
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     path = tmp_path / "cycle-success-queue.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{path.as_posix()}")
     init_database()
 
 

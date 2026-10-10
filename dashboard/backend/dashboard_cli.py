@@ -1,4 +1,4 @@
-"""Console entry: `market-helm-web` — serves API + bundled SPA."""
+"""Console entry: `markethelm-web` — serves API + bundled SPA."""
 
 import os
 

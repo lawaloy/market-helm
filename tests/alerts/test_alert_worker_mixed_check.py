@@ -25,7 +25,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_users(tmp_path, monkeypatch):
     db_path = tmp_path / "mixed-check.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return (
         create_user("mixed-a@example.com", "password123")["id"],

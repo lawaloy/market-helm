@@ -11,7 +11,7 @@ from src.storage.market_bars import latest_saved_quotes, upsert_market_bars
 
 
 def test_market_overview_exposes_quote_time_range(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     upsert_market_bars(
         [
             {
@@ -38,7 +38,7 @@ def test_market_overview_exposes_quote_time_range(tmp_path, monkeypatch):
 
 
 def test_alert_catalog_and_quote_return_newest_provider_time(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     upsert_market_bars(
         [{"symbol": "AAPL", "close": 100, "quote_timestamp": "2026-10-02T15:07:00+00:00"}],
         "2026-10-02",
@@ -74,7 +74,7 @@ def test_alert_catalog_and_quote_return_newest_provider_time(tmp_path, monkeypat
 
 def test_hosted_database_saved_quote_selection(tmp_path, monkeypatch):
     database = tmp_path / "hosted.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{database.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{database.as_posix()}")
     from src.storage.database import init_database
 
     init_database()
@@ -106,7 +106,7 @@ def test_alert_health_reports_configuration_without_exposing_key(monkeypatch):
 
 
 def test_lookup_time_is_not_misrepresented_as_market_quote_time(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     with (
         patch("dashboard.backend.api.alerts.resolve_symbol_prices", return_value={"AAPL": 150}),
         patch("dashboard.backend.api.alerts.saved_quote_details", return_value={}),

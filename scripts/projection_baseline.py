@@ -163,7 +163,7 @@ def _snapshot_inputs(data_dir: Path, snapshot_dir: Path) -> None:
 
 def capture(data_dir: Path, output_dir: Path, days: int, **thresholds: object) -> int:
     """Write an immutable observed report only after qualification succeeds."""
-    with tempfile.TemporaryDirectory(prefix="market-helm-baseline-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="markethelm-baseline-") as temporary:
         snapshot_dir = Path(temporary)
         _snapshot_inputs(data_dir, snapshot_dir)
         report = observed_report(snapshot_dir, days)

@@ -61,7 +61,7 @@ class AlertsRunResponse(BaseModel):
 
 class AlertDefaults(BaseModel):
     email_to: Optional[str] = None
-    webhook_url: Optional[str] = None  # write-only: saved to ~/.market-helm/.env, never returned
+    webhook_url: Optional[str] = None  # write-only: saved to ~/.markethelm/.env, never returned
     webhook_format: Optional[str] = None
     notify_email: Optional[bool] = None
     notify_webhook: Optional[bool] = None

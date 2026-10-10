@@ -10,9 +10,9 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def alerts_config_dir(tmp_path: Path, monkeypatch):
-    config_dir = tmp_path / "market-helm"
+    config_dir = tmp_path / "markethelm"
     config_dir.mkdir()
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
     monkeypatch.delenv("DATABASE_URL", raising=False)
     return config_dir
 

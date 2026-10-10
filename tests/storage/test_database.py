@@ -24,31 +24,31 @@ from src.storage.database import (
 
 class TestDatabaseEnabled:
     def test_disabled_when_unset_or_blank(self, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         assert database_enabled() is False
 
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "   ")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "   ")
         assert database_enabled() is False
 
     def test_enabled_when_url_present(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm.db")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm.db")
         assert database_enabled() is True
 
 
 class TestResolveDatabasePath:
     def test_missing_url_raises(self, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-        with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL is not set"):
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+        with pytest.raises(RuntimeError, match="MARKETHELM_DATABASE_URL is not set"):
             resolve_database_path()
 
     def test_relative_sqlite_url(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///relative.db")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///relative.db")
         assert resolve_database_path() == Path("/relative.db")
 
     def test_suite_style_absolute_url_is_usable(self, monkeypatch, tmp_path):
         """sqlite:///{absolute} is the form used by fixtures; connection must work."""
         db = tmp_path / "markethelm.db"
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db.as_posix()}")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db.as_posix()}")
         resolved = resolve_database_path()
         assert resolved.name == "markethelm.db"
         with get_connection() as conn:
@@ -57,25 +57,25 @@ class TestResolveDatabasePath:
     def test_four_slash_absolute_url(self, monkeypatch):
         # urlparse keeps an extra leading slash for sqlite:////abs/path URLs.
         monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL",
+            "MARKETHELM_DATABASE_URL",
             "sqlite:////var/lib/markethelm/markethelm.db",
         )
         assert resolve_database_path() == Path("//var/lib/markethelm/markethelm.db")
 
     def test_non_sqlite_scheme_rejected(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "postgres://localhost/db")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "postgres://localhost/db")
         with pytest.raises(ValueError, match="Expected a sqlite URL"):
             resolve_database_path()
 
     def test_sqlite_url_without_path_rejected(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite://")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite://")
         with pytest.raises(ValueError, match="Invalid SQLite URL"):
             resolve_database_path()
 
     def test_sqlite_url_with_host_rejected(self, monkeypatch):
         """Hosted-looking sqlite://host/path must not silently become a local file."""
         monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL",
+            "MARKETHELM_DATABASE_URL",
             "sqlite://evilhost/tmp/markethelm.db",
         )
         with pytest.raises(ValueError, match="without a host"):
@@ -83,7 +83,7 @@ class TestResolveDatabasePath:
 
     def test_sqlite_url_with_localhost_netloc_rejected(self, monkeypatch):
         monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL",
+            "MARKETHELM_DATABASE_URL",
             "sqlite://localhost/tmp/markethelm.db",
         )
         with pytest.raises(ValueError, match="without a host"):
@@ -93,15 +93,15 @@ class TestResolveDatabasePath:
 class TestDatabaseBackend:
     @pytest.mark.parametrize("scheme", ["postgres", "postgresql"])
     def test_postgresql_aliases(self, monkeypatch, scheme):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"{scheme}://db.example/markethelm")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"{scheme}://db.example/markethelm")
         assert database_backend() == "postgresql"
 
     def test_sqlite_backend(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///markethelm.db")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///markethelm.db")
         assert database_backend() == "sqlite"
 
     def test_unknown_backend_rejected(self, monkeypatch):
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "mysql://localhost/db")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "mysql://localhost/db")
         with pytest.raises(ValueError, match="Unsupported database URL scheme"):
             database_backend()
 
@@ -172,7 +172,7 @@ class TestDatabaseBackend:
 
     def test_connect_postgresql_requires_psycopg(self, monkeypatch):
         """Hosted boot without psycopg must fail closed with an actionable error."""
-        monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "postgresql://db.example/markethelm")
+        monkeypatch.setenv("MARKETHELM_DATABASE_URL", "postgresql://db.example/markethelm")
         import builtins
 
         real_import = builtins.__import__
@@ -189,7 +189,7 @@ class TestDatabaseBackend:
 
 class TestInitDatabase:
     def test_init_noop_when_disabled(self, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         # Must not raise or create files when multi-user mode is off.
         init_database()
 
@@ -206,7 +206,7 @@ class TestDatabaseMigrations:
     def configure_database(monkeypatch, tmp_path):
         database_path = tmp_path / "markethelm.db"
         monkeypatch.setenv(
-            "MARKET_HELM_DATABASE_URL",
+            "MARKETHELM_DATABASE_URL",
             f"sqlite:///{database_path.as_posix()}",
         )
 

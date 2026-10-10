@@ -14,9 +14,9 @@ from httpx import ASGITransport, AsyncClient
 @pytest.fixture
 def alerts_config_dir(tmp_path: Path, monkeypatch):
     """Isolated alerts config directory."""
-    config_dir = tmp_path / "market-helm"
+    config_dir = tmp_path / "markethelm"
     config_dir.mkdir()
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_dir / "alerts.json"))
     return config_dir
 
 
@@ -117,7 +117,7 @@ class TestAlertsConfigAPI:
 
     def test_get_config_never_returns_webhook_url(self, client, alerts_config_dir, monkeypatch):
         config_path = alerts_config_dir / "alerts.json"
-        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
         monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/secret/token")
         config_path.write_text(
             json.dumps(
@@ -482,7 +482,7 @@ class TestAlertsConfigAPI:
     ):
         """Legacy on-disk webhook URLs must be rewritten without secrets."""
         config_path = alerts_config_dir / "alerts.json"
-        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
         config_path.write_text(
             json.dumps(
                 {
@@ -506,7 +506,7 @@ class TestAlertsConfigAPI:
 
     def test_get_config_seeds_webhook_format_from_env(self, client, alerts_config_dir, monkeypatch):
         config_path = alerts_config_dir / "alerts.json"
-        monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+        monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
         monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
         config_path.write_text(
             json.dumps({"defaults": {}, "alerts": []}),

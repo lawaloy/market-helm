@@ -15,8 +15,8 @@ from src.storage.users import create_user
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "cascade.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     init_database()
     return db_path
 

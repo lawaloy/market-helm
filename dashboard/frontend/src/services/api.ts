@@ -22,7 +22,7 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
-export const AUTH_TOKEN_KEY = 'market-helm-token';
+export const AUTH_TOKEN_KEY = 'markethelm-token';
 
 export function getAuthToken(): string | null {
   if (typeof window === 'undefined') return null;

@@ -20,7 +20,7 @@ def test_safe_from_address_rejects_crlf() -> None:
 
 
 def test_platform_from_skips_poisoned_alert_email_from(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("ALERT_EMAIL_FROM", "platform@markethelm.example")
     assert (
         _platform_from_address(
@@ -34,7 +34,7 @@ def test_platform_from_skips_poisoned_alert_email_from(monkeypatch) -> None:
 
 
 def test_platform_from_rejects_poisoned_env_from(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("ALERT_EMAIL_FROM", "alerts@example.com\nBcc: evil@example.com")
     monkeypatch.setenv("ALERT_EMAIL_PROVIDER", "sendgrid")
     monkeypatch.delenv("SMTP_USER", raising=False)

@@ -20,12 +20,12 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: markethelm-readiness-ci
       POSTGRES_PASSWORD: local-ci-postgres-only
-      MARKET_HELM_ENV_FILE: ${{ github.workspace }}/.env.staging.ci
-      MARKET_HELM_PORT: '8012'
+      MARKETHELM_ENV_FILE: ${{ github.workspace }}/.env.staging.ci
+      MARKETHELM_PORT: '8012'
       # Docker Hub's shared unauthenticated runner limit can block the drill before tests start.
-      MARKET_HELM_POSTGRES_IMAGE: public.ecr.aws/docker/library/postgres:16-alpine
-      MARKET_HELM_NODE_BASE_IMAGE: public.ecr.aws/docker/library/node:22.23.2-alpine
-      MARKET_HELM_PYTHON_BASE_IMAGE: public.ecr.aws/docker/library/python:3.12-slim
+      MARKETHELM_POSTGRES_IMAGE: public.ecr.aws/docker/library/postgres:16-alpine
+      MARKETHELM_NODE_BASE_IMAGE: public.ecr.aws/docker/library/node:22.23.2-alpine
+      MARKETHELM_PYTHON_BASE_IMAGE: public.ecr.aws/docker/library/python:3.12-slim
     steps:
       - uses: actions/checkout@v4
 
@@ -38,17 +38,17 @@ jobs:
         run: |
           umask 077
           printf '%s\n' \
-            'MARKET_HELM_AUTH_SECRET=local-ci-acceptance-secret-at-least-32-characters' \
-            'MARKET_HELM_PUBLIC_URL=http://127.0.0.1:8012' \
-            'MARKET_HELM_REQUIRE_EMAIL_VERIFICATION=false' \
+            'MARKETHELM_AUTH_SECRET=local-ci-acceptance-secret-at-least-32-characters' \
+            'MARKETHELM_PUBLIC_URL=http://127.0.0.1:8012' \
+            'MARKETHELM_REQUIRE_EMAIL_VERIFICATION=false' \
             'CORS_ORIGINS=http://127.0.0.1:8012' \
-            'MARKET_HELM_TRUSTED_PROXY_CIDRS=127.0.0.1/32' \
+            'MARKETHELM_TRUSTED_PROXY_CIDRS=127.0.0.1/32' \
             'FINNHUB_API_KEY=' \
             'ALERT_EMAIL_PROVIDER=smtp' \
             'ALERT_EMAIL_FROM=' \
             'ALERT_CHECK_INTERVAL_SECONDS=60' \
-            'MARKET_HELM_RATE_LIMIT_AUTH_EMAIL=100' \
-            > "$MARKET_HELM_ENV_FILE"
+            'MARKETHELM_RATE_LIMIT_AUTH_EMAIL=100' \
+            > "$MARKETHELM_ENV_FILE"
 
       - name: Validate and start staging stack
         shell: bash

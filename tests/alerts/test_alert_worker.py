@@ -15,7 +15,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_users(tmp_path, monkeypatch):
     db_path = tmp_path / "worker.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return (
         create_user("worker-a@example.com", "password123")["id"],
@@ -66,7 +66,7 @@ def test_resolve_interval_seconds_default_without_env(monkeypatch) -> None:
 
 @patch("src.alerts.alert_worker.run_db_worker_cycle")
 def test_run_check_once_uses_db_cycle(mock_db_cycle, monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:///tmp/test.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:///tmp/test.db")
     mock_db_cycle.return_value = {
         "triggered": 2,
         "enqueued": 3,
@@ -79,8 +79,8 @@ def test_run_check_once_uses_db_cycle(mock_db_cycle, monkeypatch) -> None:
 
 
 def test_run_user_check_requires_database(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    with pytest.raises(RuntimeError, match="MARKET_HELM_DATABASE_URL"):
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    with pytest.raises(RuntimeError, match="MARKETHELM_DATABASE_URL"):
         alert_worker.run_user_check("user-1")
 
 

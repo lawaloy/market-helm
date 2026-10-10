@@ -9,7 +9,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'market-helm-theme';
+const STORAGE_KEY = 'markethelm-theme';
 
 function readStoredTheme(): Theme | null {
   try {

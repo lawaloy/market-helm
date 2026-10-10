@@ -18,7 +18,7 @@ NEW = "https://hooks.example/user/rotated-token"
 @pytest.fixture
 def db_user(tmp_path, monkeypatch):
     db_path = tmp_path / "webhook-rmw.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return create_user("webhook-rmw@example.com", "password123")["id"]
 

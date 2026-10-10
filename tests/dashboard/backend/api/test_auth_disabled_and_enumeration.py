@@ -15,10 +15,10 @@ def client():
 @pytest.fixture
 def hosted_client(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'enum.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -56,7 +56,7 @@ def hosted_client(tmp_path, monkeypatch):
 def test_remaining_auth_routes_are_disabled_without_database(
     client, monkeypatch, method, path, json_body
 ):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     kwargs = {}
     if json_body is not None:
         kwargs["json"] = json_body

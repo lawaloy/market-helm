@@ -10,11 +10,11 @@ Thank you for your interest in contributing! This document provides guidelines f
 2. **Clone your fork** locally:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/market-helm.git
-   cd market-helm
+   git clone https://github.com/YOUR_USERNAME/markethelm.git
+   cd markethelm
    ```
 
-   **End users** can install from PyPI: `pip install market-helm` — see [PyPI](https://pypi.org/project/market-helm/) and the main README.
+   **End users** can install from PyPI: `pip install markethelm` — see [PyPI](https://pypi.org/project/markethelm/) and the main README.
 
 3. **Create a virtual environment**:
 
@@ -95,7 +95,7 @@ git checkout -b fix/your-bug-fix
 python -m pytest tests/ -v --ignore=tests/integration/test_postgresql_storage.py
 
 # Run the PostgreSQL integration test against a disposable test database
-MARKET_HELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
+MARKETHELM_POSTGRES_TEST_URL=postgresql://user:password@localhost:5432/markethelm \
   python -m pytest tests/integration/test_postgresql_storage.py -v
 
 # Run with coverage
@@ -355,7 +355,7 @@ def test_function_returns_expected_value_when_given_valid_input(self):
 
 - ✅ **Web Dashboard (v0.3+)** — Market overview, projections, Historical Trends, **projection accuracy**, **Helmtower** (`/alerts`).
 - ✅ **Alerts** — `AlertEngine`, price/screening/RSI rules, shallow AND/OR compounds, cooldowns, **webhook** (JSON/Slack/Discord), **email** (SMTP + SendGrid/Mailgun), CLI, scheduled worker (`alerts run --loop`).
-- ✅ **Projection validation**: exact XNYS trading-session targets and `market-helm backtest`, shared by the CLI, API, and Historical Trends UI, with confidence-band cohorts.
+- ✅ **Projection validation**: exact XNYS trading-session targets and `markethelm backtest`, shared by the CLI, API, and Historical Trends UI, with confidence-band cohorts.
 
 </details>
 
@@ -443,7 +443,7 @@ advanced rules/channels are next — [docs/PROJECT_STATUS.md](docs/PROJECT_STATU
 - [ ] **Enhanced AI summaries** (sentiment analysis, news integration, contextual recommendations)
 - [ ] **Sector analysis** (group stocks by sector, compare performance)
 - [ ] **Portfolio tracking** (track multiple portfolios, performance metrics)
-- [ ] **Strategy backtesting** (simulate trading strategies against historical data; `market-helm backtest` currently validates saved projections only)
+- [ ] **Strategy backtesting** (simulate trading strategies against historical data; `markethelm backtest` currently validates saved projections only)
 
 </details>
 

@@ -80,7 +80,7 @@ jobs:
           pip install -e .[dev] "psycopg[binary]>=3.2.0"
       - name: Test PostgreSQL storage
         env:
-          MARKET_HELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@localhost:5432/markethelm
+          MARKETHELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@localhost:5432/markethelm
         run: pytest tests/integration/test_postgresql_storage.py -v
 
   frontend:

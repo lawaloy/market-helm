@@ -10,7 +10,7 @@ from src.alerts.alert_paths import update_user_env_vars
 
 
 def test_update_user_env_vars_rejects_newline_in_value(tmp_path: Path, monkeypatch) -> None:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     env_file.write_text("SHARED_KEEP=1\n", encoding="utf-8")
@@ -29,7 +29,7 @@ def test_update_user_env_vars_rejects_newline_in_value(tmp_path: Path, monkeypat
 
 
 def test_update_user_env_vars_rejects_crlf_in_key(tmp_path: Path, monkeypatch) -> None:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     env_file.write_text("SHARED_KEEP=1\n", encoding="utf-8")
@@ -42,7 +42,7 @@ def test_update_user_env_vars_rejects_crlf_in_key(tmp_path: Path, monkeypatch) -
 
 
 def test_update_user_env_vars_accepts_safe_webhook(tmp_path: Path, monkeypatch) -> None:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     monkeypatch.setattr("src.alerts.alert_paths.user_config_dir", lambda: user_dir)

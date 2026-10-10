@@ -21,7 +21,7 @@ export function dashboardLoadErrorMessage(err: unknown): string {
     if (status === 404) {
       return (
         'No data yet. Use "Fetch New" in the header (needs a Finnhub API key set on the server), ' +
-        'or run the market-helm CLI once to populate the data folder.'
+        'or run the markethelm CLI once to populate the data folder.'
       );
     }
     if (status === 502 || status === 503) {

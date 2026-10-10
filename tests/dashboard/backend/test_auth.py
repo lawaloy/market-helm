@@ -11,20 +11,20 @@ from src.storage.session import create_access_token
 
 @pytest.fixture
 def auth_secret(monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
 
 
 @pytest.fixture
 def db_on(tmp_path, monkeypatch, auth_secret):
     db_path = tmp_path / "auth-helpers.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     from src.storage.database import init_database
 
     init_database()
 
 
 def test_require_user_id_returns_none_when_database_disabled(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     assert asyncio.run(require_user_id(authorization=None)) is None
     assert asyncio.run(optional_user_id(authorization="Bearer anything")) is None
 
@@ -91,7 +91,7 @@ def test_require_user_id_401_when_session_revoked(db_on) -> None:
 
 
 def test_require_user_id_403_when_email_unverified(db_on, monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION", "true")
+    monkeypatch.setenv("MARKETHELM_REQUIRE_EMAIL_VERIFICATION", "true")
     from src.storage.users import create_user
 
     user = create_user("unverified-helper@example.com", "password123")

@@ -86,7 +86,7 @@ class DeleteAccountRequest(BaseModel):
 
 
 def _verification_required() -> bool:
-    return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+    return (os.environ.get("MARKETHELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
         "1",
         "true",
         "yes",
@@ -106,7 +106,7 @@ def _require_multi_user() -> None:
     if not database_enabled():
         raise HTTPException(
             status_code=501,
-            detail="Multi-user mode is disabled. Set MARKET_HELM_DATABASE_URL to enable.",
+            detail="Multi-user mode is disabled. Set MARKETHELM_DATABASE_URL to enable.",
         )
 
 

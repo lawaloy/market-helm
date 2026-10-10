@@ -15,16 +15,16 @@ import pytest
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'expensive-limits.db').as_posix()}",
     )
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_ENABLED", "true")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_GLOBAL", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_LOGIN", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_REGISTER", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_AUTH_EMAIL", "1000")
-    monkeypatch.setenv("MARKET_HELM_RATE_LIMIT_EXPENSIVE", "1")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_ENABLED", "true")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_GLOBAL", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_LOGIN", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_REGISTER", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_AUTH_EMAIL", "1000")
+    monkeypatch.setenv("MARKETHELM_RATE_LIMIT_EXPENSIVE", "1")
     # Keep spend + follow-up POSTs in the same 60s window (CI can otherwise
     # straddle `now % 60 == 0` and see a fresh expensive-write bucket).
     monkeypatch.setattr("dashboard.backend.rate_limit.time.time", lambda: 1_700_000_030)

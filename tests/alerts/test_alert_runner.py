@@ -332,7 +332,7 @@ def test_get_enabled_watch_symbols(tmp_path, monkeypatch):
         """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     assert get_enabled_watch_symbols() == ["AAPL"]
 
 
@@ -353,5 +353,5 @@ def test_get_enabled_watch_symbols_strips_and_rejects_sentinels(tmp_path, monkey
         """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     assert get_enabled_watch_symbols() == ["AAPL", "MSFT"]

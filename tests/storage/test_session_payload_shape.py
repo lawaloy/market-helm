@@ -14,7 +14,7 @@ from src.storage.session import AuthError, decode_access_token
 
 @pytest.fixture
 def auth_secret(monkeypatch):
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
 
 
 def _sign_raw(body_bytes: bytes) -> str:

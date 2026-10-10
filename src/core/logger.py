@@ -9,29 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 
-def _rename_legacy_log_files(log_path: Path) -> None:
-    """Rename stock_tracker_*.log files left from older releases to market_helm_*.log."""
-    for old in sorted(log_path.glob("stock_tracker_*.log")):
-        if old.name.startswith("stock_tracker_errors_"):
-            continue
-        suffix = old.name.removeprefix("stock_tracker_")
-        new = log_path / f"market_helm_{suffix}"
-        if not new.exists():
-            try:
-                old.rename(new)
-            except OSError:
-                pass
-    for old in sorted(log_path.glob("stock_tracker_errors_*.log")):
-        suffix = old.name.removeprefix("stock_tracker_errors_")
-        new = log_path / f"market_helm_errors_{suffix}"
-        if not new.exists():
-            try:
-                old.rename(new)
-            except OSError:
-                pass
-
-
-def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Logger:
+def setup_logger(name: str = "markethelm", log_dir: str = "logs") -> logging.Logger:
     """
     Set up logger with console and file handlers.
 
@@ -69,11 +47,9 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
     except OSError:
         return logger
 
-    _rename_legacy_log_files(log_path)
-
     today = datetime.now().strftime("%Y-%m-%d")
     try:
-        file_handler = logging.FileHandler(log_path / f"market_helm_{today}.log", encoding="utf-8")
+        file_handler = logging.FileHandler(log_path / f"markethelm_{today}.log", encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(detailed_formatter)
         logger.addHandler(file_handler)
@@ -82,7 +58,7 @@ def setup_logger(name: str = "market_helm", log_dir: str = "logs") -> logging.Lo
 
     try:
         error_handler = logging.FileHandler(
-            log_path / f"market_helm_errors_{today}.log", encoding="utf-8"
+            log_path / f"markethelm_errors_{today}.log", encoding="utf-8"
         )
         error_handler.setLevel(logging.ERROR)
         error_handler.setFormatter(detailed_formatter)

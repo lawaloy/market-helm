@@ -104,7 +104,7 @@ def test_from_alert_rejects_metadata_host() -> None:
 
 
 def test_from_alert_rejects_unsafe_env_fallback(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "http://127.0.0.1:8080/hook")
     assert WebhookNotifier.from_alert({"id": "a1", "notifications": ["webhook"]}) is None
 

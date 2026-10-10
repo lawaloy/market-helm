@@ -22,20 +22,20 @@ def _write_repo(
     (root / "dashboard" / "backend").mkdir(parents=True)
 
     (root / "setup.cfg").write_text(
-        f"[metadata]\nname = market-helm\nversion = {setup_version}\n",
+        f"[metadata]\nname = markethelm\nversion = {setup_version}\n",
         encoding="utf-8",
     )
     (root / "dashboard" / "frontend" / "package.json").write_text(
-        json.dumps({"name": "market-helm-web", "version": dashboard_version}) + "\n",
+        json.dumps({"name": "markethelm-web", "version": dashboard_version}) + "\n",
         encoding="utf-8",
     )
     (root / "dashboard" / "frontend" / "package-lock.json").write_text(
         json.dumps(
             {
-                "name": "market-helm-web",
+                "name": "markethelm-web",
                 "version": dashboard_version,
                 "lockfileVersion": 3,
-                "packages": {"": {"name": "market-helm-web", "version": dashboard_version}},
+                "packages": {"": {"name": "markethelm-web", "version": dashboard_version}},
             }
         )
         + "\n",

@@ -8,7 +8,7 @@ def _client(monkeypatch):
 
     from dashboard.backend.main import app
 
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     return TestClient(app)
 
 

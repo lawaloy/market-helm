@@ -85,7 +85,7 @@ The output goes to `dashboard/backend/static/`. Return to the repository root
 and start the integrated application:
 
 ```bash
-market-helm-web
+markethelm-web
 ```
 
 Open <http://localhost:8000>. Release automation performs the same frontend
@@ -122,7 +122,7 @@ The complete required checks and development workflow are documented in
 
 - `DATA_DIR` selects the market-data directory. A source checkout defaults to
   the repository's `data/`; an installed wheel defaults to the user data directory.
-- `HOST`, `PORT`, and `UVICORN_RELOAD` control `market-helm-web`.
+- `HOST`, `PORT`, and `UVICORN_RELOAD` control `markethelm-web`.
 - `CORS_ORIGINS` configures allowed browser origins.
 - `VITE_DEV_PORT` and `VITE_DEV_API_TARGET` affect only the Vite development server.
 - Database, authentication, email, proxy, rate-limit, and alert-worker variables

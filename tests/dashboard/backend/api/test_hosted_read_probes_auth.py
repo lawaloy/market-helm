@@ -12,8 +12,8 @@ from dashboard.backend.api import refresh as refresh_mod
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "read-probes-auth.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     from src.storage.database import init_database
 
     init_database()
@@ -64,7 +64,7 @@ class TestHostedDataInfoRequiresAuth:
         token = _register(client)
         headers = {"Authorization": f"Bearer {token}"}
         fake_loader = MagicMock()
-        fake_loader.data_dir = "/tmp/market-helm-data"
+        fake_loader.data_dir = "/tmp/markethelm-data"
         fake_loader.get_latest_date.return_value = "2026-08-04"
         fake_loader.needs_fetch_for_latest_trading_day.return_value = False
         fake_loader.get_available_dates.return_value = ["2026-08-04"]
@@ -105,7 +105,7 @@ class TestHostedRefreshStatusRequiresAuth:
 
 class TestFileModeReadProbesRemainOpen:
     def test_refresh_status_without_auth(self, client, monkeypatch):
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         _reset_refresh_state()
         r = client.get("/api/refresh/status")
         assert r.status_code == 200
@@ -113,7 +113,7 @@ class TestFileModeReadProbesRemainOpen:
 
     def test_data_info_without_auth_still_reachable(self, client, monkeypatch):
         """File mode keeps anonymous data-info (404 when no data dir is fine)."""
-        monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+        monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
         with patch(
             "dashboard.backend.services.data_loader.get_data_loader",
             side_effect=ValueError("No data available."),

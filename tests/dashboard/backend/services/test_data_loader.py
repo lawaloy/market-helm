@@ -26,7 +26,7 @@ def temp_data_dir():
 @pytest.fixture
 def loader(temp_data_dir, monkeypatch):
     """Create DataLoader with temp directory (file-mode market_bars sidecar)."""
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     from dashboard.backend.services.data_loader import DataLoader
 
     return DataLoader(data_dir=temp_data_dir)

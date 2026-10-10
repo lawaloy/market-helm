@@ -24,8 +24,8 @@ GLOBAL_WEBHOOK = "https://hooks.example/global-shared"
 @pytest.fixture
 def multi_user_env(tmp_path, monkeypatch):
     db_path = tmp_path / "dual-channel-webhook-drop.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
-    monkeypatch.setenv("MARKET_HELM_AUTH_SECRET", "test-secret-min-16-chars")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_AUTH_SECRET", "test-secret-min-16-chars")
     monkeypatch.setenv("ALERT_EMAIL_PROVIDER", "sendgrid")
     monkeypatch.setenv("SENDGRID_API_KEY", "sg-test-key")
     monkeypatch.setenv("ALERT_EMAIL_FROM", "alerts@markethelm.example")

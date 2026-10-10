@@ -10,7 +10,7 @@ from src.alerts.alert_paths import update_user_env_vars
 
 
 def _prepare_env(tmp_path: Path, monkeypatch) -> Path:
-    user_dir = tmp_path / ".market-helm"
+    user_dir = tmp_path / ".markethelm"
     env_file = user_dir / ".env"
     user_dir.mkdir()
     env_file.write_text("SHARED_KEEP=1\n", encoding="utf-8")

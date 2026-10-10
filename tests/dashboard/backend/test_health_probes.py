@@ -11,7 +11,7 @@ from src.storage.health import record_worker_heartbeat
 
 def test_ready_503_when_database_unhealthy(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'ready.db').as_posix()}",
     )
     init_database()
@@ -28,7 +28,7 @@ def test_ready_503_when_database_unhealthy(tmp_path, monkeypatch):
 
 
 def test_ready_reports_disabled_without_database(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     response = TestClient(app).get("/health/ready")
     assert response.status_code == 200
     assert response.json() == {"status": "ready", "database": "disabled"}
@@ -37,7 +37,7 @@ def test_ready_reports_disabled_without_database(monkeypatch):
 def test_ready_stays_200_when_worker_heartbeat_lookup_fails(tmp_path, monkeypatch):
     """A worker-table error must not take down the hosted readiness probe."""
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'ready-worker.db').as_posix()}",
     )
     init_database()
@@ -54,7 +54,7 @@ def test_ready_stays_200_when_worker_heartbeat_lookup_fails(tmp_path, monkeypatc
 
 
 def test_worker_probe_disabled_without_database(monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     response = TestClient(app).get("/health/worker")
     assert response.status_code == 200
     assert response.json() == {"status": "disabled"}
@@ -62,7 +62,7 @@ def test_worker_probe_disabled_without_database(monkeypatch):
 
 def test_worker_probe_503_without_heartbeat(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'worker.db').as_posix()}",
     )
     init_database()
@@ -76,7 +76,7 @@ def test_worker_probe_503_without_heartbeat(tmp_path, monkeypatch):
 
 def test_worker_probe_200_when_heartbeat_is_fresh(tmp_path, monkeypatch):
     monkeypatch.setenv(
-        "MARKET_HELM_DATABASE_URL",
+        "MARKETHELM_DATABASE_URL",
         f"sqlite:///{(tmp_path / 'worker-ok.db').as_posix()}",
     )
     init_database()

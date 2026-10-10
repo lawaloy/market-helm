@@ -16,7 +16,7 @@ from src.storage.users import create_user
 @pytest.fixture
 def db_users(tmp_path, monkeypatch):
     db_path = tmp_path / "blank-id-sync.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     mixed = create_user("blank-id-mixed@example.com", "password123")["id"]
     sibling = create_user("blank-id-sibling@example.com", "password123")["id"]

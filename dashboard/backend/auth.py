@@ -49,7 +49,7 @@ def bearer_session(authorization: Optional[str]) -> Optional[dict]:
 
 
 def _verification_required() -> bool:
-    return (os.environ.get("MARKET_HELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
+    return (os.environ.get("MARKETHELM_REQUIRE_EMAIL_VERIFICATION") or "").lower() in {
         "1",
         "true",
         "yes",

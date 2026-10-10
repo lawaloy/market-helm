@@ -42,9 +42,9 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture()
 def postgresql_database(monkeypatch):
-    base_url = os.environ.get("MARKET_HELM_POSTGRES_TEST_URL", "").strip()
+    base_url = os.environ.get("MARKETHELM_POSTGRES_TEST_URL", "").strip()
     if not base_url:
-        raise RuntimeError("MARKET_HELM_POSTGRES_TEST_URL must be configured")
+        raise RuntimeError("MARKETHELM_POSTGRES_TEST_URL must be configured")
 
     schema = f"markethelm_test_{uuid.uuid4().hex}"
     with psycopg.connect(base_url, autocommit=True) as admin:
@@ -52,7 +52,7 @@ def postgresql_database(monkeypatch):
 
     separator = "&" if "?" in base_url else "?"
     test_url = f"{base_url}{separator}options={quote(f'-csearch_path={schema}')}"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", test_url)
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", test_url)
     try:
         yield
     finally:

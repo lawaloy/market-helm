@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def send_account_email(*, recipient: str, purpose: str, token: str) -> bool:
-    raw_url = (os.environ.get("MARKET_HELM_PUBLIC_URL") or "").strip()
+    raw_url = (os.environ.get("MARKETHELM_PUBLIC_URL") or "").strip()
     parsed = urlparse(raw_url)
     local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1"}
     if (
@@ -24,7 +24,7 @@ def send_account_email(*, recipient: str, purpose: str, token: str) -> bool:
         or parsed.query
         or parsed.fragment
     ):
-        logger.error("Account email requires a safe MARKET_HELM_PUBLIC_URL")
+        logger.error("Account email requires a safe MARKETHELM_PUBLIC_URL")
         return False
     base_url = raw_url.rstrip("/") + "/"
     route = "verify-email" if purpose == "verify_email" else "reset-password"

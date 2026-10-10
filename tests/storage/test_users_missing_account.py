@@ -9,7 +9,7 @@ from src.storage.users import UserError, change_password, delete_user_account, r
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     db_path = tmp_path / "missing-account.db"
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", f"sqlite:///{db_path.as_posix()}")
     init_database()
     return db_path
 

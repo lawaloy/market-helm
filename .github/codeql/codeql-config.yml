@@ -1,6 +1,6 @@
 # Reusable workflow is only invoked from pull_request + same-repo callers; checkout
 # uses head SHA and npm uses --ignore-scripts. CodeQL Actions pack does not model
 # workflow_call, so it flags checkout→npm. Skip Actions analysis for this file only.
-name: market-helm-codeql
+name: markethelm-codeql
 paths-ignore:
   - .github/workflows/pr-auto-prepare-reusable.yml

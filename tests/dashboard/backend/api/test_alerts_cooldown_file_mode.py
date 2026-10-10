@@ -19,8 +19,8 @@ def client():
 def file_mode(tmp_path: Path, monkeypatch):
     """Isolate file-mode alerts config; ensure hosted DB mode is off."""
     config_path = tmp_path / "alerts.json"
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
-    monkeypatch.setenv("MARKET_HELM_ALERTS_CONFIG", str(config_path))
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
+    monkeypatch.setenv("MARKETHELM_ALERTS_CONFIG", str(config_path))
     return config_path
 
 

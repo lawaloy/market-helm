@@ -17,10 +17,10 @@ How to run the daily tracker after [install](../README.md#quick-start).
 python main.py
 ```
 
-Or, after `pip install market-helm`:
+Or, after `pip install markethelm`:
 
 ```bash
-market-helm
+markethelm
 ```
 
 This runs the CLI interface which:
@@ -52,8 +52,8 @@ Evaluate saved projections against closing prices on the exact fifth NYSE
 trading session after each run:
 
 ```bash
-market-helm backtest --data-dir data --days 365
-market-helm backtest --data-dir data --days 365 --output data/backtest.json
+markethelm backtest --data-dir data --days 365
+markethelm backtest --data-dir data --days 365 --output data/backtest.json
 ```
 
 The strict JSON report includes absolute error, directional accuracy, target-band
@@ -172,7 +172,7 @@ Ideal for custom dashboards, scheduled tasks with custom notifications, or integ
 After install:
 
 ```bash
-market-helm-web
+markethelm-web
 ```
 
 Open **<http://localhost:8000>** — API docs at **/docs**.
@@ -192,21 +192,21 @@ Create the user alert configuration from the bundled example, inspect its rule
 IDs, and validate a rule without delivering a notification:
 
 ```bash
-market-helm alerts init
-market-helm alerts list
-market-helm alerts test --id <alert-id> --dry-run
+markethelm alerts init
+markethelm alerts list
+markethelm alerts test --id <alert-id> --dry-run
 ```
 
 After configuring a real notification channel, evaluate the rules once with
-`market-helm alerts run` or keep the local worker running:
+`markethelm alerts run` or keep the local worker running:
 
 ```bash
-market-helm alerts run --loop
+markethelm alerts run --loop
 ```
 
-Installed packages use `~/.market-helm/alerts.json`. Put notification secrets,
+Installed packages use `~/.markethelm/alerts.json`. Put notification secrets,
 such as SMTP passwords, provider keys, and webhook URLs, in
-`~/.market-helm/.env`, not in Git. Use `market-helm alerts --config PATH ...` to
+`~/.markethelm/.env`, not in Git. Use `markethelm alerts --config PATH ...` to
 select a different configuration file. Alert provider variables and delivery
 testing are documented in
 [Transactional alert email](DEPLOYMENT.md#transactional-alert-email).
@@ -229,7 +229,7 @@ Each run writes:
 | ------------------------------------------- | ------------------------------------------- |
 | `data/market_bars.sqlite` (or app DB)       | Quotes, projections, and analysis summaries |
 | `data/projections_YYYY-MM-DD.md` (optional) | Human-readable projection report            |
-| `logs/market_helm_YYYY-MM-DD.log`           | Detailed execution logs                     |
+| `logs/markethelm_YYYY-MM-DD.log`            | Detailed execution logs                     |
 
 Set `DATA_DIR` to change the output location — see [DEPLOYMENT.md](DEPLOYMENT.md).
 
@@ -254,7 +254,7 @@ The command prints a JSON report, retains every source file, and skips dates tha
 already exist in durable storage. It is therefore safe to rerun. A nonzero exit
 status means at least one file could not be imported; the report names each
 failure. Review the reported `target` before treating the migration as complete:
-when `MARKET_HELM_DATABASE_URL` is set it is `configured_database`, otherwise it
+when `MARKETHELM_DATABASE_URL` is set it is `configured_database`, otherwise it
 is the absolute sidecar path. When no usable projections CSV exists for a date,
 the importer recovers projections embedded in that date's legacy summary and
 reports the recovery under `embedded_summary_fallbacks`.

@@ -4,7 +4,7 @@ from src.alerts.notifiers.webhook_notifier import WebhookNotifier
 
 
 def test_from_alert_ignores_env_url_and_format_when_database_enabled(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/global")
     monkeypatch.setenv("DISCORD_WEBHOOK_URL", "https://discord.com/api/webhooks/global/token")
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
@@ -13,7 +13,7 @@ def test_from_alert_ignores_env_url_and_format_when_database_enabled(monkeypatch
 
 
 def test_from_alert_uses_alert_url_but_ignores_env_format_when_hosted(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
     monkeypatch.delenv("ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("DISCORD_WEBHOOK_URL", raising=False)
@@ -32,7 +32,7 @@ def test_from_alert_uses_alert_url_but_ignores_env_format_when_hosted(monkeypatc
 
 
 def test_from_alert_honors_per_alert_format_in_hosted_mode(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
 
     notifier = WebhookNotifier.from_alert(
@@ -48,7 +48,7 @@ def test_from_alert_honors_per_alert_format_in_hosted_mode(monkeypatch) -> None:
 
 
 def test_from_alert_explicit_env_opt_out_ignores_url(monkeypatch) -> None:
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/global")
 
     assert (
@@ -60,7 +60,7 @@ def test_from_alert_explicit_env_opt_out_ignores_url(monkeypatch) -> None:
 
 
 def test_from_alert_explicit_env_opt_in_uses_url_when_hosted(monkeypatch) -> None:
-    monkeypatch.setenv("MARKET_HELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
+    monkeypatch.setenv("MARKETHELM_DATABASE_URL", "sqlite:////tmp/markethelm-webhook-iso.db")
     monkeypatch.setenv("ALERT_WEBHOOK_URL", "https://hooks.example/ops")
     monkeypatch.setenv("ALERT_WEBHOOK_FORMAT", "slack")
 

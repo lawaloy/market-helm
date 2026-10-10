@@ -17,7 +17,7 @@ from src.storage.projections_store import (
 
 @pytest.fixture
 def data_dir(tmp_path, monkeypatch):
-    monkeypatch.delenv("MARKET_HELM_DATABASE_URL", raising=False)
+    monkeypatch.delenv("MARKETHELM_DATABASE_URL", raising=False)
     return tmp_path
 
 

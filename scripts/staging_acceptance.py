@@ -391,8 +391,8 @@ def _assert_empty_dedicated_config(response: dict[str, Any]) -> None:
 
 def _credentials_from_env() -> list[tuple[str, str]]:
     names = (
-        ("MARKET_HELM_STAGING_TENANT_A_EMAIL", "MARKET_HELM_STAGING_TENANT_A_PASSWORD"),
-        ("MARKET_HELM_STAGING_TENANT_B_EMAIL", "MARKET_HELM_STAGING_TENANT_B_PASSWORD"),
+        ("MARKETHELM_STAGING_TENANT_A_EMAIL", "MARKETHELM_STAGING_TENANT_A_PASSWORD"),
+        ("MARKETHELM_STAGING_TENANT_B_EMAIL", "MARKETHELM_STAGING_TENANT_B_PASSWORD"),
     )
     credentials = [
         (os.environ.get(email, "").strip(), os.environ.get(password, ""))
@@ -400,7 +400,7 @@ def _credentials_from_env() -> list[tuple[str, str]]:
     ]
     if any(not email or not password for email, password in credentials):
         raise AcceptanceError(
-            "Tenant checks require MARKET_HELM_STAGING_TENANT_{A,B}_{EMAIL,PASSWORD}."
+            "Tenant checks require MARKETHELM_STAGING_TENANT_{A,B}_{EMAIL,PASSWORD}."
         )
     return credentials
 
@@ -444,8 +444,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base-url",
-        default=os.environ.get("MARKET_HELM_STAGING_URL", "http://127.0.0.1:8000"),
-        help="Staging API URL (or MARKET_HELM_STAGING_URL). Non-loopback URLs require HTTPS.",
+        default=os.environ.get("MARKETHELM_STAGING_URL", "http://127.0.0.1:8000"),
+        help="Staging API URL (or MARKETHELM_STAGING_URL). Non-loopback URLs require HTTPS.",
     )
     parser.add_argument(
         "--timeout", type=float, default=10.0, help="Per-request timeout in seconds."
