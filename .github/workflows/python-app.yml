@@ -106,10 +106,19 @@ jobs:
         working-directory: dashboard/frontend
         run: node ../../.github/scripts/npm-audit-ci.cjs
 
+      - name: Install locked ESLint tooling
+        working-directory: dashboard/frontend/tools/eslint
+        run: npm ci
+
+      - name: Audit ESLint tooling
+        working-directory: dashboard/frontend/tools/eslint
+        run: node ../../../../.github/scripts/npm-audit-ci.cjs
+
       - name: Build and test dashboard
         working-directory: dashboard/frontend
         run: |
           npm run format:check
+          npm run lint
           npm run build
           npm test
 

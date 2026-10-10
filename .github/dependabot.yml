@@ -14,6 +14,19 @@ updates:
       npm-all:
         patterns:
           - '*'
+  - package-ecosystem: 'npm'
+    # ESLint tooling package: keeps its own TypeScript 6 until typescript-eslint supports 7.
+    directory: '/dashboard/frontend/tools/eslint'
+    schedule:
+      interval: 'cron'
+      cronjob: '0 13 * * *'
+    groups:
+      npm-eslint:
+        patterns:
+          - '*'
+    ignore:
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: 'pip'
     directory: '/'
     schedule:
