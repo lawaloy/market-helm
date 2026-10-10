@@ -5,6 +5,7 @@ Insert a dated release section into CHANGELOG.md after [Unreleased] (Keep a Chan
 Idempotent: if ``## [X.Y.Z]`` already exists, exits 0 without changes.
 Used by the post-release GitHub Actions job only.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,7 +46,9 @@ def insert_section(text: str, version: str, date: str) -> str | None:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--version", required=True, help="Semver without v prefix, e.g. 0.10.0")
     p.add_argument("--date", required=True, help="ISO date YYYY-MM-DD")
     args = p.parse_args()
