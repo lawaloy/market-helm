@@ -11,7 +11,7 @@
 <summary><b>API key required</b></summary>
 
 - Ensure a `.env` file exists with `FINNHUB_API_KEY=your-key`.
-- Check the key is correct (40 characters).
+- Copy the key exactly from your Finnhub dashboard, with no spaces, quotes, or line breaks.
 - Restart your terminal after creating `.env`.
 
 </details>
