@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `daily_summaries` beside market bars in the hosted DB or sidecar sqlite.
 - **Alert depth:** RSI(14) threshold watches, shallow AND/OR compound conditions
   (price + RSI in Helmtower), provider candle history for RSI
-  (``market_bars`` fallback, then leftover CSV), and
+  (`market_bars` fallback, then leftover CSV), and
   hosted symbol-queue evaluation for single-symbol technical/compound rules.
 - **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
   verification command, and regression gate for projection-evaluator semantics.
