@@ -2,6 +2,13 @@
 max-line-length = 100
 # Keep black-compatible: black owns these.
 extend-ignore = E203, W503
+# E402 is intentional in these entry points: logging is configured, or sys.path is
+# extended so repo-root packages resolve, before the imports that depend on it.
+per-file-ignores =
+    main.py:E402
+    dashboard/backend/main.py:E402
+    scripts/smoke_alerts_live.py:E402
+    scripts/staging_load.py:E402
 exclude =
     .git,
     __pycache__,
