@@ -14,11 +14,14 @@ from difflib import unified_diff
 from pathlib import Path
 from typing import Optional, Sequence
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
 
-from src.analysis.backtesting import backtest_data_dir  # noqa: E402
+from src.analysis.backtesting import backtest_data_dir
+
+ROOT = _repo_path.ROOT
 
 BASELINE_DIR = ROOT / "baselines" / "projection-v1"
 DATA_DIR = BASELINE_DIR / "data"

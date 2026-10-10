@@ -2,14 +2,15 @@
 """Write dashboard/frontend/public/symbols-catalog.json from index constituents."""
 
 import json
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
 
-from dashboard.backend.api.history import build_symbol_catalog  # noqa: E402
+from dashboard.backend.api.history import build_symbol_catalog
+
+ROOT = _repo_path.ROOT
 
 OUT = ROOT / "dashboard" / "frontend" / "public" / "symbols-catalog.json"
 

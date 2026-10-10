@@ -7,11 +7,14 @@ import argparse
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
 
-from src.storage.market_bars import list_market_bar_dates  # noqa: E402
+from src.storage.market_bars import list_market_bar_dates
+
+ROOT = _repo_path.ROOT
 
 
 def main(argv: list[str] | None = None) -> int:
