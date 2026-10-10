@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **PyPI and Git today:** releases use tags **`v0.2.x`** (for example **`v0.2.9`**). The canonical Python version in **`setup.cfg`** matches that line; dashboard copies stay in sync via **`scripts/version_sync.py`**.
 
-**Ordering:** sections below are **newest first by release date**. Headings like **`[0.5.0]`** / **`[0.4.0]`** describe **historical** distribution and branding changes (e.g. **`market-desk`** → **`market-helm`**); they are not parallel “current” PyPI lines.
+**Ordering:** sections below are **newest first by release date**.
 
 ## [Unreleased]
 
@@ -142,24 +142,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Synced the documentation set with shipped historical trends, projection
   accuracy, and the alerting behavior available at that release.
 - Aligned package metadata with the **`v0.2.*`** release tag line (follows **`v0.2.7`**).
-
-## [0.5.0] - 2026-03-26
-
-### Changed
-
-- **Product branding:** **MarketHelm** (display name).
-- **GitHub repository:** **`lawaloy/market-helm`**.
-- **PyPI distribution:** **`market-helm`** (`pip install market-helm`). CLI: **`market-helm`**, **`market-helm-web`** only.
-- **User config/data (pip install):** **`~/.market-helm/`**. If it does not exist yet but **`~/.market-desk`** does, it is **renamed** to **`~/.market-helm`** on first use. Legacy log files named **`stock_tracker_*.log`** are **renamed** to **`market_helm_*.log`** when the logger starts.
-
-## [0.4.0] - 2026-03-26
-
-### Changed
-
-- **PyPI distribution** evolved to **`market-desk`** to reflect scope beyond “tracking” (monitoring, dashboard, future alerts/execution).
-- **CLI commands:** primary names are **`market-desk`** (daily run) and **`market-desk-web`** (dashboard server). _(Superseded in [0.5.0] by **`market-helm`** / **`market-helm-web`**.)_
-- **User data/config (pip install), in 0.4.0 only:** new installs used **`~/.market-desk/`**. _(Superseded in [0.5.0] by **`~/.market-helm/`**; **`~/.market-desk`** may be auto-renamed.)_
-- **Product branding** in docs: **Market Desk** (repository URL later standardized as **`lawaloy/market-helm`** in [0.5.0]).
 
 ## [0.3.1] - 2026-02-10
 
