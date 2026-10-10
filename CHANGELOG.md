@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **RSI history after CSV cutover:** `load_symbol_closes` reads durable
   `market_bars` when Finnhub candles are missing, so RSI and compound alerts
   still evaluate from saved quotes instead of a dead `daily_data_*.csv` path.
+- **Projection horizons:** Anchor premarket and intraday forecasts to the last
+  completed XNYS session, retain projection-only archive counts, and return the
+  newest samples when backtest output is limited.
+- **Windows alert settings:** Use unique temporary files and retry atomic `.env`
+  replacement when a short-lived file lock interrupts a settings save.
 
 ### Changed
 
@@ -53,14 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migrations, worker jobs, shared rate limiting, liveness/readiness/worker health,
   and metrics.
 
-### Fixed
-
-- **Projection horizons:** Anchor premarket and intraday forecasts to the last
-  completed XNYS session, retain projection-only archive counts, and return the
-  newest samples when backtest output is limited.
-- **Windows alert settings:** Use unique temporary files and retry atomic `.env`
-  replacement when a short-lived file lock interrupts a settings save.
-
 ### Not yet shipped
 
 - **Alerts:** Nested compound rules, additional indicators beyond RSI, and SMS/push
@@ -75,13 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Repository version metadata aligned with Git tag **`v0.3.7`** / PyPI **`0.3.7`** (automated post-release sync).
 
-
 ## [0.3.6] - 2026-09-23
 
 ### Changed
 
 - Repository version metadata aligned with Git tag **`v0.3.6`** / PyPI **`0.3.6`** (automated post-release sync).
-
 
 ## [0.3.5] - 2026-09-02
 

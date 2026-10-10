@@ -39,7 +39,7 @@ def insert_section(text: str, version: str, date: str) -> str | None:
         f"\n## [{version}] - {date}\n\n"
         "### Changed\n\n"
         f"- Repository version metadata aligned with Git tag **`v{version}`** / "
-        f"PyPI **`{version}`** (automated post-release sync).\n\n"
+        f"PyPI **`{version}`** (automated post-release sync).\n"
     )
     return text[:insert_at] + block + text[insert_at:]
 
