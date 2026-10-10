@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from src.alerts.alert_engine import AlertEngine
 from src.alerts.alert_rules import evaluate_compound, evaluate_leaf_symbols

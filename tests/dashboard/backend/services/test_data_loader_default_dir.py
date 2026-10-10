@@ -1,7 +1,5 @@
 """Tests for DataLoader DATA_DIR / install-path resolution."""
 
-from pathlib import Path
-
 from dashboard.backend.services import data_loader
 
 

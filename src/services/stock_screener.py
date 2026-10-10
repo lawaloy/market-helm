@@ -6,12 +6,9 @@ Designed for trading automation - finds liquid, active stocks worth tracking.
 Uses official APIs (no scraping).
 """
 
-import json
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..core.logger import setup_logger

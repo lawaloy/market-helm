@@ -6,10 +6,9 @@ Uses pytickersymbols package for reliable, maintained index lists.
 """
 
 import json
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from ..core.logger import setup_logger
 from ..utils.tickers import normalize_ticker

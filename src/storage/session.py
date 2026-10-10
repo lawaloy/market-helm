@@ -9,7 +9,7 @@ import json
 import math
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7  # 7 days
 # Bound Bearer token size so decode cannot HMAC multi-MB attacker payloads.

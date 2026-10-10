@@ -6,7 +6,6 @@ import requests
 
 from src.alerts.notifiers.email_delivery import (
     MailgunEmailBackend,
-    SendGridEmailBackend,
     email_delivery_configured,
 )
 from src.alerts.notifiers.email_notifier import EmailNotifier

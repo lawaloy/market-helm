@@ -3,8 +3,6 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 
 def _fake_home(monkeypatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("HOME", str(tmp_path))

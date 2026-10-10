@@ -84,7 +84,6 @@ def test_fetch_all_indices_uses_default_filters_when_json_corrupt(
     mock_index_fetcher_cls, _mock_indices, monkeypatch
 ):
     """Corrupt filters.json must soft-fail to StockScreener defaults (None)."""
-    import json
     from io import StringIO
     from pathlib import Path
 

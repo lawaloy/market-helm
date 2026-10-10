@@ -11,7 +11,6 @@ from src.storage.alert_watches import (
     list_enabled_symbols,
     list_watches_for_symbol,
     record_delivery,
-    sync_watches_from_config,
     validate_watches_config,
 )
 from src.storage.database import get_connection, init_database
