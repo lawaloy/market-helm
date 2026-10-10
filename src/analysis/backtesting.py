@@ -6,11 +6,8 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta
 import math
 from pathlib import Path
-import re
 from statistics import median
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
-
-import pandas as pd
 
 from .market_calendar import (
     DEFAULT_CALENDAR,
@@ -20,7 +17,6 @@ from .market_calendar import (
 )
 from ..utils.tickers import normalize_ticker
 
-_DATED_FILE = re.compile(r"^(daily_data|projections)_(\d{4}-\d{2}-\d{2})\.csv$")
 _INVALID_LABELS = frozenset({"", "nan", "<na>", "none", "nat", "null"})
 
 

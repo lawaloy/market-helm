@@ -40,17 +40,17 @@ real email delivery, DNS, TLS, backups, and restore procedures require staging.
 
 ## Current capability matrix
 
-| Area                          | Status                                       | What exists                                                                                                                                                                                       | Important remaining work                                                                                                                                    |
-| ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output, and service-boundary resilience coverage                                                                   | Live Finnhub smoke testing and full-market run reliability                                                                                                  |
-| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes                                                    |
-| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                                                                   |
-| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                                                          |
-| Alerts                        | **Shipped and tested**                       | Price, RSI, and shallow compound rules, screening match, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                         | Nested compounds and additional indicators; SMS/push; real-provider staging tests                                                                           |
-| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                                                     | Account export and stronger administrative/support tooling                                                                                                  |
-| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), durable dashboard/alert reads, legacy snapshot backfill, queue/orchestrator, and automated container backup/restore drills | Run and verify the legacy backfill per environment; remove the temporary CSV fallback; managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
-| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                                                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                                                       |
-| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls                                      |
+| Area                          | Status                                       | What exists                                                                                                                                                                                       | Important remaining work                                                                                                 |
+| ----------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| CLI and daily tracker         | **Shipped and tested**                       | Index screening, quote/profile fetch, analysis, projections, CSV/JSON/Markdown output, and service-boundary resilience coverage                                                                   | Live Finnhub smoke testing and full-market run reliability                                                               |
+| Web dashboard                 | **Shipped and tested**                       | Overview, movers, stock detail, summaries, historical trends, accuracy, refresh controls, exports, dark mode                                                                                      | Route-level code splitting, saved views/watchlists, keyboard shortcuts, performance/accessibility passes                 |
+| Projection model              | **Partial**                                  | Five-session XNYS heuristic targets, confidence, risk, recommendations, and a deterministic JSON backtest CLI                                                                                     | Qualified out-of-sample baselines, evidence-led calibration changes, fundamentals/news/ML                                |
+| Historical accuracy           | **Partial**                                  | CLI, API, and dashboard share exact-session metrics; a committed scenario matrix and golden report protect evaluator semantics                                                                    | Preserve qualified real-data baselines; add risk-adjusted and longer-horizon views                                       |
+| Alerts                        | **Shipped and tested**                       | Price, RSI, and shallow compound rules, screening match, cooldowns, log/webhook/email delivery, retries, scheduled worker, delivery history, Helmtower UI                                         | Nested compounds and additional indicators; SMS/push; real-provider staging tests                                        |
+| Accounts and tenant isolation | **Shipped and tested**                       | Registration, login/logout, bearer sessions, email verification, password reset/change, account deletion, per-user alert data                                                                     | Account export and stronger administrative/support tooling                                                               |
+| Hosted persistence            | **Shipped; operational verification needed** | SQLite/PostgreSQL adapter, versioned migrations (incl. `market_bars`), durable dashboard/alert reads, legacy snapshot backfill, queue/orchestrator, and automated container backup/restore drills | Run and verify the legacy backfill per environment; managed PostgreSQL snapshot/PITR, pooling/TLS, and failover sign-off |
+| Production controls           | **Shipped; operational verification needed** | Rate limiting, trusted-proxy handling, health/metrics, ingress/tenant acceptance, bounded capacity baseline, retention and incident runbooks                                                      | Connect a real staging ingress/provider/monitor and record external sign-off evidence                                    |
+| Automated trading             | **Not implemented**                          | No broker connection or order execution                                                                                                                                                           | Intraday/event-driven orchestration, broker integration, order/risk model, audit trail, compliance and safety controls   |
 
 ## Hosted alerts and accounts
 
@@ -103,8 +103,8 @@ unit tests and container-only integration tests cannot fully reproduce.
 1. **Market data DB cutover:** daily bars, projections, and summaries now write to
    the app DB or `DATA_DIR/market_bars.sqlite`; dashboard and alert reads prefer
    durable storage. Run and verify the legacy snapshot backfill in each
-   environment, compare representative dates, then remove the temporary CSV
-   fallback and retired artifacts.
+   environment, compare representative dates, then remove retired artifacts. Runtime
+   reads no longer fall back to CSV.
 2. **Projection validation:** the weekday post-close workflow preserves a
    cumulative forward archive and its qualification report. Keep collecting exact
    target closes until `projection_baseline.py assess` passes and the workflow
@@ -126,14 +126,13 @@ unit tests and container-only integration tests cannot fully reproduce.
 ## Live prices roadmap
 
 **Status: planned, not implemented.** Quotes and dashboard data are batch/refresh
-based today. "Fetch New" starts a background tracker run, and the UI labels prices
-as saved quotes ("Not live prices"). Live prices are a long-term product goal; this
+based today. "Fetch New" starts a background tracker run, and quotes shown in the UI come from the last saved run. Live prices are a long-term product goal; this
 section records the intended order of work. It is a plan, not an implementation claim.
 
 ### Principles
 
 - Keep batch projections and saved quotes as the reliable fallback. Live prices
-  layer on top and must degrade to the saved-quote labels when the feed is down.
+  layer on top and must degrade to the latest saved quote when the feed is down.
 - Keep the provider behind the existing boundary in `src/services/api_client.py` so
   the data source can change without touching the dashboard or alert rules.
 - Hosted mode (shared database, per-user alerts) is the target. Local file mode
@@ -142,8 +141,8 @@ section records the intended order of work. It is a plan, not an implementation 
 ### Proposed phases
 
 1. **Finish the market data database cutover** (see Recommended next work). Live
-   quotes need a durable shared store first, and the temporary CSV fallback should be
-   gone before a second data path is added.
+   quotes need a durable shared store first, and the retired CSV path is already
+   gone, so no second legacy data path remains.
 2. **Choose and validate a live-quote provider.** Confirm that the chosen plan
    allows the needed symbol count, update rate, and redistribution to end users.
    Open question: whether the current Finnhub plan is sufficient or another
@@ -154,8 +153,7 @@ section records the intended order of work. It is a plan, not an implementation 
    worker process or as its own service.
 4. **Deliver live quotes to the dashboard.** Add a push or short-interval polling
    endpoint (WebSocket or server-sent events), show a "Live" or "Delayed" state with
-   the quote time, and keep the existing "Not live prices" label whenever the feed
-   is unavailable.
+   the quote time, and fall back to the latest saved quote whenever the feed is unavailable.
 5. **Make alerts react to live quotes.** The alert worker evaluates on a schedule
    today. Extend price rules to evaluate against the latest live quote while
    keeping cooldowns and delivery retries, and do not change RSI/compound semantics

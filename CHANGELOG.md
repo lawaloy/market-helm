@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Daily quotes leave CSV:** `save_daily_data` / dashboard loaders / backtests
   read and write only `market_bars` (hosted DB or `DATA_DIR/market_bars.sqlite`).
   `daily_data_*.csv` is no longer written or used as a fallback.
+- **Legacy CSV price-history fallback removed:** RSI close history now comes only
+  from provider candles and durable `market_bars`; leftover `daily_data_*.csv`
+  files are no longer read. Import them with `scripts/backfill_market_data.py`.
+  When both sources are empty, RSI rules do not trigger and a warning is logged.
+  The unused `DataLoader._get_latest_file` helper and the dated-file pattern in
+  backtesting were deleted.
 - **Projections and summaries leave files:** `save_projections` / `save_summary`
   and dashboard loaders use durable `projections` and `daily_summaries` tables
   (migration 7 / same sidecar). `projections_*.csv` and `summary_*.json` are no
@@ -35,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `daily_summaries` beside market bars in the hosted DB or sidecar sqlite.
 - **Alert depth:** RSI(14) threshold watches, shallow AND/OR compound conditions
   (price + RSI in Helmtower), provider candle history for RSI
-  (``market_bars`` fallback, then leftover CSV), and
+  (``market_bars`` fallback), and
   hosted symbol-queue evaluation for single-symbol technical/compound rules.
 - **Projection baseline:** A versioned, synthetic scenario matrix, golden report,
   verification command, and regression gate for projection-evaluator semantics.
