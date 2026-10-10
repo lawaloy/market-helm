@@ -42,7 +42,7 @@ test.describe('WCAG A/AA accessibility', () => {
       test(`${theme} theme ${route}`, async ({ page }) => {
         await page.addInitScript(
           ([key, value]) => localStorage.setItem(key, value),
-          ['market-helm-theme', theme],
+          ['markethelm-theme', theme],
         );
         await page.goto(route);
         await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible({
@@ -69,7 +69,7 @@ test.describe('WCAG A/AA accessibility', () => {
     test(`${theme} theme Historical Trends company picker`, async ({ page }) => {
       await page.addInitScript(
         ([key, value]) => localStorage.setItem(key, value),
-        ['market-helm-theme', theme],
+        ['markethelm-theme', theme],
       );
       await page.goto('/historical');
       await expect(page.getByRole('heading', { name: 'Market history' })).toBeVisible({
@@ -84,7 +84,7 @@ test.describe('WCAG A/AA accessibility', () => {
       await stubReadyAlertsConfig(page);
       await page.addInitScript(
         ([key, value]) => localStorage.setItem(key, value),
-        ['market-helm-theme', theme],
+        ['markethelm-theme', theme],
       );
       await page.goto('/alerts');
       await expect(page.getByRole('heading', { name: 'Price alerts' })).toBeVisible({
@@ -116,7 +116,7 @@ test.describe('WCAG A/AA accessibility', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.addInitScript(
       ([key, value]) => localStorage.setItem(key, value),
-      ['market-helm-theme', 'dark'],
+      ['markethelm-theme', 'dark'],
     );
     await page.goto('/historical');
     await expect(page.getByRole('heading', { name: 'Market history' })).toBeVisible({
@@ -154,7 +154,7 @@ test.describe('WCAG A/AA accessibility', () => {
       await page.setViewportSize(viewport);
       await page.addInitScript(
         ([key, value]) => localStorage.setItem(key, value),
-        ['market-helm-theme', viewport.theme],
+        ['markethelm-theme', viewport.theme],
       );
       await page.goto('/historical');
       await expect(page.getByRole('heading', { name: 'Market history' })).toBeVisible({

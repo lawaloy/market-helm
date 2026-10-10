@@ -17,7 +17,7 @@ services:
     volumes:
       - .:/workspace
     environment:
-      MARKET_HELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@postgres:5432/markethelm
+      MARKETHELM_POSTGRES_TEST_URL: postgresql://markethelm:markethelm-test@postgres:5432/markethelm
     depends_on:
       postgres:
         condition: service_healthy

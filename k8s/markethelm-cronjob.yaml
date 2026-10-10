@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: market-helm
+  name: markethelm
 spec:
   # Runs daily at 08:00 UTC
   schedule: '0 8 * * *'
@@ -14,15 +14,15 @@ spec:
         spec:
           restartPolicy: OnFailure
           containers:
-            - name: market-helm
-              image: myregistry/market-helm:latest
+            - name: markethelm
+              image: myregistry/markethelm:latest
               imagePullPolicy: IfNotPresent
-              # Ensure the OPENAI_API_KEY is provided via a Kubernetes Secret named `market-helm-secrets`
+              # Ensure the OPENAI_API_KEY is provided via a Kubernetes Secret named `markethelm-secrets`
               env:
                 - name: OPENAI_API_KEY
                   valueFrom:
                     secretKeyRef:
-                      name: market-helm-secrets
+                      name: markethelm-secrets
                       key: OPENAI_API_KEY
               volumeMounts:
                 - name: data
