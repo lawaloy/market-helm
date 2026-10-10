@@ -79,6 +79,7 @@ describe('AlertComposer submit gate', () => {
       screen.getByText(/Reference price \$180\.50.*Saved price as of Oct 2, 2026/),
     ).toBeTruthy();
     expect(screen.queryByText(/now \$180\.50/)).toBeNull();
+    expect(screen.queryByText(/not live/i)).toBeNull();
   });
 
   it('disables Set watch when the price is blank', () => {
