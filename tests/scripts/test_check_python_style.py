@@ -33,11 +33,13 @@ def test_main_skips_when_nothing_changed(monkeypatch, capsys) -> None:
     assert "No Python files" in capsys.readouterr().out
 
 
-def test_formatting_failure_blocks_but_flake8_is_informational(monkeypatch) -> None:
+def test_flake8_blocks_unless_report_only(monkeypatch) -> None:
     monkeypatch.setattr(check_python_style, "changed_python_files", lambda base: ["a.py"])
     results = {"black --check": 0, "isort --check-only": 0, "flake8 (max-line-length 100)": 1}
     monkeypatch.setattr(check_python_style, "run_tool", lambda label, command: results[label])
+    assert check_python_style.main([]) == 1
+    assert check_python_style.main(["--report-only-flake8"]) == 0
+    results["flake8 (max-line-length 100)"] = 0
     assert check_python_style.main([]) == 0
-    assert check_python_style.main(["--strict-flake8"]) == 1
     results["black --check"] = 1
     assert check_python_style.main([]) == 1

@@ -7,8 +7,9 @@ CONTRIBUTING.md documents without mass-reformatting the whole repository:
 
 * black and isort (``--profile black``, line length 100, configured in
   ``pyproject.toml``) are blocking.
-* flake8 at 100 characters is reported but only blocks with ``--strict-flake8``,
-  because older files still carry legacy findings.
+* flake8 at 100 characters (configured in ``.flake8``) is blocking too. Only the
+  files a PR changes are checked, so legacy findings elsewhere do not fail it.
+  Pass ``--report-only-flake8`` to print flake8 findings without failing.
 
 Usage:
     python scripts/check_python_style.py --base origin/main
@@ -92,7 +93,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--fix", action="store_true", help="Apply black and isort instead of checking"
     )
     parser.add_argument(
-        "--strict-flake8", action="store_true", help="Make flake8 findings fail the run"
+        "--report-only-flake8",
+        action="store_true",
+        help="Print flake8 findings without failing the run",
     )
     args = parser.parse_args(argv)
 
@@ -118,10 +121,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("isort would reorder imports; run: python scripts/check_python_style.py --fix")
     flake8_status = run_tool("flake8 (max-line-length 100)", tool_command("flake8", *files))
     if flake8_status:
-        if args.strict_flake8:
-            failures += 1
+        if args.report_only_flake8:
+            print("flake8 findings are informational (--report-only-flake8).")
         else:
-            print("flake8 findings are informational (pass --strict-flake8 to enforce).")
+            failures += 1
+            print("flake8 found problems in the changed files above; fix them before merging.")
     return 1 if failures else 0
 
 

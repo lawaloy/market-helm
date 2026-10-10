@@ -97,17 +97,17 @@ python scripts/check_python_style.py --base origin/main --fix
 # Check without changing files, exactly as CI does
 python scripts/check_python_style.py --base origin/main
 
-# Optional: run flake8 at the documented 100-character limit
+# flake8 is part of the same check; to run it alone on specific files
 pip install flake8
-flake8 src/ tests/
+flake8 path/to/changed_file.py
 ```
 
 CI runs `scripts/check_python_style.py` on the Python files changed in each pull
-request. **black** and **isort** (configured in `pyproject.toml`) must pass for
-those files. **flake8** at 100 characters (configured in `.flake8`) is reported
-but does not fail the build, because older files still have findings. CI also
-runs flake8 with its blocking error-only rules (`E9,F63,F7,F82`) on the whole
-repository.
+request. **black**, **isort**, and **flake8** at 100 characters (configured in
+`pyproject.toml` and `.flake8`) must all pass for those files. Files you do not
+touch are not checked, so older findings elsewhere do not block your PR; if you
+edit a file that has legacy findings, fix them in the same PR. CI also runs
+flake8 with its error-only rules (`E9,F63,F7,F82`) on the whole repository.
 
 ### 5. Commit Your Changes
 
@@ -185,7 +185,7 @@ CLI/Web/API layers consume workflows for their specific presentation needs.
 
 - Follow PEP 8
 - Use type hints where appropriate
-- Maximum line length: 100 characters (enforced by black on changed files; see "Check Code Quality")
+- Maximum line length: 100 characters (enforced by black and flake8 on changed files; see "Check Code Quality")
 - Use descriptive variable names
 
 ### Imports
