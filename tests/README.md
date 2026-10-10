@@ -16,46 +16,21 @@ Tests are organized to mirror the source code layout:
 
 ```text
 tests/
-├── __init__.py
-├── conftest.py              # Pytest config: adds project root to sys.path
-├── README.md
-│
-├── analysis/                # mirrors src/analysis/
-│   ├── __init__.py
-│   ├── test_ai_summarizer.py
-│   ├── test_analyzer.py
-│   └── test_projector.py
-│
-├── core/                    # mirrors src/core/
-│   ├── __init__.py
-│   ├── test_config.py
-│   └── test_logger.py
-│
-├── services/                # mirrors src/services/
-│   ├── __init__.py
-│   └── test_api_client.py
-│
-├── storage/                 # mirrors src/storage/
-│   ├── __init__.py
-│   └── test_data_storage.py
-│
-├── workflows/               # mirrors src/workflows/
-│   ├── __init__.py
-│   └── test_tracker.py
-│
-├── alerts/                  # src/alerts/ notifiers + engine integration
-│   └── test_webhook_notifier.py
-│
-└── dashboard/               # mirrors dashboard/
-    ├── __init__.py
-    └── backend/
-        ├── __init__.py
-        ├── api/
-        │   ├── __init__.py
-        │   └── test_api.py
-        └── services/
-            ├── __init__.py
-            └── test_data_loader.py
+|-- __init__.py
+|-- conftest.py       # Pytest config: adds project root to sys.path
+|-- README.md
+|-- helpers/          # Shared test helpers
+|-- alerts/           # mirrors src/alerts/ (engine, rules, storage, workers, notifiers)
+|-- analysis/         # mirrors src/analysis/
+|-- cli/              # mirrors src/cli/
+|-- core/             # mirrors src/core/
+|-- dashboard/        # mirrors dashboard/ (backend API and services)
+|-- integration/      # PostgreSQL storage and provider-resilience tests
+|-- scripts/          # scripts/ helpers plus workflow and compose hygiene checks
+|-- services/         # mirrors src/services/
+|-- storage/          # mirrors src/storage/ (accounts, alerts, market bars, migrations)
+|-- utils/            # mirrors src/utils/
+`-- workflows/        # mirrors src/workflows/
 ```
 
 </details>
@@ -199,11 +174,7 @@ pip install pytest pytest-cov
 
 **Missing or light tests (by module):**
 
-1. `src/services/data_fetcher.py` – Stock data fetching
-2. `src/services/stock_screener.py` – Screening logic
-3. `src/services/index_fetcher.py` – Index constituent fetching
-4. `src/alerts/alert_engine.py`, `alert_rules.py`, `alert_storage.py` – Beyond webhook notifier coverage
-5. Integration tests for full workflow (end-to-end with temp `data/`)
+1. Integration tests for full workflow (end-to-end with temp `data/`)
 
 **Roadmap:** [docs/PROJECT_STATUS.md](../docs/PROJECT_STATUS.md)
 

@@ -67,8 +67,7 @@ Rerun the tracker. Each run is independent; data is saved with the date.
 
 **Can I backtest strategies?**  
 MarketHelm can validate its saved projections with `market-helm backtest`. It is
-not a general trading-strategy simulator, and it needs dated daily/projection CSV
-snapshots in the configured data directory.
+not a general trading-strategy simulator, and it needs saved quotes and projections in the configured data store (`market_bars.sqlite`).
 
 **Is my data private?**  
 Yes. Data stays on your machine. API keys never leave your environment.

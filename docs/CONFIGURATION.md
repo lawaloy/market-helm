@@ -33,7 +33,7 @@ Edit `config/filters.json`:
   "price_max": 500.0,
   "min_daily_change_pct": 2.0,
   "market_cap_min": 1000000000,
-  "top_n": 30
+  "top_n": 20
 }
 ```
 

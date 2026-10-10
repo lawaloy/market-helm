@@ -425,7 +425,7 @@ src/analysis/projector.py
 
 - **Workflow**: `src/workflows/tracker.py` - Step 4: Generate projections
 - **CLI**: `src/cli/commands.py` - Display projection results
-- **Storage**: `src/storage/data_storage.py` - Save projections to CSV/JSON
+- **Storage**: `src/storage/data_storage.py` - Save projections and summaries to durable storage
 
 </details>
 

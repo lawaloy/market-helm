@@ -48,7 +48,7 @@ Same as Option 1, invoked as a module.
 <details>
 <summary><b>Projection backtesting</b></summary>
 
-Evaluate saved projection files against closing prices on the exact fifth NYSE
+Evaluate saved projections against closing prices on the exact fifth NYSE
 trading session after each run:
 
 ```bash
@@ -120,7 +120,7 @@ python3 scripts/projection_baseline.py capture --data-dir data --days 365 \
 ```
 
 Capture refuses to create an output directory when any qualification fails.
-It evaluates a private copy of the input CSVs and hashes that same copy, preventing
+It evaluates a private copy of the `market_bars.sqlite` sidecar and hashes that same copy, preventing
 a concurrent refresh from producing a report/manifest mismatch.
 
 </details>

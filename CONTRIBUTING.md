@@ -36,7 +36,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 <details>
 <summary><b>Package version (single source of truth)</b></summary>
 
-The **canonical** release line for this repo is **`setup.cfg`** → **`[metadata]`** → **`version`** (e.g. `0.2.8`).
+The **canonical** release line for this repo is **`setup.cfg`** → **`[metadata]`** → **`version`** (e.g. `0.3.7`).
 
 These must stay aligned for new contributors and CI:
 

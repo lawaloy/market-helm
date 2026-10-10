@@ -22,7 +22,7 @@ market-helm/
 |   |-- backend/                    # FastAPI routes, auth, rate limits, health
 |   `-- frontend/                   # React/TypeScript SPA
 |-- config/                         # Exchange, filter, and alert examples
-|-- data/                           # Shared CSV/JSON/Markdown market output
+|-- data/                           # Runtime data: SQLite sidecar, optional Markdown reports
 |-- tests/                          # Python unit/integration/security tests
 `-- scripts/                        # Build, release, worker, and validation helpers
 ```
@@ -43,10 +43,7 @@ frontend build is emitted into `dashboard/backend/static/` and served by FastAPI
 
 This is the default when `MARKET_HELM_DATABASE_URL` is unset.
 
-- Market runs write dated CSV/JSON/Markdown files under `DATA_DIR` and dual-write
-  daily quote rows into durable `market_bars` (app database when
-  `MARKET_HELM_DATABASE_URL` is set, otherwise `DATA_DIR/market_bars.sqlite`).
-  Dashboard/alert readers still use CSV in this slice; DB is the accumulation path.
+- Market runs write quotes, projections, and daily summaries to durable storage (`market_bars`, `projections`, `daily_summaries`) in `DATA_DIR/market_bars.sqlite`, or in the app database when `MARKET_HELM_DATABASE_URL` is set. Optional Markdown projection reports go under `DATA_DIR`. Dashboard and alert readers use the same durable store.
 - Alert preferences and history use the local MarketHelm configuration directory.
 - Alert API routes are intended for an operator-controlled deployment and do not
   require user accounts.
@@ -63,7 +60,7 @@ accounts and tenant-owned alert state.
 
 - Bearer sessions protect tenant-specific API routes.
 - Alert configuration, watches, jobs, and delivery history are scoped per user.
-- Market data files remain shared platform inputs.
+- Market data remains a shared platform input, not tenant-owned.
 - The orchestrator creates jobs and workers claim/process them from the database.
 - Versioned migrations run at startup and fail closed on an unknown newer schema.
 - Rate limiting defaults on and health/readiness/worker/metrics endpoints support
@@ -108,7 +105,7 @@ detailed quote/profile fetch for selected symbols
         v
 market analysis + heuristic five-session XNYS projections
         |
-        +--> dated CSV/JSON/Markdown files
+        +--> durable market_bars/projections store (+ optional Markdown)
         +--> exact-session backtest CLI + dashboard history/accuracy APIs
         `--> alert evaluation snapshot
 ```
@@ -138,10 +135,9 @@ market snapshot / selected quote
 In hosted mode, database jobs add claim/lease semantics around evaluation so
 multiple workers can process user rules without sharing in-memory tenant state.
 
-Current conditions are price thresholds and screening matches. Current channels
-are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
+Current channels are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
 conditions are price thresholds, RSI thresholds, shallow AND/OR compounds of those
-leaves (plus screening match), with history loaded from saved daily CSVs. Patterns,
+leaves (plus screening match), with price history loaded from durable `market_bars` (provider candles first, then `market_bars`, then any leftover legacy CSV snapshots). Patterns,
 nested compounds, SMS, push, and cloud queue-provider adapters
 are not implemented.
 
@@ -160,16 +156,15 @@ are not implemented.
 <details>
 <summary><b>Data ownership</b></summary>
 
-| Data                     | Local mode                  | Hosted mode                         |
-| ------------------------ | --------------------------- | ----------------------------------- |
-| Market CSV/JSON/Markdown | `DATA_DIR`                  | Shared `DATA_DIR`                   |
-| Alert config and history | Local JSON/files            | Per-user database records           |
-| Accounts and sessions    | Not used                    | Database                            |
-| Worker jobs and outcomes | Local run state/history     | Database                            |
-| Provider credentials     | Environment or local `.env` | Platform secret manager/environment |
+| Data                                  | Local mode                    | Hosted mode                         |
+| ------------------------------------- | ----------------------------- | ----------------------------------- |
+| Market quotes, projections, summaries | `DATA_DIR/market_bars.sqlite` | Shared application database         |
+| Alert config and history              | Local JSON/files              | Per-user database records           |
+| Accounts and sessions                 | Not used                      | Database                            |
+| Worker jobs and outcomes              | Local run state/history       | Database                            |
+| Provider credentials                  | Environment or local `.env`   | Platform secret manager/environment |
 
-The database is not currently a market-data warehouse. Persistence for generated
-market history remains file based in both modes.
+Quotes, projections, and daily summaries are stored durably in `market_bars`, `projections`, and `daily_summaries` (application database when `MARKET_HELM_DATABASE_URL` is set, otherwise the `DATA_DIR` sidecar); only optional Markdown reports remain files.
 
 </details>
 

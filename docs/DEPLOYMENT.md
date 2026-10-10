@@ -296,7 +296,7 @@ export MARKET_HELM_DATABASE_URL=postgresql://user:password@host:5432/markethelm
 ```
 
 When `MARKET_HELM_DATABASE_URL` is unset, the application remains in local file
-mode. Market data stays in `DATA_DIR` in both modes; the database stores accounts,
+mode. Quotes, projections, and daily summaries live in the database when it is configured (otherwise in `DATA_DIR/market_bars.sqlite`); the database also stores accounts,
 sessions, per-user alert settings, jobs, and delivery outcomes.
 
 The account API under `/api/auth` includes registration, login/logout, current-user
@@ -309,7 +309,7 @@ an unknown newer version. Before production, exercise the PostgreSQL integration
 gate documented in [ARCHITECTURE.md](ARCHITECTURE.md) and verify managed backups,
 restore, pooling, TLS, and worker concurrency in staging.
 
-This project runs **locally** and can run **on a host** (VPS, PaaS, containers) the same way: application code is deployed; **market data and projections stay on disk** (or, in the future, in a database) configured via environment variables—not committed to git.
+This project runs **locally** and can run **on a host** (VPS, PaaS, containers) the same way: application code is deployed; **market data and projections live in `DATA_DIR/market_bars.sqlite` or the application database** configured via environment variables—not committed to git.
 
 ---
 
@@ -324,7 +324,7 @@ This project runs **locally** and can run **on a host** (VPS, PaaS, containers) 
 |                                                 | In git                    | On the server (never in git)                  |
 | ----------------------------------------------- | ------------------------- | --------------------------------------------- |
 | Application code                                | Yes                       | Built from git                                |
-| `data/*.csv`, `data/*.json`                     | **No** (see `.gitignore`) | Written at runtime by the tracker / dashboard |
+| `data/*.sqlite`, `data/*.md`                    | **No** (see `.gitignore`) | Written at runtime by the tracker / dashboard |
 | API keys (`FINNHUB_API_KEY`, broker keys, etc.) | **No**                    | Injected env vars or host secret store        |
 
 ---
@@ -335,7 +335,7 @@ This project runs **locally** and can run **on a host** (VPS, PaaS, containers) 
 <details>
 <summary><b>Persistence: <code>DATA_DIR</code></b></summary>
 
-The tracker and dashboard **read and write** CSV/JSON under a directory that defaults to **`data/`** at the project root.
+The tracker and dashboard **read and write** durable market data (`market_bars.sqlite`) and optional Markdown reports under a directory that defaults to **`data/`** at the project root.
 
 - **Local dev:** usually nothing to set; `data/` is created when you run the tracker.
 - **Deployed:** set **`DATA_DIR`** to an **absolute path** on **persistent storage** (attached volume, mounted disk).
