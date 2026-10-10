@@ -146,7 +146,7 @@ class StockDataFetcher:
                     try:
                         with open(filter_config_path, "r") as f:
                             filters = json.load(f)
-                    except:
+                    except Exception:
                         pass
 
                 try:
