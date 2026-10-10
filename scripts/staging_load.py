@@ -16,9 +16,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-ROOT = Path(__file__).resolve().parent.parent
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    from scripts import _repo_path
+except ImportError:  # run as ``python scripts/<name>.py``: repo root not on sys.path yet
+    import _repo_path
+
+from scripts.staging_acceptance import AcceptanceError, normalize_base_url
+
+ROOT = _repo_path.ROOT
 
 
 @dataclass(frozen=True)
@@ -75,8 +80,6 @@ def run_baseline(
     max_p95_ms: float,
     requester: Callable[[str, float], Sample] = _request,
 ) -> dict:
-    from scripts.staging_acceptance import AcceptanceError, normalize_base_url
-
     if requests < 1 or concurrency < 1 or concurrency > requests:
         raise AcceptanceError(
             "Requests and concurrency must be positive; concurrency cannot exceed requests."
@@ -146,8 +149,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    from scripts.staging_acceptance import AcceptanceError
-
     args = parse_args(argv)
     try:
         report = run_baseline(
