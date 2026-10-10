@@ -20,10 +20,10 @@ def get_indices_to_track() -> List[str]:
     Returns:
         List of index names (e.g., ["S&P 500", "NASDAQ-100"])
     """
-    # STOCK_TRACKER_CONFIG must win over the bundled repo config so deploys
+    # MARKETHELM_CONFIG must win over the bundled repo config so deploys
     # can override the tracked universe without editing the package tree.
     config_paths: List[Path] = []
-    env_raw = (os.getenv("STOCK_TRACKER_CONFIG") or "").strip()
+    env_raw = (os.getenv("MARKETHELM_CONFIG") or "").strip()
     if env_raw:
         config_paths.append(Path(env_raw))
     config_paths.extend(

@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Renamed to `markethelm`** (repository `lawaloy/markethelm`): Python distribution, console
-  scripts (`markethelm`, `markethelm-web`), environment variables (`MARKETHELM_*`), user config
+  scripts (`markethelm`, `markethelm-web`), environment variables (`MARKETHELM_*`, including `MARKETHELM_CONFIG`, for the config path override), user config
   folder (`~/.markethelm`), log file prefix, Docker/Kubernetes names, npm package names and docs.
 - **Daily quotes leave CSV:** `save_daily_data` / dashboard loaders / backtests
   read and write only `market_bars` (hosted DB or `DATA_DIR/market_bars.sqlite`).
