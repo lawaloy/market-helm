@@ -121,7 +121,6 @@ class TestAlertWatches:
 
     def test_backfill_on_init_database(self, db_user, tmp_path, monkeypatch):
         save_user_alerts_config(db_user, _sample_config())
-        db_path = tmp_path / "watches.db"
         init_database()
         assert list_enabled_symbols() == ["AAPL"]
 

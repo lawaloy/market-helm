@@ -110,7 +110,6 @@ class StockProjector:
                     volume = 0.0
             except (TypeError, ValueError):
                 volume = 0.0
-            previous_close = stock_data.get("previous_close", current_price)
 
             # NaN closes pass `<= 0` and would write NaN targets into projections CSV.
             if not math.isfinite(current_price) or current_price <= 0:

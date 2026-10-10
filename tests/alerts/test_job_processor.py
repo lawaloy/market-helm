@@ -606,8 +606,3 @@ class TestJobProcessor:
         sync_watches_from_config(db_user, _watch_config())
         enqueue_job(JOB_EVALUATE_SYMBOL, {"symbol": "AAPL", "price": 150.0})
 
-        forever_job = {
-            "id": "synthetic-eval",
-            "payload": {"symbol": "AAPL", "price": 150.0},
-        }
-        claim_calls = {"n": 0}
