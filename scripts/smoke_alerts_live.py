@@ -20,16 +20,15 @@ import sys
 import tempfile
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from dotenv import load_dotenv
-
-from src.alerts.alert_paths import user_config_dir
-from src.cli.alerts_commands import cmd_test
-
 
 def load_env() -> None:
+    from src.alerts.alert_paths import user_config_dir
+
     load_dotenv(ROOT / ".env")
     user_env = user_config_dir() / ".env"
     if user_env.exists():
@@ -170,6 +169,8 @@ def main() -> int:
         tests.extend(["smoke_webhook_json", "smoke_webhook_slack", "smoke_webhook_discord"])
     if include_email:
         tests.append("smoke_email")
+
+    from src.cli.alerts_commands import cmd_test
 
     failed = 0
     for alert_id in tests:

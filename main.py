@@ -17,7 +17,13 @@ from pathlib import Path
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-from src.cli.commands import main
+
+def run() -> int:
+    """Run the CLI (imported lazily so the sys.path setup above takes effect first)."""
+    from src.cli.commands import main
+
+    return main()
+
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(run())

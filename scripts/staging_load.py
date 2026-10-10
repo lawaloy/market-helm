@@ -20,8 +20,6 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.staging_acceptance import AcceptanceError, normalize_base_url
-
 
 @dataclass(frozen=True)
 class Sample:
@@ -77,6 +75,8 @@ def run_baseline(
     max_p95_ms: float,
     requester: Callable[[str, float], Sample] = _request,
 ) -> dict:
+    from scripts.staging_acceptance import AcceptanceError, normalize_base_url
+
     if requests < 1 or concurrency < 1 or concurrency > requests:
         raise AcceptanceError(
             "Requests and concurrency must be positive; concurrency cannot exceed requests."
@@ -146,6 +146,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from scripts.staging_acceptance import AcceptanceError
+
     args = parse_args(argv)
     try:
         report = run_baseline(
