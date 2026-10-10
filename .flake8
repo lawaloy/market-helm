@@ -1,8 +1,5 @@
 [flake8]
 max-line-length = 100
-# E203 (whitespace before ":") conflicts with black slice formatting, per black's docs.
-# W503 is already in flake8's default ignore list, so it no longer needs listing.
-extend-ignore = E203
 exclude =
     .git,
     __pycache__,

@@ -43,3 +43,27 @@ def test_flake8_blocks_unless_report_only(monkeypatch) -> None:
     assert check_python_style.main([]) == 0
     results["black --check"] = 1
     assert check_python_style.main([]) == 1
+
+
+def test_run_tool_prints_slice_hint_for_e203(capsys) -> None:
+    code = check_python_style.run_tool(
+        "fake flake8",
+        [
+            check_python_style.sys.executable,
+            "-c",
+            "print(\"a.py:1:5: E203 whitespace before ':'\")",
+        ],
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "E203 whitespace before" in out
+    assert "assign the bounds to" in out
+
+
+def test_run_tool_has_no_hint_for_other_output(capsys) -> None:
+    check_python_style.run_tool(
+        "fake tool", [check_python_style.sys.executable, "-c", "print('all good')"]
+    )
+    out = capsys.readouterr().out
+    assert "all good" in out
+    assert "hint:" not in out

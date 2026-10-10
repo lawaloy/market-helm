@@ -133,6 +133,14 @@ touch are not checked, so older findings elsewhere do not block your PR; if you
 edit a file that has legacy findings, fix them in the same PR. CI also runs
 flake8 with its error-only rules (`E9,F63,F7,F82`) on the whole repository.
 
+This repository keeps no lint suppressions: no `# noqa`, no `per-file-ignores`, and
+no `ignore` list in `.flake8`. Fix the finding instead of silencing it. One case to
+know about: black writes a slice with complex bounds as `ham[lower + offset : upper + offset]`,
+and flake8 reports that spacing as `E203`. Keep slice bounds simple, or assign complex
+bounds to named variables first (`start = lower + offset`, `stop = upper + offset`,
+`ham[start:stop]`). Simple slices such as `ham[1:9]` or `ham[lower:upper]` are not
+affected. `scripts/check_python_style.py` prints this advice when it sees `E203`.
+
 </details>
 
 <a id="5-commit-your-changes"></a>
