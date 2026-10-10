@@ -24,7 +24,7 @@ the evidence-based feature matrix and current priorities.
 
 ## Product tour
 
-The dashboard turns saved market data into an at-a-glance view of movers,
+The dashboard turns market details into an at-a-glance view of movers,
 projection confidence, recommendations, risk, and potential opportunities.
 Helmtower lets operators create price, RSI, or combined watches and route
 notifications through the configured email, Discord, or Slack channels.
@@ -130,6 +130,7 @@ market-helm-web
 ```
 
 <a id="projection-validation"></a>
+
 <details>
 <summary><b>Projection validation</b></summary>
 
@@ -155,6 +156,7 @@ python3 scripts/projection_baseline.py assess --data-dir data --days 365
 </details>
 
 <a id="runtime-data"></a>
+
 <details>
 <summary><b>Runtime data</b></summary>
 
