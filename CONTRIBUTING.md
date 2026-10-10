@@ -141,6 +141,21 @@ bounds to named variables first (`start = lower + offset`, `stop = upper + offse
 `ham[start:stop]`). Simple slices such as `ham[1:9]` or `ham[lower:upper]` are not
 affected. `scripts/check_python_style.py` prints this advice when it sees `E203`.
 
+Frontend code is linted with ESLint (`react-hooks/rules-of-hooks` and
+`react-hooks/exhaustive-deps` are errors, and warnings fail the run):
+
+```bash
+cd dashboard/frontend
+npm --prefix tools/eslint ci   # once
+npm run lint
+```
+
+ESLint lives in its own package, `dashboard/frontend/tools/eslint`, because
+`typescript-eslint` does not support TypeScript 7 (the app's compiler) yet, so the
+tooling pins its own TypeScript 6. Remove that folder and lint from the app package
+once `typescript-eslint` supports TypeScript 7. Do not add `eslint-disable` comments;
+fix the code instead.
+
 </details>
 
 <a id="5-commit-your-changes"></a>

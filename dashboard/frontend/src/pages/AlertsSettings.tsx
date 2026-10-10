@@ -131,8 +131,7 @@ const AlertsSettings: React.FC = () => {
         setError(axios.isAxiosError(err) ? err.message : 'Failed to load alerts.');
       }
     } finally {
-      if (generation !== loadGenerationRef.current) return;
-      setLoading(false);
+      if (generation === loadGenerationRef.current) setLoading(false);
     }
   }, [applyServerConfig]);
 

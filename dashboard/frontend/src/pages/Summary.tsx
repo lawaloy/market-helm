@@ -70,9 +70,10 @@ const Summary: React.FC<SummaryProps> = ({ refreshKey = 0, embedded = false }) =
         setError(msg);
       }
     } finally {
-      if (generation !== loadGenerationRef.current) return;
-      setLoading(false);
-      if (!silent) isInitialMount.current = false;
+      if (generation === loadGenerationRef.current) {
+        setLoading(false);
+        if (!silent) isInitialMount.current = false;
+      }
     }
   };
 
