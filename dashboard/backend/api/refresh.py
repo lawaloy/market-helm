@@ -197,7 +197,7 @@ def run_daily_tracker():
 
             elapsed = int(time.time() - start_time)
 
-            refresh_status["progress"] = f"Refreshing..."
+            refresh_status["progress"] = "Refreshing..."
 
             if elapsed >= max_seconds:
                 refresh_status["last_status"] = "timeout"

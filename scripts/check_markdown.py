@@ -70,7 +70,7 @@ def check_markdown_with_markdownlint(files, fix=False):
             print(f"All {len(files)} markdown files are clean!")
             return True
         else:
-            print(f"Found markdown linting errors:\n")
+            print("Found markdown linting errors:\n")
             print(result.stdout)
             if result.stderr:
                 print(result.stderr)

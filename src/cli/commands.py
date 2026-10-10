@@ -199,7 +199,7 @@ def display_results(result: dict):
                     logger.info(f"     Reason: {proj.get('reason', '')}")
             logger.info("")
 
-        logger.info(f"Full projections available in summary file")
+        logger.info("Full projections available in summary file")
         logger.info("=" * 60)
         logger.info("")
 
