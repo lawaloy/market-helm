@@ -65,7 +65,7 @@ jobs:
                 pr.head.repo?.full_name === `${owner}/${repo}` &&
                 pr.base.ref === 'main' &&
                 pr.head.ref === 'security/deps-maintenance' &&
-                ['app/github-actions', 'github-actions[bot]', 'market-helm[bot]', 'app/market-helm'].includes(authorLogin) &&
+                ['app/github-actions', 'github-actions[bot]', 'market-helm[bot]', 'markethelm[bot]', 'app/market-helm', 'app/markethelm'].includes(authorLogin) &&
                 labels.includes('dependencies') &&
                 labels.includes('security')
               );
@@ -121,8 +121,8 @@ jobs:
         env:
           CHANGED_WORKSPACES: ${{ steps.pr.outputs.changed-workspaces }}
         run: |
-          git config user.name "market-helm[bot]"
-          git config user.email "market-helm[bot]@users.noreply.github.com"
+          git config user.name "markethelm[bot]"
+          git config user.email "markethelm[bot]@users.noreply.github.com"
 
           for workspace in $(node -pe "JSON.parse(process.env.CHANGED_WORKSPACES).join(' ')"); do
             git add "$workspace/package-lock.json" "$workspace/package.json"

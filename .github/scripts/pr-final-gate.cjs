@@ -72,7 +72,7 @@ const runGate = async ({ github, context, core }) => {
       pullRequest.head?.repo?.full_name === `${owner}/${repo}` &&
       pullRequest.base?.ref === 'main' &&
       /^chore\/post-release-sync-\d+\.\d+\.\d+$/.test(pullRequest.head?.ref || '') &&
-      ['market-helm[bot]', 'app/market-helm'].includes(author);
+      ['market-helm[bot]', 'markethelm[bot]', 'app/market-helm', 'app/markethelm'].includes(author);
 
     if (!trusted) {
       core.setFailed('PR no longer satisfies trusted post-release provenance.');

@@ -6,11 +6,11 @@ const finish = require('./pr-auto-finish.cjs');
 const trustedPostReleasePr = {
   state: 'open',
   mergeable_state: 'clean',
-  user: { login: 'market-helm[bot]' },
+  user: { login: 'markethelm[bot]' },
   head: {
     ref: 'chore/post-release-sync-1.2.3',
     sha: 'head-sha',
-    repo: { full_name: 'lawaloy/market-helm' },
+    repo: { full_name: 'lawaloy/markethelm' },
   },
   base: { ref: 'main' },
   labels: [],
@@ -61,7 +61,7 @@ test('already-merged trusted PR is an idempotent success', async () => {
           },
         },
       },
-      context: { payload: {}, repo: { owner: 'lawaloy', repo: 'market-helm' } },
+      context: { payload: {}, repo: { owner: 'lawaloy', repo: 'markethelm' } },
       core: {
         info: (message) => info.push(message),
         setFailed: (message) => {
@@ -126,7 +126,7 @@ const runPostReleaseFinish = async ({ comments, reviews, threads }) => {
   try {
     await finish({
       github,
-      context: { payload: {}, repo: { owner: 'lawaloy', repo: 'market-helm' } },
+      context: { payload: {}, repo: { owner: 'lawaloy', repo: 'markethelm' } },
       core,
     });
   } finally {

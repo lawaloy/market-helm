@@ -93,7 +93,7 @@ jobs:
           run-id: ${{ steps.previous-archive.outputs.run-id }}
           github-token: ${{ github.token }}
 
-      - name: Run market-helm
+      - name: Run markethelm
         if: steps.collection-day.outputs.run == 'true'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           snapshot_date="$(date +%F)"
-          market-helm
+          markethelm
           python scripts/assert_market_bar_date.py \
             --trade-date "${snapshot_date}" \
             --data-dir data
