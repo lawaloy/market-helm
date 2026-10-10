@@ -1,7 +1,7 @@
 <div align="center">
   <img src="docs/assets/readme/markethelm-mark.png" alt="MarketHelm ship's helm and market chart logo" width="180">
   <h1>MarketHelm</h1>
-  <p><strong>Stock-market monitoring, projections, and alertsÃ¢â‚¬â€from CLI to web dashboard.</strong></p>
+  <p><strong>Stock-market monitoring, projections, and alertsÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Âfrom CLI to web dashboard.</strong></p>
   <p>
     <a href="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml"><img src="https://github.com/lawaloy/market-helm/actions/workflows/python-app.yml/badge.svg?branch=main" alt="CI status"></a>
     <a href="https://pypi.org/project/market-helm/"><img src="https://img.shields.io/pypi/v/market-helm?logo=pypi&logoColor=white" alt="PyPI version"></a>
@@ -10,9 +10,9 @@
     <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="Pull requests welcome"></a>
   </p>
   <p>
-    <a href="#quick-start">Quick start</a> Ã‚Â·
-    <a href="docs/README.md">Documentation</a> Ã‚Â·
-    <a href="docs/PROJECT_STATUS.md">Project status</a> Ã‚Â·
+    <a href="#quick-start">Quick start</a> Ãƒâ€šÃ‚Â·
+    <a href="docs/README.md">Documentation</a> Ãƒâ€šÃ‚Â·
+    <a href="docs/PROJECT_STATUS.md">Project status</a> Ãƒâ€šÃ‚Â·
     <a href="CONTRIBUTING.md">Contributing</a>
   </p>
 </div>
@@ -30,12 +30,17 @@ Helmtower lets operators create price, RSI, or combined watches and route
 notifications through the configured email, Discord, or Slack channels.
 
 <p align="center">
-  <a href="docs/assets/readme/markethelm-hero.png"><img src="docs/assets/readme/markethelm-hero.png" alt="MarketHelm dashboard with a market brief, biggest gainers and decliners, and a Helmtower price alert for Apple" width="900"></a>
+  <a href="docs/assets/readme/markethelm-hero.png">
+    <picture>
+      <source srcset="docs/assets/readme/markethelm-hero-loop.webp" type="image/webp">
+      <img src="docs/assets/readme/markethelm-hero.png" alt="MarketHelm dashboard with a market brief, biggest gainers and decliners, and a Helmtower price alert for Apple" width="900">
+    </picture>
+  </a>
 </p>
 
 Select the image to view it full size.
 Maintainers can regenerate the dashboard and alerts captures that make up this image from the seeded local application with
-`cd e2e && npm run capture:readme`. The hero itself is composed from those captures by `scripts/compose_readme_hero.py` (see the docstring for the 2x capture command).
+`cd e2e && npm run capture:readme`. The hero still is composed from those captures by `scripts/compose_readme_hero.py` (see the docstring for the 2x capture command), and the animated version by `scripts/compose_readme_hero_loop.py`.
 
 ## What runs where?
 
