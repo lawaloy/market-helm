@@ -126,14 +126,13 @@ unit tests and container-only integration tests cannot fully reproduce.
 ## Live prices roadmap
 
 **Status: planned, not implemented.** Quotes and dashboard data are batch/refresh
-based today. "Fetch New" starts a background tracker run, and the UI labels prices
-as saved quotes ("Not live prices"). Live prices are a long-term product goal; this
+based today. "Fetch New" starts a background tracker run, and quotes shown in the UI come from the last saved run. Live prices are a long-term product goal; this
 section records the intended order of work. It is a plan, not an implementation claim.
 
 ### Principles
 
 - Keep batch projections and saved quotes as the reliable fallback. Live prices
-  layer on top and must degrade to the saved-quote labels when the feed is down.
+  layer on top and must degrade to the latest saved quote when the feed is down.
 - Keep the provider behind the existing boundary in `src/services/api_client.py` so
   the data source can change without touching the dashboard or alert rules.
 - Hosted mode (shared database, per-user alerts) is the target. Local file mode
@@ -154,8 +153,7 @@ section records the intended order of work. It is a plan, not an implementation 
    worker process or as its own service.
 4. **Deliver live quotes to the dashboard.** Add a push or short-interval polling
    endpoint (WebSocket or server-sent events), show a "Live" or "Delayed" state with
-   the quote time, and keep the existing "Not live prices" label whenever the feed
-   is unavailable.
+   the quote time, and fall back to the latest saved quote whenever the feed is unavailable.
 5. **Make alerts react to live quotes.** The alert worker evaluates on a schedule
    today. Extend price rules to evaluate against the latest live quote while
    keeping cooldowns and delivery retries, and do not change RSI/compound semantics
