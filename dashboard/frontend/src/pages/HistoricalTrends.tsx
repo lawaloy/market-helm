@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/20/solid';
 import { ChartBarIcon, ClockIcon, DocumentChartBarIcon } from '@heroicons/react/24/outline';
@@ -872,36 +872,46 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
     [apiNames, symbolList],
   );
 
-  const fetchData = async (silent = false, cancelled?: () => boolean) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const response = await historyApi.getSummary(days);
-      if (cancelled?.()) return;
-      const summaryData = [...(response.data?.data ?? [])].sort((a, b) =>
-        a.date.localeCompare(b.date),
-      );
-      setData(summaryData);
-      setExpandedDate(summaryData.length ? summaryData[summaryData.length - 1].date : '');
-      setRunLens(null);
-      setSymbolList(response.data?.symbols ?? []);
-      setApiNames(response.data?.names ?? {});
-      const first = response.data?.firstDate ?? '';
-      const last = response.data?.lastDate ?? '';
-      setDateRange(first && last ? { first, last } : null);
-    } catch (err) {
-      if (cancelled?.()) return;
-      console.error('Error fetching historical data:', err);
-      if (!silent) setError('Unable to load historical data. Please try again later.');
-      setData([]);
-      setDateRange(null);
-    } finally {
-      if (!cancelled?.()) {
-        setLoading(false);
-        if (!silent) isInitialMount.current = false;
+  const fetchData = useCallback(
+    async (silent = false, cancelled?: () => boolean) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      try {
+        const response = await historyApi.getSummary(days);
+        if (cancelled?.()) return;
+        const summaryData = [...(response.data?.data ?? [])].sort((a, b) =>
+          a.date.localeCompare(b.date),
+        );
+        setData(summaryData);
+        setExpandedDate(summaryData.length ? summaryData[summaryData.length - 1].date : '');
+        setRunLens(null);
+        setSymbolList(response.data?.symbols ?? []);
+        setApiNames(response.data?.names ?? {});
+        const first = response.data?.firstDate ?? '';
+        const last = response.data?.lastDate ?? '';
+        setDateRange(first && last ? { first, last } : null);
+      } catch (err) {
+        if (cancelled?.()) return;
+        console.error('Error fetching historical data:', err);
+        if (!silent) setError('Unable to load historical data. Please try again later.');
+        setData([]);
+        setDateRange(null);
+      } finally {
+        if (!cancelled?.()) {
+          setLoading(false);
+          if (!silent) isInitialMount.current = false;
+        }
       }
-    }
-  };
+    },
+    [days],
+  );
+
+  // fetchData changes identity with `days`; the refresh effect reads it through a ref so it
+  // still runs only when refreshKey changes (a days change is already handled below).
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => {
+    fetchDataRef.current = fetchData;
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -909,8 +919,7 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days]);
+  }, [fetchData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -934,11 +943,10 @@ const HistoricalTrends: React.FC<HistoricalTrendsProps> = ({ refreshKey = 0 }) =
   useEffect(() => {
     if (isInitialMount.current) return;
     let cancelled = false;
-    void fetchData(true, () => cancelled);
+    void fetchDataRef.current(true, () => cancelled);
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
   useEffect(() => {
