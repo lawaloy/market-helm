@@ -6,9 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import pandas as pd
-import json
 from datetime import datetime, timedelta
-from functools import lru_cache
 
 from src.analysis.backtesting import backtest_data_dir
 from src.utils.tickers import normalize_ticker
@@ -82,43 +80,6 @@ class DataLoader:
         if not self.data_dir.exists():
             raise ValueError(f"Data directory not found: {self.data_dir}")
     
-    def _get_latest_file(self, pattern: str, sort_by_date: bool = False) -> Optional[Path]:
-        """Get the most recent file matching the pattern.
-        When sort_by_date=True, uses date in filename (YYYY-MM-DD) for projections/summary.
-        """
-        try:
-            files = list(self.data_dir.glob(pattern))
-        except OSError as exc:
-            # Unreadable data/ must map to ValueError → API 404, not generic 500.
-            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
-        if not files:
-            return None
-        if sort_by_date:
-            # Extract date from filename (e.g. projections_2026-02-14.csv) and pick latest.
-            # Non-ISO suffixes (tmp/partial/garbage) must not win lexicographic sort.
-            def parse_date(f: Path) -> str:
-                stem = f.stem
-                if "projections_" in stem:
-                    candidate = stem.replace("projections_", "", 1)
-                elif "summary_" in stem:
-                    candidate = stem.replace("summary_", "", 1)
-                else:
-                    return ""
-                return candidate if _is_iso_date(candidate) else ""
-            dated = [(f, parse_date(f)) for f in files if parse_date(f)]
-            if not dated:
-                return None
-            dated.sort(key=lambda x: x[1], reverse=True)
-            # Prefer most recent trading day (weekday); market closed Sat/Sun
-            for f, d in dated:
-                if _is_weekday(d):
-                    return f
-            return dated[0][0]  # Fallback to most recent if all weekends
-        try:
-            return max(files, key=lambda f: f.stat().st_mtime)
-        except OSError as exc:
-            raise ValueError(f"Data directory unreadable: {self.data_dir}") from exc
-
     def get_latest_date(self) -> Optional[str]:
         """Get the date of the most recent trading-day data (skips weekends when market is closed)."""
         dates = self.get_available_dates()

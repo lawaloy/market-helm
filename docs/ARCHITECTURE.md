@@ -119,7 +119,8 @@ multiple workers can process user rules without sharing in-memory tenant state.
 Current conditions are price thresholds and screening matches. Current channels
 are log, SMTP/SendGrid/Mailgun email, and generic/Slack/Discord webhooks. Supported
 conditions are price thresholds, RSI thresholds, shallow AND/OR compounds of those
-leaves (plus screening match), with history loaded from saved daily CSVs. Patterns,
+leaves (plus screening match), with history loaded from provider candles, then
+durable `market_bars`. Patterns,
 nested compounds, SMS, push, and cloud queue-provider adapters
 are not implemented.
 
